@@ -121,3 +121,35 @@ VCR_TEST("original files: the colony screen opens from the map and closes") {
     play.clickSquare(43, 29);
     VCR_CHECK(play.colonyScreen().has_value());
 }
+
+#include "viceroy/ui/debug_menu.hpp"
+
+VCR_TEST("original files: the debug menu changes the game only when asked") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
+    Game game(readSaveGame(Bytes(std::istreambuf_iterator<char>(in), {})), art.rules);
+    PlayScreen play(std::move(game), dir / "unused.sav");
+    DebugMenu debug;
+    VCR_CHECK(!debug.open());
+    const int gold = play.game().state().nations[3].gold;
+    debug.toggle(play);
+    VCR_CHECK(debug.open());
+    debug.handle(Command::Down, play); // Gold + 1000
+    VCR_CHECK(!debug.handle(Command::Confirm, play).empty());
+    VCR_CHECK(!debug.open());
+    VCR_CHECK(play.game().state().nations[3].gold == gold + 1000);
+
+    debug.apply(0, play); // reveal the map
+    VCR_CHECK(play.game().state().map.at(0, 0).seenBy(3));
+
+    play.openColony(1);
+    const int people = play.game().state().colonies[1].population;
+    debug.apply(1, play); // a colonist joins
+    VCR_CHECK(play.game().state().colonies[1].population == people + 1);
+    debug.apply(0, play); // goods
+    VCR_CHECK(play.game().state().colonies[1].stock[0] == 113);
+}

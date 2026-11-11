@@ -163,6 +163,7 @@ void PlayScreen::openColony(int index) {
     state.colony = index;
     state.selectedColonist = -1;
     colonyScreen_ = state;
+    lastColony_ = index;
 }
 
 bool PlayScreen::handleColonyScreen(Command command) {
