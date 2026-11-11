@@ -36,14 +36,40 @@ void setEuropeStage(SaveUnit& unit, int stage);
 std::vector<int> unitsInEurope(const SaveGame& save, const Ruleset& rules, int nation, EuropePlace place,
                                bool ships);
 
+// Land units on the docks, in the order the screen shows them (the last
+// to arrive first). Units aboard a ship in port (sentried) are not there.
+std::vector<int> unitsOnDocks(const SaveGame& save, const Ruleset& rules, int nation);
+
 // The ship a land unit sailing to or from Europe travels on: the first ship
 // along its chain of units, or -1.
 int carrierOf(const SaveGame& save, const Ruleset& rules, int unit);
 
 bool isShipType(const Ruleset& rules, int type);
 
-// Market prices per 100 units: what the market pays and what it asks.
+// Market prices per unit of a good: what the market pays and what it asks.
 int bidPrice(const SaveNation& nation, int good);
 int askPrice(const Ruleset& rules, const SaveNation& nation, int good);
+
+// --- Cargo in a ship's holds ----------------------------------------------
+// A ship's first `holds` holds carry goods: the good of hold k is a nibble
+// at byte 13 + k / 2 (the low one for even k) and its amount is byte 16 + k.
+int holdGood(const SaveUnit& ship, int hold);
+int holdAmount(const SaveUnit& ship, int hold);
+void setHold(SaveUnit& ship, int hold, int good, int amount);
+void removeHold(SaveUnit& ship, int hold);
+inline constexpr int kMaxHolds = 6;
+inline constexpr int kHoldSize = 100;
+
+struct Trade {
+    int amount = 0; // units moved
+    int gold = 0;   // paid (buying) or received after tax (selling)
+    int tax = 0;
+};
+
+// Buys up to 100 of a good into a ship in port: tops up a hold of the same
+// good, or fills a free one. Limited by gold and room.
+Trade buyGoods(SaveGame& save, const Ruleset& rules, int ship, int good, int freeHolds);
+// Sells everything of a good aboard a ship in port.
+Trade sellGoods(SaveGame& save, int ship, int good);
 
 } // namespace viceroy

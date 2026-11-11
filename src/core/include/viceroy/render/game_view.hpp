@@ -13,6 +13,7 @@
 
 #include <filesystem>
 #include <string>
+#include <vector>
 
 namespace viceroy {
 
@@ -28,6 +29,8 @@ struct Art {
     TextFile names;      // NAMES.TXT
     TextFile colonyNames; // COLONY.TXT
     TextFile labelText;   // LABELS.TXT: words on the screens
+    TextFile gameText;    // GAME.TXT: the messages
+    std::vector<SpriteSheet> portraits; // advisors: MSS0.SS, ...
     Ruleset rules;
 };
 

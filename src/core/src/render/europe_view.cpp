@@ -22,6 +22,7 @@ constexpr std::uint8_t kSelected = 0x0A; // the frame round the chosen ship
 
 constexpr int kGoodsIcon = 22;
 constexpr int kEmptyHold = 122;
+constexpr int kGreyGoodsIcon = 38;
 
 // The three boxes over the water: ships coming, ships going, the port.
 constexpr int kBoxLeft[3]{1, 72, 143};
@@ -184,28 +185,47 @@ void drawPort(Screen& screen, const Art& art, const Game& game, const EuropeView
         const int x = centre - spriteWidth(art.icons, unitIcon(game, ship)) / 2;
         drawUnit(screen, art, game, ship, x, kUnitTop);
         if (ship == view.ship) {
-            screen.frame({x - 3, kUnitTop - 1, 18, 18}, kSelected);
+            screen.frame({x - 3, kUnitTop - 1, 18, 18}, view.focus == EuropeFocus::Ships ? kWhite : kSelected);
         }
         centre += kUnitStep;
     }
-    // The holds of the chosen ship; the rest stay shut.
+    // Who is aboard the chosen ship stands beside the ships.
+    if (view.ship >= 0) {
+        for (const int p : game.passengersInPort(view.ship)) {
+            drawCentredUnit(screen, art, game, p, centre, kUnitTop);
+            centre += kUnitStep;
+        }
+    }
+    // The holds of the chosen ship; the rest stay shut. Full holds show
+    // their goods in colour, part-filled ones in grey.
     int holds = 0;
     if (view.ship >= 0) {
-        const int type = game.unit(view.ship).type;
+        const auto& ship = game.unit(view.ship);
+        const int type = ship.type;
         if (type >= 0 && static_cast<std::size_t>(type) < game.rules().units.size()) {
             holds = game.rules().units[static_cast<std::size_t>(type)].cargoSlots;
         }
+        for (int k = 0; k < std::min(ship.holds, kMaxHolds); ++k) {
+            const int good = holdGood(ship, k);
+            const int icon = (holdAmount(ship, k) >= kHoldSize ? kGoodsIcon : kGreyGoodsIcon) + good;
+            blitSprite(screen, art.icons, icon, kHoldsLeft + 12 * k + 5 - spriteWidth(art.icons, icon) / 2,
+                       kHoldsTop);
+        }
     }
     // The picture shows open holds; the ones the ship lacks are crates.
-    for (int k = holds; k < 6; ++k) {
+    for (int k = holds; k < kMaxHolds; ++k) {
         blitSprite(screen, art.icons, kEmptyHold, kHoldsLeft + 12 * k, kHoldsTop);
     }
 
     // The docks: land units in port.
     int dockCentre = kDocksCentre;
-    const auto docks = unitsInEurope(save, game.rules(), game.human(), EuropePlace::InPort, false);
-    for (auto it = docks.rbegin(); it != docks.rend(); ++it) {
-        drawCentredUnit(screen, art, game, *it, dockCentre, kDocksTop);
+    const auto docks = unitsOnDocks(save, game.rules(), game.human());
+    for (std::size_t i = 0; i < docks.size(); ++i) {
+        drawCentredUnit(screen, art, game, docks[i], dockCentre, kDocksTop);
+        if (view.focus == EuropeFocus::Docks && static_cast<int>(i) == view.dock) {
+            const int x = dockCentre - spriteWidth(art.icons, unitIcon(game, docks[i])) / 2;
+            screen.frame({x - 3, kDocksTop - 1, 18, 18}, kSelected);
+        }
         dockCentre += kUnitStep;
     }
 }
@@ -220,7 +240,7 @@ void drawMarket(Screen& screen, const Art& art, const Game& game, const EuropeVi
             std::to_string(bidPrice(nation, good)) + "/" + std::to_string(askPrice(game.rules(), nation, good));
         centred(screen, art.tiny, centre, 194, price, kPriceText);
     }
-    if (view.good >= 0 && view.good < kGoodsKinds) {
+    if (view.focus == EuropeFocus::Market && view.good >= 0 && view.good < kGoodsKinds) {
         screen.frame({19 * view.good, 179, 20, 21}, kYellow);
     }
     screen.text(art.tiny, 306, 179, "Exit", {kWhite, kNoColour, kNoColour});

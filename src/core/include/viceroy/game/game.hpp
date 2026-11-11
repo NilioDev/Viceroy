@@ -45,6 +45,7 @@ enum class MoveResult {
     NoMovesLeft, // not enough moves left this turn: its turn is over
     Blocked,     // the square cannot be entered (wrong terrain, no room)
     Occupied,    // a foreign unit, colony or settlement is there
+    HighSeas,    // a ship moved onto the high seas: it may sail for Europe
 };
 
 enum class FoundResult {
@@ -113,12 +114,28 @@ public:
     // A free colonist appears on the square (born in a colony).
     void addColonist(int x, int y, int nation);
 
+    // --- Europe --------------------------------------------------------------
+    // A ship on the high seas sets sail for Europe with everyone aboard. It
+    // will come back to this square.
+    bool sailToEurope(int ship);
+    // A ship in port sets sail for the New World with its passengers.
+    bool sailToNewWorld(int ship);
+    // Land units in port aboard this ship.
+    std::vector<int> passengersInPort(int ship) const;
+    // A unit on the docks goes aboard a ship in port, or back to the docks.
+    bool boardInPort(int unit, int ship);
+    void leaveShipInPort(int unit);
+    // Free places on a ship: holds not used by cargo or passengers.
+    int freeHolds(int ship) const;
+
     // --- Map -----------------------------------------------------------------
     void reveal(int x, int y, int radius, int nation);
     int sightRadius(int index) const;
 
 private:
     void refreshUnitFlags();
+    void sailOn(); // ships between Europe and the New World move on a stage
+    void chainPassengers(int ship, const std::vector<int>& passengers);
     void removeUnit(int index);
 
     SaveGame save_;

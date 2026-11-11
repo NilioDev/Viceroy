@@ -135,6 +135,7 @@ void startGame(App& app, const viceroy::SaveSlot& slot) {
         app.play = std::make_unique<viceroy::PlayScreen>(std::move(game), slot.path);
         app.play->setColonyNames(&app.art->colonyNames);
         app.play->setColonyArt(app.colonyArt.get());
+        app.play->setArt(app.art.get());
         app.mode = Mode::Play;
     } catch (const viceroy::FormatError& e) {
         app.status = std::string("Cannot read this savegame: ") + e.what();
@@ -549,7 +550,8 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
             break;
         }
         const bool pointing =
-            playing && (app->play->colonyScreen() || app->play->europeScreen() || app->play->viewMode());
+            playing && (app->play->colonyScreen() || app->play->europeScreen() || app->play->dialog() ||
+                        app->play->viewMode());
         if (auto command = buttonCommand(event->gbutton.button, playing && app->play->waitingForEndOfTurn(), pointing)) {
             send(*app, *command);
         }

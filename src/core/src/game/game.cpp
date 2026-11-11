@@ -2,6 +2,7 @@
 #include "viceroy/game/game.hpp"
 
 #include "viceroy/game/colony.hpp"
+#include "viceroy/game/europe.hpp"
 
 #include <algorithm>
 #include <cstdlib>
@@ -9,6 +10,9 @@
 namespace viceroy {
 
 namespace {
+
+constexpr std::uint8_t kSeaLane = 26; // the high seas: ships may sail for Europe
+
 
 constexpr int kThirds = 3;
 constexpr int kTerrainArctic = 24;
@@ -215,6 +219,9 @@ MoveResult Game::move(int index, Step step) {
     }
     reveal(toX, toY, sightRadius(index), u.nation);
     refreshUnitFlags();
+    if (ship && target.terrain == kSeaLane && !isNative(u.nation)) {
+        return MoveResult::HighSeas;
+    }
     return boarding ? MoveResult::Boarded : MoveResult::Moved;
 }
 
@@ -364,6 +371,7 @@ void Game::endTurn() {
                                     " finished.");
         }
     }
+    sailOn();
     for (int i = 0; i < unitCount(); ++i) {
         save_.units[static_cast<std::size_t>(i)].movesUsed = 0;
     }
@@ -378,6 +386,196 @@ void Game::endTurn() {
         ++save_.year;
     }
     save_.activeUnit = nextUnitNeedingOrders(-1);
+}
+
+// --- Europe --------------------------------------------------------------------
+
+namespace {
+
+// Where the nation's ships come back from Europe: bytes 50 and 51 of its
+// record, set when a ship leaves for Europe.
+constexpr std::size_t kReturnX = 50;
+constexpr std::size_t kReturnY = 51;
+
+} // namespace
+
+void Game::chainPassengers(int ship, const std::vector<int>& passengers) {
+    // The chain runs from the first passenger to the ship.
+    int previous = -1;
+    for (const int p : passengers) {
+        auto& u = save_.units[static_cast<std::size_t>(p)];
+        u.prevInTransport = previous;
+        if (previous >= 0) {
+            save_.units[static_cast<std::size_t>(previous)].nextInTransport = p;
+        }
+        previous = p;
+    }
+    if (previous >= 0) {
+        save_.units[static_cast<std::size_t>(previous)].nextInTransport = ship;
+    }
+    save_.units[static_cast<std::size_t>(ship)].prevInTransport = previous;
+    save_.units[static_cast<std::size_t>(ship)].nextInTransport = -1;
+}
+
+bool Game::sailToEurope(int ship) {
+    if (!isShip(ship) || !onMap(ship)) {
+        return false;
+    }
+    auto& u = save_.units[static_cast<std::size_t>(ship)];
+    const auto aboard = passengers(ship);
+    if (u.nation >= 0 && u.nation < kEuropeanNations) {
+        auto& raw = save_.nations[static_cast<std::size_t>(u.nation)].raw;
+        raw[kReturnX] = static_cast<std::uint8_t>(u.x);
+        raw[kReturnY] = static_cast<std::uint8_t>(u.y);
+    }
+    setEuropeStage(u, kLastStage);
+    u.orders = SaveUnit::kNoOrders;
+    for (const int p : aboard) {
+        auto& passenger = save_.units[static_cast<std::size_t>(p)];
+        passenger.x = u.x;
+        passenger.y = u.y;
+        passenger.orders = SaveUnit::kSentry;
+    }
+    chainPassengers(ship, aboard);
+    refreshUnitFlags();
+    return true;
+}
+
+std::vector<int> Game::passengersInPort(int ship) const {
+    std::vector<int> out;
+    if (europePlace(unit(ship)) != EuropePlace::InPort) {
+        return out;
+    }
+    // Walking back from the ship gives the passengers last first.
+    for (int at = unit(ship).prevInTransport, steps = 0; at >= 0 && at < unitCount() && steps < unitCount();
+         at = unit(at).prevInTransport, ++steps) {
+        if (isShip(at) || unit(at).x != unit(ship).x || unit(at).orders != SaveUnit::kSentry) {
+            break;
+        }
+        out.insert(out.begin(), at);
+    }
+    return out;
+}
+
+int Game::freeHolds(int ship) const {
+    const int type = unit(ship).type;
+    if (!isShip(ship)) {
+        return 0;
+    }
+    int used = unit(ship).holds;
+    if (onMap(ship)) {
+        used += static_cast<int>(passengers(ship).size());
+    } else {
+        used += static_cast<int>(passengersInPort(ship).size());
+    }
+    return std::max(0, rules_.units[static_cast<std::size_t>(type)].cargoSlots - used);
+}
+
+bool Game::boardInPort(int index, int ship) {
+    if (isShip(index) || !isShip(ship) || europePlace(unit(index)) != EuropePlace::InPort ||
+        europePlace(unit(ship)) != EuropePlace::InPort || unit(index).nation != unit(ship).nation ||
+        freeHolds(ship) <= 0) {
+        return false;
+    }
+    auto aboard = passengersInPort(ship);
+    if (std::find(aboard.begin(), aboard.end(), index) != aboard.end()) {
+        return false;
+    }
+    aboard.push_back(index);
+    save_.units[static_cast<std::size_t>(index)].orders = SaveUnit::kSentry;
+    chainPassengers(ship, aboard);
+    return true;
+}
+
+void Game::leaveShipInPort(int index) {
+    for (int ship = 0; ship < unitCount(); ++ship) {
+        if (!isShip(ship) || europePlace(unit(ship)) != EuropePlace::InPort) {
+            continue;
+        }
+        auto aboard = passengersInPort(ship);
+        const auto it = std::find(aboard.begin(), aboard.end(), index);
+        if (it != aboard.end()) {
+            aboard.erase(it);
+            chainPassengers(ship, aboard);
+        }
+    }
+    auto& u = save_.units[static_cast<std::size_t>(index)];
+    u.orders = SaveUnit::kNoOrders;
+    u.nextInTransport = -1;
+    u.prevInTransport = -1;
+}
+
+bool Game::sailToNewWorld(int ship) {
+    if (!isShip(ship) || europePlace(unit(ship)) != EuropePlace::InPort) {
+        return false;
+    }
+    const auto aboard = passengersInPort(ship);
+    setEuropeStage(save_.units[static_cast<std::size_t>(ship)], kPortStage - 1);
+    for (const int p : aboard) {
+        setEuropeStage(save_.units[static_cast<std::size_t>(p)], kPortStage - 1);
+    }
+    chainPassengers(ship, aboard);
+    return true;
+}
+
+void Game::sailOn() {
+    for (int ship = 0; ship < unitCount(); ++ship) {
+        if (!isShip(ship)) {
+            continue;
+        }
+        const auto& u = unit(ship);
+        const int stage = europeStage(u);
+        if (stage < 0 || stage == kPortStage) {
+            continue;
+        }
+        // Its passengers, before the ship moves on.
+        std::vector<int> aboard;
+        for (int at = u.prevInTransport, steps = 0; at >= 0 && at < unitCount() && steps < unitCount();
+             at = unit(at).prevInTransport, ++steps) {
+            if (isShip(at) || unit(at).x != u.x) {
+                break;
+            }
+            aboard.insert(aboard.begin(), at);
+        }
+        const bool ours = u.nation == human();
+        const std::string name = unitName(ship);
+        if (stage > 0) {
+            const int next = stage - 1;
+            setEuropeStage(save_.units[static_cast<std::size_t>(ship)], next);
+            for (const int p : aboard) {
+                setEuropeStage(save_.units[static_cast<std::size_t>(p)], next);
+            }
+            if (next == kPortStage && ours) {
+                lastTurnNews_.push_back(name + " has arrived in Europe.");
+            }
+            continue;
+        }
+        // Stage 0: the ship arrives in the New World where it left.
+        const auto& raw = save_.nations[static_cast<std::size_t>(u.nation & 3)].raw;
+        int x = raw[kReturnX];
+        int y = raw[kReturnY];
+        if (!save_.map.inside(x, y) || !save_.map.at(x, y).isWater()) {
+            // Nowhere known: the first sea lane from the east, half way down.
+            y = save_.map.height / 2;
+            for (x = save_.map.width - 1; x > 0 && !save_.map.at(x, y).isWater(); --x) {
+            }
+        }
+        for (const int p : aboard) {
+            auto& passenger = save_.units[static_cast<std::size_t>(p)];
+            passenger.x = x;
+            passenger.y = y;
+            passenger.orders = SaveUnit::kSentry;
+        }
+        auto& s = save_.units[static_cast<std::size_t>(ship)];
+        s.x = x;
+        s.y = y;
+        s.orders = SaveUnit::kNoOrders;
+        reveal(x, y, sightRadius(ship), s.nation);
+        if (ours) {
+            lastTurnNews_.push_back(name + " has arrived in the New World.");
+        }
+    }
+    refreshUnitFlags();
 }
 
 // --- Map -----------------------------------------------------------------------
