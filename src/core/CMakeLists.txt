@@ -2,6 +2,8 @@ configure_file(version.hpp.in "${CMAKE_CURRENT_BINARY_DIR}/generated/viceroy/ver
 
 add_library(vcr_core STATIC
     src/game_files.cpp
+    src/data/madspack.cpp
+    src/data/image.cpp
 )
 add_library(viceroy::core ALIAS vcr_core)
 

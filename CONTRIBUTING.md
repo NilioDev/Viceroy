@@ -27,7 +27,7 @@ Viceroy is an independent, from-scratch implementation.
 | `src/core` | Engine core. Platform independent, no SDL, fully unit-testable. |
 | `src/app` | Platform layer and game executable (SDL3). |
 | `tests` | Unit tests for the core. |
-| `docs` | Our own documentation, including the file formats. |
+| `docs` | Our own documentation: the file formats in `docs/formats`, and how the engine is built in `docs/architecture.md`. |
 
 ## Code style
 
