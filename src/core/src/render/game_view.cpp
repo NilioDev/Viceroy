@@ -282,6 +282,22 @@ int colonistIcon(int skill) {
     return kExpertBase + (skill >= 28 ? 19 : skill);
 }
 
+void drawUnitOrders(Screen& screen, const Art& art, const Game& game, int index, int px, int py) {
+    drawOrdersBox(screen, art, game, index, px, py);
+}
+
+std::string textLine(const TextFile& file, const char* section, int row, const char* fallback) {
+    if (const auto* s = file.find(section)) {
+        if (row >= 0 && static_cast<std::size_t>(row) < s->lines.size()) {
+            const auto fields = splitFields(s->lines[static_cast<std::size_t>(row)]);
+            if (!fields.empty()) {
+                return fields[0];
+            }
+        }
+    }
+    return fallback;
+}
+
 Art loadArt(const std::filesystem::path& folder) {
     Art art;
     art.palette = readVgaPalette(readFile(folder, "VICEROY.PAL"));
@@ -297,6 +313,7 @@ Art loadArt(const std::filesystem::path& folder) {
     art.labels = readFont(readFile(folder, "FONTINTR.FF"));
     art.names = parseTextFile(readFile(folder, "NAMES.TXT"));
     art.colonyNames = parseTextFile(readFile(folder, "COLONY.TXT"));
+    art.labelText = parseTextFile(readFile(folder, "LABELS.TXT"));
     art.rules = readRuleset(art.names);
     return art;
 }

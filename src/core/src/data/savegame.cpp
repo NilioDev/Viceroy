@@ -169,6 +169,9 @@ SaveGame readSaveGame(std::span<const std::uint8_t> file) {
         nation.raw = take<kNationSize>(in);
         nation.taxRate = nation.raw[1];
         nation.gold = s32(nation.raw.data() + 42);
+        for (std::size_t g = 0; g < kGoodsKinds; ++g) {
+            nation.prices[g] = nation.raw[76 + g];
+        }
     }
 
     save.settlements.resize(static_cast<std::size_t>(settlementCount));
@@ -274,6 +277,9 @@ Bytes writeSaveGame(const SaveGame& save) {
         auto raw = nation.raw;
         raw[1] = static_cast<std::uint8_t>(nation.taxRate);
         put32(raw.data() + 42, nation.gold);
+        for (std::size_t g = 0; g < kGoodsKinds; ++g) {
+            raw[76 + g] = static_cast<std::uint8_t>(std::clamp(nation.prices[g], 0, 255));
+        }
         append(out, raw);
     }
     for (const auto& settlement : save.settlements) {

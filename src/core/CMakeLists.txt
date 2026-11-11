@@ -13,9 +13,11 @@ add_library(vcr_core STATIC
     src/pack/library.cpp
     src/game/game.cpp
     src/game/colony.cpp
+    src/game/europe.cpp
     src/render/screen.cpp
     src/render/game_view.cpp
     src/render/colony_view.cpp
+    src/render/europe_view.cpp
     src/ui/play.cpp
     src/ui/debug_menu.cpp
 )

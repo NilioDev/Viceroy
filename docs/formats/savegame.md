@@ -115,8 +115,11 @@ bytes are kept as they are.
 bits of byte 3, moves used at 5 (in thirds: a move along a road costs one),
 orders at 8 (row of `@ORDERS`), cargo holds used at 12, skill at 23, and
 the next and previous unit of a ship's cargo chain at 24 and 26. Units in
-Europe or on the high seas have equal x and y above 200.
+Europe or on the high seas have x = y = 228 + nation + 4 × stage; see
+[Europe](../rules/europe.md) for what the stages mean.
 
-**Nation** (316 bytes): tax rate at 1, gold at 42 (32 bits).
+**Nation** (316 bytes): tax rate at 1, gold at 42 (32 bits), and the
+European market at 76: one byte per good in `@CARGO` order, from which the
+bid and asking prices follow (see [Europe](../rules/europe.md)).
 
 **Native settlement** (18 bytes): x, y, tribe (4 to 11), …, population at 4.

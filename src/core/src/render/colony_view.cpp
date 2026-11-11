@@ -465,6 +465,7 @@ ColonyArt loadColonyArt(const std::filesystem::path& folder) {
         art.parchment = parchment.sprites.front().image;
     }
     art.background = readPicture(readFile(folder, "COLONY.PIK")).image;
+    art.europe = readPicture(readFile(folder, "EUROPE.PIK")).image;
     return art;
 }
 

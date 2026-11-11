@@ -269,7 +269,7 @@ std::optional<Command> keyCommand(const SDL_KeyboardEvent& key) {
     case SDLK_M:
         return Command::MoveMode;
     case SDLK_E:
-        return ctrl ? std::optional<Command>(Command::EndTurn) : std::nullopt;
+        return ctrl ? Command::EndTurn : Command::Europe;
     case SDLK_TAB:
         return (key.mod & SDL_KMOD_SHIFT) ? Command::PreviousUnit : Command::NextUnit;
     default:
@@ -315,6 +315,8 @@ std::optional<Command> buttonCommand(Uint8 button, bool waitingForEndOfTurn, boo
         return Command::Centre;
     case SDL_GAMEPAD_BUTTON_RIGHT_STICK:
         return Command::Fortify;
+    case SDL_GAMEPAD_BUTTON_MISC1: // Share, Capture or the microphone button
+        return Command::Europe;
     default:
         return std::nullopt;
     }
@@ -374,7 +376,7 @@ void click(App& app, float wx, float wy) {
         }
         return;
     }
-    if (app.play->colonyScreen()) {
+    if (app.play->colonyScreen() || app.play->europeScreen()) {
         // The exit button in the lower right corner.
         if (x >= 300.0f && y >= 178.0f) {
             send(app, Command::Cancel);
@@ -546,7 +548,8 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
             }
             break;
         }
-        const bool pointing = playing && (app->play->colonyScreen() || app->play->viewMode());
+        const bool pointing =
+            playing && (app->play->colonyScreen() || app->play->europeScreen() || app->play->viewMode());
         if (auto command = buttonCommand(event->gbutton.button, playing && app->play->waitingForEndOfTurn(), pointing)) {
             send(*app, *command);
         }

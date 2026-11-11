@@ -16,6 +16,7 @@ struct ColonyArt {
     SpriteSheet buildings; // BUILDING.SS
     IndexedImage parchment; // PARCH.SS
     IndexedImage background; // COLONY.PIK: the lower part of the screen
+    IndexedImage europe;     // EUROPE.PIK: the home port
 };
 
 ColonyArt loadColonyArt(const std::filesystem::path& folder);

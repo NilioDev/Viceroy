@@ -27,6 +27,7 @@ struct Art {
     Font labels;         // FONTINTR.FF: names on the map
     TextFile names;      // NAMES.TXT
     TextFile colonyNames; // COLONY.TXT
+    TextFile labelText;   // LABELS.TXT: words on the screens
     Ruleset rules;
 };
 
@@ -68,5 +69,10 @@ void drawTerrain(Screen& screen, const Art& art, const Game& game, int x, int y,
 // Draws a sprite of a sheet if it exists.
 void blitSprite(Screen& screen, const SpriteSheet& sheet, int index, int x, int y);
 std::uint8_t nationColour(const Art& art, int nation);
+// The box with the nation's colour and the orders letter beside a unit
+// drawn at (px, py).
+void drawUnitOrders(Screen& screen, const Art& art, const Game& game, int index, int px, int py);
+// The first field of a row of a section of a text file, or `fallback`.
+std::string textLine(const TextFile& file, const char* section, int row, const char* fallback);
 
 } // namespace viceroy
