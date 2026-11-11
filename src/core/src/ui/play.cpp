@@ -155,13 +155,126 @@ void PlayScreen::moveActive(Step step) {
     }
 }
 
-void PlayScreen::handle(Command command) {
-    if (const auto step = stepOf(command)) {
-        moveActive(*step);
+void PlayScreen::openColony(int index) {
+    if (index < 0 || index >= static_cast<int>(game_.state().colonies.size())) {
+        return;
+    }
+    ColonyViewState state;
+    state.colony = index;
+    state.selectedColonist = -1;
+    colonyScreen_ = state;
+}
+
+bool PlayScreen::handleColonyScreen(Command command) {
+    auto& state = *colonyScreen_;
+    const auto& colony = game_.state().colonies[static_cast<std::size_t>(state.colony)];
+    const int people = colony.population;
+    switch (command) {
+    case Command::Cancel:
+    case Command::Confirm:
+        colonyScreen_.reset();
+        break;
+    case Command::MoveE:
+    case Command::Down:
+    case Command::NextUnit:
+        if (people > 0) {
+            state.selectedColonist = (state.selectedColonist + 1) % people;
+        }
+        break;
+    case Command::MoveW:
+    case Command::Up:
+    case Command::PreviousUnit:
+        if (people > 0) {
+            state.selectedColonist = (state.selectedColonist + people - 1) % people;
+        }
+        break;
+    default:
+        break;
+    }
+    return true;
+}
+
+void PlayScreen::clickSquare(int x, int y) {
+    if (const auto colony = game_.colonyAt(x, y)) {
+        if (game_.state().colonies[static_cast<std::size_t>(*colony)].nation == game_.human()) {
+            openColony(*colony);
+            return;
+        }
+    }
+    if (viewMode_) {
+        cursorX_ = x;
+        cursorY_ = y;
         return;
     }
     const int active = game_.activeUnit();
+    if (active < 0) {
+        return;
+    }
+    const auto& u = game_.unit(active);
+    const int dx = std::clamp(x - u.x, -1, 1);
+    const int dy = std::clamp(y - u.y, -1, 1);
+    for (const auto& step : kSteps) {
+        if (step.dx == dx && step.dy == dy) {
+            moveActive(step);
+            return;
+        }
+    }
+}
+
+bool PlayScreen::handle(Command command) {
+    if (colonyScreen_) {
+        return handleColonyScreen(command);
+    }
+    if (viewMode_) {
+        if (const auto step = stepOf(command)) {
+            const auto& map = game_.state().map;
+            cursorX_ = std::clamp(cursorX_ + step->dx, 0, map.width - 1);
+            cursorY_ = std::clamp(cursorY_ + step->dy, 0, map.height - 1);
+            const bool inside = cursorX_ > view_.originX && cursorY_ > view_.originY &&
+                                cursorX_ < view_.originX + kViewColumns - 1 && cursorY_ < view_.originY + kViewRows - 1;
+            if (!inside) {
+                centreOn(view_, game_, cursorX_, cursorY_);
+            }
+            return true;
+        }
+        switch (command) {
+        case Command::Confirm:
+            if (const auto colony = game_.colonyAt(cursorX_, cursorY_)) {
+                if (game_.state().colonies[static_cast<std::size_t>(*colony)].nation == game_.human()) {
+                    openColony(*colony);
+                }
+            }
+            return true;
+        case Command::Cancel:
+        case Command::MoveMode:
+            viewMode_ = false;
+            return true;
+        default:
+            break;
+        }
+    }
+    if (const auto step = stepOf(command)) {
+        moveActive(*step);
+        return true;
+    }
+    const int active = game_.activeUnit();
     switch (command) {
+    case Command::Cancel:
+        return false;
+    case Command::ViewMode: {
+        viewMode_ = true;
+        if (active >= 0) {
+            cursorX_ = game_.unit(active).x;
+            cursorY_ = game_.unit(active).y;
+        } else {
+            cursorX_ = view_.originX + kViewColumns / 2;
+            cursorY_ = view_.originY + kViewRows / 2;
+        }
+        break;
+    }
+    case Command::MoveMode:
+        viewMode_ = false;
+        break;
     case Command::Confirm:
         if (active < 0) {
             handle(Command::EndTurn);
@@ -204,6 +317,7 @@ void PlayScreen::handle(Command command) {
             switch (game_.foundColony(active, name)) {
             case FoundResult::Founded:
                 say("Founded " + name + ".");
+                openColony(static_cast<int>(game_.state().colonies.size()) - 1);
                 game_.setActiveUnit(-1);
                 activate(game_.nextUnitNeedingOrders(-1));
                 if (game_.activeUnit() >= 0) {
@@ -252,6 +366,7 @@ void PlayScreen::handle(Command command) {
     default:
         break;
     }
+    return true;
 }
 
 bool PlayScreen::save() {
@@ -280,7 +395,18 @@ void PlayScreen::tick(std::uint64_t milliseconds) {
 }
 
 void PlayScreen::draw(Screen& screen, const Art& art) const {
+    if (colonyScreen_ && colonyArt_ != nullptr) {
+        drawColonyScreen(screen, art, *colonyArt_, game_, *colonyScreen_);
+        return;
+    }
     drawGameScreen(screen, art, game_, view_);
+    if (viewMode_ && view_.blinkOn) {
+        const int px = kMapArea.x + (cursorX_ - view_.originX) * kSquare;
+        const int py = kMapArea.y + (cursorY_ - view_.originY) * kSquare;
+        screen.setClip(kMapArea);
+        screen.frame({px, py, kSquare, kSquare}, 0x0F);
+        screen.resetClip();
+    }
 }
 
 // --- Load menu ---------------------------------------------------------------

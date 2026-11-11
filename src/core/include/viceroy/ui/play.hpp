@@ -6,6 +6,7 @@
 #pragma once
 
 #include "viceroy/game/game.hpp"
+#include "viceroy/render/colony_view.hpp"
 #include "viceroy/render/game_view.hpp"
 
 #include <cstdint>
@@ -39,6 +40,8 @@ enum class Command {
     Save,
     Up, // menus
     Down,
+    ViewMode, // V: a square cursor to look around; Enter opens a colony
+    MoveMode, // M: back to moving units
 };
 
 // The main map screen while playing.
@@ -46,7 +49,11 @@ class PlayScreen {
 public:
     PlayScreen(Game game, std::filesystem::path savePath);
 
-    void handle(Command command);
+    // Returns false for Cancel when there is nothing to close, so the app
+    // can go back to its menu.
+    bool handle(Command command);
+    // The player clicked this map square.
+    void clickSquare(int x, int y);
     // Time passes: the active unit flashes.
     void tick(std::uint64_t milliseconds);
     void draw(Screen& screen, const Art& art) const;
@@ -58,6 +65,13 @@ public:
     const std::string& message() const { return view_.message; }
     // Set by the app after loading Art: needed for colony names.
     void setColonyNames(const TextFile* names) { colonyNames_ = names; }
+    void setColonyArt(const ColonyArt* art) { colonyArt_ = art; }
+    // The colony screen, when one is open.
+    const std::optional<ColonyViewState>& colonyScreen() const { return colonyScreen_; }
+    void openColony(int index);
+    bool viewMode() const { return viewMode_; }
+    int cursorX() const { return cursorX_; }
+    int cursorY() const { return cursorY_; }
     // Writes the game to the slot it was loaded from. Returns false and
     // sets the message on failure.
     bool save();
@@ -67,6 +81,7 @@ private:
     void activate(int index);
     void advance(); // to the next unit that needs orders
     void say(std::string text);
+    bool handleColonyScreen(Command command);
 
     Game game_;
     ViewState view_;
@@ -74,6 +89,11 @@ private:
     std::vector<int> waiting_; // units put off with Wait this turn
     std::uint64_t clock_ = 0;
     const TextFile* colonyNames_ = nullptr;
+    const ColonyArt* colonyArt_ = nullptr;
+    std::optional<ColonyViewState> colonyScreen_;
+    bool viewMode_ = false;
+    int cursorX_ = 0;
+    int cursorY_ = 0;
 };
 
 // One line of the load menu.

@@ -54,11 +54,6 @@ const IndexedImage* sprite(const SpriteSheet& sheet, int index) {
     return &sheet.sprites[static_cast<std::size_t>(index)].image;
 }
 
-void blitSprite(Screen& screen, const SpriteSheet& sheet, int index, int x, int y) {
-    if (const auto* img = sprite(sheet, index)) {
-        screen.blit(*img, x, y);
-    }
-}
 
 int baseTile(const MapSquare& sq) {
     switch (sq.terrain) {
@@ -133,7 +128,9 @@ bool forestShown(const MapSquare& sq) {
     return sq.isForest() && !sq.hills() && !sq.mountains();
 }
 
-void drawSquare(Screen& screen, const Art& art, const Game& game, int x, int y, int px, int py) {
+} // namespace
+
+void drawTerrain(Screen& screen, const Art& art, const Game& game, int x, int y, int px, int py) {
     const auto& map = game.state().map;
     if (!map.inside(x, y)) {
         blitSprite(screen, art.phys, kUnexplored, px, py);
@@ -183,6 +180,8 @@ void drawSquare(Screen& screen, const Art& art, const Game& game, int x, int y, 
     }
 }
 
+namespace {
+
 // The small box beside a unit with its nation's colour and its orders.
 void drawOrdersBox(Screen& screen, const Art& art, const Game& game, int index, int px, int py) {
     const auto& u = game.unit(index);
@@ -200,14 +199,6 @@ void drawCentredText(Screen& screen, const Font& font, int cx, int y, const std:
     screen.text(font, cx - Screen::textWidth(font, s) / 2, y, s, colours);
 }
 
-std::string seasonName(const Art& art, int season) {
-    if (const auto* section = art.names.find("SEASONS")) {
-        if (season >= 0 && static_cast<std::size_t>(season) < section->lines.size()) {
-            return section->lines[static_cast<std::size_t>(season)];
-        }
-    }
-    return season == 0 ? "Spring" : "Autumn";
-}
 
 std::string lineOf(const Art& art, const char* section, int row, const char* fallback) {
     if (const auto* s = art.names.find(section)) {
@@ -264,6 +255,33 @@ std::uint8_t minimapColour(const Art& art, const MapSquare& sq) {
 
 } // namespace
 
+void blitSprite(Screen& screen, const SpriteSheet& sheet, int index, int x, int y) {
+    if (const auto* img = sprite(sheet, index)) {
+        screen.blit(*img, x, y);
+    }
+}
+
+std::string seasonName(const Art& art, int season) {
+    if (const auto* section = art.names.find("SEASONS")) {
+        if (season >= 0 && static_cast<std::size_t>(season) < section->lines.size()) {
+            return section->lines[static_cast<std::size_t>(season)];
+        }
+    }
+    return season == 0 ? "Spring" : "Autumn";
+}
+
+int colonistIcon(int skill) {
+    // Colonists in a colony keep 0x1C for a free colonist; units use 0x13.
+    // Pioneers, soldiers, scouts and dragoons at work wear plain clothes.
+    if (skill >= 20 && skill <= 23) {
+        return 38 + skill;
+    }
+    if (skill == 24) {
+        return 66; // a missionary
+    }
+    return kExpertBase + (skill >= 28 ? 19 : skill);
+}
+
 Art loadArt(const std::filesystem::path& folder) {
     Art art;
     art.palette = readVgaPalette(readFile(folder, "VICEROY.PAL"));
@@ -312,8 +330,8 @@ std::uint8_t nationColour(const Art& art, int nation) {
 int unitIcon(const Game& game, int index) {
     const auto& u = game.unit(index);
     const auto& types = game.rules().units;
-    if (u.type == unit_type::kColonist && u.profession >= 0 && u.profession < 28) {
-        return kExpertBase + u.profession;
+    if (u.type == unit_type::kColonist && u.profession >= 0 && u.profession <= 28) {
+        return colonistIcon(u.profession);
     }
     if (u.type < 0 || u.type >= static_cast<int>(types.size())) {
         return 0;
@@ -327,7 +345,7 @@ void drawMap(Screen& screen, const Art& art, const Game& game, const ViewState& 
     const auto& save = game.state();
     for (int row = 0; row < kViewRows; ++row) {
         for (int col = 0; col < kViewColumns; ++col) {
-            drawSquare(screen, art, game, view.originX + col, view.originY + row, kMapArea.x + col * kSquare,
+            drawTerrain(screen, art, game, view.originX + col, view.originY + row, kMapArea.x + col * kSquare,
                        kMapArea.y + row * kSquare);
         }
     }

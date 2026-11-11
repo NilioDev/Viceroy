@@ -53,6 +53,7 @@ struct App {
 
     std::unique_ptr<viceroy::Art> art;
     std::unique_ptr<viceroy::LoadMenu> load;
+    std::unique_ptr<viceroy::ColonyArt> colonyArt;
     std::unique_ptr<viceroy::PlayScreen> play;
     viceroy::Screen screen;
     Uint64 lastTicks = 0;
@@ -114,6 +115,8 @@ void showLoadMenu(App& app) {
 void openLibrary(App& app) {
     try {
         app.art = std::make_unique<viceroy::Art>(viceroy::loadArt(viceroy::pack::baseFolder(app.library)));
+        app.colonyArt =
+            std::make_unique<viceroy::ColonyArt>(viceroy::loadColonyArt(viceroy::pack::baseFolder(app.library)));
         showLoadMenu(app);
         app.status.clear();
     } catch (const std::exception& e) {
@@ -128,6 +131,7 @@ void startGame(App& app, const viceroy::SaveSlot& slot) {
         viceroy::Game game(viceroy::readSaveGame(readAll(slot.path)), app.art->rules);
         app.play = std::make_unique<viceroy::PlayScreen>(std::move(game), slot.path);
         app.play->setColonyNames(&app.art->colonyNames);
+        app.play->setColonyArt(app.colonyArt.get());
         app.mode = Mode::Play;
     } catch (const viceroy::FormatError& e) {
         app.status = std::string("Cannot read this savegame: ") + e.what();
@@ -257,6 +261,10 @@ std::optional<Command> keyCommand(const SDL_KeyboardEvent& key) {
         return Command::BuildColony;
     case SDLK_C:
         return Command::Centre;
+    case SDLK_V:
+        return Command::ViewMode;
+    case SDLK_M:
+        return Command::MoveMode;
     case SDLK_E:
         return ctrl ? std::optional<Command>(Command::EndTurn) : std::nullopt;
     case SDLK_TAB:
@@ -266,7 +274,15 @@ std::optional<Command> keyCommand(const SDL_KeyboardEvent& key) {
     }
 }
 
-std::optional<Command> buttonCommand(Uint8 button, bool waitingForEndOfTurn) {
+// `pointing`: the colony screen or the view mode's cursor is up, so A and B
+// confirm and go back.
+std::optional<Command> buttonCommand(Uint8 button, bool waitingForEndOfTurn, bool pointing) {
+    if (pointing && button == SDL_GAMEPAD_BUTTON_SOUTH) {
+        return Command::Confirm;
+    }
+    if (pointing && button == SDL_GAMEPAD_BUTTON_EAST) {
+        return Command::Cancel;
+    }
     switch (button) {
     case SDL_GAMEPAD_BUTTON_DPAD_UP:
         return Command::MoveN;
@@ -291,6 +307,8 @@ std::optional<Command> buttonCommand(Uint8 button, bool waitingForEndOfTurn) {
     case SDL_GAMEPAD_BUTTON_START:
         return Command::Save;
     case SDL_GAMEPAD_BUTTON_BACK:
+        return Command::ViewMode;
+    case SDL_GAMEPAD_BUTTON_LEFT_STICK:
         return Command::Centre;
     case SDL_GAMEPAD_BUTTON_RIGHT_STICK:
         return Command::Fortify;
@@ -327,42 +345,44 @@ void send(App& app, Command command) {
         }
         break;
     case Mode::Play:
-        if (command == Command::Cancel) {
+        if (!app.play->handle(command)) {
             showLoadMenu(app);
-        } else {
-            app.play->handle(command);
         }
         break;
     }
 }
 
-// A click on the map moves the active unit one step towards it.
+// A click on the map: open a colony there, or move the active unit one
+// step towards it. Anywhere on the colony screen closes it for now.
 void click(App& app, float wx, float wy) {
     float x = 0;
     float y = 0;
     SDL_RenderCoordinatesFromWindow(app.renderer, wx, wy, &x, &y);
-    if (app.mode != Mode::Play || app.play->game().activeUnit() < 0) {
+    if (app.mode != Mode::Play) {
         if (app.mode != Mode::Welcome) {
             send(app, Command::Confirm);
+        }
+        return;
+    }
+    if (app.play->colonyScreen()) {
+        // The exit button in the lower right corner.
+        if (x >= 300.0f && y >= 178.0f) {
+            send(app, Command::Cancel);
         }
         return;
     }
     const auto& area = viceroy::kMapArea;
     if (x < static_cast<float>(area.x) || y < static_cast<float>(area.y) ||
         x >= static_cast<float>(area.x + area.w) || y >= static_cast<float>(area.y + area.h)) {
+        if (app.play->game().activeUnit() < 0) {
+            send(app, Command::Confirm);
+        }
         return;
     }
     const auto& view = app.play->view();
-    const auto& u = app.play->game().unit(app.play->game().activeUnit());
     const int mx = view.originX + static_cast<int>(x - static_cast<float>(area.x)) / viceroy::kSquare;
     const int my = view.originY + static_cast<int>(y - static_cast<float>(area.y)) / viceroy::kSquare;
-    const int dx = std::clamp(mx - u.x, -1, 1);
-    const int dy = std::clamp(my - u.y, -1, 1);
-    for (std::size_t d = 0; d < viceroy::kSteps.size(); ++d) {
-        if (viceroy::kSteps[d].dx == dx && viceroy::kSteps[d].dy == dy) {
-            send(app, static_cast<Command>(static_cast<int>(Command::MoveN) + static_cast<int>(d)));
-        }
-    }
+    app.play->clickSquare(mx, my);
 }
 
 void present(App& app) {
@@ -473,7 +493,7 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
             click(*app, event->button.x, event->button.y);
         }
         break;
-    case SDL_EVENT_GAMEPAD_BUTTON_DOWN:
+    case SDL_EVENT_GAMEPAD_BUTTON_DOWN: {
         if (app->mode == Mode::Welcome) {
             if (event->gbutton.button == SDL_GAMEPAD_BUTTON_SOUTH) {
                 chooseFolder(*app);
@@ -490,11 +510,13 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
             send(*app, Command::Cancel);
             break;
         }
-        if (auto command =
-                buttonCommand(event->gbutton.button, app->mode == Mode::Play && app->play->waitingForEndOfTurn())) {
+        const bool playing = app->mode == Mode::Play;
+        const bool pointing = playing && (app->play->colonyScreen() || app->play->viewMode());
+        if (auto command = buttonCommand(event->gbutton.button, playing && app->play->waitingForEndOfTurn(), pointing)) {
             send(*app, *command);
         }
         break;
+    }
     case SDL_EVENT_GAMEPAD_AXIS_MOTION: {
         const float value = static_cast<float>(event->gaxis.value) / 32767.0f;
         if (event->gaxis.axis == SDL_GAMEPAD_AXIS_LEFTX) {

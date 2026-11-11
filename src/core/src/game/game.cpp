@@ -299,11 +299,8 @@ FoundResult Game::foundColony(int index, const std::string& name) {
     colony.nation = u.nation;
     colony.population = 1;
     // The founder works as a farmer; the eight squares around are free.
-    colony.raw[32] = 0;                                     // occupation: farmer
-    colony.raw[64] = static_cast<std::uint8_t>(u.profession); // their skill
-    for (int i = 0; i < 8; ++i) {
-        colony.raw[112 + static_cast<std::size_t>(i)] = 0xFF;
-    }
+    colony.jobs[0] = 0; // farmer
+    colony.skills[0] = static_cast<std::uint8_t>(u.profession);
     save_.colonies.push_back(colony);
     auto& sq = save_.map.at(u.x, u.y);
     sq.flags = static_cast<std::uint8_t>(sq.flags | MapSquare::kHasColony | MapSquare::kRoad);
