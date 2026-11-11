@@ -73,12 +73,31 @@ struct SaveNation {
     std::array<std::uint8_t, 316> raw{};
 };
 
+// The goods a colony stores, in the order of @CARGO.
+inline constexpr int kGoodsKinds = 16;
+inline constexpr int kMaxColonists = 32;
+
 struct SaveColony {
     int x = 0;
     int y = 0;
     std::string name;
     int nation = 0;
     int population = 0;
+    // For each colonist: their job (row of @JOB) and their skill (the
+    // expert list of a colonist unit).
+    std::array<std::uint8_t, kMaxColonists> jobs{};
+    std::array<std::uint8_t, kMaxColonists> skills{};
+    // Which colonist works the squares around, in the order N, E, S, W,
+    // NW, NE, SE, SW; -1 for nobody.
+    std::array<int, 8> squares{-1, -1, -1, -1, -1, -1, -1, -1};
+    // 48 bits of building levels; see game/colony.hpp.
+    std::uint64_t buildings = 0;
+    int hammers = 0;
+    int construction = -1; // row of @BUILDING (or a unit) being built, -1 none
+    std::array<int, kGoodsKinds> stock{};
+    // Sons of Liberty membership as a fraction.
+    int rebelDividend = 0;
+    int rebelDivisor = 0;
     std::array<std::uint8_t, 202> raw{};
 };
 

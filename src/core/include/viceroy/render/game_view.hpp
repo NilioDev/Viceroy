@@ -59,6 +59,14 @@ void drawPanel(Screen& screen, const Art& art, const Game& game, const ViewState
 void drawMenuBar(Screen& screen, const Art& art);
 // The sprite in ICONS.SS for a unit.
 int unitIcon(const Game& game, int index);
+// "Spring" or "Autumn" from NAMES.TXT.
+std::string seasonName(const Art& art, int season);
+// The sprite in ICONS.SS for a colonist with this skill.
+int colonistIcon(int skill);
+// One map square: terrain, forest, hills, rivers, roads, coast; no units.
+void drawTerrain(Screen& screen, const Art& art, const Game& game, int x, int y, int px, int py);
+// Draws a sprite of a sheet if it exists.
+void blitSprite(Screen& screen, const SpriteSheet& sheet, int index, int x, int y);
 std::uint8_t nationColour(const Art& art, int nation);
 
 } // namespace viceroy

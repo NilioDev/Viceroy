@@ -128,6 +128,25 @@ SaveGame readSaveGame(std::span<const std::uint8_t> file) {
         colony.name = text(colony.raw.data() + 2, 24);
         colony.nation = colony.raw[26];
         colony.population = colony.raw[31];
+        const auto* r = colony.raw.data();
+        for (std::size_t i = 0; i < kMaxColonists; ++i) {
+            colony.jobs[i] = r[32 + i];
+            colony.skills[i] = r[64 + i];
+        }
+        for (std::size_t i = 0; i < 8; ++i) {
+            colony.squares[i] = static_cast<std::int8_t>(r[112 + i]);
+        }
+        colony.buildings = 0;
+        for (int i = 5; i >= 0; --i) {
+            colony.buildings = (colony.buildings << 8) | r[132 + i];
+        }
+        colony.hammers = u16(r + 146);
+        colony.construction = r[148] == 0xFF ? -1 : r[148];
+        for (std::size_t i = 0; i < kGoodsKinds; ++i) {
+            colony.stock[i] = s16(r + 154 + 2 * i);
+        }
+        colony.rebelDividend = s32(r + 194);
+        colony.rebelDivisor = s32(r + 198);
     }
 
     save.units.resize(static_cast<std::size_t>(unitCount));
@@ -218,6 +237,23 @@ Bytes writeSaveGame(const SaveGame& save) {
         putText(raw.data() + 2, 24, colony.name);
         raw[26] = static_cast<std::uint8_t>(colony.nation);
         raw[31] = static_cast<std::uint8_t>(colony.population);
+        for (std::size_t i = 0; i < kMaxColonists; ++i) {
+            raw[32 + i] = colony.jobs[i];
+            raw[64 + i] = colony.skills[i];
+        }
+        for (std::size_t i = 0; i < 8; ++i) {
+            raw[112 + i] = static_cast<std::uint8_t>(colony.squares[i]);
+        }
+        for (std::size_t i = 0; i < 6; ++i) {
+            raw[132 + i] = static_cast<std::uint8_t>(colony.buildings >> (8 * i));
+        }
+        put16(raw.data() + 146, colony.hammers);
+        raw[148] = static_cast<std::uint8_t>(colony.construction < 0 ? 0xFF : colony.construction);
+        for (std::size_t i = 0; i < kGoodsKinds; ++i) {
+            put16(raw.data() + 154 + 2 * i, colony.stock[i]);
+        }
+        put32(raw.data() + 194, colony.rebelDividend);
+        put32(raw.data() + 198, colony.rebelDivisor);
         append(out, raw);
     }
     for (const auto& unit : save.units) {
