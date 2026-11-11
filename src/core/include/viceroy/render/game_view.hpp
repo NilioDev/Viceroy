@@ -12,7 +12,9 @@
 #include "viceroy/render/screen.hpp"
 
 #include <filesystem>
+#include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace viceroy {
@@ -48,12 +50,24 @@ struct ViewState {
     int originX = 0; // map square shown at the top-left of the map window
     int originY = 0;
     bool blinkOn = true; // the active unit flashes
+    // A unit gliding into its square: drawn on top, this many pixels away
+    // from the square it is moving to.
+    int slideUnit = -1;
+    int slideX = 0;
+    int slideY = 0;
     std::string message; // a line shown at the bottom of the panel
 };
 
 // Puts the square in the middle of the map window, as the original does
 // with the active unit.
 void centreOn(ViewState& view, const Game& game, int x, int y);
+
+// The small map of the world in the panel: 58 squares wide and 40 high
+// around the view, one pixel each.
+inline constexpr Rect kMinimapArea{251, 8, 60, 41};
+int minimapTop(const Game& game, const ViewState& view);
+// The map square under a point of the small map, if any.
+std::optional<std::pair<int, int>> minimapSquare(const Game& game, const ViewState& view, int x, int y);
 
 void drawGameScreen(Screen& screen, const Art& art, const Game& game, const ViewState& view);
 

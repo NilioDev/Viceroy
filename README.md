@@ -53,6 +53,7 @@ and download one at the bottom of the page.
 | Action | Keyboard | Gamepad |
 | --- | --- | --- |
 | Move the active unit | Numeric keypad 1-9, arrow keys, Home / PgUp / End / PgDn for diagonals, or click a square next to it | Left stick or D-pad |
+| Move the map | Click any other square to bring it to the middle, or click the small map | Right stick |
 | No orders this turn | Space | A |
 | End the turn (when asked) | Enter | A |
 | End the turn now | Ctrl+E | Y |

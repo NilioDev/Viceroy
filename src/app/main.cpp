@@ -65,6 +65,10 @@ struct App {
     Uint64 stickFired = 0;
     float stickX = 0;
     float stickY = 0;
+    // Right stick: scrolls the map, repeating while held.
+    float lookX = 0;
+    float lookY = 0;
+    Uint64 lookFired = 0;
 };
 
 // Where the imported game, savegames and later add-ons live.
@@ -133,6 +137,7 @@ void startGame(App& app, const viceroy::SaveSlot& slot) {
     try {
         viceroy::Game game(viceroy::readSaveGame(readAll(slot.path)), app.art->rules);
         app.play = std::make_unique<viceroy::PlayScreen>(std::move(game), slot.path);
+        app.play->setAnimations(true);
         app.play->setColonyNames(&app.art->colonyNames);
         app.play->setColonyArt(app.colonyArt.get());
         app.play->setArt(app.art.get());
@@ -371,8 +376,9 @@ void send(App& app, Command command) {
     }
 }
 
-// A click on the map: open a colony there, or move the active unit one
-// step towards it. Anywhere on the colony screen closes it for now.
+// A click on the map: open a colony there, move the active unit to a square
+// next to it, or bring the map round to any other square. A click on the
+// small map moves the view there.
 void click(App& app, float wx, float wy) {
     float x = 0;
     float y = 0;
@@ -399,6 +405,13 @@ void click(App& app, float wx, float wy) {
             }
         }
         return;
+    }
+    if (!app.play->dialog() && !app.debug.open()) {
+        if (const auto square = viceroy::minimapSquare(app.play->game(), app.play->view(), static_cast<int>(x),
+                                                       static_cast<int>(y))) {
+            app.play->clickMinimap(square->first, square->second);
+            return;
+        }
     }
     const auto& area = viceroy::kMapArea;
     if (x < static_cast<float>(area.x) || y < static_cast<float>(area.y) ||
@@ -580,6 +593,9 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
             app->stickX = value;
         } else if (event->gaxis.axis == SDL_GAMEPAD_AXIS_LEFTY) {
             app->stickY = value;
+        } else if (event->gaxis.axis == SDL_GAMEPAD_AXIS_RIGHTX || event->gaxis.axis == SDL_GAMEPAD_AXIS_RIGHTY) {
+            (event->gaxis.axis == SDL_GAMEPAD_AXIS_RIGHTX ? app->lookX : app->lookY) = value;
+            break;
         } else {
             break;
         }
@@ -613,6 +629,14 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
     app->lastTicks = now;
     if (app->mode == Mode::Play) {
         app->play->tick(elapsed);
+    }
+    // The right stick scrolls the map on the main screen.
+    if (app->mode == Mode::Play && std::hypot(app->lookX, app->lookY) >= kStickThreshold && !app->debug.open() &&
+        !app->play->dialog() && !app->play->colonyScreen() && !app->play->europeScreen() &&
+        now - app->lookFired >= kStickRepeatMs / 2) {
+        app->lookFired = now;
+        const auto axis = [](float v) { return v > kStickThreshold ? 1 : v < -kStickThreshold ? -1 : 0; };
+        app->play->scrollView(axis(app->lookX), axis(app->lookY));
     }
     // Holding the stick keeps moving.
     if (app->stickCommand && now - app->stickFired >= kStickRepeatMs) {

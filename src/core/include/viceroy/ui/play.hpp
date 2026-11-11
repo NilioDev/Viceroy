@@ -63,6 +63,10 @@ public:
     bool handle(Command command);
     // The player clicked this map square.
     void clickSquare(int x, int y);
+    // A click on the small map: the view goes there.
+    void clickMinimap(int x, int y);
+    // Moves the view without moving anyone (the right stick).
+    void scrollView(int dx, int dy);
     // Time passes: the active unit flashes.
     void tick(std::uint64_t milliseconds);
     void draw(Screen& screen, const Art& art) const;
@@ -95,8 +99,21 @@ public:
     // Writes the game to the slot it was loaded from. Returns false and
     // sets the message on failure.
     bool save();
+    // Units glide from square to square, and the game pauses a moment
+    // before the next unit when one has used up its moves. Off by default
+    // (tests); the app turns it on.
+    void setAnimations(bool on) { animations_ = on; }
+    bool animating() const { return slide_.has_value(); }
 
 private:
+    struct Slide {
+        int unit = -1;
+        int dx = 0; // the step taken
+        int dy = 0;
+        std::uint64_t elapsed = 0;
+        bool advanceAfter = false; // the unit's moves are used up
+    };
+    void finishSlide();
     void moveActive(Step step);
     void activate(int index);
     void advance(); // to the next unit that needs orders
@@ -130,6 +147,8 @@ private:
     bool viewMode_ = false;
     int cursorX_ = 0;
     int cursorY_ = 0;
+    bool animations_ = false;
+    std::optional<Slide> slide_;
 };
 
 // One line of the load menu.

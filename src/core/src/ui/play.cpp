@@ -15,6 +15,10 @@ namespace viceroy {
 namespace {
 
 constexpr std::uint64_t kBlinkMs = 250;
+// How long a unit takes to glide one square, and the pause before the next
+// unit once one has used its moves. Chosen by eye against the original.
+constexpr std::uint64_t kSlideMs = 160;
+constexpr std::uint64_t kPauseMs = 250;
 constexpr std::uint8_t kGreen = 0x44;
 constexpr std::uint8_t kGold = 0x95;
 constexpr std::uint8_t kBlack = 0x00;
@@ -116,7 +120,26 @@ void PlayScreen::moveActive(Step step) {
     if (index < 0) {
         return;
     }
-    switch (game_.move(index, step)) {
+    const auto result = game_.move(index, step);
+    if (animations_ && (result == MoveResult::Moved || result == MoveResult::Boarded || result == MoveResult::HighSeas)) {
+        slide_ = Slide{index, step.dx, step.dy, 0,
+                       result == MoveResult::Boarded || (result == MoveResult::Moved && game_.movesLeft(index) <= 0)};
+        // Keep the unit in sight while it moves.
+        const auto& u = game_.unit(index);
+        const bool inside = u.x > view_.originX && u.y > view_.originY && u.x < view_.originX + kViewColumns - 1 &&
+                            u.y < view_.originY + kViewRows - 1;
+        if (!inside) {
+            centreOn(view_, game_, u.x, u.y);
+        }
+        view_.slideUnit = index;
+        view_.slideX = -step.dx * kSquare;
+        view_.slideY = -step.dy * kSquare;
+        if (result != MoveResult::HighSeas) {
+            say(result == MoveResult::Boarded ? "Aboard ship." : "");
+            return;
+        }
+    }
+    switch (result) {
     case MoveResult::Moved:
         say("");
         if (game_.movesLeft(index) <= 0) {
@@ -570,6 +593,9 @@ bool PlayScreen::handleColonyScreen(Command command) {
 }
 
 void PlayScreen::clickSquare(int x, int y) {
+    if (slide_) {
+        return;
+    }
     if (const auto colony = game_.colonyAt(x, y)) {
         if (game_.state().colonies[static_cast<std::size_t>(*colony)].nation == game_.human()) {
             openColony(*colony);
@@ -581,22 +607,40 @@ void PlayScreen::clickSquare(int x, int y) {
         cursorY_ = y;
         return;
     }
+    // A square next to the active unit moves it there. Any other square
+    // brings the map round to it, as in the original.
     const int active = game_.activeUnit();
-    if (active < 0) {
-        return;
-    }
-    const auto& u = game_.unit(active);
-    const int dx = std::clamp(x - u.x, -1, 1);
-    const int dy = std::clamp(y - u.y, -1, 1);
-    for (const auto& step : kSteps) {
-        if (step.dx == dx && step.dy == dy) {
-            moveActive(step);
-            return;
+    if (active >= 0 && game_.onMap(active)) {
+        const auto& u = game_.unit(active);
+        for (const auto& step : kSteps) {
+            if (u.x + step.dx == x && u.y + step.dy == y) {
+                moveActive(step);
+                return;
+            }
         }
+    }
+    centreOn(view_, game_, x, y);
+}
+
+void PlayScreen::clickMinimap(int x, int y) {
+    centreOn(view_, game_, x, y);
+    if (viewMode_) {
+        cursorX_ = x;
+        cursorY_ = y;
     }
 }
 
+void PlayScreen::scrollView(int dx, int dy) {
+    const auto& map = game_.state().map;
+    view_.originX = std::clamp(view_.originX + dx, 0, std::max(0, map.width - kViewColumns));
+    view_.originY = std::clamp(view_.originY + dy, 0, std::max(0, map.height - kViewRows));
+}
+
 bool PlayScreen::handle(Command command) {
+    if (slide_) {
+        // Input waits until the unit has arrived.
+        return true;
+    }
     if (dialog_) {
         return handleDialog(command);
     }
@@ -783,6 +827,36 @@ bool PlayScreen::save() {
 void PlayScreen::tick(std::uint64_t milliseconds) {
     clock_ += milliseconds;
     view_.blinkOn = (clock_ / kBlinkMs) % 2 == 0;
+    if (slide_) {
+        slide_->elapsed += milliseconds;
+        const auto t = std::min(slide_->elapsed, kSlideMs);
+        const int left = static_cast<int>((kSlideMs - t) * kSquare / kSlideMs);
+        view_.slideX = -slide_->dx * left;
+        view_.slideY = -slide_->dy * left;
+        view_.blinkOn = true;
+        if (slide_->elapsed >= kSlideMs + (slide_->advanceAfter ? kPauseMs : 0)) {
+            finishSlide();
+        }
+    }
+}
+
+void PlayScreen::finishSlide() {
+    if (!slide_) {
+        return;
+    }
+    const Slide done = *slide_;
+    slide_.reset();
+    view_.slideUnit = -1;
+    view_.slideX = 0;
+    view_.slideY = 0;
+    if (dialog_) {
+        return; // the high seas question is up; it decides what comes next
+    }
+    if (done.advanceAfter) {
+        advance();
+    } else if (game_.activeUnit() == done.unit) {
+        activate(done.unit);
+    }
 }
 
 void PlayScreen::draw(Screen& screen, const Art& art) const {

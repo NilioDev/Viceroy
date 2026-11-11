@@ -367,6 +367,22 @@ Art loadArt(const std::filesystem::path& folder) {
     return art;
 }
 
+int minimapTop(const Game& game, const ViewState& view) {
+    const auto& map = game.state().map;
+    return std::clamp(view.originY + kViewRows / 2 - 20, 0, std::max(0, map.height - 40));
+}
+
+std::optional<std::pair<int, int>> minimapSquare(const Game& game, const ViewState& view, int x, int y) {
+    const auto& map = game.state().map;
+    const int mx = x - (kMinimapArea.x + 1);
+    const int my = minimapTop(game, view) + y - kMinimapArea.y;
+    if (x < kMinimapArea.x || x >= kMinimapArea.x + kMinimapArea.w || y < kMinimapArea.y ||
+        y >= kMinimapArea.y + kMinimapArea.h || !map.inside(mx, my)) {
+        return std::nullopt;
+    }
+    return std::make_pair(mx, my);
+}
+
 void centreOn(ViewState& view, const Game& game, int x, int y) {
     const auto& map = game.state().map;
     view.originX = std::clamp(x - kViewColumns / 2, 0, std::max(0, map.width - kViewColumns));
@@ -436,13 +452,14 @@ void drawMap(Screen& screen, const Art& art, const Game& game, const ViewState& 
         const auto& u = game.unit(i);
         return game.onMap(i) && !game.isAboard(i) && !game.colonyAt(u.x, u.y);
     };
+    const int sliding = view.slideUnit >= 0 && view.slideUnit < game.unitCount() ? view.slideUnit : -1;
     for (int i = 0; i < game.unitCount(); ++i) {
-        if (shown(i)) {
+        if (shown(i) && i != sliding) {
             top.emplace(std::make_pair(game.unit(i).x, game.unit(i).y), i);
         }
     }
     const int active = game.activeUnit();
-    if (active >= 0 && active < game.unitCount() && shown(active)) {
+    if (active >= 0 && active < game.unitCount() && shown(active) && active != sliding) {
         top[std::make_pair(game.unit(active).x, game.unit(active).y)] = active;
     }
     for (const auto& [pos, i] : top) {
@@ -453,6 +470,13 @@ void drawMap(Screen& screen, const Art& art, const Game& game, const ViewState& 
         const int py = screenY(pos.second);
         blitSprite(screen, art.icons, unitIcon(game, i), px, py);
         drawOrdersBox(screen, art, game, i, px, py);
+    }
+    if (sliding >= 0 && game.onMap(sliding)) {
+        const auto& u = game.unit(sliding);
+        const int px = screenX(u.x) + view.slideX;
+        const int py = screenY(u.y) + view.slideY;
+        blitSprite(screen, art.icons, unitIcon(game, sliding), px, py);
+        drawOrdersBox(screen, art, game, sliding, px, py);
     }
 
     for (const auto& c : save.colonies) {
@@ -493,9 +517,9 @@ void drawPanel(Screen& screen, const Art& art, const Game& game, const ViewState
     screen.tile(art.wood, kPanelArea);
 
     // The small map of the world, 58 squares wide and 40 high around the view.
-    const Rect mini{251, 8, 60, 41};
+    const Rect mini = kMinimapArea;
     screen.frame({mini.x, mini.y, mini.w, mini.h}, kMinimapFrame);
-    const int top = std::clamp(view.originY + kViewRows / 2 - 20, 0, std::max(0, save.map.height - 40));
+    const int top = minimapTop(game, view);
     for (int y = 0; y < 40; ++y) {
         for (int x = 0; x < std::min(58, save.map.width); ++x) {
             const int mx = x;

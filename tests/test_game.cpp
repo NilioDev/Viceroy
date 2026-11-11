@@ -247,3 +247,47 @@ VCR_TEST("original files: a turn can be played and saved") {
     play.draw(screen, art);
     std::filesystem::remove_all(work);
 }
+
+VCR_TEST("original files: units glide, and a click far away moves the map") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
+    const Bytes bytes(std::istreambuf_iterator<char>(in), {});
+    Game game(readSaveGame(bytes), art.rules);
+    game.setActiveUnit(51); // the frigate the original shows first
+    PlayScreen play(std::move(game), {});
+    play.setAnimations(true);
+    const int frigate = play.game().activeUnit();
+    VCR_CHECK(frigate == 51);
+    const int x = play.game().unit(frigate).x;
+    const int y = play.game().unit(frigate).y;
+
+    // A click on a square far from the frigate brings the map round to it.
+    play.clickSquare(x - 10, y + 6);
+    VCR_CHECK(play.game().unit(frigate).x == x);
+    VCR_CHECK(play.view().originX == x - 10 - kViewColumns / 2);
+    // A click on the small map does the same.
+    const auto square = minimapSquare(play.game(), play.view(), kMinimapArea.x + 1 + 20,
+                                      kMinimapArea.y + 10);
+    VCR_CHECK(square.has_value() && square->first == 20);
+    play.clickMinimap(square->first, square->second);
+    VCR_CHECK(play.view().originX == 20 - kViewColumns / 2);
+
+    // A move glides; commands wait until the frigate has arrived.
+    play.handle(Command::MoveN);
+    VCR_CHECK(play.animating());
+    VCR_CHECK(play.view().slideUnit == frigate && play.view().slideY == kSquare);
+    VCR_CHECK(play.game().unit(frigate).y == y - 1);
+    play.handle(Command::MoveN);
+    VCR_CHECK(play.game().unit(frigate).y == y - 1);
+    play.tick(80);
+    VCR_CHECK(play.view().slideY > 0 && play.view().slideY < kSquare);
+    play.tick(200);
+    VCR_CHECK(!play.animating() && play.view().slideUnit == -1);
+    VCR_CHECK(play.game().activeUnit() == frigate);
+    play.handle(Command::MoveN);
+    VCR_CHECK(play.game().unit(frigate).y == y - 2);
+}
