@@ -31,6 +31,7 @@ constexpr int kHills = 48;
 constexpr int kForest = 64;
 constexpr int kRoad = 80; // 80 alone, 81-88 towards N, NE, E, ... NW
 constexpr int kPlowed = 149;
+constexpr int kCoast = 108; // + 4 × group + quadrant; see drawCoast
 constexpr int kUnexplored = 148;
 
 // --- Sprite numbers in ICONS.SS ------------------------------------------------
@@ -80,6 +81,54 @@ int neighbourMask(const SaveMap& map, int x, int y, Pred pred) {
     return (test(x + 1, y) ? 1 : 0) | (test(x - 1, y) ? 2 : 0) | (test(x, y + 1) ? 4 : 0) | (test(x, y - 1) ? 8 : 0);
 }
 
+// The shore on a water square. Each 8×8 quarter of the square gets a piece
+// chosen by its three land neighbours: the side before it going clockwise,
+// the corner, and the side after it. Pixel 0 keeps the water, transparent
+// pixels show the neighbouring land's ground, everything else is drawn.
+void drawCoast(Screen& screen, const Art& art, const SaveMap& map, int x, int y, int px, int py) {
+    struct Quarter {
+        int ox, oy;
+        Step first, corner, second;
+    };
+    static constexpr Quarter kQuarters[4] = {
+        {0, 0, {-1, 0}, {-1, -1}, {0, -1}}, // top left: west, north-west, north
+        {8, 0, {0, -1}, {1, -1}, {1, 0}},   // top right: north, north-east, east
+        {8, 8, {1, 0}, {1, 1}, {0, 1}},     // bottom right: east, south-east, south
+        {0, 8, {0, 1}, {-1, 1}, {-1, 0}},   // bottom left: south, south-west, west
+    };
+    auto land = [&](Step s) { return map.inside(x + s.dx, y + s.dy) && map.at(x + s.dx, y + s.dy).isLand(); };
+    for (int q = 0; q < 4; ++q) {
+        const auto& quarter = kQuarters[q];
+        const int group = (land(quarter.first) ? 1 : 0) + (land(quarter.corner) ? 2 : 0) + (land(quarter.second) ? 4 : 0);
+        if (group == 0) {
+            continue;
+        }
+        const auto* piece = sprite(art.phys, kCoast + 4 * group + q);
+        // The land whose ground shows through: a side first, then the corner.
+        const Step from = land(quarter.first) ? quarter.first : land(quarter.second) ? quarter.second : quarter.corner;
+        const auto* ground = sprite(art.terrain, baseTile(map.at(x + from.dx, y + from.dy)));
+        if (piece == nullptr) {
+            continue;
+        }
+        for (int j = 0; j < piece->height && j < 8; ++j) {
+            for (int i = 0; i < piece->width && i < 8; ++i) {
+                const auto c = piece->pixels[static_cast<std::size_t>(j * piece->width + i)];
+                if (c == 0) {
+                    continue;
+                }
+                if (c == kTransparent) {
+                    if (ground != nullptr && ground->width == kSquare && ground->height == kSquare) {
+                        screen.pixel(px + quarter.ox + i, py + quarter.oy + j,
+                                     ground->pixels[static_cast<std::size_t>((quarter.oy + j) * kSquare + quarter.ox + i)]);
+                    }
+                    continue;
+                }
+                screen.pixel(px + quarter.ox + i, py + quarter.oy + j, c);
+            }
+        }
+    }
+}
+
 bool forestShown(const MapSquare& sq) {
     return sq.isForest() && !sq.hills() && !sq.mountains();
 }
@@ -97,6 +146,7 @@ void drawSquare(Screen& screen, const Art& art, const Game& game, int x, int y, 
     }
     blitSprite(screen, art.terrain, baseTile(sq), px, py);
     if (!sq.isLand()) {
+        drawCoast(screen, art, map, x, y, px, py);
         return;
     }
     if (sq.flags & MapSquare::kPlowed) {

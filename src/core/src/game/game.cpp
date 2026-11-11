@@ -9,8 +9,6 @@ namespace viceroy {
 namespace {
 
 constexpr int kThirds = 3;
-constexpr int kTerrainOcean = 25;
-constexpr int kTerrainSeaLane = 26;
 constexpr int kTerrainArctic = 24;
 
 bool isNative(int nation) {
