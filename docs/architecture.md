@@ -22,7 +22,10 @@ original keeps much of this in readable tables already (for example
 ## Packs and add-ons
 
 - On first start, Viceroy imports the player's own original files into the
-  **base pack**, in an open format. The base pack is the classic rule set.
+  **base pack** in its library (see [formats/pack.md](formats/pack.md)). For
+  now the base pack holds the original files unchanged with a manifest; the
+  game's tables will be converted into an open format there step by step.
+  The base pack is the classic rule set.
 - **Add-ons** are packs that are loaded on top of the base pack. They can add
   things (a unit, a nation, a map) or change values, but never change files of
   the base pack.

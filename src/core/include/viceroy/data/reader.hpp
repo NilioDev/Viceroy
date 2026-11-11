@@ -54,6 +54,11 @@ public:
         return v;
     }
 
+    void skip(std::size_t count) {
+        need(count);
+        pos_ += count;
+    }
+
     std::span<const std::uint8_t> bytes(std::size_t count) {
         need(count);
         auto out = data_.subspan(pos_, count);
