@@ -70,7 +70,7 @@ VCR_TEST("savegame: header and map layers") {
     VCR_CHECK(save.season == 1);
     VCR_CHECK(save.turn == 42);
     VCR_CHECK(save.difficulty == 3);
-    VCR_CHECK(save.colonyCount == 1 && save.unitCount == 2 && save.tribeCount == 1);
+    VCR_CHECK(save.colonies.size() == 1 && save.units.size() == 2 && save.settlements.size() == 1);
     VCR_CHECK(save.map.width == 3 && save.map.height == 2);
     VCR_CHECK(save.map.at(0, 0).terrain == 24);
     VCR_CHECK(save.map.at(2, 0).terrain == 2);
@@ -80,6 +80,16 @@ VCR_TEST("savegame: header and map layers") {
     VCR_CHECK(save.map.at(2, 1).flags == 5);
     VCR_CHECK(save.map.at(1, 1).region == 7);
     VCR_CHECK(save.map.at(1, 1).seen == 0xF0);
+}
+
+VCR_TEST("savegame: a save is written back unchanged") {
+    const auto bytes = sampleSave();
+    VCR_CHECK(writeSaveGame(readSaveGame(bytes)) == bytes);
+    auto save = readSaveGame(bytes);
+    save.year = 1650;
+    save.units[1].x = 2;
+    const auto again = readSaveGame(writeSaveGame(save));
+    VCR_CHECK(again.year == 1650 && again.units[1].x == 2);
 }
 
 VCR_TEST("savegame: lying headers are errors") {
@@ -120,6 +130,20 @@ VCR_TEST("original files: every savegame has a sane map") {
         }
         for (const auto& sq : save.map.squares) {
             VCR_CHECK(sq.terrain <= 26);
+        }
+        // Writing the save back gives the very same bytes.
+        const auto bytes = readAll(*path);
+        VCR_CHECK(writeSaveGame(save) == bytes);
+        for (const auto& unit : save.units) {
+            // Units off the map (in Europe, at sea between the two) have
+            // equal coordinates above the map.
+            VCR_CHECK(save.map.inside(unit.x, unit.y) || (unit.x == unit.y && unit.x >= 200));
+            VCR_CHECK(unit.type >= 0 && unit.type < 23);
+            VCR_CHECK(unit.nation < 12);
+        }
+        for (const auto& colony : save.colonies) {
+            VCR_CHECK(save.map.at(colony.x, colony.y).flags & MapSquare::kHasColony);
+            VCR_CHECK(colony.nation < kEuropeanNations);
         }
     }
     VCR_CHECK(found > 0);
