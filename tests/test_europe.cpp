@@ -338,3 +338,24 @@ VCR_TEST("original files: Recruit, Purchase and Train") {
     VCR_CHECK(play.game().state().nations[3].gold == 3700);
     VCR_CHECK(artilleryPrice(play.game().state().nations[3]) == 1400);
 }
+
+VCR_TEST("original files: selling moves the market as in the original") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    Game game = loadSave(art, "COLONY00.SAV");
+    auto& dutch = game.state().nations[3];
+    VCR_CHECK(dutch.prices[1] == 7 && dutch.volumes[1] == 143);
+    // The original: four loads of 100 sugar leave the price at 6/8, the fifth brings it to 5/7.
+    for (int i = 0; i < 4; ++i) {
+        VCR_CHECK(moveMarket(game.rules(), dutch, 1, 100) == 0);
+    }
+    VCR_CHECK(moveMarket(game.rules(), dutch, 1, 100) == -1);
+    VCR_CHECK(dutch.prices[1] == 6);
+    VCR_CHECK(bidPrice(dutch, 1) == 5 && askPrice(game.rules(), dutch, 1) == 7);
+    // Buying pushes the other way.
+    VCR_CHECK(moveMarket(game.rules(), dutch, 1, -500) == 1);
+    VCR_CHECK(dutch.prices[1] == 7);
+}

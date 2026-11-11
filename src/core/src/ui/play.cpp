@@ -297,6 +297,20 @@ std::string costText(int price) {
 
 } // namespace
 
+void PlayScreen::tellPriceMove(int good, int move) {
+    if (move == 0 || art_ == nullptr) {
+        return;
+    }
+    const auto& nation = game_.state().nations[static_cast<std::size_t>(game_.human())];
+    const std::string name =
+        static_cast<std::size_t>(good) < game_.rules().cargo.size() ? game_.rules().cargo[static_cast<std::size_t>(good)].name : "";
+    const std::string port = textLine(art_->names, "HOMEPORT", game_.human(), "");
+    dialog_ = makeDialog(*art_, move > 0 ? "PRICEUP" : "PRICEDOWN", {name, port}, {bidPrice(nation, good)});
+    choices_.clear();
+    question_ = "PRICE";
+    questionUnit_ = -1;
+}
+
 void PlayScreen::openRecruit() {
     if (art_ == nullptr) {
         return;
@@ -440,6 +454,7 @@ bool PlayScreen::handleEuropeScreen(Command command) {
             if (t.amount > 0) {
                 say(std::to_string(t.amount) + " " + goodName(state.good) + " bought for " + std::to_string(t.gold) +
                     "$.");
+                tellPriceMove(state.good, t.priceMove);
             } else {
                 say(nation.gold < askPrice(game_.rules(), nation, state.good) ? "Not enough gold."
                                                                               : "No room aboard.");
@@ -460,10 +475,11 @@ bool PlayScreen::handleEuropeScreen(Command command) {
     case Command::Sentry: // S: sell
     case Command::BuildColony: // X on a gamepad
         if (state.focus == EuropeFocus::Market && state.ship >= 0) {
-            const Trade t = sellGoods(save, state.ship, state.good);
+            const Trade t = sellGoods(save, game_.rules(), state.ship, state.good);
             if (t.amount > 0) {
                 say(std::to_string(t.amount) + " " + goodName(state.good) + " sold for " + std::to_string(t.gold) +
                     "$ (tax " + std::to_string(t.tax) + "$).");
+                tellPriceMove(state.good, t.priceMove);
             }
         }
         return true;

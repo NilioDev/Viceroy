@@ -123,7 +123,9 @@ recruited at 2 to 4 (professions, as the unit's byte 23); how many were
 recruited so far at 6; artillery bought so far at 30; gold at 42 (32 bits);
 crosses at 46 and the crosses needed for the next migrant at 48 (16 bits
 each); and the European market at 76: one byte per good in `@CARGO` order,
-from which the bid and asking prices follow (see [Europe](../rules/europe.md)).
+from which the bid and asking prices follow (see [Europe](../rules/europe.md)),
+then per good the trade volume at 92 (16 bits), the gold it brought in at 124
+and the tons traded at 188 and again at 252 (32 bits each).
 The recruit, artillery and crosses fields were confirmed by changing them in
 a save and reading the prices the original then asks.
 

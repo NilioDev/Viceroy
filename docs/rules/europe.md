@@ -58,7 +58,28 @@ good's `@CARGO` row, so food 1 shows as 0/8, sugar 7 as 6/8, silver 14 as
 hold of the same good or fills a free one, as far as the gold goes; the
 tax is taken from what a sale brings in.
 
-**Not yet done:** prices moving after trade, and boycotts.
+### Prices moving
+
+Measured by selling sugar a hundred at a time and saving after each sale.
+Each good has a volume (nation record, 16 bits at 92 + 2 × good). A sale
+adds to it and a purchase takes from it. When it reaches the good's
+`fall` column of `@CARGO` in hundreds (sugar: 600), the price drops by one
+and the volume loses that much again. At minus `rise` hundreds the price
+goes up by one. The price stays within the good's `low` and `high` columns.
+"The price of … has fallen to …" (`@PRICEDOWN`, or `@PRICEUP`) follows.
+
+Seen in the original: COLONY00's sugar at 7 with volume 143 kept its price
+through four sales of 100 and fell to 6 with the fifth, leaving the volume
+at 78. Sales are counted hold by hold, so the price can change between two
+holds of the same good.
+
+The original also keeps the gold and tons traded per good (at 124 and at
+188 and 252, 32 bits each), which we update the same way.
+
+**Not yet known:** a sale of 100 sugar added 107 to the volume, but 100
+furs added exactly 100; we add the amount itself. Also not yet known are
+how the volume recovers each turn (the `attrition` column), what
+`volatility` does, how other nations' trade moves prices, and boycotts.
 
 ## Recruit, Purchase and Train
 

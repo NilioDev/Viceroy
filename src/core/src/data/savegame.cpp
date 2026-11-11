@@ -172,6 +172,12 @@ SaveGame readSaveGame(std::span<const std::uint8_t> file) {
         for (std::size_t g = 0; g < kGoodsKinds; ++g) {
             nation.prices[g] = nation.raw[76 + g];
         }
+        for (std::size_t g = 0; g < kGoodsKinds; ++g) {
+            nation.volumes[g] = s16(nation.raw.data() + 92 + 2 * g);
+            nation.tradeGold[g] = s32(nation.raw.data() + 124 + 4 * g);
+            nation.tonsTraded[g] = s32(nation.raw.data() + 188 + 4 * g);
+            nation.tonsTraded2[g] = s32(nation.raw.data() + 252 + 4 * g);
+        }
         for (std::size_t r = 0; r < nation.recruits.size(); ++r) {
             nation.recruits[r] = nation.raw[2 + r];
         }
@@ -286,6 +292,12 @@ Bytes writeSaveGame(const SaveGame& save) {
         put32(raw.data() + 42, nation.gold);
         for (std::size_t g = 0; g < kGoodsKinds; ++g) {
             raw[76 + g] = static_cast<std::uint8_t>(std::clamp(nation.prices[g], 0, 255));
+        }
+        for (std::size_t g = 0; g < kGoodsKinds; ++g) {
+            put16(raw.data() + 92 + 2 * g, std::clamp(nation.volumes[g], -32768, 32767));
+            put32(raw.data() + 124 + 4 * g, nation.tradeGold[g]);
+            put32(raw.data() + 188 + 4 * g, nation.tonsTraded[g]);
+            put32(raw.data() + 252 + 4 * g, nation.tonsTraded2[g]);
         }
         for (std::size_t r = 0; r < nation.recruits.size(); ++r) {
             raw[2 + r] = static_cast<std::uint8_t>(nation.recruits[r]);

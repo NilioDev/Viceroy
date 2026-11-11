@@ -80,6 +80,12 @@ struct SaveNation {
     // The three people waiting on the docks to be recruited (professions,
     // as SaveUnit::profession), how many were recruited so far, and the
     // crosses towards the next one coming of their own accord.
+    // How much of each good went over the market since its price last
+    // moved (sales count up, purchases down), and the totals ever traded.
+    std::array<int, kGoodsKinds> volumes{};
+    std::array<int, kGoodsKinds> tradeGold{};
+    std::array<int, kGoodsKinds> tonsTraded{};
+    std::array<int, kGoodsKinds> tonsTraded2{}; // a second copy the original keeps
     std::array<int, 3> recruits{};
     int recruitCount = 0;
     int crosses = 0;

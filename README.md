@@ -16,7 +16,7 @@ touch controls.
 > shows its buildings, people, what they produce and the warehouse; give
 > colonists other jobs with the jobs menu. At the end of the turn colonies
 > store what they make, grow and finish buildings. Ships sail to Europe from
-> the high seas, sell and buy goods there, take colonists from the docks and
+> the high seas, sell and buy goods there (prices move as you trade), take colonists from the docks and
 > sail back. In Europe you can recruit colonists, buy artillery and ships,
 > and have specialists trained. The other nations don't
 > move yet, and combat and meeting the natives are still to come. Fish and

@@ -159,28 +159,69 @@ Trade buyGoods(SaveGame& save, const Ruleset& rules, int ship, int good, int fre
     }
     setHold(s, hold, good, holdAmount(s, hold) + amount);
     trade.amount = amount;
+    trade.price = price;
     trade.gold = amount * price;
     nation.gold -= trade.gold;
+    nation.tradeGold[static_cast<std::size_t>(good)] -= trade.gold;
+    nation.tonsTraded[static_cast<std::size_t>(good)] -= amount;
+    nation.tonsTraded2[static_cast<std::size_t>(good)] -= amount;
+    trade.priceMove = moveMarket(rules, nation, good, -amount);
     return trade;
 }
 
-Trade sellGoods(SaveGame& save, int ship, int good) {
+int moveMarket(const Ruleset& rules, SaveNation& nation, int good, int volume) {
+    if (good < 0 || good >= kGoodsKinds || static_cast<std::size_t>(good) >= rules.cargo.size()) {
+        return 0;
+    }
+    const auto& cargo = rules.cargo[static_cast<std::size_t>(good)];
+    auto& v = nation.volumes[static_cast<std::size_t>(good)];
+    auto& price = nation.prices[static_cast<std::size_t>(good)];
+    v += volume;
+    const int fall = std::max(1, cargo.fall) * 100;
+    const int rise = std::max(1, cargo.rise) * 100;
+    if (v >= fall) {
+        v -= fall;
+        if (price > cargo.driftLow) {
+            --price;
+            return -1;
+        }
+    } else if (v <= -rise) {
+        v += rise;
+        if (price < cargo.driftHigh) {
+            ++price;
+            return 1;
+        }
+    }
+    return 0;
+}
+
+Trade sellGoods(SaveGame& save, const Ruleset& rules, int ship, int good) {
     Trade trade;
     auto& s = save.units[static_cast<std::size_t>(ship)];
-    if (europePlace(s) != EuropePlace::InPort || s.nation < 0 || s.nation > 3) {
+    if (europePlace(s) != EuropePlace::InPort || s.nation < 0 || s.nation > 3 || good < 0 || good >= kGoodsKinds) {
         return trade;
     }
     auto& nation = save.nations[static_cast<std::size_t>(s.nation)];
+    // Hold by hold, as the original sells them: the price can move between.
     for (int k = s.holds - 1; k >= 0; --k) {
-        if (holdGood(s, k) == good) {
-            trade.amount += holdAmount(s, k);
-            removeHold(s, k);
+        if (holdGood(s, k) != good) {
+            continue;
         }
+        const int amount = holdAmount(s, k);
+        removeHold(s, k);
+        const int price = bidPrice(nation, good);
+        const int gross = amount * price;
+        const int tax = gross * nation.taxRate / 100;
+        trade.amount += amount;
+        trade.price = price;
+        trade.tax += tax;
+        trade.gold += gross - tax;
+        nation.gold += gross - tax;
+        nation.tradeGold[static_cast<std::size_t>(good)] += gross - tax;
+        nation.tonsTraded[static_cast<std::size_t>(good)] += amount;
+        nation.tonsTraded2[static_cast<std::size_t>(good)] += amount;
+        trade.priceMove += moveMarket(rules, nation, good, amount);
     }
-    const int gross = trade.amount * bidPrice(nation, good);
-    trade.tax = gross * nation.taxRate / 100;
-    trade.gold = gross - trade.tax;
-    nation.gold += trade.gold;
     return trade;
 }
 
