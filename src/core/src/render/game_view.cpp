@@ -33,6 +33,9 @@ constexpr int kRoad = 80; // 80 alone, 81-88 towards N, NE, E, ... NW
 constexpr int kPlowed = 149;
 constexpr int kCoast = 108; // + 4 × group + quadrant; see drawCoast
 constexpr int kUnexplored = 148;
+constexpr int kGroundBlend = 104; // + side: north, east, south, west
+constexpr int kScrub = 9;     // desert forest
+constexpr int kScrubTile = 8; // TERRAIN.SS: desert with cacti
 
 // --- Sprite numbers in ICONS.SS ------------------------------------------------
 constexpr int kColonyOpen = 3; // no stockade; 0 stockade, 1 fort, 2 fortress
@@ -64,7 +67,9 @@ int baseTile(const MapSquare& sq) {
     case 26:
         return 11; // sea lane
     default:
-        return sq.terrain & 7; // forests show the open land under the trees
+        // Scrub forest is its own tile, desert with cacti; other forests show
+        // the open land under the trees.
+        return (sq.terrain & 15) == kScrub ? kScrubTile : sq.terrain & 7;
     }
 }
 
@@ -124,8 +129,47 @@ void drawCoast(Screen& screen, const Art& art, const SaveMap& map, int x, int y,
     }
 }
 
+// Where two kinds of ground meet, the original lets the neighbour's ground
+// show through a sparse dither along the shared side. The dither is in
+// PHYS0.SS sprites 104 to 107 (north, east, south, west): pixel 0 takes the
+// neighbour's ground at the same spot. The sides are applied in that order,
+// so a later side wins in the corners. Found by comparing with captures of
+// the original. An unexplored square gets the same dither from the explored
+// squares next to it.
+void blendGround(Screen& screen, const Art& art, const SaveMap& map, int x, int y, int px, int py, int nation) {
+    static constexpr Step kSides[4] = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}};
+    const auto& sq = map.at(x, y);
+    const bool explored = sq.seenBy(nation);
+    const int own = explored ? baseTile(sq) : -1;
+    for (int side = 0; side < 4; ++side) {
+        const int nx = x + kSides[side].dx;
+        const int ny = y + kSides[side].dy;
+        if (!map.inside(nx, ny)) {
+            continue;
+        }
+        const auto& n = map.at(nx, ny);
+        // Explored ground takes in other land only (the shore is drawn on
+        // the water square); the unexplored dark takes in water too.
+        if ((explored && !n.isLand()) || !n.seenBy(nation) || baseTile(n) == own) {
+            continue;
+        }
+        const auto* mask = sprite(art.phys, kGroundBlend + side);
+        const auto* ground = sprite(art.terrain, baseTile(n));
+        if (mask == nullptr || ground == nullptr || ground->width != kSquare || ground->height != kSquare) {
+            continue;
+        }
+        for (int j = 0; j < mask->height && j < kSquare; ++j) {
+            for (int i = 0; i < mask->width && i < kSquare; ++i) {
+                if (mask->pixels[static_cast<std::size_t>(j * mask->width + i)] == 0) {
+                    screen.pixel(px + i, py + j, ground->pixels[static_cast<std::size_t>(j * kSquare + i)]);
+                }
+            }
+        }
+    }
+}
+
 bool forestShown(const MapSquare& sq) {
-    return sq.isForest() && !sq.hills() && !sq.mountains();
+    return sq.isForest() && (sq.terrain & 15) != kScrub && !sq.hills() && !sq.mountains();
 }
 
 } // namespace
@@ -139,6 +183,7 @@ void drawTerrain(Screen& screen, const Art& art, const Game& game, int x, int y,
     const auto& sq = map.at(x, y);
     if (!sq.seenBy(game.human())) {
         blitSprite(screen, art.phys, kUnexplored, px, py);
+        blendGround(screen, art, map, x, y, px, py, game.human());
         return;
     }
     blitSprite(screen, art.terrain, baseTile(sq), px, py);
@@ -146,6 +191,7 @@ void drawTerrain(Screen& screen, const Art& art, const Game& game, int x, int y,
         drawCoast(screen, art, map, x, y, px, py);
         return;
     }
+    blendGround(screen, art, map, x, y, px, py, game.human());
     if (sq.flags & MapSquare::kPlowed) {
         blitSprite(screen, art.phys, kPlowed, px, py);
     }

@@ -159,6 +159,7 @@ VCR_TEST("game: colony names come from the nation's list") {
 #include "viceroy/game_files.hpp"
 #include "viceroy/render/game_view.hpp"
 
+#include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -183,6 +184,11 @@ VCR_TEST("original files: the game screen is drawn from a savegame") {
     VCR_CHECK(unitIcon(game, 51) == 15); // a frigate
     // For comparing with the original by eye: VICEROY_DUMP_SCREEN=file.
     if (const char* dump = std::getenv("VICEROY_DUMP_SCREEN")) {
+        // VICEROY_DUMP_ORIGIN=x,y shows another part of the map.
+        if (const char* origin = std::getenv("VICEROY_DUMP_ORIGIN")) {
+            std::sscanf(origin, "%d,%d", &view.originX, &view.originY);
+            drawGameScreen(screen, art, game, view);
+        }
         std::ofstream out(dump, std::ios::binary);
         out.write(reinterpret_cast<const char*>(screen.pixels().data()),
                   static_cast<std::streamsize>(screen.pixels().size()));
