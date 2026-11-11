@@ -15,9 +15,10 @@ A unit in Europe or on the high seas between has x = y = 228 + nation +
 | 2 | the port: ships in port, land units on the docks |
 | 1, 0 | "Bound For New …": sailing to the New World |
 
-We take it that ships move one stage a step towards the lower numbers. A
-ship that reaches the port at 2 stops there; one that passes 0 arrives in
-the New World. Land units on board have the stage of their ship, and the
+We take it that ships move one stage a turn towards the lower numbers (a
+guess: the real voyage may take longer, and byte 22 of a ship on the high
+seas counts something on the way). A ship that reaches the port at 2 stops
+there; one that passes 0 arrives in the New World. Land units on board have the stage of their ship, and the
 ship is found by following the chain of units (bytes 24-27 of the unit
 record): the passengers come before the ship. The original shows them
 after the ship, walking the chain backwards from it.
@@ -25,12 +26,40 @@ after the ship, walking the chain backwards from it.
 In our tests, a ship in port at stage 2 with land units of the same chain
 showed the land units on the docks, not in the ship.
 
+## Sailing
+
+A ship that moves onto a sea lane square (terrain 26) is asked the high
+seas question (`@SAILHOME`, see [message boxes](dialogs.md)). If it sails,
+the square is kept as bytes 50 and 51 of the nation record (the original's
+saves hold the square there too: the Dutch galleon of COLONY00 sailing to
+the New World carries 50, 33 as its destination, the same as the nation),
+and it enters stage 4 with everyone aboard. From the port a ship sails
+back after `@SAILAWAY`, enters stage 1, and comes out on that square.
+
+Land units on the docks may board a ship in port. We keep them as sentried
+units in the ship's chain at the port's stage; the original shows such
+units on the docks, so how it stores passengers in port is still to be
+found.
+
+## The cargo holds
+
+Byte 12 of a ship is the number of holds in use; the good in hold k is a
+nibble at byte 13 + k / 2 (the low nibble for even k) and its amount is
+byte 16 + k. In port the original shows a full hold (100) in colour and a
+part-filled one with the grey icon (`ICONS.SS` 38 + good), each centred on
+x 152 + 12k at y 165.
+
 ## The market
 
 Byte 76 + good of the nation record holds a price. The market buys at
 that price less one and sells at that price plus the fifth number of the
 good's `@CARGO` row, so food 1 shows as 0/8, sugar 7 as 6/8, silver 14 as
-13/14. Prices are per unit; cargo moves 100 at a time.
+13/14. Prices are per unit; cargo moves 100 at a time. Buying tops up a
+hold of the same good or fills a free one, as far as the gold goes; the
+tax is taken from what a sale brings in.
+
+**Not yet done:** prices moving after trade, boycotts, and the
+Recruit, Purchase and Train buttons.
 
 ## The screen
 

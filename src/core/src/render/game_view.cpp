@@ -314,6 +314,8 @@ Art loadArt(const std::filesystem::path& folder) {
     art.names = parseTextFile(readFile(folder, "NAMES.TXT"));
     art.colonyNames = parseTextFile(readFile(folder, "COLONY.TXT"));
     art.labelText = parseTextFile(readFile(folder, "LABELS.TXT"));
+    art.gameText = parseTextFile(readFile(folder, "GAME.TXT"));
+    art.portraits.push_back(readSpriteSheet(readFile(folder, "MSS0.SS")));
     art.rules = readRuleset(art.names);
     return art;
 }

@@ -154,6 +154,18 @@ void PlayScreen::moveActive(Step step) {
     case MoveResult::Occupied:
         say("Someone else is there.");
         break;
+    case MoveResult::HighSeas:
+        say("");
+        ask("SAILHOME", index);
+        if (dialog_) {
+            // Measured: the naval adviser stands over the box's left end.
+            dialog_->x = 64;
+            dialog_->y = 108;
+            dialog_->portrait = kNavalAdvisor;
+            dialog_->portraitX = 60;
+            dialog_->portraitY = 37;
+        }
+        break;
     }
 }
 
@@ -175,34 +187,155 @@ void PlayScreen::openEurope() {
     europeScreen_ = state;
 }
 
+void PlayScreen::ask(std::string_view section, int unit, std::vector<std::string> strings) {
+    if (art_ == nullptr) {
+        return;
+    }
+    dialog_ = makeDialog(*art_, section, strings);
+    question_ = std::string(section);
+    questionUnit_ = unit;
+}
+
+bool PlayScreen::handleDialog(Command command) {
+    auto& d = *dialog_;
+    const int count = std::max(1, static_cast<int>(d.options.size()));
+    switch (command) {
+    case Command::MoveN:
+    case Command::Up:
+        d.selected = (d.selected + count - 1) % count;
+        return true;
+    case Command::MoveS:
+    case Command::Down:
+        d.selected = (d.selected + 1) % count;
+        return true;
+    case Command::Confirm:
+    case Command::Skip:
+        break;
+    case Command::Cancel:
+        d.selected = count - 1; // the last choice is "no"
+        break;
+    default:
+        return true;
+    }
+    const bool yes = d.selected == 0;
+    const std::string question = question_;
+    const int unit = questionUnit_;
+    dialog_.reset();
+    if (question == "SAILHOME") {
+        if (yes && game_.sailToEurope(unit)) {
+            say(game_.unitName(unit) + " sails for Europe.");
+            advance();
+        }
+    } else if (question == "SAILAWAY") {
+        if (yes && game_.sailToNewWorld(unit) && europeScreen_) {
+            const auto ships = unitsInEurope(game_.state(), game_.rules(), game_.human(), EuropePlace::InPort, true);
+            europeScreen_->ship = ships.empty() ? -1 : ships.front();
+        }
+    }
+    return true;
+}
+
 bool PlayScreen::handleEuropeScreen(Command command) {
     auto& state = *europeScreen_;
-    const auto ships = unitsInEurope(game_.state(), game_.rules(), game_.human(), EuropePlace::InPort, true);
+    say("");
+    auto& save = game_.state();
+    const auto ships = unitsInEurope(save, game_.rules(), game_.human(), EuropePlace::InPort, true);
+    const auto docks = unitsOnDocks(save, game_.rules(), game_.human());
+    if (std::find(ships.begin(), ships.end(), state.ship) == ships.end()) {
+        state.ship = ships.empty() ? -1 : ships.front();
+    }
+    state.dock = std::clamp(state.dock, 0, std::max(0, static_cast<int>(docks.size()) - 1));
+    auto cycle = [](const std::vector<int>& list, int current, int by) {
+        if (list.empty()) {
+            return -1;
+        }
+        const auto it = std::find(list.begin(), list.end(), current);
+        const int at = it == list.end() ? 0 : static_cast<int>(it - list.begin());
+        const int n = static_cast<int>(list.size());
+        return list[static_cast<std::size_t>((at + by + n) % n)];
+    };
+    const auto& nation = save.nations[static_cast<std::size_t>(game_.human())];
+    const auto goodName = [&](int good) {
+        return static_cast<std::size_t>(good) < game_.rules().cargo.size()
+                   ? game_.rules().cargo[static_cast<std::size_t>(good)].name
+                   : std::string();
+    };
     switch (command) {
     case Command::Cancel:
     case Command::Europe:
         europeScreen_.reset();
-        break;
+        return true;
+    case Command::MoveN:
+    case Command::Up:
+        state.focus = state.focus == EuropeFocus::Market ? EuropeFocus::Ships : EuropeFocus::Docks;
+        return true;
+    case Command::MoveS:
+    case Command::Down:
+        state.focus = state.focus == EuropeFocus::Docks ? EuropeFocus::Ships : EuropeFocus::Market;
+        return true;
     case Command::MoveW:
     case Command::Left:
-        state.good = (state.good + kGoodsKinds - 1) % kGoodsKinds;
-        break;
     case Command::MoveE:
-    case Command::Right:
-        state.good = (state.good + 1) % kGoodsKinds;
-        break;
-    case Command::NextUnit:
-    case Command::Down:
-    case Command::MoveS:
-        if (!ships.empty()) {
-            const auto it = std::find(ships.begin(), ships.end(), state.ship);
-            state.ship = it == ships.end() || it + 1 == ships.end() ? ships.front() : *(it + 1);
+    case Command::Right: {
+        const int by = (command == Command::MoveW || command == Command::Left) ? -1 : 1;
+        if (state.focus == EuropeFocus::Market) {
+            state.good = (state.good + by + kGoodsKinds) % kGoodsKinds;
+        } else if (state.focus == EuropeFocus::Ships) {
+            state.ship = cycle(ships, state.ship, by);
+        } else if (!docks.empty()) {
+            const int n = static_cast<int>(docks.size());
+            state.dock = (state.dock + by + n) % n;
         }
-        break;
-    default:
-        break;
+        return true;
     }
-    return true;
+    case Command::NextUnit:
+        state.ship = cycle(ships, state.ship, 1);
+        return true;
+    case Command::Confirm:
+        if (state.focus == EuropeFocus::Market) {
+            if (state.ship < 0) {
+                say("No ship in port.");
+                return true;
+            }
+            const Trade t = buyGoods(save, game_.rules(), state.ship, state.good, game_.freeHolds(state.ship));
+            if (t.amount > 0) {
+                say(std::to_string(t.amount) + " " + goodName(state.good) + " bought for " + std::to_string(t.gold) +
+                    "$.");
+            } else {
+                say(nation.gold < askPrice(game_.rules(), nation, state.good) ? "Not enough gold."
+                                                                              : "No room aboard.");
+            }
+        } else if (state.focus == EuropeFocus::Ships) {
+            if (state.ship >= 0) {
+                ask("SAILAWAY", state.ship);
+            }
+        } else if (!docks.empty() && state.ship >= 0) {
+            const int who = docks[static_cast<std::size_t>(state.dock)];
+            if (!game_.boardInPort(who, state.ship)) {
+                say("No room aboard.");
+            }
+        }
+        return true;
+    case Command::Sentry: // S: sell
+    case Command::BuildColony: // X on a gamepad
+        if (state.focus == EuropeFocus::Market && state.ship >= 0) {
+            const Trade t = sellGoods(save, state.ship, state.good);
+            if (t.amount > 0) {
+                say(std::to_string(t.amount) + " " + goodName(state.good) + " sold for " + std::to_string(t.gold) +
+                    "$ (tax " + std::to_string(t.tax) + "$).");
+            }
+        }
+        return true;
+    case Command::Skip: // Space: everyone aboard the ship goes ashore
+        if (state.ship >= 0) {
+            for (const int p : game_.passengersInPort(state.ship)) {
+                game_.leaveShipInPort(p);
+            }
+        }
+        return true;
+    default:
+        return true;
+    }
 }
 
 bool PlayScreen::handleColonyScreen(Command command) {
@@ -307,6 +440,9 @@ void PlayScreen::clickSquare(int x, int y) {
 }
 
 bool PlayScreen::handle(Command command) {
+    if (dialog_) {
+        return handleDialog(command);
+    }
     if (europeScreen_) {
         return handleEuropeScreen(command);
     }
@@ -493,8 +629,20 @@ void PlayScreen::tick(std::uint64_t milliseconds) {
 }
 
 void PlayScreen::draw(Screen& screen, const Art& art) const {
+    drawScreen(screen, art);
+    if (dialog_) {
+        drawDialog(screen, art, *dialog_);
+    }
+}
+
+void PlayScreen::drawScreen(Screen& screen, const Art& art) const {
     if (europeScreen_ && colonyArt_ != nullptr) {
         drawEuropeScreen(screen, art, *colonyArt_, game_, *europeScreen_);
+        // Our own line for what just happened (the original has none here).
+        if (!view_.message.empty()) {
+            const int w = Screen::textWidth(art.tiny, view_.message);
+            screen.text(art.tiny, 160 - w / 2, 60, view_.message, {0x0F, kNoColour, kNoColour});
+        }
         return;
     }
     if (colonyScreen_ && colonyArt_ != nullptr) {

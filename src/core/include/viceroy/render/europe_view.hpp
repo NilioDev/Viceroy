@@ -12,9 +12,13 @@
 
 namespace viceroy {
 
+enum class EuropeFocus { Market, Ships, Docks };
+
 struct EuropeViewState {
     int ship = -1;     // the ship in port that is selected, -1 for none
     int good = 0;      // the market box with the cursor
+    int dock = 0;      // the unit on the docks with the cursor
+    EuropeFocus focus = EuropeFocus::Market;
 };
 
 // The buttons on the right, top to bottom.

@@ -7,6 +7,7 @@
 
 #include "viceroy/game/game.hpp"
 #include "viceroy/render/colony_view.hpp"
+#include "viceroy/render/dialog.hpp"
 #include "viceroy/render/europe_view.hpp"
 #include "viceroy/render/game_view.hpp"
 
@@ -14,6 +15,7 @@
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace viceroy {
@@ -76,6 +78,10 @@ public:
     // The home port in Europe, when it is shown.
     const std::optional<EuropeViewState>& europeScreen() const { return europeScreen_; }
     void openEurope();
+    // A question in a message box, when one is up.
+    const std::optional<Dialog>& dialog() const { return dialog_; }
+    // Set by the app after loading Art: needed for message boxes.
+    void setArt(const Art* art) { art_ = art; }
     // The colony opened last, or -1.
     int lastColony() const { return lastColony_; }
     // A line in the panel, as the game's own messages.
@@ -94,6 +100,9 @@ private:
     void say(std::string text);
     bool handleColonyScreen(Command command);
     bool handleEuropeScreen(Command command);
+    bool handleDialog(Command command);
+    void drawScreen(Screen& screen, const Art& art) const;
+    void ask(std::string_view section, int unit, std::vector<std::string> strings = {});
 
     Game game_;
     ViewState view_;
@@ -104,6 +113,10 @@ private:
     const ColonyArt* colonyArt_ = nullptr;
     std::optional<ColonyViewState> colonyScreen_;
     std::optional<EuropeViewState> europeScreen_;
+    std::optional<Dialog> dialog_;
+    std::string question_; // the GAME.TXT section the dialog asks
+    int questionUnit_ = -1;
+    const Art* art_ = nullptr;
     int lastColony_ = -1;
     bool viewMode_ = false;
     int cursorX_ = 0;
