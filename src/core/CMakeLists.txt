@@ -8,6 +8,9 @@ add_library(vcr_core STATIC
     src/data/text_table.cpp
     src/rules/ruleset.cpp
     src/data/savegame.cpp
+    src/util/zlib.cpp
+    src/util/zip.cpp
+    src/pack/library.cpp
 )
 add_library(viceroy::core ALIAS vcr_core)
 

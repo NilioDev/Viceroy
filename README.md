@@ -11,10 +11,9 @@ touch controls.
 
 > [!NOTE]
 > **Status: just started.** There is nothing to play yet. The program shows
-> the map of the newest savegame in your game folder with the original
-> terrain tiles; forests, hills, rivers and coastlines are not drawn yet.
-> Scroll with the arrow keys, the numeric keypad, or a gamepad's D-pad or
-> left stick.
+> the map of the newest savegame with the original terrain tiles; forests,
+> hills, rivers and coastlines are not drawn yet. Scroll with the arrow keys,
+> the numeric keypad, or a gamepad's D-pad or left stick.
 
 Viceroy is not affiliated with or endorsed by the makers of the original
 game. It contains none of the original game's files: you need your own copy.
@@ -44,12 +43,28 @@ and download one at the bottom of the page.
 
 ## Add your game
 
-Copy your game folder (the one with `VICEROY.EXE` and `VICEROY.PAL`) into a
-folder called `gamedata` next to the program, or next to the `.AppImage`
-file. Viceroy also looks in `gamedata` in the current folder and in its own
-data folder (`~/.local/share/Viceroy/Viceroy/gamedata` on Linux), or you can
-give the folder when starting it: `./Viceroy path/to/game`. See
-[gamedata/README.md](gamedata/README.md).
+You hand Viceroy your own copy of the DOS game **once**. On first start it
+asks for it:
+
+- drop the game folder (the one with `VICEROY.EXE`) or the `.zip` it came in
+  onto the window, or
+- press **Enter** or the gamepad's **A** button to choose the folder, or
+  **Z** or **Y** to choose the zip file.
+
+Viceroy checks the files, copies them into its own library and uses them from
+then on, so you can delete or move the original afterwards. The savegames that
+came with the game are copied too; your own saves are never overwritten. The
+game may sit in a subfolder of the folder or zip, and Mac leftovers such as
+`__MACOSX` are ignored. To import again, for example from another copy, just
+drop it onto the window.
+
+The library is in `~/.local/share/Viceroy/Viceroy/library` on Linux,
+`%APPDATA%\Viceroy\Viceroy\library` on Windows and
+`~/Library/Application Support/Viceroy/Viceroy/library` on macOS.
+
+If there is a `gamedata` folder with the game next to the program, next to the
+`.AppImage` file or in the current folder, Viceroy imports it by itself. You
+can also give a folder or zip when starting it: `./Viceroy path/to/col.zip`.
 
 ## License
 

@@ -3,6 +3,10 @@
 // For now: a viewer that shows the map of the player's most recent
 // savegame with the original terrain tiles, at the original 320×200
 // resolution scaled to the window. The game itself is built up step by step.
+//
+// On first start the player hands over their own copy of the game once (a
+// folder or the zip it came in); it is checked and imported into Viceroy's
+// own library and used from there on.
 #define SDL_MAIN_USE_CALLBACKS 1
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
@@ -11,6 +15,7 @@
 #include "viceroy/data/reader.hpp"
 #include "viceroy/data/savegame.hpp"
 #include "viceroy/game_files.hpp"
+#include "viceroy/pack/library.hpp"
 #include "viceroy/version.hpp"
 
 #include <algorithm>
@@ -32,6 +37,10 @@ struct App {
     SDL_Window* window = nullptr;
     SDL_Renderer* renderer = nullptr;
     std::string status;
+    std::filesystem::path library;
+    bool needGameFiles = false; // show the "hand over your game" screen
+    bool dialogOpen = false;
+    Uint32 pickedEvent = 0; // our event type for a picked file or folder
     std::optional<viceroy::SaveGame> save;
     std::vector<SDL_Texture*> terrainTiles;
     float viewX = 0; // top-left square shown
@@ -41,10 +50,20 @@ struct App {
     Uint64 lastTicks = 0;
 };
 
-// Where to look for the game files when no folder is given: next to the
+// Where the imported game, savegames and later add-ons live.
+std::filesystem::path libraryFolder() {
+    std::filesystem::path folder = std::filesystem::current_path() / "library";
+    if (char* pref = SDL_GetPrefPath("Viceroy", "Viceroy")) {
+        folder = std::filesystem::path(pref) / "library";
+        SDL_free(pref);
+    }
+    return folder;
+}
+
+// Where to look for game files to import without asking: next to the
 // AppImage file (the program itself runs from a read-only mount), next to the
 // program, in the current folder, and in the app's data folder.
-std::filesystem::path defaultGameFolder() {
+std::optional<std::filesystem::path> findGameToImport() {
     std::vector<std::filesystem::path> candidates;
     if (const char* appImage = SDL_getenv("APPIMAGE")) {
         candidates.push_back(std::filesystem::path(appImage).parent_path() / "gamedata");
@@ -62,7 +81,7 @@ std::filesystem::path defaultGameFolder() {
             return folder;
         }
     }
-    return candidates.front();
+    return std::nullopt;
 }
 
 std::vector<std::uint8_t> readAll(const std::filesystem::path& path) {
@@ -113,13 +132,20 @@ std::optional<std::filesystem::path> newestSave(const std::filesystem::path& fol
     return best;
 }
 
-void loadGame(App& app, const std::filesystem::path& folder) {
-    if (!viceroy::isGameFolder(folder)) {
-        app.status = "Put your game files in the gamedata folder.";
+void loadGame(App& app) {
+    const auto folder = viceroy::pack::baseFolder(app.library);
+    for (auto* texture : app.terrainTiles) {
+        SDL_DestroyTexture(texture);
+    }
+    app.terrainTiles.clear();
+    app.save.reset();
+    const auto palettePath = viceroy::findFileNoCase(folder, "VICEROY.PAL");
+    if (!palettePath) {
+        app.status = "Imported game incomplete; drop it again.";
         return;
     }
     try {
-        const auto palette = viceroy::readVgaPalette(readAll(*viceroy::findFileNoCase(folder, "VICEROY.PAL")));
+        const auto palette = viceroy::readVgaPalette(readAll(*palettePath));
         const auto terrainPath = viceroy::findFileNoCase(folder, "TERRAIN.SS");
         if (!terrainPath) {
             app.status = "TERRAIN.SS is missing.";
@@ -129,7 +155,7 @@ void loadGame(App& app, const std::filesystem::path& folder) {
         for (const auto& sprite : sheet.sprites) {
             app.terrainTiles.push_back(makeTexture(app.renderer, sprite.image, sheet.palette.value_or(palette)));
         }
-        const auto savePath = newestSave(folder);
+        const auto savePath = newestSave(viceroy::pack::savesFolder(app.library));
         if (!savePath) {
             app.status = "No savegame found to show.";
             return;
@@ -140,6 +166,89 @@ void loadGame(App& app, const std::filesystem::path& folder) {
     } catch (const viceroy::FormatError& e) {
         app.status = std::string("Cannot read the game files: ") + e.what();
         app.save.reset();
+    }
+}
+
+// Imports the player's game from a folder or zip, then shows it.
+void importAndLoad(App& app, const std::filesystem::path& source) {
+    try {
+        const auto result = viceroy::pack::importGame(source, app.library);
+        SDL_Log("Imported %zu game files into %s", result.files.size(), app.library.string().c_str());
+        app.needGameFiles = false;
+        loadGame(app);
+    } catch (const viceroy::pack::ImportError& e) {
+        SDL_Log("Import failed: %s", e.what());
+        app.status = e.what();
+        if (!viceroy::pack::hasBasePack(app.library)) {
+            app.needGameFiles = true;
+        }
+    }
+}
+
+// File dialogs answer on another thread; hand the choice to the event loop.
+void SDLCALL onPicked(void* userdata, const char* const* files, int) {
+    auto* app = static_cast<App*>(userdata);
+    SDL_Event event{};
+    event.type = app->pickedEvent;
+    event.user.data1 = (files != nullptr && files[0] != nullptr) ? SDL_strdup(files[0]) : nullptr;
+    SDL_PushEvent(&event);
+}
+
+void chooseFolder(App& app) {
+    if (!app.dialogOpen) {
+        app.dialogOpen = true;
+        SDL_ShowOpenFolderDialog(onPicked, &app, app.window, nullptr, false);
+    }
+}
+
+void chooseZip(App& app) {
+    static const SDL_DialogFileFilter kZip{"Zip archive", "zip"};
+    if (!app.dialogOpen) {
+        app.dialogOpen = true;
+        SDL_ShowOpenFileDialog(onPicked, &app, app.window, &kZip, 1, nullptr, false);
+    }
+}
+
+void drawText(App& app, float y, const std::string& text) {
+    const float x = (kScreenW - static_cast<float>(text.size()) * SDL_DEBUG_TEXT_FONT_CHARACTER_SIZE) / 2;
+    SDL_RenderDebugText(app.renderer, std::max(2.0f, x), y, text.c_str());
+}
+
+// Shown until the game has been imported. Our own text, nothing from the
+// original game, since we don't have its files yet.
+void drawWelcome(App& app) {
+    SDL_SetRenderDrawColor(app.renderer, 236, 196, 92, 255);
+    drawText(app, 40, "Welcome to Viceroy");
+    SDL_SetRenderDrawColor(app.renderer, 220, 220, 220, 255);
+    drawText(app, 64, "Viceroy needs your own copy");
+    drawText(app, 74, "of the DOS game, once.");
+    drawText(app, 98, "Drop its folder or zip here,");
+    drawText(app, 114, "Enter / (A): choose its folder");
+    drawText(app, 126, "Z / (Y): choose its zip file");
+    drawText(app, 150, "Esc: quit");
+
+    // Why the last try failed, wrapped to the screen width.
+    SDL_SetRenderDrawColor(app.renderer, 240, 120, 100, 255);
+    constexpr std::size_t kColumns = kScreenW / SDL_DEBUG_TEXT_FONT_CHARACTER_SIZE - 2;
+    std::string line;
+    float y = 170;
+    std::size_t start = 0;
+    while (start < app.status.size()) {
+        auto end = app.status.find(' ', start);
+        if (end == std::string::npos) {
+            end = app.status.size();
+        }
+        const std::string word = app.status.substr(start, end - start);
+        if (!line.empty() && line.size() + 1 + word.size() > kColumns) {
+            drawText(app, y, line);
+            y += 10;
+            line.clear();
+        }
+        line += (line.empty() ? "" : " ") + word;
+        start = end + 1;
+    }
+    if (!line.empty()) {
+        drawText(app, y, line);
     }
 }
 
@@ -186,8 +295,21 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char** argv) {
     }
     SDL_SetRenderLogicalPresentation(app->renderer, kScreenW, kScreenH, SDL_LOGICAL_PRESENTATION_LETTERBOX);
     SDL_SetRenderVSync(app->renderer, 1);
-    loadGame(*app, argc > 1 ? std::filesystem::path(argv[1]) : defaultGameFolder());
-    SDL_Log("%s", app->status.c_str());
+    app->pickedEvent = SDL_RegisterEvents(1);
+    app->library = libraryFolder();
+
+    // A folder or zip on the command line is imported; otherwise use the
+    // earlier import, or import a gamedata folder found nearby, or ask.
+    if (argc > 1) {
+        importAndLoad(*app, std::filesystem::path(argv[1]));
+    } else if (viceroy::pack::hasBasePack(app->library)) {
+        loadGame(*app);
+    } else if (const auto found = findGameToImport()) {
+        importAndLoad(*app, *found);
+    } else {
+        app->needGameFiles = true;
+    }
+    SDL_Log("%s", app->needGameFiles ? "Waiting for the game files." : app->status.c_str());
     app->lastTicks = SDL_GetTicks();
     return SDL_APP_CONTINUE;
 }
@@ -200,12 +322,28 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
     case SDL_EVENT_GAMEPAD_ADDED:
         SDL_OpenGamepad(event->gdevice.which);
         break;
+    case SDL_EVENT_DROP_FILE:
+        if (event->drop.data != nullptr) {
+            importAndLoad(*app, std::filesystem::path(event->drop.data));
+        }
+        break;
     case SDL_EVENT_KEY_DOWN:
     case SDL_EVENT_KEY_UP: {
         const float on = event->type == SDL_EVENT_KEY_DOWN ? 1.0f : 0.0f;
         switch (event->key.key) {
         case SDLK_ESCAPE:
             return SDL_APP_SUCCESS;
+        case SDLK_RETURN:
+        case SDLK_KP_ENTER:
+            if (app->needGameFiles && on > 0) {
+                chooseFolder(*app);
+            }
+            break;
+        case SDLK_Z:
+            if (app->needGameFiles && on > 0) {
+                chooseZip(*app);
+            }
+            break;
         case SDLK_LEFT:
         case SDLK_KP_4:
             app->moveX = -on;
@@ -243,6 +381,16 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
         case SDL_GAMEPAD_BUTTON_DPAD_DOWN:
             app->moveY = on;
             break;
+        case SDL_GAMEPAD_BUTTON_SOUTH:
+            if (app->needGameFiles && on > 0) {
+                chooseFolder(*app);
+            }
+            break;
+        case SDL_GAMEPAD_BUTTON_NORTH:
+            if (app->needGameFiles && on > 0) {
+                chooseZip(*app);
+            }
+            break;
         default:
             break;
         }
@@ -259,6 +407,13 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
         break;
     }
     default:
+        if (event->type == app->pickedEvent) {
+            app->dialogOpen = false;
+            if (auto* path = static_cast<char*>(event->user.data1)) {
+                importAndLoad(*app, std::filesystem::path(path));
+                SDL_free(path);
+            }
+        }
         break;
     }
     return SDL_APP_CONTINUE;
@@ -276,7 +431,11 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
 
     SDL_SetRenderDrawColor(app->renderer, 0, 0, 0, 255);
     SDL_RenderClear(app->renderer);
-    if (app->save && !app->terrainTiles.empty()) {
+    if (app->needGameFiles) {
+        drawWelcome(*app);
+        SDL_RenderPresent(app->renderer);
+        return SDL_APP_CONTINUE;
+    } else if (app->save && !app->terrainTiles.empty()) {
         const auto& map = app->save->map;
         const int firstX = static_cast<int>(app->viewX);
         const int firstY = static_cast<int>(app->viewY);
