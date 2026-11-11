@@ -1,0 +1,40 @@
+# Build output
+/build*/
+/out/
+CMakeUserPresets.json
+.cache/
+compile_commands.json
+
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/app/.cxx/
+android/local.properties
+
+# Editors
+.vscode/
+.idea/
+*.swp
+.DS_Store
+__MACOSX/
+
+# Original game data: never commit
+/gamedata/*
+!/gamedata/README.md
+*.EXE
+*.exe
+*.SS
+*.ss
+*.PIK
+*.pik
+*.PAL
+*.pal
+*.SAV
+*.sav
+*.FF
+*.ff
+*.COL
+*.MP
+*.MOV
+*.zip
