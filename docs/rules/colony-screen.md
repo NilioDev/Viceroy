@@ -70,3 +70,21 @@ buttons are `ICONS.SS` 67-69.
 
 The warehouse shows the 16 goods (`ICONS.SS` 22-37) centred on
 x 10 + 19k at y 181, with the amount in colour 0x3D centred below at y 194.
+
+## Jobs menu
+
+Measured on Isabella with a petty criminal distiller selected; our drawing
+matches it pixel for pixel. A box at (62, 20), 196 × 160, filled with
+`WOODTILE.SS` tiled from its corner. Its edge, from the outside in: black, a
+ring of colour 0x86, then a sunken edge (0x80 above and on the right, 0x8A
+on the left and below). All text is `FONTTINY.FF`:
+
+- the title in colour 0x44 at (67, 26): "Select a Profession for
+  <expert plural>(<present job>):" (no space before the bracket);
+- one line per job at x 75, y 36 + 8k, with "N <good>" right-aligned to end
+  at x 245;
+- the highlighted line has a bar of 0x8A at (64, y − 1), 190 × 7;
+- "(More)" as the last line, and "(F1 for Help)" in gold (0x95)
+  right-aligned to x 256 at y 171.
+
+The menu opens on the colonist's present job.

@@ -31,6 +31,8 @@ constexpr std::uint8_t kSelectGreen = 0x45;
 constexpr std::uint8_t kHarbourText = 0x39;
 constexpr std::uint8_t kStockText = 0x3D;
 constexpr std::uint8_t kRed = 0x0C;
+constexpr std::uint8_t kGold = 0x95;
+constexpr std::uint8_t kMenuBar = 0x8A;
 
 // Screen areas.
 constexpr Rect kTown{0, 8, 200, 120};
@@ -383,29 +385,74 @@ void drawWarehouse(Screen& screen, const Art& art, const SaveColony& colony) {
     screen.text(art.tiny, 306, 179, "Exit", {kWhite, kNoColour, kNoColour});
 }
 
+std::string goodName(const Game& game, int good) {
+    const auto& cargo = game.rules().cargo;
+    if (good >= 0 && static_cast<std::size_t>(good) < cargo.size()) {
+        return cargo[static_cast<std::size_t>(good)].name;
+    }
+    return {};
+}
+
+// The original's jobs menu: a wooden box with a line per job and what the
+// colonist would make at it, then "(More)".
 void drawJobsMenu(Screen& screen, const Art& art, const Game& game, const SaveColony& colony, int colonist,
                   int highlighted) {
     const auto& save = game.state();
+    const auto& jobs = game.rules().jobs;
     const auto choices = jobChoices(colony, save.map, game.rules(), save.colonies, colonist);
-    const Rect box{40, 20, 150, 14 + 8 * static_cast<int>(choices.size())};
-    screen.fill(box, kBlack);
-    screen.frame(box, 0x95);
-    for (std::size_t i = 0; i < choices.size(); ++i) {
-        const auto& c = choices[i];
-        const int y = box.y + 5 + 8 * static_cast<int>(i);
-        const bool selected = static_cast<int>(i) == highlighted;
-        const bool expert = colony.skills[static_cast<std::size_t>(colonist)] == c.job;
-        if (selected) {
-            screen.fill({box.x + 3, y - 1, box.w - 6, 8}, kGreen);
+    const Rect box{62, 20, 196, 160};
+    screen.setClip({box.x + 1, box.y + 1, box.w - 2, box.h - 2});
+    for (int y = box.y; y < box.y + box.h; ++y) {
+        for (int x = box.x; x < box.x + box.w; ++x) {
+            const auto& wood = art.wood;
+            if (wood.width > 0 && wood.height > 0) {
+                screen.pixel(x, y,
+                             wood.pixels[static_cast<std::size_t>(((y - box.y) % wood.height) * wood.width +
+                                                                  (x - box.x) % wood.width)]);
+            }
         }
-        std::string name = "Job";
-        if (const auto& jobs = game.rules().jobs; static_cast<std::size_t>(c.job) < jobs.size()) {
-            name = jobs[static_cast<std::size_t>(c.job)].name;
-        }
-        const std::uint8_t colour = selected ? kBlack : c.amount > 0 ? (expert ? 0x95 : kWhite) : 0x07;
-        screen.text(art.tiny, box.x + 8, y, name, {colour, kNoColour, kNoColour});
-        screen.text(art.tiny, box.x + box.w - 24, y, std::to_string(c.amount), {colour, kNoColour, kNoColour});
     }
+    screen.resetClip();
+    // Black, a ring of 0x86, and a sunken edge: dark above and right,
+    // light left and below.
+    screen.frame(box, kBlack);
+    screen.frame({box.x + 1, box.y + 1, box.w - 2, box.h - 2}, 0x86);
+    screen.fill({box.x + 2, box.y + 2, box.w - 4, 1}, 0x80);
+    screen.fill({box.x + box.w - 3, box.y + 2, 1, box.h - 4}, 0x80);
+    screen.fill({box.x + 2, box.y + 3, 1, box.h - 5}, kMenuBar);
+    screen.fill({box.x + 2, box.y + box.h - 3, box.w - 4, 1}, kMenuBar);
+
+    const TextColours green{kGreen, kNoColour, kNoColour};
+    auto nameOf = [&](int row, bool expert) -> std::string {
+        if (row < 0 || static_cast<std::size_t>(row) >= jobs.size()) {
+            return {};
+        }
+        return expert ? jobs[static_cast<std::size_t>(row)].expertName : jobs[static_cast<std::size_t>(row)].name;
+    };
+    const int skillOf = colony.skills[static_cast<std::size_t>(colonist)];
+    // Skills 0x1C (free colonist) and the soldier-like ones use their @JOB rows.
+    const int skillRow = skillOf == skill::kFreeColonist ? 19 : skillOf;
+    const std::string title = "Select a Profession for " + nameOf(skillRow, true) + "(" +
+                              nameOf(colony.jobs[static_cast<std::size_t>(colonist)], false) + "):";
+    screen.text(art.tiny, 67, 26, title, green);
+
+    const int lines = static_cast<int>(choices.size()) + 1;
+    for (int i = 0; i < lines; ++i) {
+        const int y = 36 + 8 * i;
+        if (i == highlighted) {
+            screen.fill({64, y - 1, 190, 7}, kMenuBar);
+        }
+        if (i == lines - 1) {
+            screen.text(art.tiny, 75, y, "(More)", green);
+            break;
+        }
+        const auto& c = choices[static_cast<std::size_t>(i)];
+        screen.text(art.tiny, 75, y, nameOf(c.job, false), green);
+        const std::string value = std::to_string(c.amount) + " " + goodName(game, jobOutput(c.job));
+        screen.text(art.tiny, 245 - Screen::textWidth(art.tiny, value), y, value, green);
+    }
+    const std::string help = "(F1 for Help)";
+    screen.text(art.tiny, 256 - Screen::textWidth(art.tiny, help), 171, help, {kGold, kNoColour, kNoColour});
 }
 
 } // namespace

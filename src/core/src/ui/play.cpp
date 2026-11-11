@@ -173,8 +173,8 @@ bool PlayScreen::handleColonyScreen(Command command) {
     auto& colony = save.colonies[static_cast<std::size_t>(state.colony)];
     const int people = colony.population;
     if (state.jobsMenu >= 0) {
-        const int lines = static_cast<int>(jobChoices(colony, save.map, game_.rules(), save.colonies,
-                                                      state.selectedColonist).size());
+        const auto choices = jobChoices(colony, save.map, game_.rules(), save.colonies, state.selectedColonist);
+        const int lines = static_cast<int>(choices.size()) + 1; // the last line is "(More)"
         switch (command) {
         case Command::MoveN:
         case Command::Up:
@@ -186,7 +186,10 @@ bool PlayScreen::handleColonyScreen(Command command) {
             break;
         case Command::Confirm:
         case Command::Skip:
-            assignJob(colony, save.map, game_.rules(), save.colonies, state.selectedColonist, state.jobsMenu);
+            if (state.jobsMenu < static_cast<int>(choices.size())) {
+                assignJob(colony, save.map, game_.rules(), save.colonies, state.selectedColonist,
+                          choices[static_cast<std::size_t>(state.jobsMenu)].job);
+            }
             state.jobsMenu = -1;
             break;
         case Command::Cancel:
@@ -205,7 +208,14 @@ bool PlayScreen::handleColonyScreen(Command command) {
     case Command::Skip:
         if (state.selectedColonist >= 0 && state.selectedColonist < people) {
             // The jobs menu opens on the colonist's present job.
-            state.jobsMenu = std::clamp<int>(colony.jobs[static_cast<std::size_t>(state.selectedColonist)], 0, 17);
+            const auto choices = jobChoices(colony, save.map, game_.rules(), save.colonies, state.selectedColonist);
+            const int current = colony.jobs[static_cast<std::size_t>(state.selectedColonist)];
+            state.jobsMenu = 0;
+            for (std::size_t i = 0; i < choices.size(); ++i) {
+                if (choices[i].job == current) {
+                    state.jobsMenu = static_cast<int>(i);
+                }
+            }
         } else {
             colonyScreen_.reset();
         }

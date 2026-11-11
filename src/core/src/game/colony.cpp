@@ -111,6 +111,11 @@ int squareYield(const Ruleset& rules, const MapSquare& square, int jobRow, int s
             amount += 1;
         }
         break;
+    case 4: // furs
+        if (road) {
+            amount += 2;
+        }
+        break;
     case 5: // lumber
         amount *= 2;
         if (road) {
@@ -124,7 +129,7 @@ int squareYield(const Ruleset& rules, const MapSquare& square, int jobRow, int s
         }
         break;
     case job::kFisherman:
-        amount += 1;
+        amount += 2;
         break;
     default:
         break;
@@ -369,6 +374,11 @@ std::vector<JobChoice> jobChoices(const SaveColony& colony, const SaveMap& map, 
         return out;
     }
     for (int j = 0; j < job::kTeacher; ++j) {
+        // Work in a building is offered only where the building stands.
+        const auto building = buildingForJob(j);
+        if (building && buildingLevel(colony, *building) == 0) {
+            continue;
+        }
         out.push_back(choiceFor(colony, map, rules, colonies, colonist, j));
     }
     return out;
