@@ -10,10 +10,11 @@ savegames, scaled sharply to any screen and with gamepad, mouse, keyboard and
 touch controls.
 
 > [!NOTE]
-> **Status: just started.** There is nothing to play yet. The program shows
-> the map of the newest savegame with the original terrain tiles; forests,
-> hills, rivers and coastlines are not drawn yet. Scroll with the arrow keys,
-> the numeric keypad, or a gamepad's D-pad or left stick.
+> **Status: first playable steps.** Load one of your savegames, move your
+> units over the original map, board ships and make landfall, found
+> colonies, end turns and save. The other nations don't move yet, and the
+> colony, Europe and trade screens, combat and meeting the natives are still
+> to come. Coastlines and fish are not drawn yet.
 
 Viceroy is not affiliated with or endorsed by the makers of the original
 game. It contains none of the original game's files: you need your own copy.
@@ -40,6 +41,26 @@ and download one at the bottom of the page.
   program*, or `chmod +x`) and double-click it.
 - 🪟 **Windows:** `Viceroy-Windows`, then start `Viceroy.exe`.
 - 🍎 **macOS:** `Viceroy-macOS`.
+
+## Controls
+
+| Action | Keyboard | Gamepad |
+| --- | --- | --- |
+| Move the active unit | Numeric keypad 1-9, arrow keys, Home / PgUp / End / PgDn for diagonals, or click a square next to it | Left stick or D-pad |
+| No orders this turn | Space | A |
+| End the turn (when asked) | Enter | A |
+| End the turn now | Ctrl+E | Y |
+| Wait (come back to this unit later) | W | |
+| Next / previous unit | Tab / Shift+Tab | RB / LB |
+| Sentry | S | B |
+| Fortify | F | Right stick click |
+| Build colony | B | X |
+| Centre the map on the unit | C | Back |
+| Save the game | Ctrl+S | Start |
+| Back to the load menu | Esc | Guide |
+
+Saving writes over the savegame you loaded, in Viceroy's library (see
+below). Your original files are never changed.
 
 ## Add your game
 

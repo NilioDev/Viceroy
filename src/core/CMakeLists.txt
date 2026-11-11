@@ -11,6 +11,10 @@ add_library(vcr_core STATIC
     src/util/zlib.cpp
     src/util/zip.cpp
     src/pack/library.cpp
+    src/game/game.cpp
+    src/render/screen.cpp
+    src/render/game_view.cpp
+    src/ui/play.cpp
 )
 add_library(viceroy::core ALIAS vcr_core)
 

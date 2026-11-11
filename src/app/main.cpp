@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// For now: a viewer that shows the map of the player's most recent
-// savegame with the original terrain tiles, at the original 320×200
-// resolution scaled to the window. The game itself is built up step by step.
+// The Viceroy app: opens a window, turns keyboard, mouse and gamepad input
+// into commands for the current screen, and shows the 320×200 screen the
+// core draws, scaled sharply to the window.
 //
 // On first start the player hands over their own copy of the game once (a
 // folder or the zip it came in); it is checked and imported into Viceroy's
@@ -11,11 +11,13 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 
-#include "viceroy/data/image.hpp"
 #include "viceroy/data/reader.hpp"
 #include "viceroy/data/savegame.hpp"
 #include "viceroy/game_files.hpp"
 #include "viceroy/pack/library.hpp"
+#include "viceroy/render/game_view.hpp"
+#include "viceroy/render/screen.hpp"
+#include "viceroy/ui/play.hpp"
 #include "viceroy/version.hpp"
 
 #include <algorithm>
@@ -23,31 +25,43 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
 
 namespace {
 
-constexpr int kScreenW = 320;
-constexpr int kScreenH = 200;
-constexpr int kTile = 16;
+using viceroy::Command;
+
+constexpr int kScreenW = viceroy::Screen::kWidth;
+constexpr int kScreenH = viceroy::Screen::kHeight;
+constexpr Uint64 kStickRepeatMs = 220;
+constexpr float kStickThreshold = 0.6f;
+
+enum class Mode { Welcome, Load, Play };
 
 struct App {
     SDL_Window* window = nullptr;
     SDL_Renderer* renderer = nullptr;
+    SDL_Texture* frame = nullptr;
     std::string status;
     std::filesystem::path library;
-    bool needGameFiles = false; // show the "hand over your game" screen
+    Mode mode = Mode::Welcome;
     bool dialogOpen = false;
     Uint32 pickedEvent = 0; // our event type for a picked file or folder
-    std::optional<viceroy::SaveGame> save;
-    std::vector<SDL_Texture*> terrainTiles;
-    float viewX = 0; // top-left square shown
-    float viewY = 0;
-    float moveX = 0; // scroll direction from keys or gamepad
-    float moveY = 0;
+
+    std::unique_ptr<viceroy::Art> art;
+    std::unique_ptr<viceroy::LoadMenu> load;
+    std::unique_ptr<viceroy::PlayScreen> play;
+    viceroy::Screen screen;
     Uint64 lastTicks = 0;
+
+    // Left stick: the direction held and when it last fired.
+    std::optional<Command> stickCommand;
+    Uint64 stickFired = 0;
+    float stickX = 0;
+    float stickY = 0;
 };
 
 // Where the imported game, savegames and later add-ons live.
@@ -84,104 +98,51 @@ std::optional<std::filesystem::path> findGameToImport() {
     return std::nullopt;
 }
 
-std::vector<std::uint8_t> readAll(const std::filesystem::path& path) {
+viceroy::Bytes readAll(const std::filesystem::path& path) {
     std::ifstream in(path, std::ios::binary);
     return {std::istreambuf_iterator<char>(in), {}};
 }
 
-SDL_Texture* makeTexture(SDL_Renderer* renderer, const viceroy::IndexedImage& image, const viceroy::Palette& palette) {
-    SDL_Surface* surface = SDL_CreateSurface(image.width, image.height, SDL_PIXELFORMAT_RGBA32);
-    if (surface == nullptr) {
-        return nullptr;
-    }
-    auto* pixels = static_cast<Uint8*>(surface->pixels);
-    for (int y = 0; y < image.height; ++y) {
-        for (int x = 0; x < image.width; ++x) {
-            const auto index = image.pixels[static_cast<std::size_t>(y * image.width + x)];
-            Uint8* p = pixels + y * surface->pitch + x * 4;
-            const auto& c = palette[index];
-            p[0] = c.r;
-            p[1] = c.g;
-            p[2] = c.b;
-            p[3] = index == viceroy::kTransparent ? 0 : 255;
-        }
-    }
-    SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
-    SDL_DestroySurface(surface);
-    if (texture != nullptr) {
-        SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST);
-    }
-    return texture;
+void showLoadMenu(App& app) {
+    app.play.reset();
+    app.load = std::make_unique<viceroy::LoadMenu>(
+        viceroy::listSaves(viceroy::pack::savesFolder(app.library), *app.art));
+    app.mode = Mode::Load;
 }
 
-std::optional<std::filesystem::path> newestSave(const std::filesystem::path& folder) {
-    std::optional<std::filesystem::path> best;
-    std::filesystem::file_time_type bestTime{};
-    for (int i = 0; i < 10; ++i) {
-        const auto path = viceroy::findFileNoCase(folder, "COLONY0" + std::to_string(i) + ".SAV");
-        if (!path) {
-            continue;
-        }
-        std::error_code ec;
-        const auto time = std::filesystem::last_write_time(*path, ec);
-        if (!best || (!ec && time > bestTime)) {
-            best = path;
-            bestTime = time;
-        }
-    }
-    return best;
-}
-
-void loadGame(App& app) {
-    const auto folder = viceroy::pack::baseFolder(app.library);
-    for (auto* texture : app.terrainTiles) {
-        SDL_DestroyTexture(texture);
-    }
-    app.terrainTiles.clear();
-    app.save.reset();
-    const auto palettePath = viceroy::findFileNoCase(folder, "VICEROY.PAL");
-    if (!palettePath) {
-        app.status = "Imported game incomplete; drop it again.";
-        return;
-    }
+// Loads the pictures and rules from the library, then shows the load menu.
+void openLibrary(App& app) {
     try {
-        const auto palette = viceroy::readVgaPalette(readAll(*palettePath));
-        const auto terrainPath = viceroy::findFileNoCase(folder, "TERRAIN.SS");
-        if (!terrainPath) {
-            app.status = "TERRAIN.SS is missing.";
-            return;
-        }
-        const auto sheet = viceroy::readSpriteSheet(readAll(*terrainPath));
-        for (const auto& sprite : sheet.sprites) {
-            app.terrainTiles.push_back(makeTexture(app.renderer, sprite.image, sheet.palette.value_or(palette)));
-        }
-        const auto savePath = newestSave(viceroy::pack::savesFolder(app.library));
-        if (!savePath) {
-            app.status = "No savegame found to show.";
-            return;
-        }
-        app.save = viceroy::readSaveGame(readAll(*savePath));
-        app.status = savePath->filename().string() + "  " + std::to_string(app.save->year) +
-                     (app.save->season == 0 ? " spring" : " autumn");
-    } catch (const viceroy::FormatError& e) {
-        app.status = std::string("Cannot read the game files: ") + e.what();
-        app.save.reset();
+        app.art = std::make_unique<viceroy::Art>(viceroy::loadArt(viceroy::pack::baseFolder(app.library)));
+        showLoadMenu(app);
+        app.status.clear();
+    } catch (const std::exception& e) {
+        app.art.reset();
+        app.status = std::string("Cannot read the imported game: ") + e.what() + " Drop it here again.";
+        app.mode = Mode::Welcome;
     }
 }
 
-// Imports the player's game from a folder or zip, then shows it.
-void importAndLoad(App& app, const std::filesystem::path& source) {
+void startGame(App& app, const viceroy::SaveSlot& slot) {
+    try {
+        viceroy::Game game(viceroy::readSaveGame(readAll(slot.path)), app.art->rules);
+        app.play = std::make_unique<viceroy::PlayScreen>(std::move(game), slot.path);
+        app.play->setColonyNames(&app.art->colonyNames);
+        app.mode = Mode::Play;
+    } catch (const viceroy::FormatError& e) {
+        app.status = std::string("Cannot read this savegame: ") + e.what();
+    }
+}
+
+// Imports the player's game from a folder or zip, then opens it.
+void importAndOpen(App& app, const std::filesystem::path& source) {
     try {
         const auto result = viceroy::pack::importGame(source, app.library);
         SDL_Log("Imported %zu game files into %s", result.files.size(), app.library.string().c_str());
-        app.needGameFiles = false;
-        loadGame(app);
+        openLibrary(app);
     } catch (const viceroy::pack::ImportError& e) {
         SDL_Log("Import failed: %s", e.what());
         app.status = e.what();
-        if (!viceroy::pack::hasBasePack(app.library)) {
-            app.needGameFiles = true;
-        }
     }
 }
 
@@ -209,13 +170,13 @@ void chooseZip(App& app) {
     }
 }
 
+// --- The welcome screen, shown before we have the game's own fonts ---------
+
 void drawText(App& app, float y, const std::string& text) {
     const float x = (kScreenW - static_cast<float>(text.size()) * SDL_DEBUG_TEXT_FONT_CHARACTER_SIZE) / 2;
     SDL_RenderDebugText(app.renderer, std::max(2.0f, x), y, text.c_str());
 }
 
-// Shown until the game has been imported. Our own text, nothing from the
-// original game, since we don't have its files yet.
 void drawWelcome(App& app) {
     SDL_SetRenderDrawColor(app.renderer, 236, 196, 92, 255);
     drawText(app, 40, "Welcome to Viceroy");
@@ -252,30 +213,193 @@ void drawWelcome(App& app) {
     }
 }
 
-// Which of the base terrain tiles to draw for a square. Forested squares use
-// the tile of their open land for now; forests, hills, mountains, rivers and
-// coastlines are drawn on top in a later step.
-std::size_t baseTile(std::uint8_t terrain) {
-    switch (terrain) {
-    case 24:
-        return 9; // arctic
-    case 25:
-        return 10; // ocean
-    case 26:
-        return 11; // sea lane
+// --- Input -------------------------------------------------------------------
+
+std::optional<Command> keyCommand(const SDL_KeyboardEvent& key) {
+    const bool ctrl = (key.mod & SDL_KMOD_CTRL) != 0;
+    switch (key.key) {
+    case SDLK_KP_8:
+    case SDLK_UP:
+        return Command::MoveN;
+    case SDLK_KP_9:
+    case SDLK_PAGEUP:
+        return Command::MoveNE;
+    case SDLK_KP_6:
+    case SDLK_RIGHT:
+        return Command::MoveE;
+    case SDLK_KP_3:
+    case SDLK_PAGEDOWN:
+        return Command::MoveSE;
+    case SDLK_KP_2:
+    case SDLK_DOWN:
+        return Command::MoveS;
+    case SDLK_KP_1:
+    case SDLK_END:
+        return Command::MoveSW;
+    case SDLK_KP_4:
+    case SDLK_LEFT:
+        return Command::MoveW;
+    case SDLK_KP_7:
+    case SDLK_HOME:
+        return Command::MoveNW;
+    case SDLK_RETURN:
+    case SDLK_KP_ENTER:
+        return Command::Confirm;
+    case SDLK_SPACE:
+        return Command::Skip;
+    case SDLK_W:
+        return Command::Wait;
+    case SDLK_S:
+        return ctrl ? Command::Save : Command::Sentry;
+    case SDLK_F:
+        return Command::Fortify;
+    case SDLK_B:
+        return Command::BuildColony;
+    case SDLK_C:
+        return Command::Centre;
+    case SDLK_E:
+        return ctrl ? std::optional<Command>(Command::EndTurn) : std::nullopt;
+    case SDLK_TAB:
+        return (key.mod & SDL_KMOD_SHIFT) ? Command::PreviousUnit : Command::NextUnit;
     default:
-        return terrain & 7u;
+        return std::nullopt;
     }
 }
 
-void clampView(App& app) {
-    if (!app.save) {
+std::optional<Command> buttonCommand(Uint8 button, bool waitingForEndOfTurn) {
+    switch (button) {
+    case SDL_GAMEPAD_BUTTON_DPAD_UP:
+        return Command::MoveN;
+    case SDL_GAMEPAD_BUTTON_DPAD_DOWN:
+        return Command::MoveS;
+    case SDL_GAMEPAD_BUTTON_DPAD_LEFT:
+        return Command::MoveW;
+    case SDL_GAMEPAD_BUTTON_DPAD_RIGHT:
+        return Command::MoveE;
+    case SDL_GAMEPAD_BUTTON_SOUTH: // A
+        return waitingForEndOfTurn ? Command::Confirm : Command::Skip;
+    case SDL_GAMEPAD_BUTTON_EAST: // B
+        return Command::Sentry;
+    case SDL_GAMEPAD_BUTTON_WEST: // X
+        return Command::BuildColony;
+    case SDL_GAMEPAD_BUTTON_NORTH: // Y
+        return Command::EndTurn;
+    case SDL_GAMEPAD_BUTTON_LEFT_SHOULDER:
+        return Command::PreviousUnit;
+    case SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER:
+        return Command::NextUnit;
+    case SDL_GAMEPAD_BUTTON_START:
+        return Command::Save;
+    case SDL_GAMEPAD_BUTTON_BACK:
+        return Command::Centre;
+    case SDL_GAMEPAD_BUTTON_RIGHT_STICK:
+        return Command::Fortify;
+    default:
+        return std::nullopt;
+    }
+}
+
+// The stick's direction in eight sectors, or nothing near the middle.
+std::optional<Command> stickDirection(float x, float y) {
+    if (std::hypot(x, y) < kStickThreshold) {
+        return std::nullopt;
+    }
+    static constexpr Command kByAngle[] = {Command::MoveE, Command::MoveSE, Command::MoveS, Command::MoveSW,
+                                           Command::MoveW, Command::MoveNW, Command::MoveN, Command::MoveNE};
+    const float angle = std::atan2(y, x); // y grows downwards
+    const long sector = std::lround(angle / (3.14159265f / 4.0f));
+    return kByAngle[static_cast<std::size_t>((sector + 8) % 8)];
+}
+
+void send(App& app, Command command) {
+    switch (app.mode) {
+    case Mode::Welcome:
+        if (command == Command::Confirm) {
+            chooseFolder(app);
+        }
+        break;
+    case Mode::Load:
+        if (command == Command::Cancel) {
+            break;
+        }
+        if (auto slot = app.load->handle(command == Command::Skip ? Command::Confirm : command)) {
+            startGame(app, *slot);
+        }
+        break;
+    case Mode::Play:
+        if (command == Command::Cancel) {
+            showLoadMenu(app);
+        } else {
+            app.play->handle(command);
+        }
+        break;
+    }
+}
+
+// A click on the map moves the active unit one step towards it.
+void click(App& app, float wx, float wy) {
+    float x = 0;
+    float y = 0;
+    SDL_RenderCoordinatesFromWindow(app.renderer, wx, wy, &x, &y);
+    if (app.mode != Mode::Play || app.play->game().activeUnit() < 0) {
+        if (app.mode != Mode::Welcome) {
+            send(app, Command::Confirm);
+        }
         return;
     }
-    const float maxX = static_cast<float>(app.save->map.width - kScreenW / kTile);
-    const float maxY = static_cast<float>(app.save->map.height - kScreenH / kTile + 1);
-    app.viewX = std::clamp(app.viewX, 0.0f, std::max(0.0f, maxX));
-    app.viewY = std::clamp(app.viewY, 0.0f, std::max(0.0f, maxY));
+    const auto& area = viceroy::kMapArea;
+    if (x < static_cast<float>(area.x) || y < static_cast<float>(area.y) ||
+        x >= static_cast<float>(area.x + area.w) || y >= static_cast<float>(area.y + area.h)) {
+        return;
+    }
+    const auto& view = app.play->view();
+    const auto& u = app.play->game().unit(app.play->game().activeUnit());
+    const int mx = view.originX + static_cast<int>(x - static_cast<float>(area.x)) / viceroy::kSquare;
+    const int my = view.originY + static_cast<int>(y - static_cast<float>(area.y)) / viceroy::kSquare;
+    const int dx = std::clamp(mx - u.x, -1, 1);
+    const int dy = std::clamp(my - u.y, -1, 1);
+    for (std::size_t d = 0; d < viceroy::kSteps.size(); ++d) {
+        if (viceroy::kSteps[d].dx == dx && viceroy::kSteps[d].dy == dy) {
+            send(app, static_cast<Command>(static_cast<int>(Command::MoveN) + static_cast<int>(d)));
+        }
+    }
+}
+
+void present(App& app) {
+    SDL_SetRenderDrawColor(app.renderer, 0, 0, 0, 255);
+    SDL_RenderClear(app.renderer);
+    if (app.mode == Mode::Welcome || !app.art) {
+        drawWelcome(app);
+        SDL_RenderPresent(app.renderer);
+        return;
+    }
+    if (app.mode == Mode::Load) {
+        app.load->draw(app.screen, *app.art);
+        if (!app.status.empty()) {
+            app.screen.text(app.art->tiny, 34, 186, app.status, {0x95, viceroy::kNoColour, viceroy::kNoColour});
+        }
+    } else {
+        app.play->draw(app.screen, *app.art);
+    }
+    // Indexed pixels to colours.
+    void* pixels = nullptr;
+    int pitch = 0;
+    if (SDL_LockTexture(app.frame, nullptr, &pixels, &pitch)) {
+        const auto& indexed = app.screen.pixels();
+        for (int y = 0; y < kScreenH; ++y) {
+            auto* row = static_cast<Uint8*>(pixels) + y * pitch;
+            for (int x = 0; x < kScreenW; ++x) {
+                const auto& c = app.art->palette[indexed[static_cast<std::size_t>(y * kScreenW + x)]];
+                row[x * 4 + 0] = c.r;
+                row[x * 4 + 1] = c.g;
+                row[x * 4 + 2] = c.b;
+                row[x * 4 + 3] = 255;
+            }
+        }
+        SDL_UnlockTexture(app.frame);
+    }
+    SDL_RenderTexture(app.renderer, app.frame, nullptr, nullptr);
+    SDL_RenderPresent(app.renderer);
 }
 
 } // namespace
@@ -295,21 +419,22 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char** argv) {
     }
     SDL_SetRenderLogicalPresentation(app->renderer, kScreenW, kScreenH, SDL_LOGICAL_PRESENTATION_LETTERBOX);
     SDL_SetRenderVSync(app->renderer, 1);
+    app->frame = SDL_CreateTexture(app->renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, kScreenW,
+                                   kScreenH);
+    SDL_SetTextureScaleMode(app->frame, SDL_SCALEMODE_NEAREST);
     app->pickedEvent = SDL_RegisterEvents(1);
     app->library = libraryFolder();
 
     // A folder or zip on the command line is imported; otherwise use the
     // earlier import, or import a gamedata folder found nearby, or ask.
     if (argc > 1) {
-        importAndLoad(*app, std::filesystem::path(argv[1]));
+        importAndOpen(*app, std::filesystem::path(argv[1]));
     } else if (viceroy::pack::hasBasePack(app->library)) {
-        loadGame(*app);
+        openLibrary(*app);
     } else if (const auto found = findGameToImport()) {
-        importAndLoad(*app, *found);
-    } else {
-        app->needGameFiles = true;
+        importAndOpen(*app, *found);
     }
-    SDL_Log("%s", app->needGameFiles ? "Waiting for the game files." : app->status.c_str());
+    SDL_Log("%s", app->mode == Mode::Welcome ? "Waiting for the game files." : "Game files ready.");
     app->lastTicks = SDL_GetTicks();
     return SDL_APP_CONTINUE;
 }
@@ -324,85 +449,68 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
         break;
     case SDL_EVENT_DROP_FILE:
         if (event->drop.data != nullptr) {
-            importAndLoad(*app, std::filesystem::path(event->drop.data));
+            importAndOpen(*app, std::filesystem::path(event->drop.data));
         }
         break;
     case SDL_EVENT_KEY_DOWN:
-    case SDL_EVENT_KEY_UP: {
-        const float on = event->type == SDL_EVENT_KEY_DOWN ? 1.0f : 0.0f;
-        switch (event->key.key) {
-        case SDLK_ESCAPE:
+        if (event->key.key == SDLK_ESCAPE) {
+            if (app->mode == Mode::Play) {
+                send(*app, Command::Cancel);
+                break;
+            }
             return SDL_APP_SUCCESS;
-        case SDLK_RETURN:
-        case SDLK_KP_ENTER:
-            if (app->needGameFiles && on > 0) {
-                chooseFolder(*app);
-            }
-            break;
-        case SDLK_Z:
-            if (app->needGameFiles && on > 0) {
-                chooseZip(*app);
-            }
-            break;
-        case SDLK_LEFT:
-        case SDLK_KP_4:
-            app->moveX = -on;
-            break;
-        case SDLK_RIGHT:
-        case SDLK_KP_6:
-            app->moveX = on;
-            break;
-        case SDLK_UP:
-        case SDLK_KP_8:
-            app->moveY = -on;
-            break;
-        case SDLK_DOWN:
-        case SDLK_KP_2:
-            app->moveY = on;
-            break;
-        default:
+        }
+        if (app->mode == Mode::Welcome && event->key.key == SDLK_Z) {
+            chooseZip(*app);
             break;
         }
+        if (auto command = keyCommand(event->key)) {
+            send(*app, *command);
+        }
         break;
-    }
+    case SDL_EVENT_MOUSE_BUTTON_DOWN:
+        if (event->button.button == SDL_BUTTON_LEFT) {
+            click(*app, event->button.x, event->button.y);
+        }
+        break;
     case SDL_EVENT_GAMEPAD_BUTTON_DOWN:
-    case SDL_EVENT_GAMEPAD_BUTTON_UP: {
-        const float on = event->type == SDL_EVENT_GAMEPAD_BUTTON_DOWN ? 1.0f : 0.0f;
-        switch (event->gbutton.button) {
-        case SDL_GAMEPAD_BUTTON_DPAD_LEFT:
-            app->moveX = -on;
-            break;
-        case SDL_GAMEPAD_BUTTON_DPAD_RIGHT:
-            app->moveX = on;
-            break;
-        case SDL_GAMEPAD_BUTTON_DPAD_UP:
-            app->moveY = -on;
-            break;
-        case SDL_GAMEPAD_BUTTON_DPAD_DOWN:
-            app->moveY = on;
-            break;
-        case SDL_GAMEPAD_BUTTON_SOUTH:
-            if (app->needGameFiles && on > 0) {
+        if (app->mode == Mode::Welcome) {
+            if (event->gbutton.button == SDL_GAMEPAD_BUTTON_SOUTH) {
                 chooseFolder(*app);
-            }
-            break;
-        case SDL_GAMEPAD_BUTTON_NORTH:
-            if (app->needGameFiles && on > 0) {
+            } else if (event->gbutton.button == SDL_GAMEPAD_BUTTON_NORTH) {
                 chooseZip(*app);
             }
             break;
-        default:
+        }
+        if (app->mode == Mode::Load && event->gbutton.button == SDL_GAMEPAD_BUTTON_SOUTH) {
+            send(*app, Command::Confirm);
             break;
         }
+        if (app->mode == Mode::Play && event->gbutton.button == SDL_GAMEPAD_BUTTON_GUIDE) {
+            send(*app, Command::Cancel);
+            break;
+        }
+        if (auto command =
+                buttonCommand(event->gbutton.button, app->mode == Mode::Play && app->play->waitingForEndOfTurn())) {
+            send(*app, *command);
+        }
         break;
-    }
     case SDL_EVENT_GAMEPAD_AXIS_MOTION: {
         const float value = static_cast<float>(event->gaxis.value) / 32767.0f;
-        const float dead = std::abs(value) < 0.25f ? 0.0f : value;
         if (event->gaxis.axis == SDL_GAMEPAD_AXIS_LEFTX) {
-            app->moveX = dead;
+            app->stickX = value;
         } else if (event->gaxis.axis == SDL_GAMEPAD_AXIS_LEFTY) {
-            app->moveY = dead;
+            app->stickY = value;
+        } else {
+            break;
+        }
+        const auto direction = stickDirection(app->stickX, app->stickY);
+        if (direction != app->stickCommand) {
+            app->stickCommand = direction;
+            if (direction) {
+                send(*app, *direction);
+                app->stickFired = SDL_GetTicks();
+            }
         }
         break;
     }
@@ -410,7 +518,7 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
         if (event->type == app->pickedEvent) {
             app->dialogOpen = false;
             if (auto* path = static_cast<char*>(event->user.data1)) {
-                importAndLoad(*app, std::filesystem::path(path));
+                importAndOpen(*app, std::filesystem::path(path));
                 SDL_free(path);
             }
         }
@@ -422,51 +530,24 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
 SDL_AppResult SDL_AppIterate(void* appstate) {
     auto* app = static_cast<App*>(appstate);
     const Uint64 now = SDL_GetTicks();
-    const float seconds = static_cast<float>(now - app->lastTicks) / 1000.0f;
+    const Uint64 elapsed = now - app->lastTicks;
     app->lastTicks = now;
-    constexpr float kSquaresPerSecond = 12.0f;
-    app->viewX += app->moveX * kSquaresPerSecond * seconds;
-    app->viewY += app->moveY * kSquaresPerSecond * seconds;
-    clampView(*app);
-
-    SDL_SetRenderDrawColor(app->renderer, 0, 0, 0, 255);
-    SDL_RenderClear(app->renderer);
-    if (app->needGameFiles) {
-        drawWelcome(*app);
-        SDL_RenderPresent(app->renderer);
-        return SDL_APP_CONTINUE;
-    } else if (app->save && !app->terrainTiles.empty()) {
-        const auto& map = app->save->map;
-        const int firstX = static_cast<int>(app->viewX);
-        const int firstY = static_cast<int>(app->viewY);
-        const float offX = (app->viewX - static_cast<float>(firstX)) * kTile;
-        const float offY = (app->viewY - static_cast<float>(firstY)) * kTile;
-        for (int y = firstY; y <= firstY + kScreenH / kTile + 1 && y < map.height; ++y) {
-            for (int x = firstX; x <= firstX + kScreenW / kTile + 1 && x < map.width; ++x) {
-                const auto tile = baseTile(map.at(x, y).terrain);
-                if (tile >= app->terrainTiles.size() || app->terrainTiles[tile] == nullptr) {
-                    continue;
-                }
-                const SDL_FRect dst{static_cast<float>((x - firstX) * kTile) - offX,
-                                    static_cast<float>((y - firstY) * kTile) - offY, kTile, kTile};
-                SDL_RenderTexture(app->renderer, app->terrainTiles[tile], nullptr, &dst);
-            }
-        }
+    if (app->mode == Mode::Play) {
+        app->play->tick(elapsed);
     }
-    SDL_SetRenderDrawColor(app->renderer, 0, 0, 0, 160);
-    SDL_SetRenderDrawBlendMode(app->renderer, SDL_BLENDMODE_BLEND);
-    const SDL_FRect bar{0, kScreenH - 10, kScreenW, 10};
-    SDL_RenderFillRect(app->renderer, &bar);
-    SDL_SetRenderDrawColor(app->renderer, 236, 196, 92, 255);
-    SDL_RenderDebugText(app->renderer, 2, kScreenH - 9, app->status.c_str());
-    SDL_RenderPresent(app->renderer);
+    // Holding the stick keeps moving.
+    if (app->stickCommand && now - app->stickFired >= kStickRepeatMs) {
+        app->stickFired = now;
+        send(*app, *app->stickCommand);
+    }
+    present(*app);
     return SDL_APP_CONTINUE;
 }
 
 void SDL_AppQuit(void* appstate, SDL_AppResult) {
     auto* app = static_cast<App*>(appstate);
-    for (auto* texture : app->terrainTiles) {
-        SDL_DestroyTexture(texture);
+    if (app->frame != nullptr) {
+        SDL_DestroyTexture(app->frame);
     }
     delete app;
 }

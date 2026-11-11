@@ -3,6 +3,7 @@
 
 #include "viceroy/data/reader.hpp"
 
+#include <algorithm>
 #include <cstring>
 
 namespace viceroy {
@@ -12,18 +13,75 @@ namespace {
 constexpr char kSignature[] = "COLONIZE";
 constexpr std::size_t kSignatureSize = sizeof(kSignature); // includes the 0 byte
 
-// Sizes of the blocks before the map, as worked out in
-// docs/formats/savegame.md.
+// Sizes of the blocks, as worked out in docs/formats/savegame.md.
 constexpr std::size_t kHeaderSize = 158;
-constexpr std::size_t kPlayersSize = 4 * 52 + 24;
+constexpr std::size_t kPlayerSize = 52;
+constexpr std::size_t kOtherSize = 24;
 constexpr std::size_t kColonySize = 202;
 constexpr std::size_t kUnitSize = 28;
-constexpr std::size_t kDwellingSize = 18;
-// Nations, the eight tribes and other game-wide data: fixed size.
-constexpr std::size_t kFixedAfterUnits = 4 * 316 + 8 * 78 + 727;
+constexpr std::size_t kNationSize = 316;
+constexpr std::size_t kSettlementSize = 18;
+constexpr std::size_t kTribesAndMoreSize = 8 * 78 + 727;
+constexpr std::size_t kTailSize = 1502;
 
 constexpr int kMaxMapSide = 256;
-constexpr int kMapLayers = 4;
+constexpr int kMaxRecords = 4096;
+
+template <std::size_t N>
+std::array<std::uint8_t, N> take(Reader& in) {
+    std::array<std::uint8_t, N> out{};
+    const auto bytes = in.bytes(N);
+    std::copy(bytes.begin(), bytes.end(), out.begin());
+    return out;
+}
+
+std::string text(const std::uint8_t* p, std::size_t size) {
+    std::string s;
+    for (std::size_t i = 0; i < size && p[i] != 0; ++i) {
+        s.push_back(static_cast<char>(p[i]));
+    }
+    return s;
+}
+
+// Leaves the bytes alone when the text is unchanged: the original keeps
+// leftovers after the 0 byte, and we write saves back byte for byte.
+void putText(std::uint8_t* p, std::size_t size, const std::string& s) {
+    if (text(p, size) == s) {
+        return;
+    }
+    std::memset(p, 0, size);
+    std::memcpy(p, s.data(), std::min(s.size(), size - 1));
+}
+
+int u16(const std::uint8_t* p) {
+    return p[0] | (p[1] << 8);
+}
+
+int s16(const std::uint8_t* p) {
+    return static_cast<std::int16_t>(static_cast<std::uint16_t>(u16(p)));
+}
+
+void put16(std::uint8_t* p, int v) {
+    p[0] = static_cast<std::uint8_t>(v);
+    p[1] = static_cast<std::uint8_t>(v >> 8);
+}
+
+void put32(std::uint8_t* p, int v) {
+    const auto u = static_cast<std::uint32_t>(v);
+    for (int i = 0; i < 4; ++i) {
+        p[i] = static_cast<std::uint8_t>(u >> (8 * i));
+    }
+}
+
+int s32(const std::uint8_t* p) {
+    return static_cast<std::int32_t>(static_cast<std::uint32_t>(p[0]) | (static_cast<std::uint32_t>(p[1]) << 8) |
+                                     (static_cast<std::uint32_t>(p[2]) << 16) |
+                                     (static_cast<std::uint32_t>(p[3]) << 24));
+}
+
+void append(Bytes& out, std::span<const std::uint8_t> bytes) {
+    out.insert(out.end(), bytes.begin(), bytes.end());
+}
 
 } // namespace
 
@@ -33,47 +91,182 @@ SaveGame readSaveGame(std::span<const std::uint8_t> file) {
     }
     Reader in(file);
     SaveGame save;
-
-    in.seek(12);
-    save.map.width = in.u16();
-    save.map.height = in.u16();
+    save.header = take<kHeaderSize>(in);
+    const auto* h = save.header.data();
+    save.map.width = u16(h + 12);
+    save.map.height = u16(h + 14);
     if (save.map.width < 1 || save.map.height < 1 || save.map.width > kMaxMapSide ||
         save.map.height > kMaxMapSide) {
         throw FormatError("savegame with impossible map size");
     }
-    in.seek(26);
-    save.year = in.u16();
-    save.season = in.u16();
-    save.turn = in.u16();
-    in.seek(42);
-    save.tribeCount = in.u16();
-    save.unitCount = in.u16();
-    save.colonyCount = in.u16();
-    in.seek(54);
-    save.difficulty = in.u8();
+    save.year = u16(h + 26);
+    save.season = u16(h + 28);
+    save.turn = u16(h + 30);
+    save.activeUnit = s16(h + 34);
+    save.humanNation = u16(h + 40) & 3;
+    const int settlementCount = u16(h + 42);
+    const int unitCount = u16(h + 44);
+    const int colonyCount = u16(h + 46);
+    save.difficulty = h[54];
+    if (settlementCount > kMaxRecords || unitCount > kMaxRecords || colonyCount > kMaxRecords) {
+        throw FormatError("savegame with impossible counts");
+    }
 
-    const std::size_t mapStart = kHeaderSize + kPlayersSize + static_cast<std::size_t>(save.colonyCount) * kColonySize +
-                                 static_cast<std::size_t>(save.unitCount) * kUnitSize +
-                                 static_cast<std::size_t>(save.tribeCount) * kDwellingSize + kFixedAfterUnits;
+    for (auto& player : save.players) {
+        player.raw = take<kPlayerSize>(in);
+        player.name = text(player.raw.data(), 24);
+        player.country = text(player.raw.data() + 24, 24);
+        player.control = player.raw[49];
+    }
+    save.other = take<kOtherSize>(in);
+
+    save.colonies.resize(static_cast<std::size_t>(colonyCount));
+    for (auto& colony : save.colonies) {
+        colony.raw = take<kColonySize>(in);
+        colony.x = colony.raw[0];
+        colony.y = colony.raw[1];
+        colony.name = text(colony.raw.data() + 2, 24);
+        colony.nation = colony.raw[26];
+        colony.population = colony.raw[31];
+    }
+
+    save.units.resize(static_cast<std::size_t>(unitCount));
+    for (auto& unit : save.units) {
+        unit.raw = take<kUnitSize>(in);
+        const auto* r = unit.raw.data();
+        unit.x = r[0];
+        unit.y = r[1];
+        unit.type = r[2];
+        unit.nation = r[3] & 0x0F;
+        unit.movesUsed = r[5];
+        unit.orders = r[8];
+        unit.holds = r[12];
+        unit.profession = r[23];
+        unit.nextInTransport = s16(r + 24);
+        unit.prevInTransport = s16(r + 26);
+    }
+
+    for (auto& nation : save.nations) {
+        nation.raw = take<kNationSize>(in);
+        nation.taxRate = nation.raw[1];
+        nation.gold = s32(nation.raw.data() + 42);
+    }
+
+    save.settlements.resize(static_cast<std::size_t>(settlementCount));
+    for (auto& settlement : save.settlements) {
+        settlement.raw = take<kSettlementSize>(in);
+        settlement.x = settlement.raw[0];
+        settlement.y = settlement.raw[1];
+        settlement.nation = settlement.raw[2];
+        settlement.population = settlement.raw[4];
+    }
+
+    const auto more = in.bytes(kTribesAndMoreSize);
+    save.tribesAndMore.assign(more.begin(), more.end());
+
     const std::size_t layer = static_cast<std::size_t>(save.map.width) * static_cast<std::size_t>(save.map.height);
-    in.seek(mapStart); // throws when the counts point past the end
-    const auto tiles = in.bytes(layer);
-    const auto mask = in.bytes(layer);
-    const auto path = in.bytes(layer);
-    const auto seen = in.bytes(layer);
-    static_assert(kMapLayers == 4);
-
+    for (auto& l : save.layers) {
+        const auto bytes = in.bytes(layer);
+        l.assign(bytes.begin(), bytes.end());
+    }
     save.map.squares.resize(layer);
     for (std::size_t i = 0; i < layer; ++i) {
         auto& sq = save.map.squares[i];
-        sq.terrain = tiles[i] & 0x1Fu;
-        sq.relief = static_cast<std::uint8_t>(tiles[i] >> 5);
-        sq.flags = mask[i];
-        sq.region = path[i];
-        sq.seen = seen[i];
+        sq.terrain = save.layers[0][i] & 0x1Fu;
+        sq.relief = static_cast<std::uint8_t>(save.layers[0][i] >> 5);
+        sq.flags = save.layers[1][i];
+        sq.region = save.layers[2][i];
+        sq.seen = save.layers[3][i];
     }
-    save.raw.assign(file.begin(), file.end());
+    const auto rest = in.bytes(in.remaining());
+    if (rest.size() < kTailSize) {
+        throw FormatError("savegame ends early");
+    }
+    save.tail.assign(rest.begin(), rest.end());
     return save;
+}
+
+Bytes writeSaveGame(const SaveGame& save) {
+    Bytes out;
+    auto header = save.header;
+    auto* h = header.data();
+    put16(h + 12, save.map.width);
+    put16(h + 14, save.map.height);
+    put16(h + 26, save.year);
+    put16(h + 28, save.season);
+    put16(h + 30, save.turn);
+    put16(h + 34, save.activeUnit);
+    put16(h + 42, static_cast<int>(save.settlements.size()));
+    put16(h + 44, static_cast<int>(save.units.size()));
+    put16(h + 46, static_cast<int>(save.colonies.size()));
+    h[54] = static_cast<std::uint8_t>(save.difficulty);
+    append(out, header);
+
+    for (const auto& player : save.players) {
+        auto raw = player.raw;
+        putText(raw.data(), 24, player.name);
+        putText(raw.data() + 24, 24, player.country);
+        raw[49] = static_cast<std::uint8_t>(player.control);
+        append(out, raw);
+    }
+    append(out, save.other);
+
+    for (const auto& colony : save.colonies) {
+        auto raw = colony.raw;
+        raw[0] = static_cast<std::uint8_t>(colony.x);
+        raw[1] = static_cast<std::uint8_t>(colony.y);
+        putText(raw.data() + 2, 24, colony.name);
+        raw[26] = static_cast<std::uint8_t>(colony.nation);
+        raw[31] = static_cast<std::uint8_t>(colony.population);
+        append(out, raw);
+    }
+    for (const auto& unit : save.units) {
+        auto raw = unit.raw;
+        raw[0] = static_cast<std::uint8_t>(unit.x);
+        raw[1] = static_cast<std::uint8_t>(unit.y);
+        raw[2] = static_cast<std::uint8_t>(unit.type);
+        raw[3] = static_cast<std::uint8_t>((raw[3] & 0xF0) | (unit.nation & 0x0F));
+        raw[5] = static_cast<std::uint8_t>(unit.movesUsed);
+        raw[8] = static_cast<std::uint8_t>(unit.orders);
+        raw[12] = static_cast<std::uint8_t>(unit.holds);
+        raw[23] = static_cast<std::uint8_t>(unit.profession);
+        put16(raw.data() + 24, unit.nextInTransport);
+        put16(raw.data() + 26, unit.prevInTransport);
+        append(out, raw);
+    }
+    for (const auto& nation : save.nations) {
+        auto raw = nation.raw;
+        raw[1] = static_cast<std::uint8_t>(nation.taxRate);
+        put32(raw.data() + 42, nation.gold);
+        append(out, raw);
+    }
+    for (const auto& settlement : save.settlements) {
+        auto raw = settlement.raw;
+        raw[0] = static_cast<std::uint8_t>(settlement.x);
+        raw[1] = static_cast<std::uint8_t>(settlement.y);
+        raw[2] = static_cast<std::uint8_t>(settlement.nation);
+        raw[4] = static_cast<std::uint8_t>(settlement.population);
+        append(out, raw);
+    }
+    append(out, save.tribesAndMore);
+
+    const std::size_t layer = save.map.squares.size();
+    std::array<Bytes, 4> layers;
+    for (std::size_t l = 0; l < 4; ++l) {
+        layers[l].resize(layer);
+    }
+    for (std::size_t i = 0; i < layer; ++i) {
+        const auto& sq = save.map.squares[i];
+        layers[0][i] = static_cast<std::uint8_t>((sq.relief << 5) | (sq.terrain & 0x1F));
+        layers[1][i] = sq.flags;
+        layers[2][i] = sq.region;
+        layers[3][i] = sq.seen;
+    }
+    for (const auto& l : layers) {
+        append(out, l);
+    }
+    append(out, save.tail);
+    return out;
 }
 
 } // namespace viceroy
