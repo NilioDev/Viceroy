@@ -43,7 +43,8 @@ jobs:
             libxi-dev libxss-dev libxtst-dev libxkbcommon-dev \
             libwayland-dev libdecor-0-dev wayland-protocols \
             libdrm-dev libgbm-dev libgl1-mesa-dev libgles2-mesa-dev libegl1-mesa-dev \
-            libdbus-1-dev libibus-1.0-dev libudev-dev
+            libdbus-1-dev libibus-1.0-dev libudev-dev \
+            desktop-file-utils
 
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVCR_WARNINGS_AS_ERRORS=ON -DVCR_USE_SYSTEM_SDL3=OFF
