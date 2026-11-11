@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "viceroy/game/game.hpp"
 
+#include "viceroy/game/colony.hpp"
+
 #include <algorithm>
 #include <cstdlib>
 
@@ -334,6 +336,34 @@ std::string Game::suggestColonyName(const TextFile& colonyNames) const {
 // --- Turns -------------------------------------------------------------------
 
 void Game::endTurn() {
+    lastTurnNews_.clear();
+    for (std::size_t c = 0; c < save_.colonies.size(); ++c) {
+        auto& colony = save_.colonies[c];
+        const ColonyTurn turn = runColonyTurn(colony, save_.map, rules_);
+        const bool ours = colony.nation == human();
+        if (turn.grew) {
+            addColonist(colony.x, colony.y, colony.nation);
+            if (ours) {
+                lastTurnNews_.push_back(colony.name + ": a new colonist was born.");
+            }
+        }
+        if (turn.starved) {
+            const auto last = static_cast<std::size_t>(colony.population - 1);
+            for (auto& who : colony.squares) {
+                if (who == static_cast<int>(last)) {
+                    who = -1;
+                }
+            }
+            --colony.population;
+            if (ours) {
+                lastTurnNews_.push_back(colony.name + ": a colonist starved.");
+            }
+        }
+        if (turn.built >= 0 && ours && static_cast<std::size_t>(turn.built) < rules_.buildings.size()) {
+            lastTurnNews_.push_back(colony.name + ": " + rules_.buildings[static_cast<std::size_t>(turn.built)].name +
+                                    " finished.");
+        }
+    }
     for (int i = 0; i < unitCount(); ++i) {
         save_.units[static_cast<std::size_t>(i)].movesUsed = 0;
     }
@@ -369,6 +399,21 @@ void Game::reveal(int x, int y, int radius, int nation) {
 int Game::sightRadius(int index) const {
     const int type = unit(index).type;
     return (type == unit_type::kScout || type == unit_type::kDragoon) ? 2 : 1;
+}
+
+void Game::addColonist(int x, int y, int nation) {
+    SaveUnit u;
+    // A free colonist with no orders, as the original stores one.
+    static constexpr std::array<std::uint8_t, 28> kTemplate{0, 0, 0, 0x80, 0, 0, 0xFF, 0x58, 0, 0, 0, 0, 0, 0,
+                                                            0, 0, 0, 0, 0xFF, 0, 0, 0, 0, 0x1C, 0xFF, 0xFF, 0xFF, 0xFF};
+    u.raw = kTemplate;
+    u.x = x;
+    u.y = y;
+    u.type = unit_type::kColonist;
+    u.nation = nation;
+    u.profession = 0x1C;
+    save_.units.push_back(u);
+    refreshUnitFlags();
 }
 
 void Game::refreshUnitFlags() {

@@ -6,6 +6,7 @@
 #include "viceroy/game_files.hpp"
 #include "viceroy/render/colony_view.hpp"
 
+#include <algorithm>
 #include <cstdlib>
 #include <fstream>
 #include <iterator>
@@ -152,4 +153,55 @@ VCR_TEST("original files: the debug menu changes the game only when asked") {
     VCR_CHECK(play.game().state().colonies[1].population == people + 1);
     debug.apply(0, play); // goods
     VCR_CHECK(play.game().state().colonies[1].stock[0] == 113);
+}
+
+VCR_TEST("original files: colonists change jobs through the jobs menu") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
+    Game game(readSaveGame(Bytes(std::istreambuf_iterator<char>(in), {})), art.rules);
+    auto& save = game.state();
+    auto& isabella = save.colonies[1];
+    // Isabella's colonists both distil rum; the squares around are free.
+    const auto choices = jobChoices(isabella, save.map, game.rules(), save.colonies, 1);
+    VCR_CHECK(choices.size() == 18);
+    VCR_CHECK(choices[0].amount > 0);  // farming the forest to the west
+    VCR_CHECK(choices[8].amount > 0);  // fishing: Isabella has docks
+    VCR_CHECK(assignJob(isabella, save.map, game.rules(), save.colonies, 1, 0));
+    VCR_CHECK(isabella.jobs[1] == 0);
+    VCR_CHECK(std::count(isabella.squares.begin(), isabella.squares.end(), 1) == 1);
+    // Back indoors: the square is freed.
+    VCR_CHECK(assignJob(isabella, save.map, game.rules(), save.colonies, 1, 9));
+    VCR_CHECK(std::count(isabella.squares.begin(), isabella.squares.end(), 1) == 0);
+    // No church in Isabella: no preaching.
+    VCR_CHECK(!assignJob(isabella, save.map, game.rules(), save.colonies, 1, 16));
+}
+
+VCR_TEST("original files: a colony stores what it makes at the end of the turn") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
+    Game game(readSaveGame(Bytes(std::istreambuf_iterator<char>(in), {})), art.rules);
+    auto& isabella = game.state().colonies[1];
+    VCR_CHECK(isabella.stock[cargo::kFood] == 13 && isabella.stock[cargo::kSugar] == 16 &&
+              isabella.stock[cargo::kRum] == 36);
+    runColonyTurn(isabella, game.state().map, game.rules());
+    // 5 food grown, 4 eaten; 4 sugar grown and distilled into 4 rum.
+    VCR_CHECK(isabella.stock[cargo::kFood] == 14);
+    VCR_CHECK(isabella.stock[cargo::kSugar] == 16);
+    VCR_CHECK(isabella.stock[cargo::kRum] == 40);
+
+    // Plenty of food makes a new colonist.
+    isabella.stock[cargo::kFood] = 199;
+    const int units = game.unitCount();
+    game.endTurn();
+    VCR_CHECK(game.unitCount() == units + 1);
+    VCR_CHECK(game.unit(units).x == isabella.x && game.unit(units).nation == 3);
+    VCR_CHECK(!game.lastTurnNews().empty());
 }

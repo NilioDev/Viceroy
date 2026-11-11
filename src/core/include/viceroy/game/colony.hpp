@@ -164,6 +164,47 @@ std::optional<BuildingKind> buildingForJob(int jobRow);
 int jobOutput(int jobRow);
 int jobInput(int jobRow);
 
+// --- Putting people to work ----------------------------------------------
+
+// A line of the jobs menu: what this colonist would make doing the job at
+// the best free place for it, or 0 when there is none.
+struct JobChoice {
+    int job = 0;
+    int amount = 0;
+    int square = -1; // where (0-7), for work on the land
+};
+
+// Jobs a colonist can do in the colony, in the order of @JOB (teachers
+// excepted), with what they would make.
+std::vector<JobChoice> jobChoices(const SaveColony& colony, const SaveMap& map, const Ruleset& rules,
+                                  const std::vector<SaveColony>& colonies, int colonist);
+
+// Moves a colonist to a job at its best free place. Returns false (and
+// changes nothing) when there is no place for it.
+bool assignJob(SaveColony& colony, const SaveMap& map, const Ruleset& rules,
+               const std::vector<SaveColony>& colonies, int colonist, int jobRow);
+
+// A square around the colony that nobody else works and that the colony may
+// use (water needs docks).
+bool squareFree(const SaveColony& colony, const SaveMap& map, const std::vector<SaveColony>& colonies, int square);
+
+// --- The end of a turn ---------------------------------------------------
+
+struct ColonyTurn {
+    bool grew = false;    // 200 food: a new colonist is born
+    bool starved = false; // no food left: a colonist died
+    int built = -1;       // row of @BUILDING finished this turn
+    std::array<int, kGoodsKinds> wasted{}; // goods the warehouse could not hold
+};
+
+// How much of each good the warehouse holds (food keeps up to 200).
+int storageLimit(const SaveColony& colony);
+
+// Stores what the colony made this turn: workshops use what is there, food
+// is eaten, hammers go into the building under way, and the warehouse
+// throws away what it cannot hold.
+ColonyTurn runColonyTurn(SaveColony& colony, const SaveMap& map, const Ruleset& rules);
+
 // The share of the colony in the Sons of Liberty, 0-100.
 int sonsOfLibertyPercent(const SaveColony& colony);
 

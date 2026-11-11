@@ -108,6 +108,10 @@ public:
     // Ends the human's turn: everyone gets their moves back, and the
     // calendar moves on (one turn a year until 1600, then spring and autumn).
     void endTurn();
+    // What happened in the human's colonies at the last end of turn.
+    const std::vector<std::string>& lastTurnNews() const { return lastTurnNews_; }
+    // A free colonist appears on the square (born in a colony).
+    void addColonist(int x, int y, int nation);
 
     // --- Map -----------------------------------------------------------------
     void reveal(int x, int y, int radius, int nation);
@@ -119,6 +123,7 @@ private:
 
     SaveGame save_;
     Ruleset rules_;
+    std::vector<std::string> lastTurnNews_;
 };
 
 } // namespace viceroy

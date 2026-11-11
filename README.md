@@ -13,10 +13,11 @@ touch controls.
 > **Status: first playable steps.** Load one of your savegames, move your
 > units over the original map, board ships and make landfall, found
 > colonies, look inside your colonies, end turns and save. The colony screen
-> shows its buildings, people, what they produce and the warehouse, but you
-> can't move people between jobs yet. The other nations don't move yet, and
-> the Europe and trade screens, combat and meeting the natives are still to
-> come. Fish and other resources are not drawn yet.
+> shows its buildings, people, what they produce and the warehouse; give
+> colonists other jobs with the jobs menu. At the end of the turn colonies
+> store what they make, grow and finish buildings. The other nations don't
+> move yet, and the Europe and trade screens, combat and meeting the natives
+> are still to come. Fish and other resources are not drawn yet.
 
 Viceroy is not affiliated with or endorsed by the makers of the original
 game. It contains none of the original game's files: you need your own copy.
@@ -61,7 +62,8 @@ and download one at the bottom of the page.
 | Look around the map (view mode), back to moving | V, M | Back, B |
 | Open your colony | Click it, or Enter on it in view mode | A on it in view mode |
 | Pick a colonist on the colony screen | Arrow keys, Tab | D-pad, LB / RB |
-| Close the colony screen | Esc, Enter or click Exit | B |
+| Give the colonist another job (jobs menu) | Enter, then the arrow keys and Enter | A, then the D-pad and A |
+| Close the colony screen | Esc, or Enter with nobody picked, or click Exit | B |
 | Save the game | Ctrl+S | Start |
 | Back to the load menu | Esc | Guide |
 
