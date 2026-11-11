@@ -4,6 +4,7 @@ add_executable(vcr_tests
     test_formats.cpp
     test_text_and_fonts.cpp
     test_ruleset.cpp
+    test_savegame.cpp
 )
 target_link_libraries(vcr_tests PRIVATE viceroy::core)
 target_compile_definitions(vcr_tests PRIVATE VICEROY_GAMEDATA_DIR="${PROJECT_SOURCE_DIR}/gamedata")

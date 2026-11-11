@@ -10,8 +10,11 @@ savegames, scaled sharply to any screen and with gamepad, mouse, keyboard and
 touch controls.
 
 > [!NOTE]
-> **Status: just started.** There is nothing to play yet. The program opens a
-> window and checks your game files.
+> **Status: just started.** There is nothing to play yet. The program shows
+> the map of the newest savegame in your game folder with the original
+> terrain tiles; forests, hills, rivers and coastlines are not drawn yet.
+> Scroll with the arrow keys, the numeric keypad, or a gamepad's D-pad or
+> left stick.
 
 Viceroy is not affiliated with or endorsed by the makers of the original
 game. It contains none of the original game's files: you need your own copy.
