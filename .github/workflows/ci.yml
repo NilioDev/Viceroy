@@ -54,6 +54,18 @@ jobs:
       - name: Test
         run: ctest --test-dir build --build-config Release --output-on-failure
 
+      - name: AppImage (Linux)
+        if: runner.os == 'Linux'
+        run: packaging/linux/make-appimage.sh build build/packages
+
+      - name: Upload AppImage
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Viceroy-Linux-AppImage
+          path: build/packages/*.AppImage
+          if-no-files-found: error
+
       - name: Upload build
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

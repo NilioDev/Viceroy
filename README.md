@@ -30,10 +30,25 @@ game. It contains none of the original game's files: you need your own copy.
   button can be changed.
 - 💾 Your old savegames keep working.
 
+## Try it
+
+There are no releases yet. Every build on `main` makes test packages: open
+the [latest CI run on main](https://github.com/NilioDev/Viceroy/actions/workflows/ci.yml?query=branch%3Amain)
+and download one at the bottom of the page.
+
+- 🐧 **Linux:** `Viceroy-Linux-AppImage`. Unpack the zip, make the
+  `.AppImage` executable (right-click, *Properties*, *Allow executing file as
+  program*, or `chmod +x`) and double-click it.
+- 🪟 **Windows:** `Viceroy-Windows`, then start `Viceroy.exe`.
+- 🍎 **macOS:** `Viceroy-macOS`.
+
 ## Add your game
 
 Copy your game folder (the one with `VICEROY.EXE` and `VICEROY.PAL`) into a
-folder called `gamedata` next to the program. See
+folder called `gamedata` next to the program, or next to the `.AppImage`
+file. Viceroy also looks in `gamedata` in the current folder and in its own
+data folder (`~/.local/share/Viceroy/Viceroy/gamedata` on Linux), or you can
+give the folder when starting it: `./Viceroy path/to/game`. See
 [gamedata/README.md](gamedata/README.md).
 
 ## License

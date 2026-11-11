@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Viceroy
+GenericName=Colonial strategy game engine
+Comment=Play the 1994 DOS colonial strategy classic with your own game files
+Exec=Viceroy
+Icon=io.github.niliodev.viceroy
+Terminal=false
+Categories=Game;StrategyGame;
+Keywords=strategy;colonial;turn-based;

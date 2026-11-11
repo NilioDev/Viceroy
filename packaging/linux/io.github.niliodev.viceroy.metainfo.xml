@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.niliodev.viceroy</id>
+  <name>Viceroy</name>
+  <summary>Play the 1994 DOS colonial strategy classic with your own game files</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <description>
+    <p>Viceroy is a free, from-scratch engine for the 1994 DOS colonial
+    strategy game. Bring your own copy of the original game files.</p>
+  </description>
+  <launchable type="desktop-id">io.github.niliodev.viceroy.desktop</launchable>
+  <url type="homepage">https://github.com/NilioDev/Viceroy</url>
+  <content_rating type="oars-1.1"/>
+</component>
