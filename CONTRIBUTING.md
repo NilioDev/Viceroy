@@ -44,3 +44,11 @@ ctest --test-dir build --output-on-failure
 
 SDL3 is used from the system when found, otherwise the pinned release is
 downloaded and built (`-DVCR_USE_SYSTEM_SDL3=OFF` forces that).
+
+## Linux AppImage
+
+`packaging/linux/make-appimage.sh build out` turns a Release build with SDL
+linked in (`-DVCR_USE_SYSTEM_SDL3=OFF`) into
+`out/Viceroy-<version>-linux-<arch>.AppImage`. CI makes one on every run
+(artifact `Viceroy-Linux-AppImage`). The icon in `packaging/linux` is our own
+art.

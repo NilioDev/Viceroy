@@ -41,13 +41,28 @@ struct App {
     Uint64 lastTicks = 0;
 };
 
+// Where to look for the game files when no folder is given: next to the
+// AppImage file (the program itself runs from a read-only mount), next to the
+// program, in the current folder, and in the app's data folder.
 std::filesystem::path defaultGameFolder() {
-    const char* base = SDL_GetBasePath();
-    std::filesystem::path root = base ? std::filesystem::path(base) : std::filesystem::current_path();
-    if (std::filesystem::exists(root / "gamedata")) {
-        return root / "gamedata";
+    std::vector<std::filesystem::path> candidates;
+    if (const char* appImage = SDL_getenv("APPIMAGE")) {
+        candidates.push_back(std::filesystem::path(appImage).parent_path() / "gamedata");
     }
-    return std::filesystem::current_path() / "gamedata";
+    if (const char* base = SDL_GetBasePath()) {
+        candidates.push_back(std::filesystem::path(base) / "gamedata");
+    }
+    candidates.push_back(std::filesystem::current_path() / "gamedata");
+    if (char* pref = SDL_GetPrefPath("Viceroy", "Viceroy")) {
+        candidates.push_back(std::filesystem::path(pref) / "gamedata");
+        SDL_free(pref);
+    }
+    for (const auto& folder : candidates) {
+        if (viceroy::isGameFolder(folder)) {
+            return folder;
+        }
+    }
+    return candidates.front();
 }
 
 std::vector<std::uint8_t> readAll(const std::filesystem::path& path) {
