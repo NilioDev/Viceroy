@@ -192,6 +192,7 @@ void PlayScreen::ask(std::string_view section, int unit, std::vector<std::string
         return;
     }
     dialog_ = makeDialog(*art_, section, strings);
+    choices_.clear();
     question_ = std::string(section);
     questionUnit_ = unit;
 }
@@ -199,28 +200,51 @@ void PlayScreen::ask(std::string_view section, int unit, std::vector<std::string
 bool PlayScreen::handleDialog(Command command) {
     auto& d = *dialog_;
     const int count = std::max(1, static_cast<int>(d.options.size()));
+    const bool list = !choices_.empty();
     switch (command) {
     case Command::MoveN:
     case Command::Up:
-        d.selected = (d.selected + count - 1) % count;
+        stepSelection(d, -1);
         return true;
     case Command::MoveS:
     case Command::Down:
-        d.selected = (d.selected + 1) % count;
+        stepSelection(d, 1);
         return true;
     case Command::Confirm:
     case Command::Skip:
         break;
     case Command::Cancel:
-        d.selected = count - 1; // the last choice is "no"
+        // The first choice of a list is "None"; elsewhere the last is "no".
+        d.selected = list ? 0 : count - 1;
         break;
     default:
         return true;
     }
-    const bool yes = d.selected == 0;
+    const int choice = d.selected;
     const std::string question = question_;
     const int unit = questionUnit_;
     dialog_.reset();
+    answer(question, unit, choice);
+    return true;
+}
+
+void PlayScreen::answer(const std::string& question, int unit, int choice) {
+    const bool yes = choice == 0;
+    const auto picked = [&]() {
+        return choice >= 0 && static_cast<std::size_t>(choice) < choices_.size() ? choices_[static_cast<std::size_t>(choice)]
+                                                                                 : -1;
+    }();
+    choices_.clear();
+    const auto showOnDocks = [&](int made) {
+        if (made >= 0 && europeScreen_) {
+            europeScreen_->focus = EuropeFocus::Docks;
+            europeScreen_->dock = 0;
+            const auto ships = unitsInEurope(game_.state(), game_.rules(), game_.human(), EuropePlace::InPort, true);
+            if (europeScreen_->ship < 0 && !ships.empty()) {
+                europeScreen_->ship = ships.front();
+            }
+        }
+    };
     if (question == "SAILHOME") {
         if (yes && game_.sailToEurope(unit)) {
             say(game_.unitName(unit) + " sails for Europe.");
@@ -231,8 +255,108 @@ bool PlayScreen::handleDialog(Command command) {
             const auto ships = unitsInEurope(game_.state(), game_.rules(), game_.human(), EuropePlace::InPort, true);
             europeScreen_->ship = ships.empty() ? -1 : ships.front();
         }
+    } else if (question == "RECRUIT") {
+        if (picked >= 0) {
+            showOnDocks(game_.recruit(picked));
+        }
+    } else if (question == "KINGRECRUIT") {
+        if (picked >= 0) {
+            showOnDocks(game_.train(picked));
+        }
+    } else if (question == "PURCHASE") {
+        if (picked >= 0 && art_ != nullptr) {
+            const auto& nation = game_.state().nations[static_cast<std::size_t>(game_.human())];
+            for (const auto& item : purchaseList(nation)) {
+                if (item.unitType == picked) {
+                    dialog_ = makeDialog(*art_, "REALLYBUY", {game_.rules().units[static_cast<std::size_t>(picked)].name},
+                                         {item.price});
+                    placeEuropeDialog(*dialog_, false);
+                    question_ = "REALLYBUY";
+                    questionUnit_ = picked;
+                }
+            }
+        }
+    } else if (question == "REALLYBUY") {
+        if (yes) {
+            const int made = game_.purchase(unit);
+            if (made >= 0 && game_.isShip(made) && europeScreen_) {
+                europeScreen_->ship = made;
+                europeScreen_->focus = EuropeFocus::Ships;
+            } else {
+                showOnDocks(made);
+            }
+        }
     }
-    return true;
+}
+
+namespace {
+
+std::string costText(int price) {
+    return "(Cost: " + std::to_string(price) + ")";
+}
+
+} // namespace
+
+void PlayScreen::openRecruit() {
+    if (art_ == nullptr) {
+        return;
+    }
+    const auto& nation = game_.state().nations[static_cast<std::size_t>(game_.human())];
+    const int price = recruitPrice(nation);
+    Dialog d = makeDialog(*art_, "RECRUIT", {}, {price});
+    choices_ = {-1};
+    addOption(d, "(None)");
+    for (std::size_t slot = 0; slot < nation.recruits.size(); ++slot) {
+        const auto job = static_cast<std::size_t>(professionJob(nation.recruits[slot]));
+        addOption(d, job < game_.rules().jobs.size() ? game_.rules().jobs[job].expertName : "?", {},
+                  nation.gold < price);
+        choices_.push_back(static_cast<int>(slot));
+    }
+    d.selected = 0;
+    placeEuropeDialog(d);
+    dialog_ = d;
+    question_ = "RECRUIT";
+    questionUnit_ = -1;
+}
+
+void PlayScreen::openPurchase() {
+    if (art_ == nullptr) {
+        return;
+    }
+    const auto& nation = game_.state().nations[static_cast<std::size_t>(game_.human())];
+    Dialog d = makeDialog(*art_, "PURCHASE");
+    choices_ = {-1};
+    addOption(d, "None");
+    for (const auto& item : purchaseList(nation)) {
+        addOption(d, game_.rules().units[static_cast<std::size_t>(item.unitType)].name, costText(item.price),
+                  nation.gold < item.price);
+        choices_.push_back(item.unitType);
+    }
+    d.selected = 0;
+    placeEuropeDialog(d);
+    dialog_ = d;
+    question_ = "PURCHASE";
+    questionUnit_ = -1;
+}
+
+void PlayScreen::openTrain() {
+    if (art_ == nullptr) {
+        return;
+    }
+    const auto& nation = game_.state().nations[static_cast<std::size_t>(game_.human())];
+    Dialog d = makeDialog(*art_, "KINGRECRUIT");
+    choices_ = {-1};
+    addOption(d, "None");
+    for (const int row : trainingList(game_.rules())) {
+        const auto& job = game_.rules().jobs[static_cast<std::size_t>(row)];
+        addOption(d, job.expertName, costText(job.europeCost), nation.gold < job.europeCost);
+        choices_.push_back(row);
+    }
+    d.selected = 0;
+    placeEuropeDialog(d);
+    dialog_ = d;
+    question_ = "KINGRECRUIT";
+    questionUnit_ = -1;
 }
 
 bool PlayScreen::handleEuropeScreen(Command command) {
@@ -267,11 +391,24 @@ bool PlayScreen::handleEuropeScreen(Command command) {
         return true;
     case Command::MoveN:
     case Command::Up:
-        state.focus = state.focus == EuropeFocus::Market ? EuropeFocus::Ships : EuropeFocus::Docks;
+        state.focus = state.focus == EuropeFocus::Market  ? EuropeFocus::Ships
+                      : state.focus == EuropeFocus::Ships ? EuropeFocus::Docks
+                                                          : EuropeFocus::Buttons;
         return true;
     case Command::MoveS:
     case Command::Down:
-        state.focus = state.focus == EuropeFocus::Docks ? EuropeFocus::Ships : EuropeFocus::Market;
+        state.focus = state.focus == EuropeFocus::Buttons ? EuropeFocus::Docks
+                      : state.focus == EuropeFocus::Docks ? EuropeFocus::Ships
+                                                          : EuropeFocus::Market;
+        return true;
+    case Command::Recruit:
+        openRecruit();
+        return true;
+    case Command::Purchase:
+        openPurchase();
+        return true;
+    case Command::Train:
+        openTrain();
         return true;
     case Command::MoveW:
     case Command::Left:
@@ -282,6 +419,8 @@ bool PlayScreen::handleEuropeScreen(Command command) {
             state.good = (state.good + by + kGoodsKinds) % kGoodsKinds;
         } else if (state.focus == EuropeFocus::Ships) {
             state.ship = cycle(ships, state.ship, by);
+        } else if (state.focus == EuropeFocus::Buttons) {
+            state.button = (state.button + by + 3) % 3;
         } else if (!docks.empty()) {
             const int n = static_cast<int>(docks.size());
             state.dock = (state.dock + by + n) % n;
@@ -309,6 +448,8 @@ bool PlayScreen::handleEuropeScreen(Command command) {
             if (state.ship >= 0) {
                 ask("SAILAWAY", state.ship);
             }
+        } else if (state.focus == EuropeFocus::Buttons) {
+            state.button == 0 ? openRecruit() : state.button == 1 ? openPurchase() : openTrain();
         } else if (!docks.empty() && state.ship >= 0) {
             const int who = docks[static_cast<std::size_t>(state.dock)];
             if (!game_.boardInPort(who, state.ship)) {

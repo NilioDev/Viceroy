@@ -94,4 +94,11 @@ int Screen::textWidth(const Font& font, std::string_view s) {
     return w;
 }
 
+void Screen::setColours(const Palette& palette, int first, int last) {
+    for (int i = std::max(0, first); i <= std::min(255, last); ++i) {
+        colours_[static_cast<std::size_t>(i)] = palette[static_cast<std::size_t>(i)];
+        overridden_[static_cast<std::size_t>(i)] = true;
+    }
+}
+
 } // namespace viceroy

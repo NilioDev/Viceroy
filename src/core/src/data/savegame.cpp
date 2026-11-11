@@ -172,6 +172,13 @@ SaveGame readSaveGame(std::span<const std::uint8_t> file) {
         for (std::size_t g = 0; g < kGoodsKinds; ++g) {
             nation.prices[g] = nation.raw[76 + g];
         }
+        for (std::size_t r = 0; r < nation.recruits.size(); ++r) {
+            nation.recruits[r] = nation.raw[2 + r];
+        }
+        nation.recruitCount = nation.raw[6];
+        nation.artilleryBought = nation.raw[30];
+        nation.crosses = u16(nation.raw.data() + 46);
+        nation.crossesNeeded = u16(nation.raw.data() + 48);
     }
 
     save.settlements.resize(static_cast<std::size_t>(settlementCount));
@@ -280,6 +287,13 @@ Bytes writeSaveGame(const SaveGame& save) {
         for (std::size_t g = 0; g < kGoodsKinds; ++g) {
             raw[76 + g] = static_cast<std::uint8_t>(std::clamp(nation.prices[g], 0, 255));
         }
+        for (std::size_t r = 0; r < nation.recruits.size(); ++r) {
+            raw[2 + r] = static_cast<std::uint8_t>(nation.recruits[r]);
+        }
+        raw[6] = static_cast<std::uint8_t>(std::clamp(nation.recruitCount, 0, 255));
+        raw[30] = static_cast<std::uint8_t>(std::clamp(nation.artilleryBought, 0, 255));
+        put16(raw.data() + 46, nation.crosses);
+        put16(raw.data() + 48, nation.crossesNeeded);
         append(out, raw);
     }
     for (const auto& settlement : save.settlements) {

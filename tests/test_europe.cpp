@@ -127,7 +127,8 @@ VCR_TEST("original files: the high seas question") {
         std::ofstream out(dump, std::ios::binary);
         out.write(reinterpret_cast<const char*>(screen.pixels().data()),
                   static_cast<std::streamsize>(screen.pixels().size()));
-        for (const auto& c : art.palette) {
+        for (int i = 0; i < 256; ++i) {
+            const auto c = screen.colour(art.palette, static_cast<std::uint8_t>(i));
             out.put(static_cast<char>(c.r)).put(static_cast<char>(c.g)).put(static_cast<char>(c.b));
         }
     }
@@ -225,4 +226,115 @@ VCR_TEST("original files: colonists on the docks board a ship in port") {
     game.endTurn();
     VCR_CHECK(game.onMap(56) && game.onMap(85) && game.onMap(86) && game.isAboard(85));
     VCR_CHECK(!game.onMap(87));
+}
+
+VCR_TEST("europe: recruit prices as measured on the original") {
+    SaveNation n;
+    // (recruits so far, crosses, crosses needed) -> price, read off the original's Recruit box.
+    struct Case {
+        int count, crosses, needed, price;
+    };
+    for (const Case c : {Case{32, 30, 284, 715}, Case{28, 31, 268, 636}, Case{12, 88, 106, 150}, Case{12, 0, 106, 380},
+                         Case{0, 0, 106, 140}, Case{30, 0, 106, 740}, Case{12, 50, 106, 250}, Case{30, 80, 106, 298},
+                         Case{0, 106, 106, 101}, Case{20, 106, 106, 113}, Case{200, 106, 106, 859}}) {
+        n.recruitCount = c.count;
+        n.crosses = c.crosses;
+        n.crossesNeeded = c.needed;
+        VCR_CHECK(recruitPrice(n) == c.price);
+    }
+    n.artilleryBought = 8;
+    VCR_CHECK(artilleryPrice(n) == 1300);
+}
+
+VCR_TEST("original files: Recruit, Purchase and Train") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    Art art = loadArt(dir);
+    const ColonyArt colonyArt = loadColonyArt(dir);
+    PlayScreen play(loadSave(art, "COLONY03.SAV"), {});
+    play.setColonyArt(&colonyArt);
+    play.setArt(&art);
+    const auto& dutch = play.game().state().nations[3];
+    VCR_CHECK(dutch.recruits[0] == 6 && dutch.recruits[1] == 5 && dutch.recruits[2] == kFreeColonist);
+    VCR_CHECK(recruitPrice(dutch) == 150);
+    VCR_CHECK(artilleryPrice(dutch) == 1300);
+
+    // The training list in the original's order.
+    const auto rows = trainingList(play.game().rules());
+    VCR_CHECK(rows.size() == 17);
+    VCR_CHECK(rows[0] == 6 && rows[1] == 5 && rows[5] == 13 && rows[6] == 8 && rows[10] == 20 && rows[16] == 21);
+
+    play.handle(Command::Europe);
+    const auto dump = [&](const char* name) {
+        const char* base = std::getenv("VICEROY_DUMP_DIALOG");
+        if (base == nullptr) {
+            return;
+        }
+        Screen screen;
+        play.draw(screen, art);
+        std::ofstream out(std::string(base) + "_" + name, std::ios::binary);
+        out.write(reinterpret_cast<const char*>(screen.pixels().data()),
+                  static_cast<std::streamsize>(screen.pixels().size()));
+        for (int i = 0; i < 256; ++i) {
+            const auto c = screen.colour(art.palette, static_cast<std::uint8_t>(i));
+            out.put(static_cast<char>(c.r)).put(static_cast<char>(c.g)).put(static_cast<char>(c.b));
+        }
+    };
+
+    play.handle(Command::Recruit);
+    VCR_CHECK(play.dialog().has_value());
+    VCR_CHECK(play.dialog()->options.size() == 4);
+    VCR_CHECK(play.dialog()->options[1] == "Expert Ore Miners");
+    VCR_CHECK(play.dialog()->x == 62 && play.dialog()->y == 88 && dialogHeight(*play.dialog()) == 103);
+    dump("recruit");
+    const int units = play.game().unitCount();
+    const int gold = dutch.gold;
+    play.handle(Command::Down);
+    play.handle(Command::Confirm);
+    VCR_CHECK(play.game().unitCount() == units + 1);
+    VCR_CHECK(dutch.gold == gold - 150);
+    VCR_CHECK(dutch.recruitCount == 13 && dutch.crosses == 0);
+    VCR_CHECK(recruitPrice(dutch) == 400); // as the original asks next
+    VCR_CHECK(play.game().unit(units).profession == 6);
+    VCR_CHECK(europePlace(play.game().unit(units)) == EuropePlace::InPort);
+    VCR_CHECK(unitsOnDocks(play.game().state(), play.game().rules(), 3).front() == units);
+
+    play.game().state().nations[3].gold = 1062;
+    play.handle(Command::Purchase);
+    VCR_CHECK(play.dialog()->y == 80 && dialogHeight(*play.dialog()) == 119);
+    VCR_CHECK(play.dialog()->values[2] == "(Cost: 1000)");
+    VCR_CHECK(play.dialog()->disabled[1] && !play.dialog()->disabled[2]); // 1062 gold buys no artillery
+    dump("purchase");
+    play.handle(Command::Down); // skips the artillery
+    VCR_CHECK(play.dialog()->selected == 2);
+    play.handle(Command::Cancel);
+    VCR_CHECK(!play.dialog().has_value());
+
+    play.handle(Command::Train);
+    VCR_CHECK(play.dialog()->small);
+    VCR_CHECK(play.dialog()->y == 10 && dialogHeight(*play.dialog()) == 180);
+    VCR_CHECK(play.dialog()->values[1] == "(Cost: 600)");
+    dump("train");
+    for (int i = 0; i < 12; ++i) {
+        play.handle(Command::Down);
+    }
+    VCR_CHECK(play.dialog()->selected == 3); // the cursor wraps over the eight it can afford
+    play.handle(Command::Confirm);
+    const int gunsmith = play.game().unitCount() - 1;
+    VCR_CHECK(play.game().unit(gunsmith).profession == 15);
+    VCR_CHECK(play.game().state().nations[3].gold == 1062 - 850);
+
+    play.game().state().nations[3].gold = 5000;
+    play.handle(Command::Purchase);
+    play.handle(Command::Down);
+    play.handle(Command::Confirm);
+    VCR_CHECK(play.dialog().has_value()); // "Purchase Artillery for 1300$?"
+    dump("reallybuy");
+    play.handle(Command::Confirm);
+    const int artillery = play.game().unitCount() - 1;
+    VCR_CHECK(play.game().unit(artillery).type == kArtillery);
+    VCR_CHECK(play.game().state().nations[3].gold == 3700);
+    VCR_CHECK(artilleryPrice(play.game().state().nations[3]) == 1400);
 }

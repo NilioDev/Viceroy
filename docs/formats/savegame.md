@@ -118,8 +118,13 @@ the next and previous unit of a ship's cargo chain at 24 and 26. Units in
 Europe or on the high seas have x = y = 228 + nation + 4 × stage; see
 [Europe](../rules/europe.md) for what the stages mean.
 
-**Nation** (316 bytes): tax rate at 1, gold at 42 (32 bits), and the
-European market at 76: one byte per good in `@CARGO` order, from which the
-bid and asking prices follow (see [Europe](../rules/europe.md)).
+**Nation** (316 bytes): tax rate at 1; the three people waiting to be
+recruited at 2 to 4 (professions, as the unit's byte 23); how many were
+recruited so far at 6; artillery bought so far at 30; gold at 42 (32 bits);
+crosses at 46 and the crosses needed for the next migrant at 48 (16 bits
+each); and the European market at 76: one byte per good in `@CARGO` order,
+from which the bid and asking prices follow (see [Europe](../rules/europe.md)).
+The recruit, artillery and crosses fields were confirmed by changing them in
+a save and reading the prices the original then asks.
 
 **Native settlement** (18 bytes): x, y, tribe (4 to 11), …, population at 4.

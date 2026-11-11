@@ -34,6 +34,8 @@ constexpr int kHoldsLeft = 147;
 constexpr int kHoldsTop = 165;
 constexpr int kDocksCentre = 239;
 constexpr int kDocksTop = 138;
+constexpr int kDocksPerRow = 3;
+constexpr int kDocksRowStep = 25;
 
 // LABELS.TXT @MISC rows.
 constexpr int kExpectedSoon = 9;
@@ -72,9 +74,13 @@ void drawTopLine(Screen& screen, const Art& art, const Game& game) {
     centred(screen, art.tiny, 160, 1, text, kGreen);
 }
 
-void drawButtons(Screen& screen, const Art& art) {
+void drawButtons(Screen& screen, const Art& art, const EuropeViewState& view) {
     for (int i = 0; i < 3; ++i) {
         const Rect& r = kEuropeButtons[i];
+        if (view.focus == EuropeFocus::Buttons && view.button == i) {
+            // Not in the original, which has no keyboard way to the buttons.
+            screen.frame({r.x - 2, r.y - 2, r.w + 4, r.h + 4}, kWhite);
+        }
         screen.fill({r.x, r.y, r.w, 1}, kButtonLight);
         screen.fill({r.x, r.y, 1, r.h}, kButtonLight);
         screen.fill({r.x + 1, r.y + r.h - 1, r.w - 1, 1}, kButtonDark);
@@ -217,16 +223,17 @@ void drawPort(Screen& screen, const Art& art, const Game& game, const EuropeView
         blitSprite(screen, art.icons, kEmptyHold, kHoldsLeft + 12 * k, kHoldsTop);
     }
 
-    // The docks: land units in port.
-    int dockCentre = kDocksCentre;
+    // The docks: land units in port, three to a row; further rows stand
+    // on the quay below.
     const auto docks = unitsOnDocks(save, game.rules(), game.human());
     for (std::size_t i = 0; i < docks.size(); ++i) {
-        drawCentredUnit(screen, art, game, docks[i], dockCentre, kDocksTop);
+        const int dockCentre = kDocksCentre + kUnitStep * static_cast<int>(i % kDocksPerRow);
+        const int top = kDocksTop + kDocksRowStep * static_cast<int>(i / kDocksPerRow);
+        drawCentredUnit(screen, art, game, docks[i], dockCentre, top);
         if (view.focus == EuropeFocus::Docks && static_cast<int>(i) == view.dock) {
             const int x = dockCentre - spriteWidth(art.icons, unitIcon(game, docks[i])) / 2;
-            screen.frame({x - 3, kDocksTop - 1, 18, 18}, kSelected);
+            screen.frame({x - 3, top - 1, 18, 18}, kSelected);
         }
-        dockCentre += kUnitStep;
     }
 }
 
@@ -254,7 +261,7 @@ void drawEuropeScreen(Screen& screen, const Art& art, const ColonyArt& colonyArt
     screen.clear(kBlack);
     screen.blit(colonyArt.europe, 0, 0);
     drawTopLine(screen, art, game);
-    drawButtons(screen, art);
+    drawButtons(screen, art, view);
     drawBoxTitles(screen, art, game, view);
     drawSailing(screen, art, game, 0, EuropePlace::ToEurope);
     drawSailing(screen, art, game, 1, EuropePlace::ToNewWorld);

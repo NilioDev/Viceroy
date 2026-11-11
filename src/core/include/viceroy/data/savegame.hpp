@@ -77,6 +77,14 @@ struct SaveNation {
     // original buys at one less and sells at this plus the good's spread;
     // see game/europe.hpp.
     std::array<int, kGoodsKinds> prices{};
+    // The three people waiting on the docks to be recruited (professions,
+    // as SaveUnit::profession), how many were recruited so far, and the
+    // crosses towards the next one coming of their own accord.
+    std::array<int, 3> recruits{};
+    int recruitCount = 0;
+    int crosses = 0;
+    int crossesNeeded = 0;
+    int artilleryBought = 0;
     std::array<std::uint8_t, 316> raw{};
 };
 inline constexpr int kMaxColonists = 32;

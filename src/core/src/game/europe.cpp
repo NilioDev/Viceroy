@@ -184,4 +184,59 @@ Trade sellGoods(SaveGame& save, int ship, int good) {
     return trade;
 }
 
+int recruitPrice(const SaveNation& nation) {
+    // At no crosses the price is 140 + 20 per recruit so far. It falls in
+    // a straight line as crosses gather, to a floor reached when they are
+    // all there: about a fifth of the full price, but not much under 100.
+    const int full = 140 + 20 * std::max(0, nation.recruitCount);
+    const int needed = std::max(1, nation.crossesNeeded);
+    const int crosses = std::clamp(nation.crosses, 0, needed);
+    const long long fall = std::min(99LL * (full - 100), 79253LL * full / 1000) ; // in hundredths
+    return full - static_cast<int>(fall * crosses / needed / 100);
+}
+
+int artilleryPrice(const SaveNation& nation) {
+    return 500 + 100 * std::max(0, nation.artilleryBought);
+}
+
+std::vector<PurchaseItem> purchaseList(const SaveNation& nation) {
+    return {{kArtillery, artilleryPrice(nation)}, {13, 1000}, {14, 2000}, {15, 3000}, {16, 2000}, {17, 5000}};
+}
+
+std::vector<int> trainingList(const Ruleset& rules) {
+    std::vector<int> rows;
+    for (std::size_t i = 0; i < rules.jobs.size(); ++i) {
+        if (rules.jobs[i].europeCost > 0) {
+            rows.push_back(static_cast<int>(i));
+        }
+    }
+    // A selection sort that takes the last of equal prices: it gives the
+    // order the original shows (carpenters before fishermen).
+    const auto cost = [&](int row) { return rules.jobs[static_cast<std::size_t>(row)].europeCost; };
+    for (std::size_t i = 0; i < rows.size(); ++i) {
+        std::size_t least = i;
+        for (std::size_t j = i + 1; j < rows.size(); ++j) {
+            if (cost(rows[j]) <= cost(rows[least])) {
+                least = j;
+            }
+        }
+        std::swap(rows[i], rows[least]);
+    }
+    return rows;
+}
+
+int professionJob(int profession) {
+    return profession == kFreeColonist ? 19 : profession;
+}
+
+int professionUnitType(int profession) {
+    switch (profession) {
+    case 0x14: return 2; // hardy pioneer
+    case 0x15: return 1; // veteran soldier
+    case 0x16: return 5; // seasoned scout
+    case 0x18: return 3; // jesuit missionary
+    default: return 0;
+    }
+}
+
 } // namespace viceroy

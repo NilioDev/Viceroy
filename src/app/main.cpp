@@ -271,6 +271,12 @@ std::optional<Command> keyCommand(const SDL_KeyboardEvent& key) {
         return Command::MoveMode;
     case SDLK_E:
         return ctrl ? Command::EndTurn : Command::Europe;
+    case SDLK_R:
+        return Command::Recruit;
+    case SDLK_P:
+        return Command::Purchase;
+    case SDLK_T:
+        return Command::Train;
     case SDLK_TAB:
         return (key.mod & SDL_KMOD_SHIFT) ? Command::PreviousUnit : Command::NextUnit;
     default:
@@ -379,8 +385,18 @@ void click(App& app, float wx, float wy) {
     }
     if (app.play->colonyScreen() || app.play->europeScreen()) {
         // The exit button in the lower right corner.
-        if (x >= 300.0f && y >= 178.0f) {
+        if (x >= 300.0f && y >= 178.0f && !app.play->dialog()) {
             send(app, Command::Cancel);
+        }
+        if (app.play->europeScreen() && !app.play->dialog()) {
+            static constexpr Command kButtons[] = {Command::Recruit, Command::Purchase, Command::Train};
+            for (int i = 0; i < 3; ++i) {
+                const auto& b = viceroy::kEuropeButtons[i];
+                if (x >= static_cast<float>(b.x) && x < static_cast<float>(b.x + b.w) && y >= static_cast<float>(b.y) &&
+                    y < static_cast<float>(b.y + b.h)) {
+                    send(app, kButtons[i]);
+                }
+            }
         }
         return;
     }
@@ -406,6 +422,7 @@ void present(App& app) {
         SDL_RenderPresent(app.renderer);
         return;
     }
+    app.screen.resetColours();
     if (app.mode == Mode::Load) {
         app.load->draw(app.screen, *app.art);
         if (!app.status.empty()) {
@@ -423,7 +440,7 @@ void present(App& app) {
         for (int y = 0; y < kScreenH; ++y) {
             auto* row = static_cast<Uint8*>(pixels) + y * pitch;
             for (int x = 0; x < kScreenW; ++x) {
-                const auto& c = app.art->palette[indexed[static_cast<std::size_t>(y * kScreenW + x)]];
+                const auto c = app.screen.colour(app.art->palette, indexed[static_cast<std::size_t>(y * kScreenW + x)]);
                 row[x * 4 + 0] = c.r;
                 row[x * 4 + 1] = c.g;
                 row[x * 4 + 2] = c.b;

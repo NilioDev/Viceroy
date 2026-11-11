@@ -17,7 +17,8 @@ touch controls.
 > colonists other jobs with the jobs menu. At the end of the turn colonies
 > store what they make, grow and finish buildings. Ships sail to Europe from
 > the high seas, sell and buy goods there, take colonists from the docks and
-> sail back; recruiting and training come next. The other nations don't
+> sail back. In Europe you can recruit colonists, buy artillery and ships,
+> and have specialists trained. The other nations don't
 > move yet, and combat and meeting the natives are still to come. Fish and
 > other resources are not drawn yet.
 
@@ -67,11 +68,12 @@ and download one at the bottom of the page.
 | Give the colonist another job (jobs menu) | Enter, then the arrow keys and Enter | A, then the D-pad and A |
 | Close the colony screen | Esc, or Enter with nobody picked, or click Exit | B |
 | Open the home port in Europe | E | Share / Capture button |
-| In Europe: move between the market, the ships and the docks | Up / Down | D-pad up / down |
+| In Europe: move between the market, the ships, the docks and the buttons | Up / Down | D-pad up / down |
 | In Europe: pick a good, ship or colonist | Left / Right | D-pad left / right |
 | In Europe: buy 100 of the good, send the ship to the New World, put the colonist aboard | Enter | A |
 | In Europe: sell the good from the ship | S | X |
 | In Europe: everyone aboard goes back to the docks | Space | |
+| In Europe: Recruit, Purchase, Train | R, P, T, or click the button | D-pad up to the buttons, then A |
 | Close the Europe screen | Esc, or click Exit | B |
 | Answer a question | Up / Down and Enter | D-pad and A |
 | Save the game | Ctrl+S | Start |

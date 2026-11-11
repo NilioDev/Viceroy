@@ -58,8 +58,43 @@ good's `@CARGO` row, so food 1 shows as 0/8, sugar 7 as 6/8, silver 14 as
 hold of the same good or fills a free one, as far as the gold goes; the
 tax is taken from what a sale brings in.
 
-**Not yet done:** prices moving after trade, boycotts, and the
-Recruit, Purchase and Train buttons.
+**Not yet done:** prices moving after trade, and boycotts.
+
+## Recruit, Purchase and Train
+
+Measured by changing the nation record of a save and reading what the
+original then asks (43 readings).
+
+- **Recruit** offers the three people waiting at bytes 2 to 4 of the nation
+  record, named by the plural column of `@JOB` (profession 0x1C, a free
+  colonist, uses the Colonist row), after "(None)". The passage costs
+  140 + 20 × the recruits so far (byte 6) with no crosses. As crosses
+  (byte 46) gather towards those needed (byte 48) the price falls in a
+  straight line: price = full − ⌊K × crosses / needed⌋ with
+  K = min(0.99 × (full − 100), 0.79253 × full). This fits 36 of the 39
+  readings exactly and the rest within two gold; the exact rule is not
+  known. After a recruit the count goes up by one and the crosses go back
+  to 0 (the next price was the full one). The recruit's place is taken by
+  someone new; who comes is a guess weighted towards the unskilled, as the
+  original's odds are not known.
+- **Purchase** lists Artillery for 500 + 100 × the artillery bought so far
+  (byte 30), Caravel 1000, Merchantman 2000, Galleon 3000, Privateer 2000
+  and Frigate 5000, then asks "Purchase <unit> for <price>$?" (`@REALLYBUY`).
+- **Train** (`@KINGRECRUIT`, in the small font) lists every `@JOB` row with
+  a price in its fourth column, cheapest first. Where two cost the same the
+  original's order is that of a selection sort that takes the last of equal
+  prices: Master Carpenters before Expert Fishermen, Hardy Pioneers before
+  Master Tobacconists.
+- In all three, choices the gold doesn't cover are grey (0x08) and the bar
+  skips them. Recruit and Train take the gold at once; nothing asks again.
+- The new unit stands on the docks, first in line. Veteran soldiers arrive
+  as soldiers, hardy pioneers as pioneers, Jesuit missionaries as
+  missionaries and seasoned scouts as scouts (seen for soldiers; the others
+  are assumed). Ships bought wait in port.
+- The original shows units on the docks three to a row; a fourth stands on
+  the quay below, about 25 lower.
+
+The boxes themselves are in [dialogs](dialogs.md).
 
 ## The screen
 

@@ -72,4 +72,31 @@ Trade buyGoods(SaveGame& save, const Ruleset& rules, int ship, int good, int fre
 // Sells everything of a good aboard a ship in port.
 Trade sellGoods(SaveGame& save, int ship, int good);
 
+// --- Recruit, Purchase and Train --------------------------------------------
+// What the passage of a recruit costs: 140 + 20 for every recruit so far,
+// less a share for the crosses gathered towards the next migrant. Measured
+// on the original; see docs/rules/europe.md.
+int recruitPrice(const SaveNation& nation);
+int artilleryPrice(const SaveNation& nation);
+
+struct PurchaseItem {
+    int unitType = 0; // row of @UNIT
+    int price = 0;
+};
+// The Purchase list: artillery and the ships, in the original's order.
+std::vector<PurchaseItem> purchaseList(const SaveNation& nation);
+
+// The rows of @JOB the Royal University teaches, cheapest first, in the
+// original's order where two cost the same.
+std::vector<int> trainingList(const Ruleset& rules);
+
+// The row of @JOB that names a profession (SaveUnit::profession).
+int professionJob(int profession);
+// The unit a person of a profession arrives as: veteran soldiers come as
+// soldiers, pioneers as pioneers, and so on. The rest are colonists.
+int professionUnitType(int profession);
+
+inline constexpr int kFreeColonist = 0x1C;
+inline constexpr int kArtillery = 11;
+
 } // namespace viceroy

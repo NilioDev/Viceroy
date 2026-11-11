@@ -48,6 +48,9 @@ enum class Command {
     Europe,   // E: the home port
     Left,     // menus and screens that list things side by side
     Right,
+    Recruit,  // R, P, T: the buttons in Europe
+    Purchase,
+    Train,
 };
 
 // The main map screen while playing.
@@ -103,6 +106,10 @@ private:
     bool handleDialog(Command command);
     void drawScreen(Screen& screen, const Art& art) const;
     void ask(std::string_view section, int unit, std::vector<std::string> strings = {});
+    void openRecruit();
+    void openPurchase();
+    void openTrain();
+    void answer(const std::string& question, int unit, int choice);
 
     Game game_;
     ViewState view_;
@@ -116,6 +123,7 @@ private:
     std::optional<Dialog> dialog_;
     std::string question_; // the GAME.TXT section the dialog asks
     int questionUnit_ = -1;
+    std::vector<int> choices_; // what each choice of a list stands for
     const Art* art_ = nullptr;
     int lastColony_ = -1;
     bool viewMode_ = false;
