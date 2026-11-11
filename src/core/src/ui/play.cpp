@@ -376,6 +376,7 @@ void PlayScreen::openTrain() {
 bool PlayScreen::handleEuropeScreen(Command command) {
     auto& state = *europeScreen_;
     say("");
+    state.receipt.reset();
     auto& save = game_.state();
     const auto ships = unitsInEurope(save, game_.rules(), game_.human(), EuropePlace::InPort, true);
     const auto docks = unitsOnDocks(save, game_.rules(), game_.human());
@@ -452,8 +453,7 @@ bool PlayScreen::handleEuropeScreen(Command command) {
             }
             const Trade t = buyGoods(save, game_.rules(), state.ship, state.good, game_.freeHolds(state.ship));
             if (t.amount > 0) {
-                say(std::to_string(t.amount) + " " + goodName(state.good) + " bought for " + std::to_string(t.gold) +
-                    "$.");
+                state.receipt = TradeReceipt{false, t.amount, goodName(state.good), t.price, t.gold, nation.taxRate, 0};
                 tellPriceMove(state.good, t.priceMove);
             } else {
                 say(nation.gold < askPrice(game_.rules(), nation, state.good) ? "Not enough gold."
@@ -477,8 +477,8 @@ bool PlayScreen::handleEuropeScreen(Command command) {
         if (state.focus == EuropeFocus::Market && state.ship >= 0) {
             const Trade t = sellGoods(save, game_.rules(), state.ship, state.good);
             if (t.amount > 0) {
-                say(std::to_string(t.amount) + " " + goodName(state.good) + " sold for " + std::to_string(t.gold) +
-                    "$ (tax " + std::to_string(t.tax) + "$).");
+                state.receipt =
+                    TradeReceipt{true, t.amount, goodName(state.good), t.price, t.gold + t.tax, nation.taxRate, t.tax};
                 tellPriceMove(state.good, t.priceMove);
             }
         }

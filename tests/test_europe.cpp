@@ -76,6 +76,19 @@ VCR_TEST("original files: the market and the home port") {
             out.put(static_cast<char>(c.r)).put(static_cast<char>(c.g)).put(static_cast<char>(c.b));
         }
     }
+    // The notes after a sale and a purchase, as the original shows them.
+    for (const bool sold : {true, false}) {
+        view.receipt = sold ? TradeReceipt{true, 100, "Sugar", 6, 600, 2, 12} : TradeReceipt{false, 100, "Sugar", 8, 800, 2, 0};
+        drawEuropeScreen(screen, art, colonyArt, game, view);
+        if (const char* dump = std::getenv("VICEROY_DUMP_RECEIPT")) {
+            std::ofstream out(std::string(dump) + (sold ? "_sold" : "_bought"), std::ios::binary);
+            out.write(reinterpret_cast<const char*>(screen.pixels().data()),
+                      static_cast<std::streamsize>(screen.pixels().size()));
+            for (const auto& c : art.palette) {
+                out.put(static_cast<char>(c.r)).put(static_cast<char>(c.g)).put(static_cast<char>(c.b));
+            }
+        }
+    }
 }
 
 #include "viceroy/ui/play.hpp"

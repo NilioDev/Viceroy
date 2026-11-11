@@ -35,6 +35,12 @@ constexpr int kHoldsTop = 165;
 constexpr int kDocksCentre = 239;
 constexpr int kDocksTop = 138;
 constexpr int kDocksPerRow = 3;
+// The trade note over the sky, measured on the original.
+constexpr std::uint8_t kReceiptText = 0x30;
+constexpr std::uint8_t kReceiptShade = 0x36;
+constexpr int kReceiptTop = 12;
+constexpr int kReceiptLabelRight = 147;
+constexpr int kReceiptValueRight = 200;
 constexpr int kDocksRowStep = 25;
 
 // LABELS.TXT @MISC rows.
@@ -253,6 +259,29 @@ void drawMarket(Screen& screen, const Art& art, const Game& game, const EuropeVi
     screen.text(art.tiny, 306, 179, "Exit", {kWhite, kNoColour, kNoColour});
 }
 
+void drawReceipt(Screen& screen, const Art& art, const TradeReceipt& r) {
+    const TextColours colours{kReceiptText, kReceiptShade, kBlack};
+    const auto centre = [&](int y, const std::string& text) {
+        // The original centres on the ink, without the last letter's spacing column.
+        screen.text(art.labels, 160 - (Screen::textWidth(art.labels, text) - 1) / 2, y, text, colours);
+    };
+    const auto row = [&](int y, const std::string& label, const std::string& value) {
+        screen.text(art.labels, kReceiptLabelRight - Screen::textWidth(art.labels, label), y, label, colours);
+        screen.text(art.labels, kReceiptValueRight - Screen::textWidth(art.labels, value), y, value, colours);
+    };
+    const std::string what = std::to_string(r.amount) + " " + r.good + " at " + std::to_string(r.perTon) + "$/ton";
+    if (!r.sold) {
+        centre(kReceiptTop, "Bought " + what);
+        centre(kReceiptTop + 11, "Price: " + std::to_string(r.price) + "$");
+        return;
+    }
+    centre(kReceiptTop, "Sold " + what);
+    row(kReceiptTop + 11, "Price:", std::to_string(r.price) + "$");
+    row(kReceiptTop + 22, std::to_string(r.taxRate) + "% Tax:", "-" + std::to_string(r.tax) + "$");
+    screen.fill({100, kReceiptTop + 33, 101, 1}, kBlack);
+    row(kReceiptTop + 36, "Net:", std::to_string(r.price - r.tax) + "$");
+}
+
 } // namespace
 
 void drawEuropeScreen(Screen& screen, const Art& art, const ColonyArt& colonyArt, const Game& game,
@@ -267,6 +296,9 @@ void drawEuropeScreen(Screen& screen, const Art& art, const ColonyArt& colonyArt
     drawSailing(screen, art, game, 1, EuropePlace::ToNewWorld);
     drawPort(screen, art, game, view);
     drawMarket(screen, art, game, view);
+    if (view.receipt) {
+        drawReceipt(screen, art, *view.receipt);
+    }
 }
 
 } // namespace viceroy

@@ -81,6 +81,18 @@ furs added exactly 100; we add the amount itself. Also not yet known are
 how the volume recovers each turn (the `attrition` column), what
 `volatility` does, how other nations' trade moves prices, and boycotts.
 
+### The trade note
+
+After each sale or purchase the original writes a note over the sky,
+in the labels font in colour 0x30 with 0x36 for the font's second colour
+and a black shadow; it stays until the next action. A sale shows
+"Sold 100 Sugar at 6$/ton" centred at y 12 (centred on 160 less half of
+the width minus one), then three rows 11 apart: "Price:", "2% Tax:" and,
+below a black line from x 100 to 200 at y 45, "Net:" at y 48. Labels end
+at x 147 and the amounts ("600$", "-12$", "588$") at x 200. A purchase
+shows "Bought 100 Sugar at 8$/ton" and "Price: 800$" centred below it.
+Both were compared pixel for pixel with the original.
+
 ## Recruit, Purchase and Train
 
 Measured by changing the nation record of a save and reading what the
