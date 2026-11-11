@@ -87,11 +87,29 @@ ten saves).
 flags (1), control (1: 0 human, 1 computer, 2 withdrawn), colonies founded
 (1), diplomacy (1). The 24 bytes after the four players are kept as they are.
 
-**Colony** (202 bytes): x, y (1 each), name (24), nation (1), …,
-population at 31, the colonists' jobs at 32 (one byte each), their skills
-at 64, …, the squares worked at 112 (8 bytes, 0xFF free), …, buildings from
-132: the low three bits are the fortification (0 none, 1 stockade, 3 fort,
-7 fortress).
+**Colony** (202 bytes):
+
+| Offset | Size | Meaning |
+| --- | --- | --- |
+| 0 | 2 | x, y |
+| 2 | 24 | name |
+| 26 | 1 | nation |
+| 31 | 1 | population |
+| 32 | 32 | each colonist's job (row of `@JOB`) |
+| 64 | 32 | each colonist's skill (0-17 experts, 0x14-0x1B pioneer to convert, 0x1C free colonist) |
+| 112 | 8 | who works the squares N, E, S, W, NW, NE, SE, SW (colonist number, 0xFF nobody) |
+| 132 | 6 | buildings, 48 bits, lowest first; see below |
+| 146 | 2 | hammers |
+| 148 | 1 | what is being built (0xFF nothing) |
+| 154 | 32 | stock of the 16 goods (signed 16 bits each, in `@CARGO` order) |
+| 194 | 4 + 4 | Sons of Liberty as a fraction: members, total |
+
+Each kind of building has a field of bits that fill up from the lowest as it
+is improved (0, 1, 11, 111): fortification 3 bits, armory 3, docks 3, town
+hall 3, schoolhouse 3, warehouse 1, unused 1, stable 1, custom house 1,
+printing press 2, weaver 3, tobacconist 3, distiller 3, capitol 2, fur
+trader 3, carpenter 2, church 2, blacksmith 3, then 6 unused bits. The other
+bytes are kept as they are.
 
 **Unit** (28 bytes): x, y, type (row of `@UNIT`), nation in the low four
 bits of byte 3, moves used at 5 (in thirds: a move along a road costs one),
