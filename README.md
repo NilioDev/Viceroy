@@ -65,6 +65,12 @@ and download one at the bottom of the page.
 | Save the game | Ctrl+S | Start |
 | Back to the load menu | Esc | Guide |
 
+**Debug menu.** F12, or Back and Start together on a gamepad, opens a menu
+for testing that is not part of the original game: reveal the map, add gold,
+give units their moves back, end the turn, or jump to your next colony. On a
+colony screen it adds goods, a colonist, a level to every building or Sons of
+Liberty. Nothing changes unless you pick an entry.
+
 Saving writes over the savegame you loaded, in Viceroy's library (see
 below). Your original files are never changed.
 

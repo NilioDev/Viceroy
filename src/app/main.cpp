@@ -17,6 +17,7 @@
 #include "viceroy/pack/library.hpp"
 #include "viceroy/render/game_view.hpp"
 #include "viceroy/render/screen.hpp"
+#include "viceroy/ui/debug_menu.hpp"
 #include "viceroy/ui/play.hpp"
 #include "viceroy/version.hpp"
 
@@ -55,6 +56,7 @@ struct App {
     std::unique_ptr<viceroy::LoadMenu> load;
     std::unique_ptr<viceroy::ColonyArt> colonyArt;
     std::unique_ptr<viceroy::PlayScreen> play;
+    viceroy::DebugMenu debug;
     viceroy::Screen screen;
     Uint64 lastTicks = 0;
 
@@ -109,6 +111,7 @@ void showLoadMenu(App& app) {
     app.load = std::make_unique<viceroy::LoadMenu>(
         viceroy::listSaves(viceroy::pack::savesFolder(app.library), *app.art));
     app.mode = Mode::Load;
+    app.debug = viceroy::DebugMenu{};
 }
 
 // Loads the pictures and rules from the library, then shows the load menu.
@@ -345,6 +348,13 @@ void send(App& app, Command command) {
         }
         break;
     case Mode::Play:
+        if (app.debug.open()) {
+            const std::string result = app.debug.handle(command, *app.play);
+            if (!result.empty()) {
+                app.play->showMessage(result);
+            }
+            break;
+        }
         if (!app.play->handle(command)) {
             showLoadMenu(app);
         }
@@ -400,6 +410,7 @@ void present(App& app) {
         }
     } else {
         app.play->draw(app.screen, *app.art);
+        app.debug.draw(app.screen, *app.art);
     }
     // Indexed pixels to colours.
     void* pixels = nullptr;
@@ -473,6 +484,10 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
         }
         break;
     case SDL_EVENT_KEY_DOWN:
+        if (event->key.key == SDLK_F12 && app->mode == Mode::Play) {
+            app->debug.toggle(*app->play);
+            break;
+        }
         if (event->key.key == SDLK_ESCAPE) {
             if (app->mode == Mode::Play) {
                 send(*app, Command::Cancel);
@@ -511,6 +526,26 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
             break;
         }
         const bool playing = app->mode == Mode::Play;
+        // Back and Start together open the debug menu.
+        if (playing && event->gbutton.button == SDL_GAMEPAD_BUTTON_START) {
+            SDL_Gamepad* pad = SDL_GetGamepadFromID(event->gbutton.which);
+            if (pad != nullptr && SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_BACK)) {
+                app->debug.toggle(*app->play);
+                break;
+            }
+        }
+        if (playing && app->debug.open()) {
+            if (event->gbutton.button == SDL_GAMEPAD_BUTTON_SOUTH) {
+                send(*app, Command::Confirm);
+            } else if (event->gbutton.button == SDL_GAMEPAD_BUTTON_EAST) {
+                send(*app, Command::Cancel);
+            } else if (event->gbutton.button == SDL_GAMEPAD_BUTTON_DPAD_UP) {
+                send(*app, Command::Up);
+            } else if (event->gbutton.button == SDL_GAMEPAD_BUTTON_DPAD_DOWN) {
+                send(*app, Command::Down);
+            }
+            break;
+        }
         const bool pointing = playing && (app->play->colonyScreen() || app->play->viewMode());
         if (auto command = buttonCommand(event->gbutton.button, playing && app->play->waitingForEndOfTurn(), pointing)) {
             send(*app, *command);

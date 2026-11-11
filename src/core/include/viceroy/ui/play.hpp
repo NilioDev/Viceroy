@@ -69,6 +69,10 @@ public:
     // The colony screen, when one is open.
     const std::optional<ColonyViewState>& colonyScreen() const { return colonyScreen_; }
     void openColony(int index);
+    // The colony opened last, or -1.
+    int lastColony() const { return lastColony_; }
+    // A line in the panel, as the game's own messages.
+    void showMessage(std::string text) { say(std::move(text)); }
     bool viewMode() const { return viewMode_; }
     int cursorX() const { return cursorX_; }
     int cursorY() const { return cursorY_; }
@@ -91,6 +95,7 @@ private:
     const TextFile* colonyNames_ = nullptr;
     const ColonyArt* colonyArt_ = nullptr;
     std::optional<ColonyViewState> colonyScreen_;
+    int lastColony_ = -1;
     bool viewMode_ = false;
     int cursorX_ = 0;
     int cursorY_ = 0;
