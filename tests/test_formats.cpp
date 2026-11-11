@@ -34,7 +34,7 @@ bool throwsFormatError(F&& f) {
 // literal 'A', literal 'B', short copy of 4 bytes from 2 back, end marker.
 const V kAbStream = {'F', 'A', 'B', 12, 0x93, 0x00, 'A', 'B', 0xFE, 0x00, 0x00, 0x00};
 
-V container(const std::vector<std::pair<std::uint16_t, V>>& parts, const std::vector<std::size_t>& sizes) {
+V container(const std::vector<std::pair<int, V>>& parts, const std::vector<std::size_t>& sizes) {
     V out(0xB0, 0);
     const std::string sig = "MADSPACK 2.0\x1a";
     std::copy(sig.begin(), sig.end(), out.begin());
