@@ -67,14 +67,18 @@ struct SavePlayer {
     std::array<std::uint8_t, 52> raw{};
 };
 
+// The goods a colony stores, in the order of @CARGO.
+inline constexpr int kGoodsKinds = 16;
+
 struct SaveNation {
     int taxRate = 0;
     int gold = 0;
+    // The European market: one value per good, in @CARGO order. The
+    // original buys at one less and sells at this plus the good's spread;
+    // see game/europe.hpp.
+    std::array<int, kGoodsKinds> prices{};
     std::array<std::uint8_t, 316> raw{};
 };
-
-// The goods a colony stores, in the order of @CARGO.
-inline constexpr int kGoodsKinds = 16;
 inline constexpr int kMaxColonists = 32;
 
 struct SaveColony {

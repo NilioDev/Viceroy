@@ -7,6 +7,7 @@
 
 #include "viceroy/game/game.hpp"
 #include "viceroy/render/colony_view.hpp"
+#include "viceroy/render/europe_view.hpp"
 #include "viceroy/render/game_view.hpp"
 
 #include <cstdint>
@@ -42,6 +43,9 @@ enum class Command {
     Down,
     ViewMode, // V: a square cursor to look around; Enter opens a colony
     MoveMode, // M: back to moving units
+    Europe,   // E: the home port
+    Left,     // menus and screens that list things side by side
+    Right,
 };
 
 // The main map screen while playing.
@@ -69,6 +73,9 @@ public:
     // The colony screen, when one is open.
     const std::optional<ColonyViewState>& colonyScreen() const { return colonyScreen_; }
     void openColony(int index);
+    // The home port in Europe, when it is shown.
+    const std::optional<EuropeViewState>& europeScreen() const { return europeScreen_; }
+    void openEurope();
     // The colony opened last, or -1.
     int lastColony() const { return lastColony_; }
     // A line in the panel, as the game's own messages.
@@ -86,6 +93,7 @@ private:
     void advance(); // to the next unit that needs orders
     void say(std::string text);
     bool handleColonyScreen(Command command);
+    bool handleEuropeScreen(Command command);
 
     Game game_;
     ViewState view_;
@@ -95,6 +103,7 @@ private:
     const TextFile* colonyNames_ = nullptr;
     const ColonyArt* colonyArt_ = nullptr;
     std::optional<ColonyViewState> colonyScreen_;
+    std::optional<EuropeViewState> europeScreen_;
     int lastColony_ = -1;
     bool viewMode_ = false;
     int cursorX_ = 0;

@@ -15,9 +15,11 @@ touch controls.
 > colonies, look inside your colonies, end turns and save. The colony screen
 > shows its buildings, people, what they produce and the warehouse; give
 > colonists other jobs with the jobs menu. At the end of the turn colonies
-> store what they make, grow and finish buildings. The other nations don't
-> move yet, and the Europe and trade screens, combat and meeting the natives
-> are still to come. Fish and other resources are not drawn yet.
+> store what they make, grow and finish buildings. The home port in Europe
+> shows the market prices, ships on their way and in port, and the docks;
+> buying, selling and recruiting there come next. The other nations don't
+> move yet, and combat and meeting the natives are still to come. Fish and
+> other resources are not drawn yet.
 
 Viceroy is not affiliated with or endorsed by the makers of the original
 game. It contains none of the original game's files: you need your own copy.
@@ -64,6 +66,9 @@ and download one at the bottom of the page.
 | Pick a colonist on the colony screen | Arrow keys, Tab | D-pad, LB / RB |
 | Give the colonist another job (jobs menu) | Enter, then the arrow keys and Enter | A, then the D-pad and A |
 | Close the colony screen | Esc, or Enter with nobody picked, or click Exit | B |
+| Open the home port in Europe | E | Share / Capture button |
+| Look along the market, pick a ship in port | Left / Right, Down | D-pad |
+| Close the Europe screen | Esc, or click Exit | B |
 | Save the game | Ctrl+S | Start |
 | Back to the load menu | Esc | Guide |
 

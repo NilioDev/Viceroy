@@ -3,6 +3,7 @@
 
 #include "viceroy/data/reader.hpp"
 #include "viceroy/game/colony.hpp"
+#include "viceroy/game/europe.hpp"
 #include "viceroy/game_files.hpp"
 
 #include <algorithm>
@@ -167,6 +168,43 @@ void PlayScreen::openColony(int index) {
     lastColony_ = index;
 }
 
+void PlayScreen::openEurope() {
+    EuropeViewState state;
+    const auto ships = unitsInEurope(game_.state(), game_.rules(), game_.human(), EuropePlace::InPort, true);
+    state.ship = ships.empty() ? -1 : ships.front();
+    europeScreen_ = state;
+}
+
+bool PlayScreen::handleEuropeScreen(Command command) {
+    auto& state = *europeScreen_;
+    const auto ships = unitsInEurope(game_.state(), game_.rules(), game_.human(), EuropePlace::InPort, true);
+    switch (command) {
+    case Command::Cancel:
+    case Command::Europe:
+        europeScreen_.reset();
+        break;
+    case Command::MoveW:
+    case Command::Left:
+        state.good = (state.good + kGoodsKinds - 1) % kGoodsKinds;
+        break;
+    case Command::MoveE:
+    case Command::Right:
+        state.good = (state.good + 1) % kGoodsKinds;
+        break;
+    case Command::NextUnit:
+    case Command::Down:
+    case Command::MoveS:
+        if (!ships.empty()) {
+            const auto it = std::find(ships.begin(), ships.end(), state.ship);
+            state.ship = it == ships.end() || it + 1 == ships.end() ? ships.front() : *(it + 1);
+        }
+        break;
+    default:
+        break;
+    }
+    return true;
+}
+
 bool PlayScreen::handleColonyScreen(Command command) {
     auto& state = *colonyScreen_;
     auto& save = game_.state();
@@ -269,8 +307,15 @@ void PlayScreen::clickSquare(int x, int y) {
 }
 
 bool PlayScreen::handle(Command command) {
+    if (europeScreen_) {
+        return handleEuropeScreen(command);
+    }
     if (colonyScreen_) {
         return handleColonyScreen(command);
+    }
+    if (command == Command::Europe) {
+        openEurope();
+        return true;
     }
     if (viewMode_) {
         if (const auto step = stepOf(command)) {
@@ -448,6 +493,10 @@ void PlayScreen::tick(std::uint64_t milliseconds) {
 }
 
 void PlayScreen::draw(Screen& screen, const Art& art) const {
+    if (europeScreen_ && colonyArt_ != nullptr) {
+        drawEuropeScreen(screen, art, *colonyArt_, game_, *europeScreen_);
+        return;
+    }
     if (colonyScreen_ && colonyArt_ != nullptr) {
         drawColonyScreen(screen, art, *colonyArt_, game_, *colonyScreen_);
         return;
