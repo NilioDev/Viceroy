@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <bit>
+#include <cstdlib>
 
 namespace viceroy {
 
@@ -270,6 +271,213 @@ ColonyProduction colonyProduction(const SaveColony& colony, const SaveMap& map, 
     p.produced[cargo::kCrosses] += 1;
     p.foodEaten = 2 * population;
     return p;
+}
+
+bool squareFree(const SaveColony& colony, const SaveMap& map, const std::vector<SaveColony>& colonies, int square) {
+    if (square < 0 || square >= 8 || colony.squares[static_cast<std::size_t>(square)] >= 0) {
+        return false;
+    }
+    const int x = colony.x + kColonySquares[static_cast<std::size_t>(square)].dx;
+    const int y = colony.y + kColonySquares[static_cast<std::size_t>(square)].dy;
+    if (!map.inside(x, y)) {
+        return false;
+    }
+    if (map.at(x, y).isWater() && buildingLevel(colony, BuildingKind::Docks) == 0) {
+        return false;
+    }
+    // Worked by a neighbouring colony?
+    for (const auto& other : colonies) {
+        if (&other == &colony || std::abs(other.x - x) > 1 || std::abs(other.y - y) > 1) {
+            continue;
+        }
+        if (other.x == x && other.y == y) {
+            return false;
+        }
+        for (std::size_t s = 0; s < 8; ++s) {
+            if (other.squares[s] >= 0 && other.x + kColonySquares[s].dx == x && other.y + kColonySquares[s].dy == y) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+namespace {
+
+int workersIn(const SaveColony& colony, BuildingKind kind, int except) {
+    int n = 0;
+    for (int i = 0; i < colony.population; ++i) {
+        if (i == except) {
+            continue;
+        }
+        const bool outside = std::find(colony.squares.begin(), colony.squares.end(), i) != colony.squares.end();
+        const auto b = buildingForJob(colony.jobs[static_cast<std::size_t>(i)]);
+        if (!outside && b && *b == kind) {
+            ++n;
+        }
+    }
+    return n;
+}
+
+int currentSquare(const SaveColony& colony, int colonist) {
+    for (std::size_t s = 0; s < 8; ++s) {
+        if (colony.squares[s] == colonist) {
+            return static_cast<int>(s);
+        }
+    }
+    return -1;
+}
+
+JobChoice choiceFor(const SaveColony& colony, const SaveMap& map, const Ruleset& rules,
+                    const std::vector<SaveColony>& colonies, int colonist, int jobRow) {
+    JobChoice choice;
+    choice.job = jobRow;
+    const int skillOf = colony.skills[static_cast<std::size_t>(colonist)];
+    if (jobRow < static_cast<int>(kSquareWorkCount)) {
+        const int here = currentSquare(colony, colonist);
+        for (int s = 0; s < 8; ++s) {
+            if (s != here && !squareFree(colony, map, colonies, s)) {
+                continue;
+            }
+            const auto& sq = map.at(colony.x + kColonySquares[static_cast<std::size_t>(s)].dx,
+                                    colony.y + kColonySquares[static_cast<std::size_t>(s)].dy);
+            if (sq.isWater() != (jobRow == job::kFisherman)) {
+                continue;
+            }
+            const int amount = squareYield(rules, sq, jobRow, skillOf);
+            if (amount > choice.amount) {
+                choice.amount = amount;
+                choice.square = s;
+            }
+        }
+        return choice;
+    }
+    const auto building = buildingForJob(jobRow);
+    if (!building || buildingLevel(colony, *building) == 0 || workersIn(colony, *building, colonist) >= 3) {
+        return choice;
+    }
+    choice.amount = jobRow == job::kTeacher ? 0 : buildingYield(buildingLevel(colony, *building), skillOf, jobRow);
+    return choice;
+}
+
+} // namespace
+
+std::vector<JobChoice> jobChoices(const SaveColony& colony, const SaveMap& map, const Ruleset& rules,
+                                  const std::vector<SaveColony>& colonies, int colonist) {
+    std::vector<JobChoice> out;
+    if (colonist < 0 || colonist >= colony.population) {
+        return out;
+    }
+    for (int j = 0; j < job::kTeacher; ++j) {
+        out.push_back(choiceFor(colony, map, rules, colonies, colonist, j));
+    }
+    return out;
+}
+
+bool assignJob(SaveColony& colony, const SaveMap& map, const Ruleset& rules,
+               const std::vector<SaveColony>& colonies, int colonist, int jobRow) {
+    if (colonist < 0 || colonist >= colony.population || jobRow < 0 || jobRow > job::kTeacher) {
+        return false;
+    }
+    const JobChoice choice = choiceFor(colony, map, rules, colonies, colonist, jobRow);
+    const bool onLand = jobRow < static_cast<int>(kSquareWorkCount);
+    if (onLand ? choice.square < 0 : (!buildingForJob(jobRow) ||
+                                       buildingLevel(colony, *buildingForJob(jobRow)) == 0 ||
+                                       workersIn(colony, *buildingForJob(jobRow), colonist) >= 3)) {
+        return false;
+    }
+    const int here = currentSquare(colony, colonist);
+    if (here >= 0) {
+        colony.squares[static_cast<std::size_t>(here)] = -1;
+    }
+    if (onLand) {
+        colony.squares[static_cast<std::size_t>(choice.square)] = colonist;
+    }
+    colony.jobs[static_cast<std::size_t>(colonist)] = static_cast<std::uint8_t>(jobRow);
+    return true;
+}
+
+int storageLimit(const SaveColony& colony) {
+    // Raw byte 149: 0 none, 1 warehouse, 2 warehouse expansion.
+    return 100 * (1 + std::clamp<int>(colony.raw[149], 0, 2));
+}
+
+ColonyTurn runColonyTurn(SaveColony& colony, const SaveMap& map, const Ruleset& rules) {
+    ColonyTurn turn;
+    const auto p = colonyProduction(colony, map, rules);
+    std::array<int, cargo::kCount> made = p.produced;
+
+    // Workshops: as much as their raw good allows, from this turn's
+    // harvest first and then from the warehouse.
+    std::array<int, cargo::kCount> wanted{};
+    std::array<int, cargo::kCount> outputOf{};
+    for (std::size_t i = 0; i < p.colonists.size(); ++i) {
+        const auto& work = p.colonists[i];
+        if (!work.building || work.good < 0) {
+            continue;
+        }
+        const int input = jobInput(colony.jobs[i]);
+        if (input >= 0) {
+            wanted[static_cast<std::size_t>(input)] += work.amount;
+            outputOf[static_cast<std::size_t>(input)] = work.good;
+        }
+    }
+    for (int raw = 0; raw < cargo::kCount; ++raw) {
+        const auto r = static_cast<std::size_t>(raw);
+        if (wanted[r] == 0) {
+            continue;
+        }
+        const int available = made[r] + (raw < kGoodsKinds ? std::max(0, colony.stock[r]) : 0);
+        const int used = std::min(wanted[r], available);
+        const int shortfall = wanted[r] - used;
+        made[static_cast<std::size_t>(outputOf[r])] -= shortfall;
+        made[r] -= used; // negative: taken from the warehouse
+    }
+
+    // Food.
+    made[cargo::kFood] -= p.foodEaten;
+    for (int good = 0; good < kGoodsKinds; ++good) {
+        colony.stock[static_cast<std::size_t>(good)] += made[static_cast<std::size_t>(good)];
+    }
+    auto& food = colony.stock[cargo::kFood];
+    if (food >= 200) {
+        food -= 200;
+        turn.grew = true;
+    } else if (food < 0) {
+        food = 0;
+        turn.starved = colony.population > 1;
+    }
+
+    // Construction.
+    colony.hammers += std::max(0, made[cargo::kHammers]);
+    if (colony.construction >= 0 && static_cast<std::size_t>(colony.construction) < rules.buildings.size()) {
+        const auto& b = rules.buildings[static_cast<std::size_t>(colony.construction)];
+        const int tools = b.tools * 10;
+        if (colony.hammers >= b.hammers && colony.stock[cargo::kTools] >= tools) {
+            for (int k = 0; k < kBuildingKinds; ++k) {
+                const auto& f = kBuildingFields[static_cast<std::size_t>(k)];
+                if (f.firstRow >= 0 && colony.construction >= f.firstRow && colony.construction < f.firstRow + f.bits) {
+                    setBuildingLevel(colony, static_cast<BuildingKind>(k), colony.construction - f.firstRow + 1);
+                }
+            }
+            colony.hammers -= b.hammers;
+            colony.stock[cargo::kTools] -= tools;
+            turn.built = colony.construction;
+            colony.construction = -1;
+        }
+    }
+
+    // What the warehouse cannot hold is lost.
+    const int limit = storageLimit(colony);
+    for (int good = 1; good < kGoodsKinds; ++good) {
+        auto& amount = colony.stock[static_cast<std::size_t>(good)];
+        if (amount > limit) {
+            turn.wasted[static_cast<std::size_t>(good)] = amount - limit;
+            amount = limit;
+        }
+        amount = std::max(0, amount);
+    }
+    return turn;
 }
 
 int sonsOfLibertyPercent(const SaveColony& colony) {

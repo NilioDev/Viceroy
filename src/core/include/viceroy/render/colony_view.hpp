@@ -23,6 +23,7 @@ ColonyArt loadColonyArt(const std::filesystem::path& folder);
 struct ColonyViewState {
     int colony = 0;
     int selectedColonist = 0; // -1 for none
+    int jobsMenu = -1;        // the highlighted line of the jobs menu, -1 when closed
 };
 
 void drawColonyScreen(Screen& screen, const Art& art, const ColonyArt& colonyArt, const Game& game,

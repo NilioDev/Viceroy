@@ -2,6 +2,7 @@
 #include "viceroy/ui/play.hpp"
 
 #include "viceroy/data/reader.hpp"
+#include "viceroy/game/colony.hpp"
 #include "viceroy/game_files.hpp"
 
 #include <algorithm>
@@ -168,12 +169,46 @@ void PlayScreen::openColony(int index) {
 
 bool PlayScreen::handleColonyScreen(Command command) {
     auto& state = *colonyScreen_;
-    const auto& colony = game_.state().colonies[static_cast<std::size_t>(state.colony)];
+    auto& save = game_.state();
+    auto& colony = save.colonies[static_cast<std::size_t>(state.colony)];
     const int people = colony.population;
+    if (state.jobsMenu >= 0) {
+        const int lines = static_cast<int>(jobChoices(colony, save.map, game_.rules(), save.colonies,
+                                                      state.selectedColonist).size());
+        switch (command) {
+        case Command::MoveN:
+        case Command::Up:
+            state.jobsMenu = (state.jobsMenu + lines - 1) % std::max(1, lines);
+            break;
+        case Command::MoveS:
+        case Command::Down:
+            state.jobsMenu = (state.jobsMenu + 1) % std::max(1, lines);
+            break;
+        case Command::Confirm:
+        case Command::Skip:
+            assignJob(colony, save.map, game_.rules(), save.colonies, state.selectedColonist, state.jobsMenu);
+            state.jobsMenu = -1;
+            break;
+        case Command::Cancel:
+            state.jobsMenu = -1;
+            break;
+        default:
+            break;
+        }
+        return true;
+    }
     switch (command) {
     case Command::Cancel:
-    case Command::Confirm:
         colonyScreen_.reset();
+        break;
+    case Command::Confirm:
+    case Command::Skip:
+        if (state.selectedColonist >= 0 && state.selectedColonist < people) {
+            // The jobs menu opens on the colonist's present job.
+            state.jobsMenu = std::clamp<int>(colony.jobs[static_cast<std::size_t>(state.selectedColonist)], 0, 17);
+        } else {
+            colonyScreen_.reset();
+        }
         break;
     case Command::MoveE:
     case Command::Down:
@@ -186,7 +221,8 @@ bool PlayScreen::handleColonyScreen(Command command) {
     case Command::Up:
     case Command::PreviousUnit:
         if (people > 0) {
-            state.selectedColonist = (state.selectedColonist + people - 1) % people;
+            state.selectedColonist = state.selectedColonist < 0 ? people - 1
+                                                                : (state.selectedColonist + people - 1) % people;
         }
         break;
     default:
@@ -284,7 +320,13 @@ bool PlayScreen::handle(Command command) {
     case Command::EndTurn:
         game_.endTurn();
         waiting_.clear();
-        say("");
+        {
+            std::string news;
+            for (const auto& line : game_.lastTurnNews()) {
+                news += (news.empty() ? "" : " ") + line;
+            }
+            say(news);
+        }
         activate(game_.activeUnit());
         break;
     case Command::Skip:

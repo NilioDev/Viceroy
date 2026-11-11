@@ -383,6 +383,31 @@ void drawWarehouse(Screen& screen, const Art& art, const SaveColony& colony) {
     screen.text(art.tiny, 306, 179, "Exit", {kWhite, kNoColour, kNoColour});
 }
 
+void drawJobsMenu(Screen& screen, const Art& art, const Game& game, const SaveColony& colony, int colonist,
+                  int highlighted) {
+    const auto& save = game.state();
+    const auto choices = jobChoices(colony, save.map, game.rules(), save.colonies, colonist);
+    const Rect box{40, 20, 150, 14 + 8 * static_cast<int>(choices.size())};
+    screen.fill(box, kBlack);
+    screen.frame(box, 0x95);
+    for (std::size_t i = 0; i < choices.size(); ++i) {
+        const auto& c = choices[i];
+        const int y = box.y + 5 + 8 * static_cast<int>(i);
+        const bool selected = static_cast<int>(i) == highlighted;
+        const bool expert = colony.skills[static_cast<std::size_t>(colonist)] == c.job;
+        if (selected) {
+            screen.fill({box.x + 3, y - 1, box.w - 6, 8}, kGreen);
+        }
+        std::string name = "Job";
+        if (const auto& jobs = game.rules().jobs; static_cast<std::size_t>(c.job) < jobs.size()) {
+            name = jobs[static_cast<std::size_t>(c.job)].name;
+        }
+        const std::uint8_t colour = selected ? kBlack : c.amount > 0 ? (expert ? 0x95 : kWhite) : 0x07;
+        screen.text(art.tiny, box.x + 8, y, name, {colour, kNoColour, kNoColour});
+        screen.text(art.tiny, box.x + box.w - 24, y, std::to_string(c.amount), {colour, kNoColour, kNoColour});
+    }
+}
+
 } // namespace
 
 ColonyArt loadColonyArt(const std::filesystem::path& folder) {
@@ -416,6 +441,9 @@ void drawColonyScreen(Screen& screen, const Art& art, const ColonyArt& colonyArt
     drawHarbour(screen, art);
     drawProductionView(screen, art, production);
     drawWarehouse(screen, art, colony);
+    if (view.jobsMenu >= 0 && view.selectedColonist >= 0) {
+        drawJobsMenu(screen, art, game, colony, view.selectedColonist, view.jobsMenu);
+    }
 }
 
 } // namespace viceroy

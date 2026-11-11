@@ -44,3 +44,28 @@ bells).
 ## Food
 
 Every colonist eats 2 food.
+
+## At the end of the turn
+
+Every colony, the computer's too, stores what it made:
+
+- Workshops take their raw good from this turn's harvest first, then from
+  the warehouse. What they can't get is not made.
+- Food left after eating goes into the warehouse. At 200 food, 200 are used
+  up and a free colonist appears on the colony's square. When the food runs
+  out, the last colonist starves (a colony never starves to nothing).
+- Hammers add up towards the building under way. It is finished when there
+  are enough hammers and tools (`@BUILDING` lists both); those are used up.
+- The warehouse holds 100 of each good, 200 with a warehouse and 300 with
+  the expansion; the rest is thrown away. Food is not limited this way.
+
+**Not yet done:** bells (Sons of Liberty), crosses (immigration), horses
+breeding, building ships and units, and the warnings before goods are lost.
+
+## The jobs menu
+
+Pick a colonist on the colony screen and press Enter (or A) for the jobs
+menu. It lists each job with what the colonist would make at the best free
+place for it. Picking a job moves them there. Work on the land needs a free
+square (water squares need docks, and a square a neighbouring colony works is
+taken). Work in a building needs the building and room for up to three.
