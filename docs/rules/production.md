@@ -11,9 +11,10 @@ be checked against more colonies.
 | --- | --- |
 | Farmer | yield + 1, + 1 more when plowed |
 | Sugar, tobacco, cotton planter | yield, + 1 when plowed |
+| Fur trapper | yield, + 2 with a road (a guess: it could also be yield × 2) |
 | Lumberjack | yield × 2, + 2 with a road |
 | Ore or silver miner | yield, + 1 with a road |
-| Fisherman | yield + 1 |
+| Fisherman | yield + 2 |
 
 A river adds 1 to all of them. An expert farmer makes 2 more; other experts
 make twice as much.
@@ -26,9 +27,12 @@ Checked: Isabella (savannah commons: 5 food, 4 sugar), Jamestown (tropical
 forest commons: 4 food, 3 furs; farmers on plowed savannah: 5, expert 7;
 lumberjacks: 4, with a road 6).
 
+The original's jobs menu for a petty criminal in Isabella agrees: farmer 3
+(tropical forest), sugar 1, furs 4 and lumber 6 (forest with a road), fish 5.
+
 **Not yet known:** fish and other resources (where they are and what they
 add). Jamestown's fisherman makes 7 on an ocean square where this model
-gives 4.
+gives 5.
 
 ## In buildings
 
@@ -69,3 +73,5 @@ menu. It lists each job with what the colonist would make at the best free
 place for it. Picking a job moves them there. Work on the land needs a free
 square (water squares need docks, and a square a neighbouring colony works is
 taken). Work in a building needs the building and room for up to three.
+The menu lists only the buildings the colony has (Isabella, without an armory
+or a church, shows 16 jobs), then "(More)".

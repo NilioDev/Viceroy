@@ -80,8 +80,10 @@ VCR_TEST("original files: a colony's production and screen") {
 
     Screen screen;
     const int which = std::getenv("VICEROY_COLONY") ? std::atoi(std::getenv("VICEROY_COLONY")) : 1;
-    drawColonyScreen(screen, art, colonyArt, game, {which, 0});
-    VCR_CHECK(screen.at(200, 50) == 0);
+    // VICEROY_JOBS=line opens the jobs menu on that line, for comparing.
+    const int jobsLine = std::getenv("VICEROY_JOBS") ? std::atoi(std::getenv("VICEROY_JOBS")) : -1;
+    drawColonyScreen(screen, art, colonyArt, game, {which, 0, jobsLine});
+    VCR_CHECK(jobsLine >= 0 || screen.at(200, 50) == 0);
     if (const char* dump = std::getenv("VICEROY_DUMP_COLONY")) {
         dumpScreen(screen, art, dump);
     }
@@ -167,7 +169,10 @@ VCR_TEST("original files: colonists change jobs through the jobs menu") {
     auto& isabella = save.colonies[1];
     // Isabella's colonists both distil rum; the squares around are free.
     const auto choices = jobChoices(isabella, save.map, game.rules(), save.colonies, 1);
-    VCR_CHECK(choices.size() == 18);
+    // As the original lists them: the land, then the buildings Isabella has
+    // (no armory, no church), 16 lines before "(More)".
+    VCR_CHECK(choices.size() == 16);
+    VCR_CHECK(choices.back().job == job::kStatesman);
     VCR_CHECK(choices[0].amount > 0);  // farming the forest to the west
     VCR_CHECK(choices[8].amount > 0);  // fishing: Isabella has docks
     VCR_CHECK(assignJob(isabella, save.map, game.rules(), save.colonies, 1, 0));

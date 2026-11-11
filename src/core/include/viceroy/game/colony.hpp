@@ -174,8 +174,9 @@ struct JobChoice {
     int square = -1; // where (0-7), for work on the land
 };
 
-// Jobs a colonist can do in the colony, in the order of @JOB (teachers
-// excepted), with what they would make.
+// Jobs a colonist can do in the colony, in the order of @JOB: all work on
+// the land, and work in the buildings the colony has (teachers excepted),
+// with what they would make.
 std::vector<JobChoice> jobChoices(const SaveColony& colony, const SaveMap& map, const Ruleset& rules,
                                   const std::vector<SaveColony>& colonies, int colonist);
 
