@@ -14,10 +14,15 @@ be checked against more colonies.
 | Fur trapper | yield, + 2 with a road (a guess: it could also be yield × 2) |
 | Lumberjack | yield × 2, + 2 with a road |
 | Ore or silver miner | yield, + 1 with a road |
-| Fisherman | yield + 2 |
+| Fisherman | yield + 1 where the water has land on 3 or more of its 8 sides, yield − 1 elsewhere |
 
-A river adds 1 to all of them. An expert farmer makes 2 more; other experts
-make twice as much.
+A river adds 1 to all of them. An expert farmer or fisherman makes 2 more;
+other experts make twice as much. The Sons of Liberty add to all of this or
+take from it (see [liberty.md](liberty.md)).
+
+Measured on test colonies: the ocean (yield 3) gives a colonist 2 food with
+land on one or two sides, 4 with three or more (also when the land is only
+at the corners); an expert fisherman makes 2 more (6 next to land).
 
 The colony's own square (the town commons) counts as plowed. It makes food
 and one other good: furs in a forest, otherwise its best crop or ore, at its
@@ -30,9 +35,11 @@ lumberjacks: 4, with a road 6).
 The original's jobs menu for a petty criminal in Isabella agrees: farmer 3
 (tropical forest), sugar 1, furs 4 and lumber 6 (forest with a road), fish 5.
 
-**Not yet known:** fish and other resources (where they are and what they
-add). Jamestown's fisherman makes 7 on an ocean square where this model
-gives 5.
+**Not yet known:** what fish and the other resources add (where they are
+is in map-drawing.md). Jamestown's fisherman makes 7 on an ocean square
+where this model gives 5. At higher difficulty the colony's own square
+makes less food (5, 4, 3, 3, 3 on plains from Discoverer to Viceroy); the
+rule is not known yet and Viceroy does not do this.
 
 ## In buildings
 
@@ -64,7 +71,7 @@ Every colony, the computer's too, stores what it made:
 - The warehouse holds 100 of each good, 200 with a warehouse and 300 with
   the expansion; the rest is thrown away. Food is not limited this way.
 
-**Not yet done:** bells (Sons of Liberty), horses
+**Not yet done:** horses
 breeding, building ships and units, and the warnings before goods are lost.
 
 ## The jobs menu

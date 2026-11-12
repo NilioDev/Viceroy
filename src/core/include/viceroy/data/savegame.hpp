@@ -116,9 +116,11 @@ struct SaveColony {
     int hammers = 0;
     int construction = -1; // row of @BUILDING (or a unit) being built, -1 none
     std::array<int, kGoodsKinds> stock{};
-    // Sons of Liberty membership as a fraction.
+    // Sons of Liberty membership as a fraction (see docs/rules/liberty.md).
     int rebelDividend = 0;
     int rebelDivisor = 0;
+    // The production bonus reached: 1 at 50%, 2 at 100% (bits of byte 28).
+    int libertyBonus = 0;
     std::array<std::uint8_t, 202> raw{};
 };
 

@@ -9,7 +9,7 @@ A `GAME.TXT` section starts with lines such as `@width=190` (the width of
 the text) and `@default=1` (the choice that starts highlighted, counted
 from 1). Then come the text lines, a blank line, and one line per choice.
 The text lines are joined and wrapped again to fit the width. `%STRING0`,
-`%STRING1`, ... and `%NUMBER0`, ... are filled in; words in `{braces}` are
+`%STRING1`, ... and `%NUMBER0`, ... are filled in and `%%` is a percent sign; words in `{braces}` are
 drawn in gold. A line is wrapped when the next word would make it wider
 than `@width` − 5. `@y=91` puts the box's top at that row instead of
 centring it, and `@options` starts the choices with no blank line before
@@ -50,6 +50,9 @@ x centred on the screen. The agent (`MSS2.SS`) stands at (99, y − 78),
 drawn over the box so his hands rest on its top edge. A box too tall for
 the harbour (Train) is centred on the whole screen and the agent is not
 shown.
+
+Reports about a colony (Sons of Liberty) are described in
+[liberty.md](liberty.md).
 
 Portraits bring their own colours: palette entries 152 to 251 come from
 the portrait's sheet while it is shown.

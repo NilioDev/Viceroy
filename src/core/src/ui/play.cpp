@@ -228,11 +228,12 @@ void PlayScreen::openEurope() {
     europeScreen_ = state;
 }
 
-void PlayScreen::ask(std::string_view section, int unit, std::vector<std::string> strings, int nation) {
+void PlayScreen::ask(std::string_view section, int unit, std::vector<std::string> strings, int nation,
+                     std::vector<int> numbers) {
     if (art_ == nullptr) {
         return;
     }
-    dialog_ = makeDialog(*art_, section, strings, {}, nation);
+    dialog_ = makeDialog(*art_, section, strings, numbers, nation);
     choices_.clear();
     question_ = std::string(section);
     questionUnit_ = unit;
@@ -297,7 +298,22 @@ void PlayScreen::showNotices() {
         }
         return;
     }
-    ask(notice.section, -1, notice.strings);
+    if (notice.colony >= 0 && notice.colony < static_cast<int>(game_.state().colonies.size())) {
+        // A report about a colony: the map shows it, and the box offers
+        // to go there.
+        const auto& colony = game_.state().colonies[static_cast<std::size_t>(notice.colony)];
+        notice.strings.resize(std::max<std::size_t>(notice.strings.size(), 2));
+        notice.strings[1] = countryName(*art_, game_.human());
+        centreOn(view_, game_, colony.x, colony.y);
+        ask(notice.section, notice.colony, notice.strings, game_.human(), notice.numbers);
+        if (dialog_) {
+            addOption(*dialog_, textLine(art_->labelText, "MISC", 34, "Continue turn."));
+            addOption(*dialog_, textLine(art_->labelText, "MISC", 35, "Zoom to colony."));
+            placeColonialDialog(*dialog_);
+        }
+        return;
+    }
+    ask(notice.section, -1, notice.strings, -1, notice.numbers);
     if (dialog_) {
         placeFrontiersmanDialog(*dialog_);
     }
@@ -345,7 +361,12 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
             }
         }
     };
-    if (question == "SAILHOME") {
+    if (question == "REBELMAJORITY" || question == "REBELUNANIMOUS" || question == "TORYMINORITY" ||
+        question == "TORYMAJORITY") {
+        if (choice == 1) {
+            openColony(unit);
+        }
+    } else if (question == "SAILHOME") {
         if (yes && game_.sailToEurope(unit)) {
             say(game_.unitName(unit) + " sails for Europe.");
             advance();
@@ -601,7 +622,7 @@ bool PlayScreen::handleColonyScreen(Command command) {
     auto& colony = save.colonies[static_cast<std::size_t>(state.colony)];
     const int people = colony.population;
     if (state.jobsMenu >= 0) {
-        const auto choices = jobChoices(colony, save.map, game_.rules(), save.colonies, state.selectedColonist);
+        const auto choices = jobChoices(colony, save.map, game_.rules(), save.colonies, state.selectedColonist, save.difficulty);
         const int lines = static_cast<int>(choices.size()) + 1; // the last line is "(More)"
         switch (command) {
         case Command::MoveN:
@@ -636,7 +657,7 @@ bool PlayScreen::handleColonyScreen(Command command) {
     case Command::Skip:
         if (state.selectedColonist >= 0 && state.selectedColonist < people) {
             // The jobs menu opens on the colonist's present job.
-            const auto choices = jobChoices(colony, save.map, game_.rules(), save.colonies, state.selectedColonist);
+            const auto choices = jobChoices(colony, save.map, game_.rules(), save.colonies, state.selectedColonist, save.difficulty);
             const int current = colony.jobs[static_cast<std::size_t>(state.selectedColonist)];
             state.jobsMenu = 0;
             for (std::size_t i = 0; i < choices.size(); ++i) {

@@ -45,6 +45,7 @@ std::string fill(std::string text, const std::vector<std::string>& strings, cons
     for (std::size_t i = numbers.size(); i-- > 0;) {
         replaceAll(text, "%NUMBER" + std::to_string(i), std::to_string(numbers[i]));
     }
+    replaceAll(text, "%%", "%"); // a percent sign
     return text;
 }
 
@@ -125,8 +126,7 @@ Dialog makeDialog(const Art& art, std::string_view section, const std::vector<st
     Dialog d;
     std::string country;
     if (nation >= 0) {
-        constexpr int kDutch = 3;
-        country = (nation == kDutch ? "the " : "") + textLine(art.names, "COUNTRY", nation, "");
+        country = countryName(art, nation);
     }
     const auto* found = art.gameText.find(section);
     if (found == nullptr) {
@@ -223,6 +223,20 @@ void placeReligiousDialog(Dialog& d) {
     d.y = (252 - dialogHeight(d)) / 2;
     d.portraitX = 114;
     d.portraitY = d.y - 52;
+}
+
+void placeColonialDialog(Dialog& d) {
+    d.portrait = kColonialAdvisor;
+    d.portraitBehind = false; // his musket lies over the box
+    d.x = 39;
+    d.y = (278 - dialogHeight(d)) / 2;
+    d.portraitX = 210;
+    d.portraitY = d.y - 77;
+}
+
+std::string countryName(const Art& art, int nation) {
+    constexpr int kDutch = 3;
+    return (nation == kDutch ? "the " : "") + textLine(art.names, "COUNTRY", nation, "");
 }
 
 void stepSelection(Dialog& d, int by) {
