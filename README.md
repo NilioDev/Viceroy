@@ -88,6 +88,9 @@ new game comes later.
 | Save the game | Ctrl+S, or Game, Save Game | Start, then Save Game |
 | Back to the load menu | Esc | Guide |
 
+The mouse pointer is the game's own arrow, drawn in the picture as the
+original does; it hides while you play with a gamepad.
+
 **Debug menu.** F12, or Back and Start together on a gamepad, opens a menu
 for testing that is not part of the original game: reveal the map, add gold,
 give units their moves back, end the turn, or jump to your next colony. On a

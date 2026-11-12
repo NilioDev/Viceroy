@@ -76,7 +76,34 @@ struct App {
     float lookX = 0;
     float lookY = 0;
     Uint64 lookFired = 0;
+
+    // The original draws its own mouse pointer (CURSOR.SS sprite 0) into
+    // the picture; ours shows once the mouse moves and hides again while
+    // the gamepad is used.
+    bool pointerShown = false;
+    float pointerX = 0;
+    float pointerY = 0;
 };
+
+void drawPointer(App& app) {
+    if (!app.pointerShown || app.art->cursor.sprites.empty()) {
+        return;
+    }
+    const auto& image = app.art->cursor.sprites.front().image;
+    const int left = static_cast<int>(app.pointerX);
+    const int top = static_cast<int>(app.pointerY);
+    for (int j = 0; j < image.height; ++j) {
+        for (int i = 0; i < image.width; ++i) {
+            const auto c = image.pixels[static_cast<std::size_t>(j * image.width + i)];
+            // The sheet marks the sprite's box with a pixel of colour 9 in
+            // two corners; the original does not draw those.
+            const bool marker = c == 0x09 && (i == image.width - 1 || j == image.height - 1);
+            if (c != viceroy::kTransparent && !marker) {
+                app.screen.pixel(left + i, top + j, c);
+            }
+        }
+    }
+}
 
 // Where the imported game, savegames and later add-ons live.
 std::filesystem::path libraryFolder() {
@@ -533,6 +560,7 @@ void present(App& app) {
         app.play->draw(app.screen, *app.art);
         app.debug.draw(app.screen, *app.art);
     }
+    drawPointer(app);
     // Indexed pixels to colours.
     void* pixels = nullptr;
     int pitch = 0;
@@ -571,6 +599,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char** argv) {
     }
     SDL_SetRenderLogicalPresentation(app->renderer, kScreenW, kScreenH, SDL_LOGICAL_PRESENTATION_LETTERBOX);
     SDL_SetRenderVSync(app->renderer, 1);
+    SDL_HideCursor();
     app->frame = SDL_CreateTexture(app->renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, kScreenW,
                                    kScreenH);
     SDL_SetTextureScaleMode(app->frame, SDL_SCALEMODE_NEAREST);
@@ -658,7 +687,15 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
             }
         }
         break;
+    case SDL_EVENT_MOUSE_MOTION:
+        app->pointerShown = true;
+        SDL_RenderCoordinatesFromWindow(app->renderer, event->motion.x, event->motion.y, &app->pointerX,
+                                        &app->pointerY);
+        break;
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
+        app->pointerShown = true;
+        SDL_RenderCoordinatesFromWindow(app->renderer, event->button.x, event->button.y, &app->pointerX,
+                                        &app->pointerY);
         if (event->button.button == SDL_BUTTON_LEFT) {
             click(*app, event->button.x, event->button.y);
             if (app->mode == Mode::Play && app->play->quitRequested()) {
@@ -667,6 +704,7 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
         }
         break;
     case SDL_EVENT_GAMEPAD_BUTTON_DOWN: {
+        app->pointerShown = false;
         if (app->mode == Mode::Intro) {
             showTitle(*app);
             break;

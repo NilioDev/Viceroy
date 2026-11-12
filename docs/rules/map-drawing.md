@@ -144,6 +144,13 @@ A click on the small map does the same for the square one up and to the
 left of the one drawn under the pointer's tip; the small map then follows
 the view.
 
+## The mouse pointer
+
+The original draws its own pointer into the picture: `CURSOR.SS` sprite 0,
+the arrow, with its tip at the sprite's top-left corner. The sheet marks the
+sprite's box with colour 9 in two corners, which is not drawn. Sprite 1 is a
+second pointer whose use is not yet known.
+
 ## Resources
 
 What 28 captures of a view-mode tour of one map showed (153 squares with a

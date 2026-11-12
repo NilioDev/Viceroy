@@ -26,6 +26,7 @@ struct Art {
     SpriteSheet phys;    // PHYS0.SS: forests, hills, rivers, roads, fog
     SpriteSheet icons;   // ICONS.SS: units, colonies, settlements, goods
     IndexedImage wood;   // WOODTILE.SS: the wooden background
+    SpriteSheet cursor;  // CURSOR.SS: the mouse pointers
     Font tiny;           // FONTTINY.FF
     Font small;          // FONTSMAL.FF
     Font labels;         // FONTINTR.FF: names on the map

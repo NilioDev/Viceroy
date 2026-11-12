@@ -488,6 +488,7 @@ Art loadArt(const std::filesystem::path& folder) {
     art.terrain = readSpriteSheet(readFile(folder, "TERRAIN.SS"));
     art.phys = readSpriteSheet(readFile(folder, "PHYS0.SS"));
     art.icons = readSpriteSheet(readFile(folder, "ICONS.SS"));
+    art.cursor = readSpriteSheet(readFile(folder, "CURSOR.SS"));
     const auto wood = readSpriteSheet(readFile(folder, "WOODTILE.SS"));
     if (!wood.sprites.empty()) {
         art.wood = wood.sprites.front().image;
