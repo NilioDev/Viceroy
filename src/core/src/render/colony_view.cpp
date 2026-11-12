@@ -6,6 +6,7 @@
 #include "viceroy/game_files.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <fstream>
 #include <iterator>
 #include <string>
@@ -33,6 +34,9 @@ constexpr std::uint8_t kStockText = 0x3D;
 constexpr std::uint8_t kRed = 0x0C;
 constexpr std::uint8_t kGold = 0x95;
 constexpr std::uint8_t kMenuBar = 0x8A;
+constexpr std::uint8_t kPanelInk = 0x39;   // the Make panel: words and the dark edge of buttons
+constexpr std::uint8_t kPanelLight = 0x30; // the light edge of buttons
+constexpr std::uint8_t kButtonShadow = 0x3F;
 
 // Screen areas.
 constexpr Rect kTown{0, 8, 200, 120};
@@ -368,9 +372,106 @@ void drawProductionView(Screen& screen, const Art& art, const ColonyProduction& 
             }
         }
     }
-    blitSprite(screen, art.icons, kButtonProduction, 304, 133);
-    blitSprite(screen, art.icons, kButtonUnits, 303, 147);
-    blitSprite(screen, art.icons, kButtonBuild, 303, 162);
+}
+
+std::string goodName(const Game& game, int good) {
+    const auto& cargo = game.rules().cargo;
+    if (good >= 0 && static_cast<std::size_t>(good) < cargo.size()) {
+        return cargo[static_cast<std::size_t>(good)].name;
+    }
+    return {};
+}
+
+// The three buttons right of the panel. The one showing is pressed in: it
+// moves a pixel down and right with a dark line above and left of it; the
+// others stand out with the dark line below and right.
+void drawPanelButtons(Screen& screen, const Art& art, ColonyPanel showing) {
+    static constexpr int kSprites[3] = {kButtonProduction, kButtonUnits, kButtonBuild};
+    static constexpr int kTops[3] = {132, 147, 162};
+    for (int i = 0; i < 3; ++i) {
+        const int sprite = kSprites[i];
+        const int w = spriteWidth(art.icons, sprite);
+        const int h = static_cast<std::size_t>(sprite) < art.icons.sprites.size()
+                          ? art.icons.sprites[static_cast<std::size_t>(sprite)].image.height
+                          : 0;
+        const int x = 303;
+        const int y = kTops[i];
+        if (static_cast<int>(showing) == i) {
+            blitSprite(screen, art.icons, sprite, x + 1, y + 1);
+            screen.fill({x, y, w, 1}, kButtonShadow);
+            screen.fill({x, y + 1, 1, h - 1}, kButtonShadow);
+        } else {
+            blitSprite(screen, art.icons, sprite, x, y);
+            screen.fill({x + w, y + 1, 1, h}, kButtonShadow);
+            screen.fill({x + 1, y + h, w, 1}, kButtonShadow);
+        }
+    }
+}
+
+// LABELS.TXT rows.
+constexpr int kLabelNothing = 32;  // @MISC
+constexpr int kLabelRequires = 43; // @MISC
+constexpr int kLabelComplete = 127; // @MISC
+constexpr int kLabelBuy = 2;        // @CTITLE
+constexpr int kLabelChange = 3;
+constexpr int kLabelSelectItem = 4;
+constexpr int kLabelNoProduction = 5;
+
+// A button of the panel: a raised box with a word in it.
+void drawPanelBox(Screen& screen, const Art& art, const PanelButton& b, const std::string& word) {
+    screen.fill({b.x, b.y, b.w, 1}, kPanelInk);
+    screen.fill({b.x, b.y + 1, 1, b.h - 1}, kPanelInk);
+    screen.fill({b.x + b.w - 1, b.y + 1, 1, b.h - 1}, kPanelLight);
+    screen.fill({b.x + 1, b.y + b.h - 1, b.w - 1, 1}, kPanelLight);
+    screen.text(art.tiny, b.x + 3, b.y + 2, word, {kWhite, kNoColour, kNoColour});
+}
+
+// The Make panel: what is being built, BUY and CHANGE, the hammers so far
+// in four rows (each row a quarter of what is needed), and the tools it
+// needs.
+void drawMakePanel(Screen& screen, const Art& art, const Game& game, const SaveColony& colony) {
+    const auto& rules = game.rules();
+    const int construction = colony.construction;
+    const std::string title = construction < 0 ? textLine(art.labelText, "MISC", kLabelNothing, "Nothing")
+                                               : constructionName(rules, construction);
+    screen.text(art.tiny, 256 - (Screen::textWidth(art.tiny, title) - 1) / 2, 132, title, {kPanelInk, kNoColour, kNoColour});
+    if (construction >= 0) {
+        drawPanelBox(screen, art, kBuyButton, textLine(art.labelText, "CTITLE", kLabelBuy, "BUY"));
+    }
+    drawPanelBox(screen, art, kChangeButton, textLine(art.labelText, "CTITLE", kLabelChange, "CHANGE"));
+    if (construction < 0) {
+        // Measured: with nothing to build the hammers kept show as one row
+        // of at most 10.
+        for (int i = 0; i < std::min(colony.hammers, 10); ++i) {
+            blitSprite(screen, art.icons, kHammerIcon, 212 + 9 * i, 147);
+        }
+        return;
+    }
+    const int needed = constructionHammers(rules, construction);
+    const int perRow = (needed + 3) / 4;
+    int left = colony.hammers;
+    for (int row = 0; row < 4 && left > 0 && perRow > 0; ++row) {
+        const int count = std::min(left, perRow);
+        left -= count;
+        const int y = 147 + 6 * row;
+        // Nine pixels apart while a row fits; otherwise spread so that the
+        // last one stands about 80 pixels on, with the count on the row
+        // once they stand closer than 2 pixels.
+        const int spread = (80 * perRow + perRow - 2) / std::max(1, perRow - 1);
+        const bool fits = perRow * 9 <= 92;
+        for (int i = 0; i < count; ++i) {
+            blitSprite(screen, art.icons, kHammerIcon, 212 + (fits ? 9 * i : i * spread / perRow), y);
+        }
+        if (!fits && spread < 2 * perRow) {
+            drawCount(screen, art, 214, y, spriteWidth(art.icons, kHammerIcon), count);
+        }
+    }
+    const int tools = constructionTools(rules, construction);
+    if (tools > 0) {
+        const std::string text = "(" + textLine(art.labelText, "MISC", kLabelRequires, "Requires") + " " +
+                                 std::to_string(tools) + " " + goodName(game, cargo::kTools) + ")";
+        screen.text(art.tiny, 256 - (Screen::textWidth(art.tiny, text) - 1) / 2, 170, text, {kWhite, kNoColour, kNoColour});
+    }
 }
 
 void drawWarehouse(Screen& screen, const Art& art, const SaveColony& colony) {
@@ -385,22 +486,8 @@ void drawWarehouse(Screen& screen, const Art& art, const SaveColony& colony) {
     screen.text(art.tiny, 306, 179, "Exit", {kWhite, kNoColour, kNoColour});
 }
 
-std::string goodName(const Game& game, int good) {
-    const auto& cargo = game.rules().cargo;
-    if (good >= 0 && static_cast<std::size_t>(good) < cargo.size()) {
-        return cargo[static_cast<std::size_t>(good)].name;
-    }
-    return {};
-}
-
-// The original's jobs menu: a wooden box with a line per job and what the
-// colonist would make at it, then "(More)".
-void drawJobsMenu(Screen& screen, const Art& art, const Game& game, const SaveColony& colony, int colonist,
-                  int highlighted) {
-    const auto& save = game.state();
-    const auto& jobs = game.rules().jobs;
-    const auto choices = jobChoices(colony, save.map, game.rules(), save.colonies, colonist, save.difficulty);
-    const Rect box{62, 20, 196, 160};
+// A wooden box as the original's menus on the colony screen have.
+void drawWoodBox(Screen& screen, const Art& art, const Rect& box) {
     screen.setClip({box.x + 1, box.y + 1, box.w - 2, box.h - 2});
     for (int y = box.y; y < box.y + box.h; ++y) {
         for (int x = box.x; x < box.x + box.w; ++x) {
@@ -421,6 +508,17 @@ void drawJobsMenu(Screen& screen, const Art& art, const Game& game, const SaveCo
     screen.fill({box.x + box.w - 3, box.y + 2, 1, box.h - 4}, 0x80);
     screen.fill({box.x + 2, box.y + 3, 1, box.h - 5}, kMenuBar);
     screen.fill({box.x + 2, box.y + box.h - 3, box.w - 4, 1}, kMenuBar);
+}
+
+// The original's jobs menu: a wooden box with a line per job and what the
+// colonist would make at it, then "(More)".
+void drawJobsMenu(Screen& screen, const Art& art, const Game& game, const SaveColony& colony, int colonist,
+                  int highlighted) {
+    const auto& save = game.state();
+    const auto& jobs = game.rules().jobs;
+    const auto choices = jobChoices(colony, save.map, game.rules(), save.colonies, colonist, save.difficulty);
+    const Rect box{62, 20, 196, 160};
+    drawWoodBox(screen, art, box);
 
     const TextColours green{kGreen, kNoColour, kNoColour};
     auto nameOf = [&](int row, bool expert) -> std::string {
@@ -455,7 +553,60 @@ void drawJobsMenu(Screen& screen, const Art& art, const Game& game, const SaveCo
     screen.text(art.tiny, 256 - Screen::textWidth(art.tiny, help), 171, help, {kGold, kNoColour, kNoColour});
 }
 
+
+// "Select An Item To Build": a wooden box with "(No Production)" and a line
+// per thing the colony can build, with the hammers and tools still wanted.
+void drawBuildList(Screen& screen, const Art& art, const Game& game, const SaveColony& colony, int highlighted) {
+    const auto& save = game.state();
+    const auto& rules = game.rules();
+    const auto options = buildOptions(colony, save.map, rules);
+    const auto b = buildListBox(static_cast<int>(options.size()));
+    drawWoodBox(screen, art, {b.x, b.y, b.w, b.h});
+    const TextColours green{kGreen, kNoColour, kNoColour};
+    const TextColours gold{kGold, kNoColour, kNoColour};
+    screen.text(art.tiny, b.x + 5, b.y + 6, textLine(art.labelText, "CTITLE", kLabelSelectItem, "Select An Item To Build"),
+                green);
+    const int lines = static_cast<int>(options.size()) + 1;
+    for (int i = 0; i < lines; ++i) {
+        const int y = b.firstLine + 8 * i;
+        const bool lit = i == highlighted;
+        if (lit) {
+            screen.fill({b.x + 4, y - 1, b.w - 8, 7}, kMenuBar);
+        }
+        const TextColours ink = lit ? gold : green;
+        if (i == 0) {
+            screen.text(art.tiny, b.x + 9, y, textLine(art.labelText, "CTITLE", kLabelNoProduction, "(No Production)"), ink);
+            continue;
+        }
+        const auto& o = options[static_cast<std::size_t>(i - 1)];
+        std::string name = constructionName(rules, o.construction);
+        for (auto& ch : name) {
+            ch = static_cast<char>(std::toupper(static_cast<unsigned char>(ch)));
+        }
+        screen.text(art.tiny, b.x + 9, y, name, ink);
+        std::string right;
+        if (o.complete) {
+            right = "(" + textLine(art.labelText, "MISC", kLabelComplete, "COMPLETE") + ")";
+        } else {
+            const int hammers = std::max(0, constructionHammers(rules, o.construction) - colony.hammers);
+            right = "(" + std::to_string(hammers) + " " + goodName(game, cargo::kHammers) + ")";
+            if (const int tools = constructionTools(rules, o.construction); tools > 0) {
+                right += "(" + std::to_string(tools) + " " + goodName(game, cargo::kTools) + ")";
+            }
+        }
+        screen.text(art.tiny, b.x + 175 - Screen::textWidth(art.tiny, right), y, right, ink);
+    }
+    const std::string help = "(F1 for Help)";
+    screen.text(art.tiny, b.x + b.w - 2 - Screen::textWidth(art.tiny, help), b.y + b.h - 9, help, gold);
+}
+
 } // namespace
+
+BuildListBox buildListBox(int items) {
+    const int h = 8 * items + 32;
+    const int y = (200 - h) / 2;
+    return {68, y, 184, h, y + 16};
+}
 
 ColonyArt loadColonyArt(const std::filesystem::path& folder) {
     ColonyArt art;
@@ -487,10 +638,18 @@ void drawColonyScreen(Screen& screen, const Art& art, const ColonyArt& colonyArt
     screen.fill({0, kLowerTop, Screen::kWidth, 1}, kBlack);
     drawPeople(screen, art, colony, production, view.selectedColonist);
     drawHarbour(screen, art);
-    drawProductionView(screen, art, production);
+    if (view.panel == ColonyPanel::Make) {
+        drawMakePanel(screen, art, game, colony);
+    } else if (view.panel == ColonyPanel::Production) {
+        drawProductionView(screen, art, production);
+    }
+    drawPanelButtons(screen, art, view.panel);
     drawWarehouse(screen, art, colony);
     if (view.jobsMenu >= 0 && view.selectedColonist >= 0) {
         drawJobsMenu(screen, art, game, colony, view.selectedColonist, view.jobsMenu);
+    }
+    if (view.buildList >= 0) {
+        drawBuildList(screen, art, game, colony, view.buildList);
     }
 }
 

@@ -586,6 +586,9 @@ void click(App& app, float wx, float wy) {
         return;
     }
     if (app.play->colonyScreen() || app.play->europeScreen()) {
+        if (app.play->colonyScreen() && app.play->clickColonyScreen(static_cast<int>(x), static_cast<int>(y))) {
+            return;
+        }
         // The exit button in the lower right corner.
         if (x >= 300.0f && y >= 178.0f && !app.play->dialog()) {
             send(app, Command::Cancel);

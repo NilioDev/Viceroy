@@ -358,10 +358,12 @@ VCR_TEST("construction: colonies build wagons, artillery and ships (measured)") 
     r.units[12].cost = 1; // wagon train: 40 hammers
     r.units[13].cost = 4; // caravel: 128 hammers, 40 tools
     r.units[13].tools = 4;
-    r.units[17].cost = 16; // frigate: never built in a colony
+    r.units[17].cost = 16; // frigate: offered, but never built in a colony
     VCR_CHECK(constructionUnit(42) == 11);
     VCR_CHECK(constructionUnit(47) == 16);
-    VCR_CHECK(constructionUnit(48) == -1);
+    VCR_CHECK(constructionUnit(48) == 17);
+    VCR_CHECK(constructionUnit(49) == -1);
+    VCR_CHECK(constructionHammers(r, 48) == 512);
     VCR_CHECK(constructionHammers(r, 42) == 192);
     VCR_CHECK(constructionHammers(r, 43) == 40);
     VCR_CHECK(constructionHammers(r, 44) == 128);
@@ -392,4 +394,121 @@ VCR_TEST("construction: colonies build wagons, artillery and ships (measured)") 
     c.hammers = 999;
     VCR_CHECK(runColonyTurn(c, map, r).builtUnit == -1);
     VCR_CHECK(c.hammers == 999);
+}
+
+VCR_TEST("build list: the next level of each building, then units (measured)") {
+    Ruleset r;
+    r.buildings.resize(42);
+    for (auto& b : r.buildings) {
+        b.hammers = 52;
+    }
+    r.buildings[3].minColonySize = 1; // armory
+    r.buildings[13].minColonySize = 8; // college: too small a colony
+    r.units.resize(19);
+    SaveMap map;
+    map.width = 3;
+    map.height = 3;
+    map.squares.resize(9);
+    SaveColony c;
+    c.x = 1;
+    c.y = 1;
+    c.population = 4;
+    c.construction = 0;
+    c.raw[149] = 0; // no warehouse yet
+    setBuildingLevel(c, BuildingKind::Fortification, 1);
+    setBuildingLevel(c, BuildingKind::Schoolhouse, 1);
+
+    auto has = [](const std::vector<BuildOption>& list, int construction) {
+        return std::any_of(list.begin(), list.end(), [&](const BuildOption& o) { return o.construction == construction; });
+    };
+    auto options = buildOptions(c, map, r);
+    // The stockade being built is already there: shown, but complete.
+    VCR_CHECK(!options.empty() && options.front().construction == 0 && options.front().complete);
+    VCR_CHECK(has(options, 1));   // fort, the next level
+    VCR_CHECK(!has(options, 2));  // not the fortress yet
+    VCR_CHECK(has(options, 3));   // armory
+    VCR_CHECK(!has(options, 6));  // docks only by the water
+    VCR_CHECK(!has(options, 13)); // college needs 8 colonists
+    VCR_CHECK(has(options, 15));  // warehouse
+    VCR_CHECK(!has(options, 16)); // not its expansion yet
+    VCR_CHECK(!has(options, 10) && !has(options, 30)); // never the town hall's upper levels or the capitol
+    VCR_CHECK(has(options, 43));  // a wagon train anywhere
+    VCR_CHECK(!has(options, 42)); // artillery needs an armory
+    VCR_CHECK(!has(options, 44)); // ships need a shipyard
+
+    map.at(0, 0).terrain = 25; // the ocean next door
+    setBuildingLevel(c, BuildingKind::Armory, 1);
+    setBuildingLevel(c, BuildingKind::Docks, 3);
+    c.raw[149] = 1;
+    options = buildOptions(c, map, r);
+    VCR_CHECK(has(options, 42) && has(options, 4));
+    VCR_CHECK(has(options, 16) && !has(options, 15));
+    for (int ship = 44; ship <= kFrigateConstruction; ++ship) {
+        VCR_CHECK(has(options, ship));
+    }
+}
+
+VCR_TEST("original files: choosing what a colony builds") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    const ColonyArt colonyArt = loadColonyArt(dir);
+    std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
+    Game game(readSaveGame(Bytes(std::istreambuf_iterator<char>(in), {})), art.rules);
+    PlayScreen play(std::move(game), dir / "unused.sav");
+    play.setColonyArt(&colonyArt);
+    play.setArt(&art);
+    play.openColony(1);
+    const auto& colony = play.game().state().colonies[1];
+    const auto options = buildOptions(colony, play.game().state().map, play.game().rules());
+    VCR_CHECK(options.size() >= 2);
+
+    // B opens the list on the Make panel, on what is being built now.
+    play.handle(Command::BuildColony);
+    VCR_CHECK(play.colonyScreen()->panel == ColonyPanel::Make);
+    VCR_CHECK(play.colonyScreen()->buildList >= 0);
+    Screen screen;
+    play.draw(screen, art);
+
+    // The line above the first item is "(No Production)".
+    while (play.colonyScreen()->buildList != 0) {
+        play.handle(Command::Down);
+    }
+    play.handle(Command::Down);
+    play.handle(Command::Confirm);
+    VCR_CHECK(play.colonyScreen()->buildList == -1);
+    VCR_CHECK(colony.construction == options.front().construction || options.front().complete);
+
+    play.handle(Command::BuildColony);
+    play.handle(Command::Up);
+    if (play.colonyScreen()->buildList != 0) {
+        while (play.colonyScreen()->buildList != 0) {
+            play.handle(Command::Up);
+        }
+    }
+    play.handle(Command::Confirm);
+    VCR_CHECK(colony.construction == -1);
+
+    // Clicks: the house button goes back to production, the hammer to Make,
+    // CHANGE opens the list and a click on a line picks it.
+    VCR_CHECK(play.clickColonyScreen(kPanelButtons[0].x + 2, kPanelButtons[0].y + 2));
+    VCR_CHECK(play.colonyScreen()->panel == ColonyPanel::Production);
+    VCR_CHECK(play.clickColonyScreen(kPanelButtons[2].x + 2, kPanelButtons[2].y + 2));
+    VCR_CHECK(play.colonyScreen()->panel == ColonyPanel::Make);
+    VCR_CHECK(play.clickColonyScreen(kChangeButton.x + 2, kChangeButton.y + 2));
+    VCR_CHECK(play.colonyScreen()->buildList == 0);
+    const auto box = buildListBox(static_cast<int>(options.size()));
+    int pick = -1;
+    for (std::size_t i = 0; i < options.size(); ++i) {
+        if (!options[i].complete) {
+            pick = static_cast<int>(i);
+            break;
+        }
+    }
+    VCR_CHECK(pick >= 0);
+    VCR_CHECK(play.clickColonyScreen(box.x + 20, box.firstLine + 8 * (pick + 1) + 2));
+    VCR_CHECK(colony.construction == options[static_cast<std::size_t>(pick)].construction);
+    VCR_CHECK(play.colonyScreen()->buildList == -1);
 }

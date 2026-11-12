@@ -21,11 +21,33 @@ struct ColonyArt {
 
 ColonyArt loadColonyArt(const std::filesystem::path& folder);
 
+// What the panel right of the harbour shows; the three buttons beside it
+// switch between them.
+enum class ColonyPanel { Production, Units, Make };
+
 struct ColonyViewState {
     int colony = 0;
     int selectedColonist = 0; // -1 for none
     int jobsMenu = -1;        // the highlighted line of the jobs menu, -1 when closed
+    ColonyPanel panel = ColonyPanel::Production;
+    int buildList = -1;       // the highlighted line of the list of things to build, -1 when closed
 };
+
+// Where the panel's parts are, for clicks.
+struct PanelButton {
+    int x, y, w, h;
+};
+inline constexpr PanelButton kPanelButtons[3] = {{303, 132, 15, 14}, {303, 147, 15, 14}, {303, 162, 15, 14}};
+inline constexpr PanelButton kChangeButton{270, 138, 29, 9};
+inline constexpr PanelButton kBuyButton{216, 138, 17, 9};
+
+// The list of things to build: the box and the first line of items (the
+// line above them is "(No Production)").
+struct BuildListBox {
+    int x, y, w, h;
+    int firstLine; // y of "(No Production)"
+};
+BuildListBox buildListBox(int items);
 
 void drawColonyScreen(Screen& screen, const Art& art, const ColonyArt& colonyArt, const Game& game,
                       const ColonyViewState& view);

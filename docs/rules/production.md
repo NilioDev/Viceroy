@@ -149,7 +149,8 @@ Every colony, the computer's too, stores what it made:
   lost (measured: 600 hammers on a 40-hammer wagon train leave 0).
 - Byte 148 can also name a unit: 42 + n is `@UNIT` row 11 + n, so 42
   artillery, 43 wagon train, 44 caravel, 45 merchantman, 46 galleon, 47
-  privateer. 48 (frigate) and higher never finish. A unit costs its `@UNIT`
+  privateer, 48 frigate. The frigate is offered in the list of a colony
+  with a shipyard but never finishes; nothing higher exists. A unit costs its `@UNIT`
   cost column times 32 hammers (artillery 192, caravel 128), except the wagon
   train, 40, and its tools column times 10 tools. The colony keeps building
   the same unit afterwards. The new unit stands on the colony's square,
@@ -170,7 +171,23 @@ other colony messages of `GAME.TXT` (`@CARGOREADY*`, `@SPOIL*`,
 `@FOODLOW`, `@FOOD1/2`, `@STARVE*`, `@LUMBER` and the other run-outs); the
 original showed `@FOODLOW` and `@CARGOREADY1` in the same test turns.
 
-## Horses
+## What a colony can build
+
+Measured on the lists of Curacao and Roanoke (`COLONY00.SAV` with buildings
+added and taken away):
+
+- of each kind of building, the next level only; the warehouse and its
+  expansion follow byte 149;
+- never the upper town hall levels (rows 10, 11) or the capitol (30, 31),
+  and not the factory levels or the arsenal, which need Adam Smith;
+- docks only next to water, and nothing whose `@BUILDING` colony size is
+  bigger than the colony;
+- what the colony is still set to build although it is already there,
+  marked "(COMPLETE)";
+- then artillery with an armory, a wagon train always, and the caravel,
+  merchantman, galleon, privateer and frigate with a shipyard (docks
+  level 3).
+
 
 Horses breed from the food left over after the colonists have eaten, and
 each new horse uses one of those food. Measured on test colonies, one turn

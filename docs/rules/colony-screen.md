@@ -88,3 +88,56 @@ on the left and below). All text is `FONTTINY.FF`:
   right-aligned to x 256 at y 171.
 
 The menu opens on the colonist's present job.
+
+## Panel buttons
+
+Right of the panel stand three buttons, `ICONS.SS` 67 (production), 68
+(units present) and 69 (Make), at x 303 and y 132, 147 and 162. The one
+whose panel is showing is pressed in: drawn a pixel down and to the right,
+with a line of colour 0x3F above and left of it. The others stand out, with
+the 0x3F line below and right of them.
+
+## Make panel
+
+Measured on Curacao for a wagon train, the fort and the fortress at several
+amounts of hammers, and "Nothing"; our drawing matches pixel for pixel.
+
+- The name of what is being built (`@BUILDING` or `@UNIT`, or "Nothing")
+  in colour 0x39, centred on x 256 at y 132 (x = 256 − (width − 1) / 2).
+- BUY (not shown for Nothing) at (216, 138), 17 × 9, and CHANGE at
+  (270, 138), 29 × 9: colour 0x39 along the top and left, 0x30 along the
+  bottom and right, the word in white 3 pixels in and 2 down.
+- The hammers so far in four rows at y 147 + 6r: each row holds a quarter
+  of what is needed (n, rounded up) and the rows fill in order. Hammer k of
+  a row stands at x 212 + 9k while the row fits (9n ≤ 92). Otherwise the
+  hammers spread so the last one lands about 80 pixels on: with
+  A = ⌈80n / (n − 1)⌉, hammer k stands at 212 + ⌊kA / n⌋. Once they stand
+  closer than 2 pixels (A < 2n, so from 42 a row), each row also shows its
+  count in white on black over its start, as the production rows do,
+  2 pixels further right. Measured with 10, 13, 14, 20, 30, 40, 44, 48, 50,
+  60, 64 and 80 a row (the capitol's 100 a row differs, but it is never
+  offered).
+- With nothing to build the hammers kept show as one row of at most 10,
+  9 pixels apart.
+- "(Requires N Tools)" in white centred the same way at y 170 when tools are
+  needed.
+
+## Select An Item To Build
+
+CHANGE (or B) opens a wooden box like the jobs menu, 184 wide at x 68,
+8n + 32 high for n things and centred on the screen (top (200 − h) / 2).
+Measured on Curacao and Roanoke with 16 to 20 lines; our drawing matches.
+
+- "Select An Item To Build" in 0x44 at (73, top + 6), "(No Production)" at
+  x 77, top + 16, then one line per thing at top + 24 + 8k, its name in
+  capitals.
+- On the right, ending at x 243: "(N Hammers)" still wanted (never below 0)
+  followed straight away by "(N Tools)" when it needs tools, or
+  "(COMPLETE)" for something already built that the colony was still set
+  to build.
+- The highlighted line is gold (0x95) on a bar of 0x8A at (72, y − 1),
+  176 × 7, and "(F1 for Help)" in gold ends at x 250, 9 pixels above the
+  bottom.
+- The list opens on what is being built now.
+
+What the list offers is in [production.md](production.md#what-a-colony-can-build).
