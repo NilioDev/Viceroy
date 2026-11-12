@@ -63,7 +63,7 @@ tile (the first side if it is land, else the second, else the corner).
 
 ## Still unknown
 
-- Where fish and other resources appear (not a simple lattice).
+- Where fish and other resources appear. See "Resources" below.
 - The recolouring of a colony's flag to the nation's colour.
 
 ## The small map
@@ -79,3 +79,35 @@ tile, or of hills sprite 48 or mountains sprite 32. Forests show their
 ground. The view is a white frame of 15 × 12 squares. All but 4 of the
 small map's pixels matched; those are settlements the original leaves out
 (perhaps not yet visited) and one corner of the view frame.
+
+## Resources
+
+What 28 captures of a view-mode tour of one map showed (153 squares with a
+resource out of about 1,800 explored ones). The resource sprite is drawn over
+the finished square; which sprite depends on the ground:
+
+| Ground | PHYS0.SS sprite |
+|--------|-----------------|
+| Ocean | 96 (fish) |
+| Desert, scrub | 90 (oasis) |
+| Plains | 91 |
+| Prairie | 92 |
+| Grassland | 93 |
+| Savannah | 94 |
+| Swamp, wetland and rain forest | 95 |
+| Mixed forest | 97 (beaver) |
+| Broadleaf forest | 98 (deer), seen twice |
+| Conifer and tropical forest | 99 (timber) |
+| Hills | 102 |
+| Mountains | 101, and 89 twice |
+
+Tundra, marsh and boreal forest showed none in this map; sea lanes never
+have one.
+
+Where they appear is not stored in the savegame: no bit of the four map
+layers, nor any bit array elsewhere in the file, matches. It is computed, and
+not with a simple period: no 4×4 or 8×8 block holds a fixed number. The one
+strong clue is `(x + 19 × y) mod 64`: open ground, hills and ocean only take
+a resource on 21 of the 64 values, forests on another 18, but even then only
+a quarter to a half of those squares have one. The rest of the rule is
+still unknown, so Viceroy does not draw resources yet.
