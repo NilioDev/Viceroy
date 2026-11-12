@@ -491,10 +491,13 @@ VCR_TEST("original files: choosing what a colony builds") {
     play.handle(Command::Confirm);
     VCR_CHECK(colony.construction == -1);
 
-    // Clicks: the house button goes back to production, the hammer to Make,
-    // CHANGE opens the list and a click on a line picks it.
+    // Clicks: the house button goes back to production, the musket to the
+    // units present, the hammer to Make, CHANGE opens the list and a click
+    // on a line picks it.
     VCR_CHECK(play.clickColonyScreen(kPanelButtons[0].x + 2, kPanelButtons[0].y + 2));
     VCR_CHECK(play.colonyScreen()->panel == ColonyPanel::Production);
+    VCR_CHECK(play.clickColonyScreen(kPanelButtons[1].x + 2, kPanelButtons[1].y + 2));
+    VCR_CHECK(play.colonyScreen()->panel == ColonyPanel::Units);
     VCR_CHECK(play.clickColonyScreen(kPanelButtons[2].x + 2, kPanelButtons[2].y + 2));
     VCR_CHECK(play.colonyScreen()->panel == ColonyPanel::Make);
     VCR_CHECK(play.clickColonyScreen(kChangeButton.x + 2, kChangeButton.y + 2));

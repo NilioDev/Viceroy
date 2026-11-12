@@ -37,6 +37,7 @@ constexpr std::uint8_t kMenuBar = 0x8A;
 constexpr std::uint8_t kPanelInk = 0x39;   // the Make panel: words and the dark edge of buttons
 constexpr std::uint8_t kPanelLight = 0x30; // the light edge of buttons
 constexpr std::uint8_t kButtonShadow = 0x3F;
+constexpr std::uint8_t kUnitFrame = 0x0A; // bright green
 
 // Screen areas.
 constexpr Rect kTown{0, 8, 200, 120};
@@ -426,6 +427,34 @@ void drawPanelBox(Screen& screen, const Art& art, const PanelButton& b, const st
     screen.text(art.tiny, b.x + 3, b.y + 2, word, {kWhite, kNoColour, kNoColour});
 }
 
+// "Units Present": the land units standing in the colony, in a row along
+// the bottom of the panel, the first one framed.
+void drawUnitsPanel(Screen& screen, const Art& art, const Game& game, const SaveColony& colony) {
+    const std::string title = textLine(art.labelText, "CMISC", 1, "Units Present");
+    screen.text(art.tiny, 256 - (Screen::textWidth(art.tiny, title) - 1) / 2, 132, title, {kPanelInk, kNoColour, kNoColour});
+    int k = 0;
+    const auto here = game.unitsAt(colony.x, colony.y);
+    for (auto it = here.rbegin(); it != here.rend(); ++it) {
+        const int u = *it;
+        if (game.isShip(u)) {
+            continue;
+        }
+        // Measured: 18 pixels apart at row 158, the first framed in bright
+        // green.
+        // How the original goes on past five is not known yet; stop
+        // before the buttons.
+        if (k == 5) {
+            break;
+        }
+        const int x = 213 + 18 * k;
+        drawUnitInColonyList(screen, art, game, u, x, 158);
+        if (k == 0) {
+            screen.frame({x - 1, 157, 18, 18}, kUnitFrame);
+        }
+        ++k;
+    }
+}
+
 // The Make panel: what is being built, BUY and CHANGE, the hammers so far
 // in four rows (each row a quarter of what is needed), and the tools it
 // needs.
@@ -640,7 +669,9 @@ void drawColonyScreen(Screen& screen, const Art& art, const ColonyArt& colonyArt
     drawHarbour(screen, art);
     if (view.panel == ColonyPanel::Make) {
         drawMakePanel(screen, art, game, colony);
-    } else if (view.panel == ColonyPanel::Production) {
+    } else if (view.panel == ColonyPanel::Units) {
+        drawUnitsPanel(screen, art, game, colony);
+    } else {
         drawProductionView(screen, art, production);
     }
     drawPanelButtons(screen, art, view.panel);

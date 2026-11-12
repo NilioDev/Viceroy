@@ -719,6 +719,10 @@ bool PlayScreen::clickColonyScreen(int x, int y) {
         state.panel = ColonyPanel::Production;
         return true;
     }
+    if (inside(kPanelButtons[1])) {
+        state.panel = ColonyPanel::Units;
+        return true;
+    }
     if (inside(kPanelButtons[2])) {
         state.panel = ColonyPanel::Make;
         return true;

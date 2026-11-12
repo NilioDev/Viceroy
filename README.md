@@ -17,7 +17,8 @@ touch controls.
 > clear forests and build roads with your pioneers, found colonies, look inside your colonies, end turns and save. The colony screen
 > shows its buildings, people, what they produce and the warehouse; give
 > colonists other jobs with the jobs menu, and choose what the colony builds
-> on its Make panel or pay to finish it there. At the end of the turn colonies
+> on its Make panel or pay to finish it there; the musket button lists the
+> units in the colony. At the end of the turn colonies
 > store what they make, breed horses from spare food, grow and finish
 > the buildings, wagon trains, artillery and ships under way. Ships sail to Europe from
 > the high seas, sell and buy goods there (prices move as you trade), take colonists from the docks and
