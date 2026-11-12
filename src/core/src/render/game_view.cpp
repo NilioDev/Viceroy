@@ -524,15 +524,6 @@ void drawUnitInColonyList(Screen& screen, const Art& art, const Game& game, int 
     if (orders == SaveUnit::kNoOrders) {
         orders = SaveUnit::kSentry;
     }
-    // Artillery is the smaller picture here, with its box two pixels lower
-    // than on the map.
-    constexpr int kSmallArtilleryIcon = 65;
-    if (game.unit(index).type == kArtillery) {
-        if (const auto* image = sprite(art.icons, kSmallArtilleryIcon); image != nullptr && image->width > 0) {
-            drawUnitParts(screen, art, game, index, *image, px + 2, py, {px + 6, py + 2, 7, 9}, orders, true);
-            return;
-        }
-    }
     const int icon = unitIcon(game, index);
     const auto* image = sprite(art.icons, icon);
     if (image == nullptr || image->width <= 0) {
