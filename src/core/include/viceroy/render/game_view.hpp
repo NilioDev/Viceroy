@@ -59,6 +59,11 @@ struct ViewState {
     int slideX = 0;
     int slideY = 0;
     std::string message; // a line shown at the bottom of the panel
+    // With no unit to move, the panel tells about this square (the view
+    // cursor's, or at the end of the turn the last unit's) and its units.
+    int lookX = -1;
+    int lookY = -1;
+    bool endOfTurn = false; // "End of Turn" below that
 };
 
 // Puts the square in the middle of the map window, as the original does
@@ -77,6 +82,8 @@ void drawGameScreen(Screen& screen, const Art& art, const Game& game, const View
 // Pieces, exposed for tests and other screens.
 void drawMap(Screen& screen, const Art& art, const Game& game, const ViewState& view);
 void drawPanel(Screen& screen, const Art& art, const Game& game, const ViewState& view);
+// The panel's lines about ViewState::lookX/lookY when no unit is active.
+void drawSquarePanel(Screen& screen, const Art& art, const Game& game, const ViewState& view);
 void drawMenuBar(Screen& screen, const Art& art);
 // The sprite in ICONS.SS for a unit.
 int unitIcon(const Game& game, int index);

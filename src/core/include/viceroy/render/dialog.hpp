@@ -35,6 +35,7 @@ struct Dialog {
 // Portraits in Art::portraits.
 inline constexpr int kNavalAdvisor = 0; // MSS0.SS
 inline constexpr int kEuropeAgent = 1;  // MSS2.SS: the man in the home port
+inline constexpr int kFrontiersman = 2; // MSS3.SS: tells about pioneers' work
 
 // The box for a GAME.TXT section, with %STRING0, %STRING1, ... and
 // %NUMBER0, ... filled in. Text is joined and wrapped to the section's
@@ -48,6 +49,10 @@ void addOption(Dialog& dialog, std::string text, std::string value = {}, bool di
 // The questions asked in the home port: the agent stands behind the box,
 // which is centred on the harbour (or on the screen when it is too tall).
 void placeEuropeDialog(Dialog& dialog, bool help = true);
+
+// Messages about the land (a pioneer's work): the box centred on row 144,
+// the frontiersman standing behind it.
+void placeFrontiersmanDialog(Dialog& dialog);
 
 // Moves the bar to the next choice that is not greyed, by +1 or -1.
 void stepSelection(Dialog& dialog, int by);

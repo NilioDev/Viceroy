@@ -116,7 +116,9 @@ bytes are kept as they are.
 
 **Unit** (28 bytes): x, y, type (row of `@UNIT`), nation in the low four
 bits of byte 3, moves used at 5 (in thirds: a move along a road costs one),
-orders at 8 (row of `@ORDERS`), cargo holds used at 12, skill at 23, and
+orders at 8 (row of `@ORDERS`), cargo holds used at 12, a pioneer's tools
+at 21, the turns at a pioneer's job at 22 (see
+[pioneers](../rules/pioneers.md)), skill at 23, and
 the next and previous unit of a ship's cargo chain at 24 and 26. Units in
 Europe or on the high seas have x = y = 228 + nation + 4 × stage; see
 [Europe](../rules/europe.md) for what the stages mean.

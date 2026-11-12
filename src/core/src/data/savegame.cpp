@@ -161,6 +161,8 @@ SaveGame readSaveGame(std::span<const std::uint8_t> file) {
         unit.movesUsed = r[5];
         unit.orders = r[8];
         unit.holds = r[12];
+        unit.tools = r[21];
+        unit.workTurns = r[22];
         unit.profession = r[23];
         unit.nextInTransport = s16(r + 24);
         unit.prevInTransport = s16(r + 26);
@@ -283,6 +285,8 @@ Bytes writeSaveGame(const SaveGame& save) {
         raw[5] = static_cast<std::uint8_t>(unit.movesUsed);
         raw[8] = static_cast<std::uint8_t>(unit.orders);
         raw[12] = static_cast<std::uint8_t>(unit.holds);
+        raw[21] = static_cast<std::uint8_t>(std::clamp(unit.tools, 0, 255));
+        raw[22] = static_cast<std::uint8_t>(std::clamp(unit.workTurns, 0, 255));
         raw[23] = static_cast<std::uint8_t>(unit.profession);
         put16(raw.data() + 24, unit.nextInTransport);
         put16(raw.data() + 26, unit.prevInTransport);

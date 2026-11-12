@@ -351,8 +351,10 @@ void drawOrdersBox(Screen& screen, const Art& art, const Game& game, int index, 
     const char letter = (u.orders >= 0 && u.orders < 11) ? kLetters[u.orders] : '-';
     const char text[2] = {letter, 0};
     // A unit with orders shows its letter in the darker half of the
-    // nation's colour; the dash of a unit without orders is black.
-    const std::uint8_t ink = u.orders != SaveUnit::kNoOrders && colour >= 8 && colour < 16
+    // nation's colour; the dash of a unit without orders is black, and so
+    // are the Dutch letters (seen for P and R on orange).
+    constexpr std::uint8_t kDutchOrange = 0x0D;
+    const std::uint8_t ink = u.orders != SaveUnit::kNoOrders && colour >= 8 && colour < 16 && colour != kDutchOrange
                                  ? static_cast<std::uint8_t>(colour - 8)
                                  : kBlack;
     const int w = Screen::textWidth(art.tiny, text);
@@ -390,8 +392,9 @@ UnitPlacement unitPlacement(const Game& game, int index, int icon, int width) {
     if (type == unit_type::kWagonTrain) {
         return {2, 6, 0};
     }
-    // People: six wide stand three in, eight wide two in; the box at the feet.
-    const int x = width <= 6 ? 3 : 2;
+    // People: six or seven wide (a pioneer) stand three in, eight wide two
+    // in; the box at the feet.
+    const int x = width <= 7 ? 3 : 2;
     return {x, x + width - 2, 7};
 }
 
@@ -539,6 +542,7 @@ Art loadArt(const std::filesystem::path& folder) {
     placeMenus(art, art.menus);
     art.portraits.push_back(readSpriteSheet(readFile(folder, "MSS0.SS")));
     art.portraits.push_back(readSpriteSheet(readFile(folder, "MSS2.SS")));
+    art.portraits.push_back(readSpriteSheet(readFile(folder, "MSS3.SS")));
     art.rules = readRuleset(art.names);
     return art;
 }
@@ -792,7 +796,7 @@ void drawPanel(Screen& screen, const Art& art, const Game& game, const ViewState
     screen.text(art.tiny, 242, 51, seasonName(art, save.season) + " " + std::to_string(save.year), green);
     const auto& nation = save.nations[static_cast<std::size_t>(game.human())];
     screen.text(art.tiny, 242, 58,
-                "Gold: " + std::to_string(nation.gold) + "$  Tax: " + std::to_string(nation.taxRate) + "%", green);
+                "Gold:" + std::to_string(nation.gold) + "$  Tax: " + std::to_string(nation.taxRate) + "%", green);
 
     const int active = game.activeUnit();
     if (active >= 0 && active < game.unitCount()) {
@@ -810,11 +814,43 @@ void drawPanel(Screen& screen, const Art& art, const Game& game, const ViewState
         screen.text(art.tiny, 260, 77, "Locat: (" + std::to_string(u.x) + ", " + std::to_string(u.y) + ")", green);
         const std::string nationName = lineOf(art, "NATIONALITY", u.nation, "");
         screen.text(art.tiny, 242, 86, (nationName.empty() ? "" : nationName + " ") + game.unitName(active), green);
-        const std::string orders = lineOf(art, "ORDERS", u.orders, "No Orders");
-        screen.text(art.tiny, 242, 93, orders, gold);
-        if (save.map.inside(u.x, u.y)) {
-            screen.text(art.tiny, 242, 100, "(" + terrainName(art, save.map.at(u.x, u.y)) + ")", green);
+        // Then a line each, 7 apart (seen for a pioneer): a colonist's
+        // skill and a pioneer's tools in gold, the orders, the square's
+        // terrain and its road and plowed field.
+        int y = 93;
+        auto line = [&](const std::string& text, const TextColours& colours) {
+            screen.text(art.tiny, 242, y, text, colours);
+            y += 7;
+        };
+        if (!game.isShip(active) && u.type < unit_type::kTreasure) {
+            // 0x1C, the free colonist, past the end of @JOB, reads as its
+            // "Colonist" row.
+            constexpr std::size_t kColonistRow = 19;
+            const auto row = static_cast<std::size_t>(u.profession) < 28 ? static_cast<std::size_t>(u.profession)
+                                                                        : kColonistRow;
+            if (row < art.rules.jobs.size()) {
+                line(art.rules.jobs[row].name, gold);
+            }
         }
+        if (u.type == unit_type::kPioneer) {
+            line("(" + std::to_string(u.tools) + " Tools)", gold);
+        }
+        line(lineOf(art, "ORDERS", u.orders, "No Orders"), gold);
+        if (save.map.inside(u.x, u.y)) {
+            const auto& sq = save.map.at(u.x, u.y);
+            line("(" + terrainName(art, sq) + ")", green);
+            // "Road" and "Plowed" in the MISC section of LABELS.TXT.
+            if ((sq.flags & MapSquare::kRoad) != 0) {
+                line("(" + textLine(art.labelText, "MISC", 31, "Road") + ")", green);
+            }
+            if ((sq.flags & MapSquare::kPlowed) != 0) {
+                line("(" + textLine(art.labelText, "MISC", 83, "Plowed") + ")", green);
+            }
+        }
+    }
+
+    if ((active < 0 || active >= game.unitCount()) && save.map.inside(view.lookX, view.lookY)) {
+        drawSquarePanel(screen, art, game, view);
     }
 
     if (!view.message.empty()) {
@@ -845,6 +881,55 @@ void drawPanel(Screen& screen, const Art& art, const Game& game, const ViewState
         if (!line.empty()) {
             flush();
         }
+    }
+}
+
+void drawSquarePanel(Screen& screen, const Art& art, const Game& game, const ViewState& view) {
+    // Measured at the end of a turn, a pioneer at work on plains: the
+    // square, then each unit on it with its tools and orders, then "End of
+    // Turn" in white.
+    const auto& save = game.state();
+    const auto& sq = save.map.at(view.lookX, view.lookY);
+    const TextColours green{kGreen, kNoColour, kNoColour};
+    const TextColours gold{kGold, kNoColour, kNoColour};
+    int y = 68;
+    auto line = [&](const std::string& text) {
+        screen.text(art.tiny, 242, y, text, green);
+        y += 7;
+    };
+    // Guess: the number after the place is the region from the path layer.
+    line("Locat: (" + std::to_string(view.lookX) + ", " + std::to_string(view.lookY) + ") " +
+         std::to_string(sq.region & 0x0F));
+    const auto human = static_cast<std::size_t>(game.human());
+    if (human < save.players.size()) {
+        line(save.players[human].country);
+    }
+    line("(" + terrainName(art, sq) + ")");
+    if ((sq.flags & MapSquare::kRoad) != 0) {
+        line("(" + textLine(art.labelText, "MISC", 31, "Road") + ")");
+    }
+    if ((sq.flags & MapSquare::kPlowed) != 0) {
+        line("(" + textLine(art.labelText, "MISC", 83, "Plowed") + ")");
+    }
+    y += 3;
+    for (const int i : game.unitsAt(view.lookX, view.lookY)) {
+        const auto& u = game.unit(i);
+        drawUnitOnSquare(screen, art, game, i, 242, y);
+        int ty = y + 4;
+        if (u.type == unit_type::kPioneer) {
+            screen.text(art.tiny, 260, ty, std::to_string(u.tools) + " Tools", gold);
+        } else {
+            screen.text(art.tiny, 260, ty, game.unitName(i), gold);
+        }
+        ty += 6;
+        screen.text(art.tiny, 260, ty, lineOf(art, "ORDERS", u.orders, "No Orders"), gold);
+        y += 16;
+        if (y > 160) {
+            break;
+        }
+    }
+    if (view.endOfTurn) {
+        screen.text(art.tiny, 242, y + 9, "End of Turn", {kWhite, kNoColour, kNoColour});
     }
 }
 
