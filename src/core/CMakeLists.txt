@@ -15,6 +15,7 @@ add_library(vcr_core STATIC
     src/game/colony.cpp
     src/game/europe.cpp
     src/game/resource.cpp
+    src/game/new_game.cpp
     src/render/screen.cpp
     src/render/game_view.cpp
     src/render/colony_view.cpp
