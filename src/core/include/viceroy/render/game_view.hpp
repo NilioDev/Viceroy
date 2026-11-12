@@ -64,6 +64,10 @@ struct ViewState {
     int lookX = -1;
     int lookY = -1;
     bool endOfTurn = false; // "End of Turn" below that
+    // While the messages of a turn's end are up, the panel still shows the
+    // turn that ended (seen); -1 for the game's own date.
+    int shownYear = -1;
+    int shownSeason = 0;
 };
 
 // Puts the square in the middle of the map window, as the original does

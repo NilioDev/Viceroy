@@ -121,8 +121,13 @@ void drawMarkedText(Screen& screen, const Font& font, int x, int y, const std::s
 }
 
 Dialog makeDialog(const Art& art, std::string_view section, const std::vector<std::string>& strings,
-                  const std::vector<int>& numbers) {
+                  const std::vector<int>& numbers, int nation) {
     Dialog d;
+    std::string country;
+    if (nation >= 0) {
+        constexpr int kDutch = 3;
+        country = (nation == kDutch ? "the " : "") + textLine(art.names, "COUNTRY", nation, "");
+    }
     const auto* found = art.gameText.find(section);
     if (found == nullptr) {
         return d;
@@ -132,7 +137,10 @@ Dialog makeDialog(const Art& art, std::string_view section, const std::vector<st
     bool seenText = false;
     int fixedY = -1;
     for (const auto& raw : found->lines) {
-        const std::string line = fill(raw, strings, numbers);
+        std::string line = fill(raw, strings, numbers);
+        if (nation >= 0) {
+            replaceAll(line, "%COUNTRY", country);
+        }
         if (!line.empty() && line[0] == '@') {
             if (line == "@smallfont") {
                 d.small = true;
@@ -206,6 +214,15 @@ void placeFrontiersmanDialog(Dialog& d) {
     d.y = (288 - dialogHeight(d)) / 2;
     d.portraitX = 86;
     d.portraitY = d.y - 87;
+}
+
+void placeReligiousDialog(Dialog& d) {
+    d.portrait = kReligiousAdvisor;
+    d.portraitBehind = false;
+    d.x = (Screen::kWidth - boxWidth(d)) / 2;
+    d.y = (252 - dialogHeight(d)) / 2;
+    d.portraitX = 114;
+    d.portraitY = d.y - 52;
 }
 
 void stepSelection(Dialog& d, int by) {

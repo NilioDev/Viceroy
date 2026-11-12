@@ -543,6 +543,7 @@ Art loadArt(const std::filesystem::path& folder) {
     art.portraits.push_back(readSpriteSheet(readFile(folder, "MSS0.SS")));
     art.portraits.push_back(readSpriteSheet(readFile(folder, "MSS2.SS")));
     art.portraits.push_back(readSpriteSheet(readFile(folder, "MSS3.SS")));
+    art.portraits.push_back(readSpriteSheet(readFile(folder, "MSS4.SS")));
     art.rules = readRuleset(art.names);
     return art;
 }
@@ -793,7 +794,9 @@ void drawPanel(Screen& screen, const Art& art, const Game& game, const ViewState
 
     const TextColours green{kGreen, kNoColour, kNoColour};
     const TextColours gold{kGold, kNoColour, kNoColour};
-    screen.text(art.tiny, 242, 51, seasonName(art, save.season) + " " + std::to_string(save.year), green);
+    const int year = view.shownYear >= 0 ? view.shownYear : save.year;
+    const int season = view.shownYear >= 0 ? view.shownSeason : save.season;
+    screen.text(art.tiny, 242, 51, seasonName(art, season) + " " + std::to_string(year), green);
     const auto& nation = save.nations[static_cast<std::size_t>(game.human())];
     screen.text(art.tiny, 242, 58,
                 "Gold:" + std::to_string(nation.gold) + "$  Tax: " + std::to_string(nation.taxRate) + "%", green);
@@ -901,7 +904,7 @@ void drawSquarePanel(Screen& screen, const Art& art, const Game& game, const Vie
     line("Locat: (" + std::to_string(view.lookX) + ", " + std::to_string(view.lookY) + ") " +
          std::to_string(sq.region & 0x0F));
     const auto human = static_cast<std::size_t>(game.human());
-    if (human < save.players.size()) {
+    if (human < save.players.size() && sq.isLand()) {
         line(save.players[human].country);
     }
     line("(" + terrainName(art, sq) + ")");
@@ -912,24 +915,42 @@ void drawSquarePanel(Screen& screen, const Art& art, const Game& game, const Vie
         line("(" + textLine(art.labelText, "MISC", 83, "Plowed") + ")");
     }
     y += 3;
-    for (const int i : game.unitsAt(view.lookX, view.lookY)) {
+    // A ship comes first with the people aboard after it, in the order of
+    // its cargo chain from the last one loaded (seen: merchantman, veteran,
+    // pioneer); then the rest.
+    std::vector<int> order;
+    const auto here = game.unitsAt(view.lookX, view.lookY);
+    for (const int i : here) {
+        if (std::find(order.begin(), order.end(), i) != order.end()) {
+            continue;
+        }
+        order.push_back(i);
+        for (int next = game.unit(i).prevInTransport; next >= 0 && next < game.unitCount() &&
+                                                       std::find(order.begin(), order.end(), next) == order.end();
+             next = game.unit(next).prevInTransport) {
+            if (std::find(here.begin(), here.end(), next) != here.end()) {
+                order.push_back(next);
+            }
+        }
+    }
+    for (const int i : order) {
         const auto& u = game.unit(i);
         drawUnitOnSquare(screen, art, game, i, 242, y);
-        int ty = y + 4;
+        std::string name = game.unitName(i);
         if (u.type == unit_type::kPioneer) {
-            screen.text(art.tiny, 260, ty, std::to_string(u.tools) + " Tools", gold);
-        } else {
-            screen.text(art.tiny, 260, ty, game.unitName(i), gold);
+            name = std::to_string(u.tools) + " Tools";
+        } else if ((u.type == unit_type::kSoldier || u.type == unit_type::kDragoon) && u.profession == 0x15) {
+            name = textLine(art.labelText, "MISC", 65, "Veteran");
         }
-        ty += 6;
-        screen.text(art.tiny, 260, ty, lineOf(art, "ORDERS", u.orders, "No Orders"), gold);
-        y += 16;
+        screen.text(art.tiny, 260, y + 4, name, gold);
+        screen.text(art.tiny, 260, y + 10, lineOf(art, "ORDERS", u.orders, "No Orders"), gold);
+        y += 18;
         if (y > 160) {
             break;
         }
     }
     if (view.endOfTurn) {
-        screen.text(art.tiny, 242, y + 9, "End of Turn", {kWhite, kNoColour, kNoColour});
+        screen.text(art.tiny, 242, y + 7, "End of Turn", {kWhite, kNoColour, kNoColour});
     }
 }
 

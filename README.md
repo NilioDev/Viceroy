@@ -20,7 +20,8 @@ touch controls.
 > store what they make, grow and finish buildings. Ships sail to Europe from
 > the high seas, sell and buy goods there (prices move as you trade), take colonists from the docks and
 > sail back. In Europe you can recruit colonists, buy artillery and ships,
-> and have specialists trained. The other nations don't
+> and have specialists trained. Crosses made in your colonies and churches
+> bring colonists over from the docks for free. The other nations don't
 > move yet, and combat and meeting the natives are still to come. Fish,
 > ore and the other resources show on the map where the original puts them;
 > lost city rumours are not drawn yet.
