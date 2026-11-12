@@ -107,16 +107,51 @@ int landAround(const SaveMap& map, int x, int y) {
     return n;
 }
 
+namespace {
+
+// Measured on test colonies: what a resource adds to the land's yield for
+// the job it suits.
+int resourceAdds(Resource resource, int jobRow) {
+    switch (resource) {
+    case Resource::Grain:
+    case Resource::Oasis:
+        return jobRow == job::kFarmer ? 2 : 0;
+    case Resource::Fish:
+        return jobRow == job::kFisherman ? 3 : 0;
+    case Resource::Timber:
+        return jobRow == 5 ? 2 : 0;
+    case Resource::Deer:
+        return jobRow == 4 ? 2 : 0;
+    case Resource::Beaver:
+        return jobRow == 4 ? 3 : 0;
+    case Resource::HillsOre:
+        return jobRow == 6 ? 2 : 0;
+    case Resource::Minerals:
+        return jobRow == 6 ? 3 : 0;
+    default:
+        return 0;
+    }
+}
+
+// Cotton, tobacco and sugar double their crop instead.
+bool resourceDoubles(Resource resource, int jobRow) {
+    return (resource == Resource::Sugar && jobRow == 1) || (resource == Resource::Tobacco && jobRow == 2) ||
+           (resource == Resource::Cotton && jobRow == 3);
+}
+
+} // namespace
+
 int squareYield(const Ruleset& rules, const MapSquare& square, int jobRow, int skill, WorkModifier modifier,
-                bool nearLand) {
+                bool nearLand, Resource resource) {
     const int row = terrainRow(square);
     int amount = yieldOf(rules, row, jobRow);
     if (amount <= 0) {
         return 0;
     }
-    // Measured: the bonus is added to the land's own yield, so whatever
-    // doubles it (lumber, experts) doubles the bonus too.
-    amount += modifier.bonus;
+    // Measured: the bonus and most resources are added to the land's own
+    // yield, so whatever doubles it (lumber, experts) doubles them too.
+    const int added = modifier.bonus + resourceAdds(resource, jobRow);
+    amount += added;
     const bool plowed = (square.flags & MapSquare::kPlowed) != 0;
     const bool road = (square.flags & MapSquare::kRoad) != 0;
     switch (jobRow) {
@@ -161,11 +196,14 @@ int squareYield(const Ruleset& rules, const MapSquare& square, int jobRow, int s
     if (square.river()) {
         amount += 1;
     }
+    if (resourceDoubles(resource, jobRow)) {
+        amount *= 2;
+    }
     if (isExpert(skill, jobRow)) {
-        // Expert farmers and fishermen make 2 more (and the bonus twice);
-        // the other experts make twice as much.
+        // Expert farmers and fishermen make 2 more (and the bonus and the
+        // resource twice); the other experts make twice as much.
         const bool adds = jobRow == job::kFarmer || jobRow == job::kFisherman;
-        amount = adds ? amount + 2 + modifier.bonus : amount * 2;
+        amount = adds ? amount + 2 + added : amount * 2;
     }
     // The tories' penalty comes off the end.
     return std::max(0, amount - modifier.penalty);
@@ -281,7 +319,7 @@ ColonyProduction colonyProduction(const SaveColony& colony, const SaveMap& map, 
         work.square = static_cast<int>(s);
         work.good = jobOutput(jobRow);
         work.amount = squareYield(rules, map.at(x, y), jobRow, colony.skills[static_cast<std::size_t>(who)], modifier,
-                                  landAround(map, x, y) >= 3);
+                                  landAround(map, x, y) >= 3, resourceAt(map, x, y));
     }
 
     for (int i = 0; i < population; ++i) {
@@ -388,7 +426,8 @@ JobChoice choiceFor(const SaveColony& colony, const SaveMap& map, const Ruleset&
             if (sq.isWater() != (jobRow == job::kFisherman)) {
                 continue;
             }
-            const int amount = squareYield(rules, sq, jobRow, skillOf, modifier, landAround(map, x, y) >= 3);
+            const int amount =
+                squareYield(rules, sq, jobRow, skillOf, modifier, landAround(map, x, y) >= 3, resourceAt(map, x, y));
             if (amount > choice.amount) {
                 choice.amount = amount;
                 choice.square = s;
