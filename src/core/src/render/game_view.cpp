@@ -2,6 +2,7 @@
 #include "viceroy/render/game_view.hpp"
 
 #include "viceroy/data/reader.hpp"
+#include "viceroy/game/europe.hpp"
 #include "viceroy/game_files.hpp"
 
 #include <algorithm>
@@ -231,17 +232,52 @@ void drawTerrain(Screen& screen, const Art& art, const Game& game, int x, int y,
 
 namespace {
 
-// The small box beside a unit with its nation's colour and its orders.
-void drawOrdersBox(Screen& screen, const Art& art, const Game& game, int index, int px, int py) {
+// The small box with the unit's nation's colour and its orders letter.
+void drawOrdersBox(Screen& screen, const Art& art, const Game& game, int index, Rect box) {
     const auto& u = game.unit(index);
-    const Rect box{px + 9, py, 7, 9};
-    screen.fill(box, nationColour(art, u.nation));
+    const std::uint8_t colour = nationColour(art, u.nation);
+    screen.fill(box, colour);
     screen.frame(box, kBlack);
     static constexpr const char* kLetters = "-STGLFFBPR-";
     const char letter = (u.orders >= 0 && u.orders < 11) ? kLetters[u.orders] : '-';
     const char text[2] = {letter, 0};
+    // A unit with orders shows its letter in the darker half of the
+    // nation's colour; the dash of a unit without orders is black.
+    const std::uint8_t ink = u.orders != SaveUnit::kNoOrders && colour >= 8 && colour < 16
+                                 ? static_cast<std::uint8_t>(colour - 8)
+                                 : kBlack;
     const int w = Screen::textWidth(art.tiny, text);
-    screen.text(art.tiny, box.x + (box.w - w) / 2 + 1, box.y + 2, text, {kBlack, kBlack, kBlack});
+    screen.text(art.tiny, box.x + (box.w - w) / 2 + 1, box.y + 2, text, {ink, kNoColour, kNoColour});
+}
+
+// A unit on its square at (px, py), as measured on the original: the
+// sprite two pixels in (a narrow person centred on the next eight), a black
+// shadow two pixels left of it, then the orders box, then the unit.
+void drawUnitOnSquare(Screen& screen, const Art& art, const Game& game, int index, int px, int py) {
+    const auto* image = sprite(art.icons, unitIcon(game, index));
+    if (image == nullptr || image->width <= 0) {
+        return;
+    }
+    const int x = px + 2 + std::max(0, (8 - image->width) / 2);
+    for (int j = 0; j < image->height; ++j) {
+        for (int i = 0; i < image->width; ++i) {
+            if (image->pixels[static_cast<std::size_t>(j * image->width + i)] != kTransparent) {
+                screen.pixel(x - 2 + i, py + j, kBlack);
+            }
+        }
+    }
+    const int type = game.unit(index).type;
+    Rect box{x + image->width - 2, py + 7, 7, 9}; // at a person's feet
+    if (isShipType(game.rules(), type)) {
+        box = {x + 7, py, 7, 9}; // by the mast
+    } else if (type == unit_type::kDragoon || type == unit_type::kScout || type == 7 || type == 8 || type == 21 ||
+               type == 22) {
+        box = {x - 2, py, 7, 9}; // behind the rider
+    } else if (type == unit_type::kTreasure || type == 11 || type == unit_type::kWagonTrain) {
+        box = {x + 4, py, 7, 9}; // above the wheels
+    }
+    drawOrdersBox(screen, art, game, index, box);
+    screen.blit(*image, x, py);
 }
 
 void drawCentredText(Screen& screen, const Font& font, int cx, int y, const std::string& s, TextColours colours) {
@@ -331,7 +367,7 @@ int colonistIcon(int skill) {
 }
 
 void drawUnitOrders(Screen& screen, const Art& art, const Game& game, int index, int px, int py) {
-    drawOrdersBox(screen, art, game, index, px, py);
+    drawUnitOnSquare(screen, art, game, index, px, py);
 }
 
 std::string textLine(const TextFile& file, const char* section, int row, const char* fallback) {
@@ -422,8 +458,21 @@ int unitIcon(const Game& game, int index) {
     if (u.type < 0 || u.type >= static_cast<int>(types.size())) {
         return 0;
     }
-    // @UNIT gives an icon number, counted from 1.
-    return types[static_cast<std::size_t>(u.type)].icon - 1;
+    // @UNIT gives an icon number, counted from 1. That is the expert's
+    // picture; anyone else armed, mounted, with tools or as a missionary
+    // shows the plainer one 28 sprites before it (seen on the original:
+    // a soldier who is no veteran wears no blue coat).
+    const int icon = types[static_cast<std::size_t>(u.type)].icon - 1;
+    int expert = -1;
+    switch (u.type) {
+    case unit_type::kSoldier:
+    case unit_type::kDragoon: expert = 0x15; break;
+    case unit_type::kPioneer: expert = 0x14; break;
+    case unit_type::kScout: expert = 0x16; break;
+    case unit_type::kMissionary: expert = 0x18; break;
+    default: return icon;
+    }
+    return u.profession == expert ? icon : icon - 28;
 }
 
 void drawMap(Screen& screen, const Art& art, const Game& game, const ViewState& view) {
@@ -450,6 +499,26 @@ void drawMap(Screen& screen, const Art& art, const Game& game, const ViewState& 
         }
     }
 
+    // Colonies, each with its name, in the order of the save; a later one
+    // covers the end of an earlier name, and units cover them all.
+    for (const auto& c : save.colonies) {
+        if (!visible(c.x, c.y)) {
+            continue;
+        }
+        const int px = screenX(c.x);
+        const int py = screenY(c.y);
+        const int fortification = c.raw[132] & 7;
+        const int icon = fortification == 0 ? kColonyOpen : fortification == 1 ? 0 : fortification == 3 ? 1 : 2;
+        // The picture is 21 wide, centred on the square; its pennant is
+        // overdrawn with the owner's.
+        if (const auto* image = sprite(art.icons, icon)) {
+            screen.blit(*image, px + (kSquare - image->width) / 2, py);
+        }
+        blitSprite(screen, art.icons, kNationFlagBase + std::clamp(c.nation, 0, kEuropeanNations - 1), px + 3, py);
+        const std::string population = std::to_string(c.population);
+        drawCentredText(screen, art.tiny, px + 8, py + 5, population, {kWhite, kBlack, kBlack});
+        screen.text(art.labels, px + 2, py + 16, c.name, {kWhite, kBlack, kBlack});
+    }
     // Units: the top one on each square (the active unit wins its square).
     std::map<std::pair<int, int>, int> top;
     auto shown = [&](int i) {
@@ -472,30 +541,15 @@ void drawMap(Screen& screen, const Art& art, const Game& game, const ViewState& 
         }
         const int px = screenX(pos.first);
         const int py = screenY(pos.second);
-        blitSprite(screen, art.icons, unitIcon(game, i), px, py);
-        drawOrdersBox(screen, art, game, i, px, py);
+        drawUnitOnSquare(screen, art, game, i, px, py);
     }
     if (sliding >= 0 && game.onMap(sliding)) {
         const auto& u = game.unit(sliding);
         const int px = screenX(u.x) + view.slideX;
         const int py = screenY(u.y) + view.slideY;
-        blitSprite(screen, art.icons, unitIcon(game, sliding), px, py);
-        drawOrdersBox(screen, art, game, sliding, px, py);
+        drawUnitOnSquare(screen, art, game, sliding, px, py);
     }
 
-    for (const auto& c : save.colonies) {
-        if (!visible(c.x, c.y)) {
-            continue;
-        }
-        const int px = screenX(c.x);
-        const int py = screenY(c.y);
-        const int fortification = c.raw[132] & 7;
-        const int icon = fortification == 0 ? kColonyOpen : fortification == 1 ? 0 : fortification == 3 ? 1 : 2;
-        blitSprite(screen, art.icons, icon, px, py);
-        const std::string population = std::to_string(c.population);
-        drawCentredText(screen, art.tiny, px + 8, py + 5, population, {kWhite, kBlack, kBlack});
-        screen.text(art.labels, px + 2, py + 16, c.name, {kWhite, kBlack, kBlack});
-    }
     screen.resetClip();
 }
 
@@ -559,8 +613,7 @@ void drawPanel(Screen& screen, const Art& art, const Game& game, const ViewState
     const int active = game.activeUnit();
     if (active >= 0 && active < game.unitCount()) {
         const auto& u = game.unit(active);
-        blitSprite(screen, art.icons, unitIcon(game, active), 241, 68);
-        drawOrdersBox(screen, art, game, active, 241, 68);
+        drawUnitOnSquare(screen, art, game, active, 242, 68);
         const int left = game.movesLeft(active);
         std::string moves = std::to_string(left / 3);
         if (left % 3 != 0) {

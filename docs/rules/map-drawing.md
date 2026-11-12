@@ -64,7 +64,30 @@ tile (the first side if it is land, else the second, else the corner).
 ## Still unknown
 
 - Where fish and other resources appear. See "Resources" below.
-- The recolouring of a colony's flag to the nation's colour.
+- Where the orders box of a scout, treasure, wagon train or cavalry goes
+  (they follow the dragoon or the artillery until measured).
+
+## Colonies and units
+
+Measured on the original (COLONY00, around Isabella; every unit in about
+250 captures of the map):
+
+- First all colonies, in the order of the save, each with its name: a later
+  colony covers the end of an earlier one's name. Then the units, which cover
+  colonies and names.
+- A colony picture (21 wide) is centred on its square, so it starts 2 pixels
+  to the left. The owner's pennant (`ICONS.SS` 118 + nation) is drawn over
+  the one in the picture, at the square's left + 3, top.
+- A unit's sprite starts 2 pixels into its square; a person 6 wide is
+  centred on the 8 pixels from there (so 3 pixels in). A black copy of its
+  shape lies 2 pixels to its left, as in the port.
+- Then the orders box (7 × 9), then the unit over it. Where the box goes, from
+  the sprite's left `x`: a ship at (x + 7, top), a person at (x + width − 2,
+  top + 7), a dragoon at (x − 2, top), artillery at (x + 4, top).
+- The panel shows the active unit the same way, its square at (242, 68).
+- A soldier, dragoon, pioneer, scout or missionary who is not the matching
+  expert shows the plainer sprite 28 before the one `@UNIT` names (a soldier
+  without a blue coat).
 
 ## The small map
 
