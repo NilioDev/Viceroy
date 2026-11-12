@@ -565,6 +565,49 @@ int horsesBred(const SaveColony& colony, int foodSurplus) {
     return std::clamp(bred, 0, std::max(0, storageLimit(colony) - horses));
 }
 
+int constructionUnit(int construction) {
+    if (construction < kFirstUnitConstruction || construction >= kFirstUnitConstruction + kUnitConstructionRows) {
+        return -1;
+    }
+    return 11 + (construction - kFirstUnitConstruction);
+}
+
+int constructionHammers(const Ruleset& rules, int construction) {
+    if (const int unit = constructionUnit(construction); unit >= 0) {
+        if (static_cast<std::size_t>(unit) >= rules.units.size()) {
+            return 0;
+        }
+        constexpr int kWagonTrain = 12;
+        return unit == kWagonTrain ? 40 : rules.units[static_cast<std::size_t>(unit)].cost * 32;
+    }
+    if (construction < 0 || static_cast<std::size_t>(construction) >= rules.buildings.size()) {
+        return 0;
+    }
+    return rules.buildings[static_cast<std::size_t>(construction)].hammers;
+}
+
+int constructionTools(const Ruleset& rules, int construction) {
+    if (const int unit = constructionUnit(construction); unit >= 0) {
+        return static_cast<std::size_t>(unit) < rules.units.size() ? rules.units[static_cast<std::size_t>(unit)].tools * 10
+                                                                    : 0;
+    }
+    if (construction < 0 || static_cast<std::size_t>(construction) >= rules.buildings.size()) {
+        return 0;
+    }
+    return rules.buildings[static_cast<std::size_t>(construction)].tools;
+}
+
+std::string constructionName(const Ruleset& rules, int construction) {
+    if (const int unit = constructionUnit(construction); unit >= 0) {
+        return static_cast<std::size_t>(unit) < rules.units.size() ? rules.units[static_cast<std::size_t>(unit)].name
+                                                                    : std::string{};
+    }
+    if (construction < 0 || static_cast<std::size_t>(construction) >= rules.buildings.size()) {
+        return {};
+    }
+    return rules.buildings[static_cast<std::size_t>(construction)].name;
+}
+
 ColonyTurn runColonyTurn(SaveColony& colony, const SaveMap& map, const Ruleset& rules, int difficulty) {
     ColonyTurn turn;
     const auto p = colonyProduction(colony, map, rules, difficulty);
@@ -618,19 +661,33 @@ ColonyTurn runColonyTurn(SaveColony& colony, const SaveMap& map, const Ruleset& 
         turn.starved = colony.population > 1;
     }
 
-    // Construction.
+    // Construction. Measured: whatever hammers are left over are lost when
+    // something is finished.
     colony.hammers += std::max(0, made[cargo::kHammers]);
-    if (colony.construction >= 0 && static_cast<std::size_t>(colony.construction) < rules.buildings.size()) {
-        const auto& b = rules.buildings[static_cast<std::size_t>(colony.construction)];
-        const int tools = b.tools;
-        if (colony.hammers >= b.hammers && colony.stock[cargo::kTools] >= tools) {
+    const int needHammers = constructionHammers(rules, colony.construction);
+    if (needHammers > 0 && colony.hammers >= needHammers) {
+        const int tools = constructionTools(rules, colony.construction);
+        if (colony.stock[cargo::kTools] < tools) {
+            turn.toolsNeeded = tools;
+        } else if (const int unit = constructionUnit(colony.construction); unit >= 0) {
+            colony.hammers = 0;
+            colony.stock[cargo::kTools] -= tools;
+            turn.builtUnit = unit;
+        } else {
             for (int k = 0; k < kBuildingKinds; ++k) {
                 const auto& f = kBuildingFields[static_cast<std::size_t>(k)];
                 if (f.firstRow >= 0 && colony.construction >= f.firstRow && colony.construction < f.firstRow + f.bits) {
                     setBuildingLevel(colony, static_cast<BuildingKind>(k), colony.construction - f.firstRow + 1);
                 }
             }
-            colony.hammers -= b.hammers;
+            // Measured: the expansion only raises byte 149 (1 warehouse,
+            // 2 expansion), which sets what the warehouse holds.
+            constexpr int kWarehouseRow = 15;
+            if (colony.construction == kWarehouseRow || colony.construction == kWarehouseRow + 1) {
+                colony.raw[149] = static_cast<std::uint8_t>(
+                    std::max<int>(colony.raw[149], colony.construction - kWarehouseRow + 1));
+            }
+            colony.hammers = 0;
             colony.stock[cargo::kTools] -= tools;
             turn.built = colony.construction;
             colony.construction = -1;

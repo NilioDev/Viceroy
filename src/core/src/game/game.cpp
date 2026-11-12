@@ -423,7 +423,7 @@ void Game::endTurn() {
         if (turn.grew) {
             addColonist(colony.x, colony.y, colony.nation);
             if (ours) {
-                lastTurnNews_.push_back(colony.name + ": a new colonist was born.");
+                notices_.push_back(GameNotice{"NEWCOLONIST", {colony.name}, -1, {}, static_cast<int>(c)});
             }
         }
         if (turn.starved) {
@@ -438,9 +438,23 @@ void Game::endTurn() {
                 lastTurnNews_.push_back(colony.name + ": a colonist starved.");
             }
         }
-        if (turn.built >= 0 && ours && static_cast<std::size_t>(turn.built) < rules_.buildings.size()) {
-            lastTurnNews_.push_back(colony.name + ": " + rules_.buildings[static_cast<std::size_t>(turn.built)].name +
-                                    " finished.");
+        if (turn.builtUnit >= 0) {
+            addBuiltUnit(colony.x, colony.y, colony.nation, turn.builtUnit);
+        }
+        if (ours && (turn.built >= 0 || turn.builtUnit >= 0)) {
+            // Measured: "Curacao colony produces Wagon Train." from the
+            // colonial advisor, with the map on the colony.
+            const std::string what = turn.builtUnit >= 0 ? rules_.units[static_cast<std::size_t>(turn.builtUnit)].name
+                                                         : constructionName(rules_, turn.built);
+            notices_.push_back(GameNotice{"BUILT", {colony.name, what}, -1, {}, static_cast<int>(c)});
+        }
+        if (ours && turn.toolsNeeded > 0) {
+            const int have = std::max(0, colony.stock[cargo::kTools]);
+            notices_.push_back(GameNotice{have > 0 ? "NEEDTOOLS" : "NEEDTOOLS0",
+                                          {colony.name, constructionName(rules_, colony.construction)},
+                                          -1,
+                                          {turn.toolsNeeded, have},
+                                          static_cast<int>(c)});
         }
     }
     gatherCrosses();
@@ -692,6 +706,22 @@ void Game::addColonist(int x, int y, int nation) {
     u.type = unit_type::kColonist;
     u.nation = nation;
     u.profession = 0x1C;
+    save_.units.push_back(u);
+    refreshUnitFlags();
+}
+
+void Game::addBuiltUnit(int x, int y, int nation, int type) {
+    SaveUnit u;
+    // As the original stores a unit it has just built (measured: artillery
+    // keeps the colonist's 0x1C in byte 23, wagons and ships 0).
+    static constexpr std::array<std::uint8_t, 28> kTemplate{0, 0, 0, 0x80, 0, 0, 0xFF, 0x58, 0, 0, 0, 0, 0, 0,
+                                                            0, 0, 0, 0, 0xFF, 0, 0, 0, 0, 0, 0xFF, 0xFF, 0xFF, 0xFF};
+    u.raw = kTemplate;
+    u.x = x;
+    u.y = y;
+    u.type = type;
+    u.nation = nation;
+    u.profession = type == kArtillery ? 0x1C : 0;
     save_.units.push_back(u);
     refreshUnitFlags();
 }

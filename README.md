@@ -18,7 +18,8 @@ touch controls.
 > shows its buildings, people, what they produce and the warehouse; give
 > colonists other jobs with the jobs menu. At the end of the turn colonies
 > store what they make, breed horses from spare food, grow and finish
-> buildings. Ships sail to Europe from
+> the buildings, wagon trains, artillery and ships under way (choosing what
+> to build comes later). Ships sail to Europe from
 > the high seas, sell and buy goods there (prices move as you trade), take colonists from the docks and
 > sail back. In Europe you can recruit colonists, buy artillery and ships,
 > and have specialists trained. Crosses made in your colonies and churches

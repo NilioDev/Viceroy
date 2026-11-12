@@ -349,3 +349,47 @@ VCR_TEST("construction: finishes with the hammers and tools the ruleset lists") 
     VCR_CHECK(c.stock[cargo::kTools] == 0);
     VCR_CHECK(buildingLevel(c, BuildingKind::Fortification) == 3);
 }
+
+VCR_TEST("construction: colonies build wagons, artillery and ships (measured)") {
+    Ruleset r;
+    r.units.resize(19);
+    r.units[11].cost = 6; // artillery: 192 hammers, 40 tools
+    r.units[11].tools = 4;
+    r.units[12].cost = 1; // wagon train: 40 hammers
+    r.units[13].cost = 4; // caravel: 128 hammers, 40 tools
+    r.units[13].tools = 4;
+    r.units[17].cost = 16; // frigate: never built in a colony
+    VCR_CHECK(constructionUnit(42) == 11);
+    VCR_CHECK(constructionUnit(47) == 16);
+    VCR_CHECK(constructionUnit(48) == -1);
+    VCR_CHECK(constructionHammers(r, 42) == 192);
+    VCR_CHECK(constructionHammers(r, 43) == 40);
+    VCR_CHECK(constructionHammers(r, 44) == 128);
+    VCR_CHECK(constructionTools(r, 44) == 40);
+
+    SaveMap map;
+    SaveColony c;
+    c.construction = 43;
+    c.hammers = 39;
+    VCR_CHECK(runColonyTurn(c, map, r).builtUnit == -1);
+    c.hammers = 600; // what is left over is lost
+    auto turn = runColonyTurn(c, map, r);
+    VCR_CHECK(turn.builtUnit == 12);
+    VCR_CHECK(c.hammers == 0);
+    VCR_CHECK(c.construction == 43); // it goes on building wagons
+
+    c.construction = 44;
+    c.hammers = 128;
+    c.stock[cargo::kTools] = 39;
+    turn = runColonyTurn(c, map, r);
+    VCR_CHECK(turn.builtUnit == -1);
+    VCR_CHECK(turn.toolsNeeded == 40);
+    c.stock[cargo::kTools] = 40;
+    VCR_CHECK(runColonyTurn(c, map, r).builtUnit == 13);
+    VCR_CHECK(c.stock[cargo::kTools] == 0);
+
+    c.construction = 48;
+    c.hammers = 999;
+    VCR_CHECK(runColonyTurn(c, map, r).builtUnit == -1);
+    VCR_CHECK(c.hammers == 999);
+}

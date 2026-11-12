@@ -146,6 +146,8 @@ public:
     // Message boxes for the player that came up since the last call: a
     // pioneer out of tools, ...
     std::vector<GameNotice> takeNotices() { return std::exchange(notices_, {}); }
+    // A unit the colony on this square has built.
+    void addBuiltUnit(int x, int y, int nation, int type);
     // A free colonist appears on the square (born in a colony).
     void addColonist(int x, int y, int nation);
 

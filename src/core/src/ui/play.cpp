@@ -302,8 +302,11 @@ void PlayScreen::showNotices() {
         // A report about a colony: the map shows it, and the box offers
         // to go there.
         const auto& colony = game_.state().colonies[static_cast<std::size_t>(notice.colony)];
-        notice.strings.resize(std::max<std::size_t>(notice.strings.size(), 2));
-        notice.strings[1] = countryName(*art_, game_.human());
+        // The liberty reports name the country as their second string.
+        if (notice.strings.size() < 2) {
+            notice.strings.resize(2);
+            notice.strings[1] = countryName(*art_, game_.human());
+        }
         centreOn(view_, game_, colony.x, colony.y);
         ask(notice.section, notice.colony, notice.strings, game_.human(), notice.numbers);
         if (dialog_) {
