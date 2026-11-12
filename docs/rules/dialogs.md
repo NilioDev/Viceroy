@@ -11,7 +11,9 @@ from 1). Then come the text lines, a blank line, and one line per choice.
 The text lines are joined and wrapped again to fit the width. `%STRING0`,
 `%STRING1`, ... and `%NUMBER0`, ... are filled in; words in `{braces}` are
 drawn in gold. A line is wrapped when the next word would make it wider
-than `@width` − 5.
+than `@width` − 5. `@y=91` puts the box's top at that row instead of
+centring it, and `@options` starts the choices with no blank line before
+them (the main menu, see [opening.md](opening.md)).
 
 The font is `FONTINTR.FF`. Its pixel values 1, 2 and 3 take the colours
 from `@COLORS` in `NAMES.TXT`: the letter (basic 0x44, or hilite 0x95 in

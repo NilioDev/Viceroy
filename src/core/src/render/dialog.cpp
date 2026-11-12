@@ -118,11 +118,16 @@ Dialog makeDialog(const Art& art, std::string_view section, const std::vector<st
     std::string text;
     bool inOptions = false;
     bool seenText = false;
+    int fixedY = -1;
     for (const auto& raw : found->lines) {
         const std::string line = fill(raw, strings, numbers);
         if (!line.empty() && line[0] == '@') {
             if (line == "@smallfont") {
                 d.small = true;
+            } else if (line == "@options") {
+                inOptions = true;
+            } else if (line.rfind("@y=", 0) == 0) {
+                fixedY = std::atoi(line.c_str() + 3);
             } else if (line.rfind("@width=", 0) == 0) {
                 d.width = std::max(40, std::atoi(line.c_str() + 7));
             } else if (line.rfind("@default=", 0) == 0) {
@@ -153,7 +158,7 @@ Dialog makeDialog(const Art& art, std::string_view section, const std::vector<st
     d.lines = wrap(fontOf(art, d), text, d.width - kTextLeft);
     d.selected = d.options.empty() ? 0 : std::min(d.selected, static_cast<int>(d.options.size()) - 1);
     d.x = (Screen::kWidth - boxWidth(d)) / 2;
-    d.y = (Screen::kHeight - dialogHeight(d)) / 2;
+    d.y = fixedY >= 0 ? fixedY : (Screen::kHeight - dialogHeight(d)) / 2;
     return d;
 }
 
@@ -202,6 +207,22 @@ int dialogHeight(const Dialog& d) {
         return textBottom + kOptionGap + 2 + helpRoom;
     }
     return textBottom + kOptionGap + optionStep * static_cast<int>(d.options.size()) + 2 + helpRoom;
+}
+
+int dialogOptionAt(const Dialog& d, int x, int y) {
+    const Rect box{d.x, d.y, boxWidth(d), dialogHeight(d)};
+    if (x < box.x + 4 || x >= box.x + box.w - 4) {
+        return -1;
+    }
+    int top = box.y + kTextTop + static_cast<int>(d.lines.size()) * (d.small ? kSmallLineStep : kLineStep) + kOptionGap;
+    const int step = d.small ? kSmallOptionStep : kOptionStep;
+    for (int i = 0; i < static_cast<int>(d.options.size()); ++i) {
+        if (y >= top - 1 && y < top - 1 + step) {
+            return i;
+        }
+        top += step;
+    }
+    return -1;
 }
 
 void drawDialog(Screen& screen, const Art& art, const Dialog& d) {

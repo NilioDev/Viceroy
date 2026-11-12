@@ -50,8 +50,15 @@ and download one at the bottom of the page.
 
 ## Controls
 
+When the game files are in place, Viceroy plays the original's opening and
+then shows its main menu. For now only **LOAD Game** works there; starting a
+new game comes later.
+
 | Action | Keyboard | Gamepad |
 | --- | --- | --- |
+| Skip the opening | Any key, or click | Any button |
+| Pick in the main menu or the load menu | Up / Down and Enter, or click | D-pad and A |
+| Back from the load menu to the main menu | Esc | B |
 | Move the active unit | Numeric keypad 1-9, arrow keys, Home / PgUp / End / PgDn for diagonals, or click a square next to it | Left stick or D-pad |
 | Move the map | Click any other square to bring it to the middle, or click the small map | Right stick |
 | No orders this turn | Space | A |

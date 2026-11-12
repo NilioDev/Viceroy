@@ -55,6 +55,9 @@ void stepSelection(Dialog& dialog, int by);
 // The box's height in pixels.
 int dialogHeight(const Dialog& dialog);
 
+// The choice under a point of the screen, or -1.
+int dialogOptionAt(const Dialog& dialog, int x, int y);
+
 void drawDialog(Screen& screen, const Art& art, const Dialog& dialog);
 
 } // namespace viceroy

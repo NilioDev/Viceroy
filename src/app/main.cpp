@@ -19,6 +19,7 @@
 #include "viceroy/render/screen.hpp"
 #include "viceroy/ui/debug_menu.hpp"
 #include "viceroy/ui/play.hpp"
+#include "viceroy/ui/title.hpp"
 #include "viceroy/version.hpp"
 
 #include <algorithm>
@@ -41,7 +42,7 @@ constexpr int kScreenH = viceroy::Screen::kHeight;
 constexpr Uint64 kStickRepeatMs = 220;
 constexpr float kStickThreshold = 0.6f;
 
-enum class Mode { Welcome, Load, Play };
+enum class Mode { Welcome, Intro, Title, Load, Play };
 
 struct App {
     SDL_Window* window = nullptr;
@@ -54,6 +55,11 @@ struct App {
     Uint32 pickedEvent = 0; // our event type for a picked file or folder
 
     std::unique_ptr<viceroy::Art> art;
+    std::unique_ptr<viceroy::TitleArt> title;
+    std::unique_ptr<viceroy::MainMenu> mainMenu;
+    // The opening while it plays, and its last picture behind the menu
+    // when it played to the end.
+    std::unique_ptr<viceroy::Intro> intro;
     std::unique_ptr<viceroy::LoadMenu> load;
     std::unique_ptr<viceroy::ColonyArt> colonyArt;
     std::unique_ptr<viceroy::PlayScreen> play;
@@ -119,13 +125,55 @@ void showLoadMenu(App& app) {
     app.debug = viceroy::DebugMenu{};
 }
 
-// Loads the pictures and rules from the library, then shows the load menu.
+// The day this program was built, the way the original dates itself:
+// "7-Feb-95".
+std::string buildDate() {
+    const std::string date = __DATE__; // "Nov 12 2026"
+    const int day = std::atoi(date.substr(4, 2).c_str());
+    return std::to_string(day) + "-" + date.substr(0, 3) + "-" + date.substr(9, 2);
+}
+
+// The original's main menu, or the load menu when its pictures are missing.
+void showTitle(App& app) {
+    if (!app.title) {
+        showLoadMenu(app);
+        return;
+    }
+    app.play.reset();
+    if (app.intro && !app.intro->finished()) {
+        app.intro.reset(); // skipped: the still title picture instead
+    }
+    app.mainMenu = std::make_unique<viceroy::MainMenu>(*app.art, std::string(viceroy::kVersion), buildDate());
+    app.mode = Mode::Title;
+}
+
+void pickTitle(App& app, viceroy::TitleChoice choice) {
+    if (choice == viceroy::TitleChoice::Load) {
+        showLoadMenu(app);
+    } else {
+        app.mainMenu->say("Not in Viceroy yet.");
+    }
+}
+
+// Loads the pictures and rules from the library, then shows the main menu.
 void openLibrary(App& app) {
     try {
         app.art = std::make_unique<viceroy::Art>(viceroy::loadArt(viceroy::pack::baseFolder(app.library)));
         app.colonyArt =
             std::make_unique<viceroy::ColonyArt>(viceroy::loadColonyArt(viceroy::pack::baseFolder(app.library)));
-        showLoadMenu(app);
+        try {
+            app.title = std::make_unique<viceroy::TitleArt>(
+                viceroy::loadTitleArt(viceroy::pack::baseFolder(app.library)));
+        } catch (const std::exception& e) {
+            SDL_Log("No opening: %s", e.what());
+            app.title.reset();
+        }
+        if (app.title) {
+            app.intro = std::make_unique<viceroy::Intro>(*app.title);
+            app.mode = Mode::Intro;
+        } else {
+            showTitle(app);
+        }
         app.status.clear();
     } catch (const std::exception& e) {
         app.art.reset();
@@ -356,8 +404,19 @@ void send(App& app, Command command) {
             chooseFolder(app);
         }
         break;
+    case Mode::Intro:
+        showTitle(app);
+        break;
+    case Mode::Title:
+        if (auto choice = app.mainMenu->handle(command)) {
+            pickTitle(app, *choice);
+        }
+        break;
     case Mode::Load:
         if (command == Command::Cancel) {
+            if (app.title) {
+                showTitle(app);
+            }
             break;
         }
         if (auto slot = app.load->handle(command == Command::Skip ? Command::Confirm : command)) {
@@ -386,6 +445,16 @@ void click(App& app, float wx, float wy) {
     float x = 0;
     float y = 0;
     SDL_RenderCoordinatesFromWindow(app.renderer, wx, wy, &x, &y);
+    if (app.mode == Mode::Intro) {
+        showTitle(app);
+        return;
+    }
+    if (app.mode == Mode::Title) {
+        if (auto choice = app.mainMenu->click(static_cast<int>(x), static_cast<int>(y))) {
+            pickTitle(app, *choice);
+        }
+        return;
+    }
     if (app.mode != Mode::Play) {
         if (app.mode != Mode::Welcome) {
             send(app, Command::Confirm);
@@ -445,7 +514,11 @@ void present(App& app) {
         return;
     }
     app.screen.resetColours();
-    if (app.mode == Mode::Load) {
+    if (app.mode == Mode::Intro) {
+        app.intro->draw(app.screen, *app.title);
+    } else if (app.mode == Mode::Title) {
+        app.mainMenu->draw(app.screen, *app.art, *app.title, app.intro.get());
+    } else if (app.mode == Mode::Load) {
         app.load->draw(app.screen, *app.art);
         if (!app.status.empty()) {
             app.screen.text(app.art->tiny, 34, 186, app.status, {0x95, viceroy::kNoColour, viceroy::kNoColour});
@@ -530,8 +603,12 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
             app->debug.toggle(*app->play);
             break;
         }
+        if (app->mode == Mode::Intro) {
+            showTitle(*app);
+            break;
+        }
         if (event->key.key == SDLK_ESCAPE) {
-            if (app->mode == Mode::Play) {
+            if (app->mode == Mode::Play || (app->mode == Mode::Load && app->title)) {
                 send(*app, Command::Cancel);
                 break;
             }
@@ -584,6 +661,10 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
         }
         break;
     case SDL_EVENT_GAMEPAD_BUTTON_DOWN: {
+        if (app->mode == Mode::Intro) {
+            showTitle(*app);
+            break;
+        }
         if (app->mode == Mode::Welcome) {
             if (event->gbutton.button == SDL_GAMEPAD_BUTTON_SOUTH) {
                 chooseFolder(*app);
@@ -592,8 +673,12 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
             }
             break;
         }
-        if (app->mode == Mode::Load && event->gbutton.button == SDL_GAMEPAD_BUTTON_SOUTH) {
+        if ((app->mode == Mode::Load || app->mode == Mode::Title) && event->gbutton.button == SDL_GAMEPAD_BUTTON_SOUTH) {
             send(*app, Command::Confirm);
+            break;
+        }
+        if (app->mode == Mode::Load && event->gbutton.button == SDL_GAMEPAD_BUTTON_EAST) {
+            send(*app, Command::Cancel);
             break;
         }
         if (app->mode == Mode::Play && event->gbutton.button == SDL_GAMEPAD_BUTTON_GUIDE) {
@@ -675,6 +760,12 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
     app->lastTicks = now;
     if (app->mode == Mode::Play) {
         app->play->tick(elapsed);
+    }
+    if (app->mode == Mode::Intro) {
+        app->intro->tick(elapsed);
+        if (app->intro->finished()) {
+            showTitle(*app);
+        }
     }
     // The right stick scrolls the map on the main screen.
     if (app->mode == Mode::Play && std::hypot(app->lookX, app->lookY) >= kStickThreshold && !app->debug.open() &&
