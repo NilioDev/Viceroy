@@ -28,7 +28,7 @@ Ruleset farmRules() {
     r.terrain.resize(21);
     r.terrain[2].yield[job::kFarmer] = 4;  // plains: 5 food for a colonist
     r.terrain[10].yield[5] = 3;            // its forest: 6 lumber
-    r.terrain[17].yield[job::kFisherman] = 2; // ocean
+    r.terrain[17].yield[job::kFisherman] = 3; // ocean
     return r;
 }
 

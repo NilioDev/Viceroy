@@ -151,10 +151,9 @@ int squareYield(const Ruleset& rules, const MapSquare& square, int jobRow, int s
         }
         break;
     case job::kFisherman:
-        // Measured: water with land on 3 or more sides; 1 or 2 is not enough.
-        if (nearLand) {
-            amount += 2;
-        }
+        // Measured: ocean (yield 3) gives a colonist 4 with land on 3 or
+        // more of its 8 sides and 2 with less.
+        amount += nearLand ? 1 : -1;
         break;
     default:
         break;

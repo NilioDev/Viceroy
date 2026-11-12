@@ -163,7 +163,8 @@ struct WorkModifier {
 WorkModifier workModifier(const SaveColony& colony, int difficulty);
 
 // What a colonist of this skill makes doing this job on a square. Fishing
-// gives 2 more where the water has land on at least 3 of its 8 sides.
+// gives 1 more than the yield where the water has land on at least 3 of its
+// 8 sides, and 1 less elsewhere.
 int squareYield(const Ruleset& rules, const MapSquare& square, int jobRow, int skill, WorkModifier modifier = {},
                 bool nearLand = true);
 // How many of the 8 squares around are land.

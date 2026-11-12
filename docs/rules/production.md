@@ -14,15 +14,15 @@ be checked against more colonies.
 | Fur trapper | yield, + 2 with a road (a guess: it could also be yield × 2) |
 | Lumberjack | yield × 2, + 2 with a road |
 | Ore or silver miner | yield, + 1 with a road |
-| Fisherman | yield, + 2 where the water has land on 3 or more of its 8 sides |
+| Fisherman | yield + 1 where the water has land on 3 or more of its 8 sides, yield − 1 elsewhere |
 
 A river adds 1 to all of them. An expert farmer or fisherman makes 2 more;
 other experts make twice as much. The Sons of Liberty add to all of this or
 take from it (see [liberty.md](liberty.md)).
 
-Measured on test colonies: open water gives a colonist 2 food with land on
-one or two sides, 4 with three or more (also when the land is only at the
-corners); an expert fisherman makes 2 more (6 next to land).
+Measured on test colonies: the ocean (yield 3) gives a colonist 2 food with
+land on one or two sides, 4 with three or more (also when the land is only
+at the corners); an expert fisherman makes 2 more (6 next to land).
 
 The colony's own square (the town commons) counts as plowed. It makes food
 and one other good: furs in a forest, otherwise its best crop or ore, at its
