@@ -215,10 +215,18 @@ struct ColonyTurn {
     std::array<int, kGoodsKinds> wasted{}; // goods the warehouse could not hold
     int libertyBefore = 0; // the production bonus before and after the turn
     int libertyAfter = 0;
+    int horsesBred = 0;    // new horses, each fed with one food of the surplus
 };
+
+// The food the colony's own square makes without the liberty bonus.
+int centreFoodYield(const Ruleset& rules, const MapSquare& square, int difficulty);
 
 // How much of each good the warehouse holds (food keeps up to 200).
 int storageLimit(const SaveColony& colony);
+
+// How many horses the colony breeds from the food left over after the
+// colonists have eaten (see docs/rules/production.md).
+int horsesBred(const SaveColony& colony, int foodSurplus);
 
 // Stores what the colony made this turn: workshops use what is there, food
 // is eaten, hammers go into the building under way, and the warehouse
