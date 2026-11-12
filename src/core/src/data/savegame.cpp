@@ -148,6 +148,7 @@ SaveGame readSaveGame(std::span<const std::uint8_t> file) {
         }
         colony.rebelDividend = s32(r + 194);
         colony.rebelDivisor = s32(r + 198);
+        colony.libertyBonus = (r[28] & 0x02) != 0 ? 2 : (r[28] & 0x04) != 0 ? 1 : 0;
     }
 
     save.units.resize(static_cast<std::size_t>(unitCount));
@@ -274,6 +275,9 @@ Bytes writeSaveGame(const SaveGame& save) {
         }
         put32(raw.data() + 194, colony.rebelDividend);
         put32(raw.data() + 198, colony.rebelDivisor);
+        raw[28] = static_cast<std::uint8_t>((raw[28] & ~0x06) | (colony.libertyBonus >= 2   ? 0x06
+                                                                 : colony.libertyBonus == 1 ? 0x04
+                                                                                            : 0));
         append(out, raw);
     }
     for (const auto& unit : save.units) {

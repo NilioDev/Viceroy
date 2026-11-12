@@ -97,6 +97,7 @@ flags (1), control (1: 0 human, 1 computer, 2 withdrawn), colonies founded
 | 0 | 2 | x, y |
 | 2 | 24 | name |
 | 26 | 1 | nation |
+| 28 | 1 | flags; 0x04 the +1 Sons of Liberty bonus, 0x02 (with 0x04) the +2 |
 | 31 | 1 | population |
 | 32 | 32 | each colonist's job (row of `@JOB`) |
 | 64 | 32 | each colonist's skill (0-17 experts, 0x14-0x1B pioneer to convert, 0x1C free colonist) |
@@ -105,7 +106,7 @@ flags (1), control (1: 0 human, 1 computer, 2 withdrawn), colonies founded
 | 146 | 2 | hammers |
 | 148 | 1 | what is being built (0xFF nothing) |
 | 154 | 32 | stock of the 16 goods (signed 16 bits each, in `@CARGO` order) |
-| 194 | 4 + 4 | Sons of Liberty as a fraction: members, total |
+| 194 | 4 + 4 | Sons of Liberty: rebels and total, see [liberty](../rules/liberty.md) |
 
 Each kind of building has a field of bits that fill up from the lowest as it
 is improved (0, 1, 11, 111): fortification 3 bits, armory 3, docks 3, town

@@ -153,10 +153,24 @@ struct ColonyProduction {
 // The row of the terrain tables (@UNFORESTED, @FORESTED, @OTHER) for a square.
 int terrainRow(const MapSquare& square);
 
-// What a colonist of this skill makes doing this job on a square.
-int squareYield(const Ruleset& rules, const MapSquare& square, int jobRow, int skill);
+// How the Sons of Liberty change what each colonist makes: a bonus of 1
+// or 2 once membership has reached 50% or 100%, and a penalty of 1 for
+// every (10 - difficulty) tories.
+struct WorkModifier {
+    int bonus = 0;
+    int penalty = 0;
+};
+WorkModifier workModifier(const SaveColony& colony, int difficulty);
 
-ColonyProduction colonyProduction(const SaveColony& colony, const SaveMap& map, const Ruleset& rules);
+// What a colonist of this skill makes doing this job on a square. Fishing
+// gives 2 more where the water has land on at least 3 of its 8 sides.
+int squareYield(const Ruleset& rules, const MapSquare& square, int jobRow, int skill, WorkModifier modifier = {},
+                bool nearLand = true);
+// How many of the 8 squares around are land.
+int landAround(const SaveMap& map, int x, int y);
+
+ColonyProduction colonyProduction(const SaveColony& colony, const SaveMap& map, const Ruleset& rules,
+                                  int difficulty = 0);
 
 // The building a job is done in, if any.
 std::optional<BuildingKind> buildingForJob(int jobRow);
@@ -178,7 +192,7 @@ struct JobChoice {
 // the land, and work in the buildings the colony has (teachers excepted),
 // with what they would make.
 std::vector<JobChoice> jobChoices(const SaveColony& colony, const SaveMap& map, const Ruleset& rules,
-                                  const std::vector<SaveColony>& colonies, int colonist);
+                                  const std::vector<SaveColony>& colonies, int colonist, int difficulty = 0);
 
 // Moves a colonist to a job at its best free place. Returns false (and
 // changes nothing) when there is no place for it.
@@ -196,6 +210,8 @@ struct ColonyTurn {
     bool starved = false; // no food left: a colonist died
     int built = -1;       // row of @BUILDING finished this turn
     std::array<int, kGoodsKinds> wasted{}; // goods the warehouse could not hold
+    int libertyBefore = 0; // the production bonus before and after the turn
+    int libertyAfter = 0;
 };
 
 // How much of each good the warehouse holds (food keeps up to 200).
@@ -204,9 +220,23 @@ int storageLimit(const SaveColony& colony);
 // Stores what the colony made this turn: workshops use what is there, food
 // is eaten, hammers go into the building under way, and the warehouse
 // throws away what it cannot hold.
-ColonyTurn runColonyTurn(SaveColony& colony, const SaveMap& map, const Ruleset& rules);
+ColonyTurn runColonyTurn(SaveColony& colony, const SaveMap& map, const Ruleset& rules, int difficulty = 0);
+
+// --- Sons of Liberty -----------------------------------------------------
 
 // The share of the colony in the Sons of Liberty, 0-100.
 int sonsOfLibertyPercent(const SaveColony& colony);
+// How many of the colonists are rebels (the rest are tories).
+int rebelCount(const SaveColony& colony);
+// One turn's change of membership: the bells come in, both sides of the
+// fraction wear away by a 64th, and the rebels by a fifth of their share.
+void gatherBells(SaveColony& colony, int bells);
+// The production bonus moves one step a turn towards what membership
+// allows (1 at 50%, 2 at 100%).
+void updateLibertyBonus(SaveColony& colony);
+// A new colony starts at 0 of 200 and gathers its first bells at once.
+void startLiberty(SaveColony& colony, const SaveMap& map, const Ruleset& rules, int difficulty);
+// A colonist joining adds 100 to the total and the colony gathers again.
+void joinLiberty(SaveColony& colony, const SaveMap& map, const Ruleset& rules, int difficulty);
 
 } // namespace viceroy

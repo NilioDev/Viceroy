@@ -21,7 +21,9 @@ touch controls.
 > the high seas, sell and buy goods there (prices move as you trade), take colonists from the docks and
 > sail back. In Europe you can recruit colonists, buy artillery and ships,
 > and have specialists trained. Crosses made in your colonies and churches
-> bring colonists over from the docks for free. The other nations don't
+> bring colonists over from the docks for free. Liberty bells win colonists
+> for the Sons of Liberty: at 50% and 100% membership a colony works
+> better, and too many tories slow it down. The other nations don't
 > move yet, and combat and meeting the natives are still to come. Fish,
 > ore and the other resources show on the map where the original puts them;
 > lost city rumours are not drawn yet.

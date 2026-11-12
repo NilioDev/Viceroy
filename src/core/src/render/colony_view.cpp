@@ -265,7 +265,7 @@ void drawPeople(Screen& screen, const Art& art, const SaveColony& colony, const 
                 int selected) {
     const TextColours white{kWhite, kWhite, kWhite};
     const int sol = sonsOfLibertyPercent(colony);
-    const int rebels = (colony.population * sol + 50) / 100;
+    const int rebels = rebelCount(colony);
     blitSprite(screen, art.icons, kRebelFlag, 2, 132);
     screen.text(art.tiny, 15, 133, std::to_string(sol) + "% (" + std::to_string(rebels) + ")", white);
     const std::string tory =
@@ -399,7 +399,7 @@ void drawJobsMenu(Screen& screen, const Art& art, const Game& game, const SaveCo
                   int highlighted) {
     const auto& save = game.state();
     const auto& jobs = game.rules().jobs;
-    const auto choices = jobChoices(colony, save.map, game.rules(), save.colonies, colonist);
+    const auto choices = jobChoices(colony, save.map, game.rules(), save.colonies, colonist, save.difficulty);
     const Rect box{62, 20, 196, 160};
     screen.setClip({box.x + 1, box.y + 1, box.w - 2, box.h - 2});
     for (int y = box.y; y < box.y + box.h; ++y) {
@@ -476,7 +476,7 @@ void drawColonyScreen(Screen& screen, const Art& art, const ColonyArt& colonyArt
         return;
     }
     const auto& colony = save.colonies[static_cast<std::size_t>(view.colony)];
-    const auto production = colonyProduction(colony, save.map, game.rules());
+    const auto production = colonyProduction(colony, save.map, game.rules(), save.difficulty);
 
     screen.resetClip();
     screen.clear(kBlack);

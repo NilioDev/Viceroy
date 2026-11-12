@@ -89,12 +89,34 @@ int terrainRow(const MapSquare& square) {
     return square.terrain & 7;
 }
 
-int squareYield(const Ruleset& rules, const MapSquare& square, int jobRow, int skill) {
+WorkModifier workModifier(const SaveColony& colony, int difficulty) {
+    WorkModifier m;
+    m.bonus = std::clamp(colony.libertyBonus, 0, 2);
+    const int tories = std::max(0, colony.population - rebelCount(colony));
+    m.penalty = tories / std::max(1, 10 - std::clamp(difficulty, 0, 4));
+    return m;
+}
+
+int landAround(const SaveMap& map, int x, int y) {
+    int n = 0;
+    for (const auto& o : kColonySquares) {
+        if (map.inside(x + o.dx, y + o.dy) && !map.at(x + o.dx, y + o.dy).isWater()) {
+            ++n;
+        }
+    }
+    return n;
+}
+
+int squareYield(const Ruleset& rules, const MapSquare& square, int jobRow, int skill, WorkModifier modifier,
+                bool nearLand) {
     const int row = terrainRow(square);
     int amount = yieldOf(rules, row, jobRow);
     if (amount <= 0) {
         return 0;
     }
+    // Measured: the bonus is added to the land's own yield, so whatever
+    // doubles it (lumber, experts) doubles the bonus too.
+    amount += modifier.bonus;
     const bool plowed = (square.flags & MapSquare::kPlowed) != 0;
     const bool road = (square.flags & MapSquare::kRoad) != 0;
     switch (jobRow) {
@@ -129,7 +151,10 @@ int squareYield(const Ruleset& rules, const MapSquare& square, int jobRow, int s
         }
         break;
     case job::kFisherman:
-        amount += 2;
+        // Measured: water with land on 3 or more sides; 1 or 2 is not enough.
+        if (nearLand) {
+            amount += 2;
+        }
         break;
     default:
         break;
@@ -138,9 +163,13 @@ int squareYield(const Ruleset& rules, const MapSquare& square, int jobRow, int s
         amount += 1;
     }
     if (isExpert(skill, jobRow)) {
-        amount = jobRow == job::kFarmer ? amount + 2 : amount * 2;
+        // Expert farmers and fishermen make 2 more (and the bonus twice);
+        // the other experts make twice as much.
+        const bool adds = jobRow == job::kFarmer || jobRow == job::kFisherman;
+        amount = adds ? amount + 2 + modifier.bonus : amount * 2;
     }
-    return amount;
+    // The tories' penalty comes off the end.
+    return std::max(0, amount - modifier.penalty);
 }
 
 std::optional<BuildingKind> buildingForJob(int jobRow) {
@@ -200,8 +229,12 @@ int jobInput(int jobRow) {
     }
 }
 
-ColonyProduction colonyProduction(const SaveColony& colony, const SaveMap& map, const Ruleset& rules) {
+ColonyProduction colonyProduction(const SaveColony& colony, const SaveMap& map, const Ruleset& rules,
+                                  int difficulty) {
     ColonyProduction p;
+    const WorkModifier modifier = workModifier(colony, difficulty);
+    // The colony's own square gets the bonus but not the penalty.
+    const WorkModifier centreModifier{modifier.bonus, 0};
     const int population = std::clamp(colony.population, 0, kMaxColonists);
     p.colonists.resize(static_cast<std::size_t>(population));
 
@@ -210,7 +243,7 @@ ColonyProduction colonyProduction(const SaveColony& colony, const SaveMap& map, 
     if (map.inside(colony.x, colony.y)) {
         MapSquare centre = map.at(colony.x, colony.y);
         centre.flags = static_cast<std::uint8_t>(centre.flags | MapSquare::kPlowed);
-        p.centreFood = squareYield(rules, centre, job::kFarmer, -1);
+        p.centreFood = squareYield(rules, centre, job::kFarmer, -1, centreModifier);
         const int row = terrainRow(centre);
         int best = -1;
         int bestAmount = 0;
@@ -226,7 +259,7 @@ ColonyProduction colonyProduction(const SaveColony& colony, const SaveMap& map, 
         }
         if (best >= 0 && yieldOf(rules, row, best) > 0) {
             p.centreGood = jobOutput(best);
-            p.centreAmount = yieldOf(rules, row, best) + 1;
+            p.centreAmount = yieldOf(rules, row, best) + 1 + centreModifier.bonus;
         }
         p.produced[cargo::kFood] += p.centreFood;
         if (p.centreGood >= 0) {
@@ -248,7 +281,8 @@ ColonyProduction colonyProduction(const SaveColony& colony, const SaveMap& map, 
         const int jobRow = colony.jobs[static_cast<std::size_t>(who)];
         work.square = static_cast<int>(s);
         work.good = jobOutput(jobRow);
-        work.amount = squareYield(rules, map.at(x, y), jobRow, colony.skills[static_cast<std::size_t>(who)]);
+        work.amount = squareYield(rules, map.at(x, y), jobRow, colony.skills[static_cast<std::size_t>(who)], modifier,
+                                  landAround(map, x, y) >= 3);
     }
 
     for (int i = 0; i < population; ++i) {
@@ -259,7 +293,10 @@ ColonyProduction colonyProduction(const SaveColony& colony, const SaveMap& map, 
             if (work.building) {
                 const int level = std::max(1, buildingLevel(colony, *work.building));
                 work.good = jobOutput(jobRow);
-                work.amount = work.good >= 0 ? buildingYield(level, colony.skills[static_cast<std::size_t>(i)], jobRow) : 0;
+                // Measured: in a building the bonus and the penalty count
+                // once for each worker, expert or not.
+                const int base = buildingYield(level, colony.skills[static_cast<std::size_t>(i)], jobRow);
+                work.amount = work.good >= 0 ? std::max(0, base + modifier.bonus - modifier.penalty) : 0;
                 const int input = jobInput(jobRow);
                 if (input >= 0) {
                     p.needed[static_cast<std::size_t>(input)] += work.amount;
@@ -335,8 +372,9 @@ int currentSquare(const SaveColony& colony, int colonist) {
 }
 
 JobChoice choiceFor(const SaveColony& colony, const SaveMap& map, const Ruleset& rules,
-                    const std::vector<SaveColony>& colonies, int colonist, int jobRow) {
+                    const std::vector<SaveColony>& colonies, int colonist, int jobRow, int difficulty = 0) {
     JobChoice choice;
+    const WorkModifier modifier = workModifier(colony, difficulty);
     choice.job = jobRow;
     const int skillOf = colony.skills[static_cast<std::size_t>(colonist)];
     if (jobRow < static_cast<int>(kSquareWorkCount)) {
@@ -345,12 +383,13 @@ JobChoice choiceFor(const SaveColony& colony, const SaveMap& map, const Ruleset&
             if (s != here && !squareFree(colony, map, colonies, s)) {
                 continue;
             }
-            const auto& sq = map.at(colony.x + kColonySquares[static_cast<std::size_t>(s)].dx,
-                                    colony.y + kColonySquares[static_cast<std::size_t>(s)].dy);
+            const int x = colony.x + kColonySquares[static_cast<std::size_t>(s)].dx;
+            const int y = colony.y + kColonySquares[static_cast<std::size_t>(s)].dy;
+            const auto& sq = map.at(x, y);
             if (sq.isWater() != (jobRow == job::kFisherman)) {
                 continue;
             }
-            const int amount = squareYield(rules, sq, jobRow, skillOf);
+            const int amount = squareYield(rules, sq, jobRow, skillOf, modifier, landAround(map, x, y) >= 3);
             if (amount > choice.amount) {
                 choice.amount = amount;
                 choice.square = s;
@@ -362,14 +401,15 @@ JobChoice choiceFor(const SaveColony& colony, const SaveMap& map, const Ruleset&
     if (!building || buildingLevel(colony, *building) == 0 || workersIn(colony, *building, colonist) >= 3) {
         return choice;
     }
-    choice.amount = jobRow == job::kTeacher ? 0 : buildingYield(buildingLevel(colony, *building), skillOf, jobRow);
+    const int base = buildingYield(buildingLevel(colony, *building), skillOf, jobRow);
+    choice.amount = jobRow == job::kTeacher ? 0 : std::max(0, base + modifier.bonus - modifier.penalty);
     return choice;
 }
 
 } // namespace
 
 std::vector<JobChoice> jobChoices(const SaveColony& colony, const SaveMap& map, const Ruleset& rules,
-                                  const std::vector<SaveColony>& colonies, int colonist) {
+                                  const std::vector<SaveColony>& colonies, int colonist, int difficulty) {
     std::vector<JobChoice> out;
     if (colonist < 0 || colonist >= colony.population) {
         return out;
@@ -380,7 +420,7 @@ std::vector<JobChoice> jobChoices(const SaveColony& colony, const SaveMap& map, 
         if (building && buildingLevel(colony, *building) == 0) {
             continue;
         }
-        out.push_back(choiceFor(colony, map, rules, colonies, colonist, j));
+        out.push_back(choiceFor(colony, map, rules, colonies, colonist, j, difficulty));
     }
     return out;
 }
@@ -413,9 +453,9 @@ int storageLimit(const SaveColony& colony) {
     return 100 * (1 + std::clamp<int>(colony.raw[149], 0, 2));
 }
 
-ColonyTurn runColonyTurn(SaveColony& colony, const SaveMap& map, const Ruleset& rules) {
+ColonyTurn runColonyTurn(SaveColony& colony, const SaveMap& map, const Ruleset& rules, int difficulty) {
     ColonyTurn turn;
-    const auto p = colonyProduction(colony, map, rules);
+    const auto p = colonyProduction(colony, map, rules, difficulty);
     std::array<int, cargo::kCount> made = p.produced;
 
     // Workshops: as much as their raw good allows, from this turn's
@@ -488,6 +528,12 @@ ColonyTurn runColonyTurn(SaveColony& colony, const SaveMap& map, const Ruleset& 
         }
         amount = std::max(0, amount);
     }
+
+    // Bells: membership moves, and then the bonus the next turn works with.
+    turn.libertyBefore = colony.libertyBonus;
+    gatherBells(colony, p.produced[cargo::kBells]);
+    updateLibertyBonus(colony);
+    turn.libertyAfter = colony.libertyBonus;
     return turn;
 }
 
@@ -496,6 +542,44 @@ int sonsOfLibertyPercent(const SaveColony& colony) {
         return 0;
     }
     return std::clamp(static_cast<int>(100LL * colony.rebelDividend / colony.rebelDivisor), 0, 100);
+}
+
+int rebelCount(const SaveColony& colony) {
+    // Measured: 5% of 10 is no rebel, 36% of 2 is one; halves round down.
+    return (colony.population * sonsOfLibertyPercent(colony) + 49) / 100;
+}
+
+void gatherBells(SaveColony& colony, int bells) {
+    const long long rebels = std::max(0, colony.rebelDividend);
+    const long long total = std::max(0, colony.rebelDivisor);
+    long long newTotal = total + 2LL * std::max(0, colony.population) - total / 64;
+    long long newRebels = rebels + std::max(0, bells) - rebels / 64 - (total > 0 ? 5 * rebels / total : 0);
+    newTotal = std::clamp<long long>(newTotal, 0, 0x7FFFFFFF);
+    newRebels = std::clamp<long long>(newRebels, 0, newTotal);
+    colony.rebelDivisor = static_cast<int>(newTotal);
+    colony.rebelDividend = static_cast<int>(newRebels);
+}
+
+void updateLibertyBonus(SaveColony& colony) {
+    const int percent = sonsOfLibertyPercent(colony);
+    const int target = percent >= 100 ? 2 : percent >= 50 ? 1 : 0;
+    if (colony.libertyBonus < target) {
+        ++colony.libertyBonus;
+    } else if (colony.libertyBonus > target) {
+        --colony.libertyBonus;
+    }
+}
+
+void startLiberty(SaveColony& colony, const SaveMap& map, const Ruleset& rules, int difficulty) {
+    colony.rebelDividend = 0;
+    colony.rebelDivisor = 200;
+    colony.libertyBonus = 0;
+    gatherBells(colony, colonyProduction(colony, map, rules, difficulty).produced[cargo::kBells]);
+}
+
+void joinLiberty(SaveColony& colony, const SaveMap& map, const Ruleset& rules, int difficulty) {
+    colony.rebelDivisor += 100;
+    gatherBells(colony, colonyProduction(colony, map, rules, difficulty).produced[cargo::kBells]);
 }
 
 } // namespace viceroy

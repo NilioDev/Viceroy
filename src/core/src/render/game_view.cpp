@@ -544,6 +544,7 @@ Art loadArt(const std::filesystem::path& folder) {
     art.portraits.push_back(readSpriteSheet(readFile(folder, "MSS2.SS")));
     art.portraits.push_back(readSpriteSheet(readFile(folder, "MSS3.SS")));
     art.portraits.push_back(readSpriteSheet(readFile(folder, "MSS4.SS")));
+    art.portraits.push_back(readSpriteSheet(readFile(folder, "MSS1.SS")));
     art.rules = readRuleset(art.names);
     return art;
 }

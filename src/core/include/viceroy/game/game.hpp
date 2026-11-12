@@ -65,6 +65,8 @@ struct GameNotice {
     std::string section;
     std::vector<std::string> strings;
     int value = -1; // what the screen needs to fill in the rest: a profession, ...
+    std::vector<int> numbers{}; // the %NUMBERs
+    int colony = -1;          // the colony it is about, for "Zoom to colony."
 };
 
 enum class FoundResult {

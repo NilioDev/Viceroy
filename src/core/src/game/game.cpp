@@ -372,6 +372,7 @@ FoundResult Game::foundColony(int index, const std::string& name) {
     // The founder works as a farmer; the eight squares around are free.
     colony.jobs[0] = 0; // farmer
     colony.skills[0] = static_cast<std::uint8_t>(u.profession);
+    startLiberty(colony, save_.map, rules_, save_.difficulty);
     save_.colonies.push_back(colony);
     auto& sq = save_.map.at(u.x, u.y);
     sq.flags = static_cast<std::uint8_t>(sq.flags | MapSquare::kHasColony | MapSquare::kRoad);
@@ -406,10 +407,19 @@ std::string Game::suggestColonyName(const TextFile& colonyNames) const {
 
 void Game::endTurn() {
     lastTurnNews_.clear();
-    for (std::size_t c = 0; c < save_.colonies.size(); ++c) {
+    // Measured: the original goes through the colonies from the last
+    // founded to the first, which sets the order of its messages.
+    for (std::size_t c = save_.colonies.size(); c-- > 0;) {
         auto& colony = save_.colonies[c];
-        const ColonyTurn turn = runColonyTurn(colony, save_.map, rules_);
+        const ColonyTurn turn = runColonyTurn(colony, save_.map, rules_, save_.difficulty);
         const bool ours = colony.nation == human();
+        if (ours && turn.libertyAfter != turn.libertyBefore) {
+            const bool up = turn.libertyAfter > turn.libertyBefore;
+            const char* section = up ? (turn.libertyAfter == 2 ? "REBELUNANIMOUS" : "REBELMAJORITY")
+                                     : (turn.libertyAfter == 1 ? "TORYMINORITY" : "TORYMAJORITY");
+            GameNotice notice{section, {colony.name}, -1, {sonsOfLibertyPercent(colony)}, static_cast<int>(c)};
+            notices_.push_back(std::move(notice));
+        }
         if (turn.grew) {
             addColonist(colony.x, colony.y, colony.nation);
             if (ours) {
@@ -737,7 +747,7 @@ void Game::gatherCrosses() {
     int crosses = 2;
     for (const auto& colony : save_.colonies) {
         if (colony.nation == human()) {
-            crosses += colonyProduction(colony, save_.map, rules_).produced[cargo::kCrosses];
+            crosses += colonyProduction(colony, save_.map, rules_, save_.difficulty).produced[cargo::kCrosses];
         }
     }
     nation.crosses += crosses;
