@@ -28,6 +28,8 @@ struct Dialog {
     int y = 20;
     int width = 190; // as GAME.TXT gives it; the box is 6 wider
     int portrait = -1; // an advisor (kNavalAdvisor, ...) or -1
+    int indent = 0;    // room on the left for a unit's picture: the box is that much wider
+    int unit = -1;     // the unit whose picture stands there (drawn by the screen)
     int portraitX = 0;
     int portraitY = 0;
 };
@@ -74,6 +76,9 @@ void placeMapDialog(Dialog& dialog);
 // centred across the screen and on row 130.
 void placeTradeDialog(Dialog& d);
 void placeBuyDialog(Dialog& dialog);
+// Options for a unit in a colony: the unit's picture at the top left, the
+// text beside it, the box centred on the screen.
+void placeUnitDialog(Dialog& dialog, int unit);
 // The name of a European nation as the messages use it ("the Netherlands").
 std::string countryName(const Art& art, int nation);
 

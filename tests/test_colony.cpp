@@ -125,6 +125,82 @@ VCR_TEST("original files: the colony screen opens from the map and closes") {
     VCR_CHECK(play.colonyScreen().has_value());
 }
 
+VCR_TEST("colony: move to front puts a unit first in Units Present") {
+    SaveGame s;
+    s.humanNation = 3;
+    s.map.width = 3;
+    s.map.height = 3;
+    s.map.squares.resize(9);
+    SaveColony c;
+    c.x = 1;
+    c.y = 1;
+    c.nation = 3;
+    s.colonies.push_back(c);
+    for (int i = 0; i < 4; ++i) {
+        SaveUnit u;
+        u.x = i == 1 ? 0 : 1; // unit 1 stands elsewhere
+        u.y = 1;
+        u.nation = 3;
+        s.units.push_back(u);
+    }
+    s.units[3].nextInTransport = 0; // a link that must follow the units
+    s.activeUnit = 2;
+    Ruleset rules;
+    rules.units.resize(1);
+    rules.units[0].name = "Colonists";
+    Game g(std::move(s), rules);
+    const auto& colony = g.state().colonies[0];
+    VCR_CHECK(unitsPresent(g, colony) == (std::vector<int>{3, 2, 0}));
+    // Unit 0 comes to the front: it becomes the last unit, the others move
+    // down one, and every reference follows.
+    VCR_CHECK(g.moveToFront(0) == 3);
+    VCR_CHECK(unitsPresent(g, colony) == (std::vector<int>{3, 2, 1}));
+    VCR_CHECK(g.unit(2).nextInTransport == 3);
+    VCR_CHECK(g.activeUnit() == 1);
+    VCR_CHECK(g.unit(0).x == 0);
+    // The five in front stand 18 pixels apart from x 212.
+    VCR_CHECK(unitPresentAt(212, 160) == 0);
+    VCR_CHECK(unitPresentAt(230, 160) == 1);
+    VCR_CHECK(unitPresentAt(302, 160) == -1);
+    VCR_CHECK(unitPresentAt(230, 150) == -1);
+}
+
+VCR_TEST("original files: a unit's options in Units Present") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    const ColonyArt colonyArt = loadColonyArt(dir);
+    std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
+    Game game(readSaveGame(Bytes(std::istreambuf_iterator<char>(in), {})), art.rules);
+    PlayScreen play(std::move(game), dir / "unused.sav");
+    play.setArt(&art);
+    play.setColonyArt(&colonyArt);
+    play.openColony(13); // Curacao: two colonists and two artillery
+    VCR_CHECK(play.clickColonyScreen(305, 150)); // the musket button
+    const auto& colony = play.game().state().colonies[13];
+    const auto before = unitsPresent(play.game(), colony);
+    VCR_CHECK(before.size() == 4);
+    // The second unit, an indentured servant without orders.
+    VCR_CHECK(play.clickColonyScreen(240, 166));
+    VCR_CHECK(play.dialog().has_value());
+    VCR_CHECK(play.dialog()->options ==
+              (std::vector<std::string>{"Move to front.", "Clear orders.", "Fortify.", "No changes."}));
+    VCR_CHECK(play.colonyScreen()->selectedUnit == before[1]);
+    play.handle(Command::Confirm); // Move to front.
+    const auto after = unitsPresent(play.game(), colony);
+    VCR_CHECK(play.game().unit(after[0]).profession == 0x19);
+    VCR_CHECK(play.colonyScreen()->selectedUnit == after[0]);
+
+    // The first unit has no "Move to front."; Fortify gives orders 5.
+    VCR_CHECK(play.clickColonyScreen(221, 166));
+    VCR_CHECK(play.dialog()->options.size() == 3);
+    play.handle(Command::Down);
+    play.handle(Command::Confirm);
+    VCR_CHECK(play.game().unit(after[0]).orders == SaveUnit::kFortify);
+}
+
 #include "viceroy/ui/debug_menu.hpp"
 
 VCR_TEST("original files: the debug menu changes the game only when asked") {

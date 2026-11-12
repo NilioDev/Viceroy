@@ -355,10 +355,11 @@ void drawOrdersBox(Screen& screen, const Art& art, const Game& game, int index, 
     // nation's colour; a dash is always black (seen for a French dragoon
     // with orders 11 in the combat analysis), and so
     // are the Dutch letters on the map (seen for P and R on orange). In the
-    // colony's list of units the Dutch letters are dark orange too.
+    // colony's list of units the Dutch letters are dark orange too, except
+    // the F of a unit still fortifying (orders 5), which is black.
     constexpr std::uint8_t kDutchOrange = 0x0D;
     const std::uint8_t ink = letter != '-' && colour >= 8 && colour < 16 &&
-                                     (colour != kDutchOrange || listInk)
+                                     (colour != kDutchOrange || (listInk && orders != SaveUnit::kFortify))
                                  ? static_cast<std::uint8_t>(colour - 8)
                                  : kBlack;
     const int w = Screen::textWidth(art.tiny, text);
@@ -517,6 +518,37 @@ int colonistIcon(int skill) {
 
 void drawUnitOrders(Screen& screen, const Art& art, const Game& game, int index, int px, int py) {
     drawUnitOnSquare(screen, art, game, index, px, py);
+}
+
+void drawSmallUnit(Screen& screen, const Art& art, const Game& game, int index, int px, int py, int right) {
+    const int icon = unitIcon(game, index);
+    const auto* image = sprite(art.icons, icon);
+    if (image == nullptr || image->width <= 0) {
+        return;
+    }
+    // Measured: the picture shrunk to three eighths, sampling rows and
+    // columns 1, 4, 7, 9, 12 and 15, centred on px.
+    int columns = 0;
+    while ((8 * columns + 5) / 3 < image->width) {
+        ++columns;
+    }
+    const int x0 = px - columns / 2;
+    for (int i = 0;; ++i) {
+        const int sy = (8 * i + 5) / 3;
+        if (sy >= image->height) {
+            break;
+        }
+        for (int j = 0;; ++j) {
+            const int sx = (8 * j + 5) / 3;
+            if (sx >= image->width) {
+                break;
+            }
+            const auto c = image->pixels[static_cast<std::size_t>(sy * image->width + sx)];
+            if (c != kTransparent && x0 + j < right) {
+                screen.pixel(x0 + j, py + i, c);
+            }
+        }
+    }
 }
 
 void drawUnitInColonyList(Screen& screen, const Art& art, const Game& game, int index, int px, int py) {

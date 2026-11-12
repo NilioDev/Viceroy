@@ -928,6 +928,29 @@ void Game::refreshUnitFlags() {
     }
 }
 
+int Game::moveToFront(int index) {
+    if (index < 0 || index >= unitCount()) {
+        return index;
+    }
+    const int last = unitCount() - 1;
+    const SaveUnit moved = save_.units[static_cast<std::size_t>(index)];
+    save_.units.erase(save_.units.begin() + index);
+    save_.units.push_back(moved);
+    auto fix = [index, last](int& ref) {
+        if (ref == index) {
+            ref = last;
+        } else if (ref > index) {
+            --ref;
+        }
+    };
+    for (auto& u : save_.units) {
+        fix(u.nextInTransport);
+        fix(u.prevInTransport);
+    }
+    fix(save_.activeUnit);
+    return last;
+}
+
 void Game::removeUnit(int index) {
     save_.units.erase(save_.units.begin() + index);
     auto fix = [index](int& ref) {

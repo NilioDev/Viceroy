@@ -106,6 +106,9 @@ void drawUnitOrders(Screen& screen, const Art& art, const Game& game, int index,
 // The same in the colony's list of units present: a unit without orders
 // shows as on sentry, and artillery has a smaller picture.
 void drawUnitInColonyList(Screen& screen, const Art& art, const Game& game, int index, int px, int py);
+// A unit standing small on the horizon of the Units Present panel, centred on
+// px; nothing is drawn from x `right` on.
+void drawSmallUnit(Screen& screen, const Art& art, const Game& game, int index, int px, int py, int right);
 // The first field of a row of a section of a text file, or `fallback`.
 std::string textLine(const TextFile& file, const char* section, int row, const char* fallback);
 
