@@ -192,9 +192,17 @@ void PlayScreen::moveActive(Step step) {
         say(game_.isShip(index) ? "Ships can't go on land." : "Can't go there.");
         break;
     }
-    case MoveResult::Occupied:
-        say("Someone else is there.");
+    case MoveResult::Occupied: {
+        const auto& u = game_.unit(index);
+        const int defender = game_.canAttack(index) ? game_.defenderAt(u.x + step.dx, u.y + step.dy, index) : -1;
+        if (defender >= 0 && !game_.colonyAt(u.x + step.dx, u.y + step.dy) &&
+            !game_.settlementAt(u.x + step.dx, u.y + step.dy)) {
+            startAttack(index, defender);
+        } else {
+            say("Someone else is there.");
+        }
         break;
+    }
     case MoveResult::HighSeas:
         say("");
         ask("SAILHOME", index);
@@ -271,6 +279,72 @@ bool PlayScreen::handleDialog(Command command) {
     return true;
 }
 
+std::string PlayScreen::adjective(int nation) const {
+    if (art_ != nullptr) {
+        if (const auto* s = art_->names.find("NATIONALITY")) {
+            if (nation >= 0 && static_cast<std::size_t>(nation) < s->lines.size()) {
+                return s->lines[static_cast<std::size_t>(nation)];
+            }
+        }
+    }
+    return "";
+}
+
+void PlayScreen::startAttack(int attacker, int defender) {
+    attack_ = PendingAttack{attacker, defender, false};
+    const int us = game_.unit(attacker).nation;
+    const int them = game_.unit(defender).nation;
+    if (game_.atPeace(us, them)) {
+        // "We have signed a peace treaty with the French, Your Excellency."
+        ask("HAVETREATY", attacker, {adjective(them)});
+        if (dialog_) {
+            placeMapDialog(*dialog_);
+        }
+        return;
+    }
+    continueAttack();
+}
+
+void PlayScreen::continueAttack() {
+    if (!attack_) {
+        return;
+    }
+    const int left = game_.movesLeft(attack_->attacker);
+    if (left < 3 && !attack_->tiredAsked) {
+        // "If we force them to attack this turn, they will fight at 1/3
+        // strength."
+        ask("HALF", attack_->attacker, {}, -1, {left});
+        if (dialog_) {
+            placeMapDialog(*dialog_);
+        }
+        return;
+    }
+    if (game_.combatAnalysisShown()) {
+        analysisUp_ = true;
+        return;
+    }
+    resolveAttack();
+}
+
+void PlayScreen::resolveAttack() {
+    analysisUp_ = false;
+    if (!attack_) {
+        return;
+    }
+    const auto fight = *attack_;
+    attack_.reset();
+    game_.attack(fight.attacker, fight.defender);
+    for (auto& notice : game_.takeNotices()) {
+        tell(std::move(notice));
+    }
+    // Seen: the map stays on the battle while its news is up.
+    if (dialog_) {
+        advanceAfterNotices_ = true;
+    } else {
+        advance();
+    }
+}
+
 namespace {
 // The question of every report about a colony: "Continue turn." or "Zoom
 // to colony.".
@@ -285,12 +359,24 @@ void PlayScreen::tell(GameNotice notice) {
 void PlayScreen::showNotices() {
     if (!dialog_ && notices_.empty()) {
         view_.shownYear = -1; // the new turn's date
+        if (advanceAfterNotices_) {
+            advanceAfterNotices_ = false;
+            advance();
+        }
     }
     if (dialog_ || notices_.empty() || art_ == nullptr) {
         return;
     }
     GameNotice notice = notices_.front();
     notices_.erase(notices_.begin());
+    for (const auto& [string, nation] : notice.adjectives) {
+        if (string >= 0) {
+            if (notice.strings.size() <= static_cast<std::size_t>(string)) {
+                notice.strings.resize(static_cast<std::size_t>(string) + 1);
+            }
+            notice.strings[static_cast<std::size_t>(string)] = adjective(nation);
+        }
+    }
     if (notice.section == "UNREST") {
         // "Colonists (%STRING1) now available in %STRING0."
         const auto& jobs = game_.rules().jobs;
@@ -338,7 +424,15 @@ void PlayScreen::showNotices() {
     }
     ask(notice.section, -1, notice.strings, -1, notice.numbers);
     if (dialog_) {
-        placeFrontiersmanDialog(*dialog_);
+        // Measured: battles are told by the colonial advisor, the work of
+        // pioneers by the frontiersman.
+        constexpr std::string_view kBattles[] = {"DEMOTE", "COLONISTCAPTURE", "COLONISTCAPTURE2", "WAGONCAPTURE",
+                                                 "LOOTCAPTURE", "ARTILLERY", "ARTILLERY2"};
+        if (std::find(std::begin(kBattles), std::end(kBattles), notice.section) != std::end(kBattles)) {
+            placeMapDialog(*dialog_);
+        } else {
+            placeFrontiersmanDialog(*dialog_);
+        }
     }
 }
 
@@ -387,6 +481,31 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
     if (question == kColonyReport) {
         if (choice == 1) {
             openColony(unit);
+        }
+    } else if (question == "HAVETREATY") {
+        // "Cancel Action." or "Break Treaty."
+        if (choice == 1 && attack_) {
+            const int us = game_.unit(attack_->attacker).nation;
+            const int them = game_.unit(attack_->defender).nation;
+            game_.declareWar(us, them);
+            // Measured: "Spanish cancel peace treaty with Dutch." when the
+            // Dutch attack the Spanish.
+            ask("CANCELPEACE", -1, {adjective(them), adjective(us)});
+            if (dialog_) {
+                placeMapDialog(*dialog_);
+            }
+        } else {
+            attack_.reset();
+        }
+    } else if (question == "CANCELPEACE") {
+        continueAttack();
+    } else if (question == "HALF") {
+        // "Charge!" or "Then let them rest."
+        if (choice == 0 && attack_) {
+            attack_->tiredAsked = true;
+            continueAttack();
+        } else {
+            attack_.reset();
         }
     } else if (question == "SAILHOME") {
         if (yes && game_.sailToEurope(unit)) {
@@ -893,6 +1012,11 @@ bool PlayScreen::handle(Command command) {
     if (dialog_) {
         return handleDialog(command);
     }
+    if (analysisUp_) {
+        // Any key goes on to the fight.
+        resolveAttack();
+        return true;
+    }
     if (menu_) {
         return handleMenu(command);
     }
@@ -1136,6 +1260,9 @@ void PlayScreen::draw(Screen& screen, const Art& art) const {
     drawScreen(screen, art);
     if (menu_ && !colonyScreen_ && !europeScreen_) {
         drawMenuBar(screen, art, art.menus, &*menu_);
+    }
+    if (analysisUp_ && attack_) {
+        drawCombatAnalysis(screen, art, game_, game_.analyseAttack(attack_->attacker, attack_->defender));
     }
     if (dialog_) {
         drawDialog(screen, art, *dialog_);

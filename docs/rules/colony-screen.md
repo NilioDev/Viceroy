@@ -105,9 +105,9 @@ like the Make panel's title. The units stand in a row at y 158, 18 pixels
 apart from x 213, in the reverse order of the units on the square, each
 with its shadow and orders box as on the map. A unit without orders shows
 an "S" (sentry). The letters are in the darker half of the nation's colour,
-on the Dutch orange too (0x05, unlike the map). Artillery is the small
-picture `ICONS.SS` 65, two pixels right of the place, with its box at +6,
-+2. The first unit has a frame of colour 0x0A at x − 1, y 157, 18 × 18.
+on the Dutch orange too (0x05, unlike the map). Damaged artillery is the
+small picture `ICONS.SS` 65, two pixels right of the place, with its box at
++6, +2, as on the map (both artillery on Curacao were damaged). The first unit has a frame of colour 0x0A at x − 1, y 157, 18 × 18.
 
 Measured on Curacao in a save with two colonists and two artillery.
 **Not yet known:** how the row goes on past five units, and what clicking

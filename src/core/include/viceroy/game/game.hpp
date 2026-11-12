@@ -7,6 +7,7 @@
 #pragma once
 
 #include "viceroy/data/savegame.hpp"
+#include "viceroy/game/combat.hpp"
 #include "viceroy/rules/ruleset.hpp"
 
 #include <array>
@@ -69,6 +70,9 @@ struct GameNotice {
     int value = -1; // what the screen needs to fill in the rest: a profession, ...
     std::vector<int> numbers{}; // the %NUMBERs
     int colony = -1;          // the colony it is about, for "Zoom to colony."
+    // %STRINGs that are a nation's adjective ("French"): which string, and
+    // the nation, for the screen to fill in.
+    std::vector<std::pair<int, int>> adjectives{};
 };
 
 enum class FoundResult {
@@ -176,6 +180,28 @@ public:
     bool buyConstruction(int colony);
     int train(int jobRow);
 
+    // --- Combat ----------------------------------------------------------------
+    // A land unit with an attack value (soldiers, dragoons, artillery, ...).
+    bool canAttack(int index) const;
+    // Artillery that has lost a battle once: weaker, and the next defeat
+    // destroys it.
+    bool isDamagedArtillery(int index) const;
+    // The unit that defends a square against `attacker`: the strongest one
+    // there, or -1.
+    int defenderAt(int x, int y, int attacker) const;
+    // European nations at peace (the treaty bit of their relations).
+    bool atPeace(int nation, int other) const;
+    // Breaks the treaty both ways: the two nations are at war.
+    void declareWar(int nation, int other);
+    // The game option "Combat Analysis" (header byte 19, bit 1).
+    bool combatAnalysisShown() const;
+    CombatAnalysis analyseAttack(int attacker, int defender) const;
+    // Fights it out: the loser is demoted, damaged or captured, and the
+    // attacker's turn is over. Notices tell what happened.
+    CombatOutcome attack(int attacker, int defender);
+    // The odds the attacker wins, from the two strengths.
+    static bool attackerWins(int attack, int defense, int roll);
+
     // --- Map -----------------------------------------------------------------
     void reveal(int x, int y, int radius, int nation);
     int sightRadius(int index) const;
@@ -200,6 +226,8 @@ private:
     void foodNotices(const ColonyTurn& turn, int colony);
     void runOutNotices(const ColonyTurn& turn, int colony);
     std::uint32_t random_ = 0;
+    int nextRandom(int range); // 0 .. range - 1
+    void loseBattle(int loser, int winner);
 };
 
 } // namespace viceroy

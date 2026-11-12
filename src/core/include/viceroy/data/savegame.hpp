@@ -146,6 +146,9 @@ struct SaveUnit {
     static constexpr int kFortified = 6;
     static constexpr int kPlow = 8; // "Clear/Plow": plow, or clear a forest
     static constexpr int kRoad = 9;
+
+    // Flags in raw[4]: artillery that lost a battle (measured).
+    static constexpr std::uint8_t kDamaged = 0x80;
 };
 
 struct SaveSettlement {

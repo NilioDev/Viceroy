@@ -93,6 +93,7 @@ public:
     void openEurope();
     // A question in a message box, when one is up.
     const std::optional<Dialog>& dialog() const { return dialog_; }
+    bool combatAnalysisUp() const { return analysisUp_; }
     // Set by the app after loading Art: needed for message boxes.
     void setArt(const Art* art) { art_ = art; }
     // The colony opened last, or -1.
@@ -163,6 +164,12 @@ private:
     // A message box with the frontiersman; waits its turn behind others.
     void tell(GameNotice notice);
     void showNotices(); // the next waiting message, when no box is up
+    // A fight, step by step: the treaty question, the tired men, the
+    // Combat Analysis box, then the result.
+    void startAttack(int attacker, int defender);
+    void continueAttack();
+    void resolveAttack();
+    std::string adjective(int nation) const; // "French"
 
     Game game_;
     ViewState view_;
@@ -188,6 +195,14 @@ private:
     std::optional<OpenMenu> menu_;
     bool quit_ = false;
     bool quitToLoad_ = false;
+    struct PendingAttack {
+        int attacker = -1;
+        int defender = -1;
+        bool tiredAsked = false;
+    };
+    std::optional<PendingAttack> attack_;
+    bool advanceAfterNotices_ = false; // the next unit once the news is read
+    bool analysisUp_ = false; // the Combat Analysis box waits for a key
 };
 
 // One line of the load menu.

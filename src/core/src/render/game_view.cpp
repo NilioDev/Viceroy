@@ -352,11 +352,12 @@ void drawOrdersBox(Screen& screen, const Art& art, const Game& game, int index, 
     const char letter = (orders >= 0 && orders < 11) ? kLetters[orders] : '-';
     const char text[2] = {letter, 0};
     // A unit with orders shows its letter in the darker half of the
-    // nation's colour; the dash of a unit without orders is black, and so
+    // nation's colour; a dash is always black (seen for a French dragoon
+    // with orders 11 in the combat analysis), and so
     // are the Dutch letters on the map (seen for P and R on orange). In the
     // colony's list of units the Dutch letters are dark orange too.
     constexpr std::uint8_t kDutchOrange = 0x0D;
-    const std::uint8_t ink = orders != SaveUnit::kNoOrders && colour >= 8 && colour < 16 &&
+    const std::uint8_t ink = letter != '-' && colour >= 8 && colour < 16 &&
                                      (colour != kDutchOrange || listInk)
                                  ? static_cast<std::uint8_t>(colour - 8)
                                  : kBlack;
@@ -382,6 +383,7 @@ UnitPlacement unitPlacement(const Game& game, int index, int icon, int width) {
     case 9:                    // artillery
     case 16: return {2, 6, 0}; // treasure
     case 76: return {2, 0, 0}; // dragoon: behind the rider
+    case 65: return {2, 6, 2}; // damaged artillery
     default: break;
     }
     const int type = game.unit(index).type;
@@ -522,15 +524,6 @@ void drawUnitInColonyList(Screen& screen, const Art& art, const Game& game, int 
     if (orders == SaveUnit::kNoOrders) {
         orders = SaveUnit::kSentry;
     }
-    // Artillery is the smaller picture here, with its box two pixels lower
-    // than on the map.
-    constexpr int kSmallArtilleryIcon = 65;
-    if (game.unit(index).type == kArtillery) {
-        if (const auto* image = sprite(art.icons, kSmallArtilleryIcon); image != nullptr && image->width > 0) {
-            drawUnitParts(screen, art, game, index, *image, px + 2, py, {px + 6, py + 2, 7, 9}, orders, true);
-            return;
-        }
-    }
     const int icon = unitIcon(game, index);
     const auto* image = sprite(art.icons, icon);
     if (image == nullptr || image->width <= 0) {
@@ -631,6 +624,12 @@ int unitIcon(const Game& game, int index) {
     }
     if (u.type < 0 || u.type >= static_cast<int>(types.size())) {
         return 0;
+    }
+    // Measured in the combat analysis: damaged artillery has its own,
+    // smaller picture.
+    constexpr int kDamagedArtilleryIcon = 65;
+    if (game.isDamagedArtillery(index)) {
+        return kDamagedArtilleryIcon;
     }
     // @UNIT gives an icon number, counted from 1. That is the expert's
     // picture; anyone else armed, mounted, with tools or as a missionary

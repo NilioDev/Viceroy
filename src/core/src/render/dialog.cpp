@@ -268,6 +268,12 @@ void placeColonialDialog(Dialog& d) {
     d.portraitY = d.y - 77;
 }
 
+void placeMapDialog(Dialog& d) {
+    placeColonialDialog(d);
+    d.x = 54;
+    d.portraitX = 195;
+}
+
 void placeBuyDialog(Dialog& d) {
     d.portrait = kBuyAdvisor;
     d.portraitBehind = false; // her hands lie over the box
@@ -326,21 +332,7 @@ int dialogOptionAt(const Dialog& d, int x, int y) {
     return -1;
 }
 
-void drawDialog(Screen& screen, const Art& art, const Dialog& d) {
-    const Rect box{d.x, d.y, boxWidth(d), dialogHeight(d)};
-    const bool hasPortrait = d.portrait >= 0 && static_cast<std::size_t>(d.portrait) < art.portraits.size() &&
-                             !art.portraits[static_cast<std::size_t>(d.portrait)].sprites.empty();
-    if (hasPortrait) {
-        // The portraits' own colours: palette entries 152 to 251.
-        const auto& sheet = art.portraits[static_cast<std::size_t>(d.portrait)];
-        if (sheet.palette) {
-            screen.setColours(*sheet.palette, 152, 251);
-        }
-    }
-    if (hasPortrait && d.portraitBehind) {
-        screen.blit(art.portraits[static_cast<std::size_t>(d.portrait)].sprites.front().image, d.portraitX,
-                    d.portraitY);
-    }
+void drawWoodBox(Screen& screen, const Art& art, Rect box) {
     screen.setClip({box.x + 1, box.y + 1, box.w - 2, box.h - 2});
     const auto& wood = art.wood;
     if (wood.width > 0 && wood.height > 0) {
@@ -359,6 +351,62 @@ void drawDialog(Screen& screen, const Art& art, const Dialog& d) {
     screen.fill({box.x + box.w - 3, box.y + 2, 1, box.h - 4}, kEdgeDark);
     screen.fill({box.x + 2, box.y + 3, 1, box.h - 5}, kEdgeLight);
     screen.fill({box.x + 2, box.y + box.h - 3, box.w - 4, 1}, kEdgeLight);
+}
+
+void drawCombatAnalysis(Screen& screen, const Art& art, const Game& game, const CombatAnalysis& analysis) {
+    // Measured on the original: a box 214 wide centred on the screen, the
+    // title, then a row of 20 pixels for each side's unit and for each
+    // bonus, the attacker on the left and the defender from x + 107.
+    const std::size_t rows = 1 + std::max(analysis.attacker.bonuses.size(), analysis.defender.bonuses.size());
+    const int w = 214;
+    const int h = 26 + 20 * static_cast<int>(rows);
+    const Rect box{(Screen::kWidth - w) / 2, (Screen::kHeight - h) / 2, w, h};
+    drawWoodBox(screen, art, box);
+    const Font& font = art.tiny;
+    const std::string title = textLine(art.labelText, "MISC", combat_label::kTitle, "COMBAT ANALYSIS");
+    // Measured: one pixel right of the centre our widths give.
+    screen.text(font, box.x + (w - Screen::textWidth(font, title)) / 2 + 1, box.y + 9, title, kBasic);
+    const auto label = [&](int row) { return textLine(art.labelText, "MISC", row, ""); };
+    const auto side = [&](const CombatSide& s, int left) {
+        int y = box.y + 24;
+        if (s.unit >= 0) {
+            drawUnitOrders(screen, art, game, s.unit, left, y - 1);
+        }
+        const std::string name = s.unit >= 0 ? game.unitName(s.unit) : "";
+        screen.text(font, left + 17, y + 5, name, kBasic);
+        const std::string base = std::to_string(s.base);
+        screen.text(font, left + 80 - Screen::textWidth(font, base), y + 5, base, kHilite);
+        for (const auto& b : s.bonuses) {
+            y += 20;
+            if (b.terrainPicture && s.unit >= 0) {
+                const auto& u = game.unit(s.unit);
+                drawTerrain(screen, art, game, u.x, u.y, left, y - 1);
+            }
+            screen.text(font, b.terrainPicture ? left + 17 : left, y + 5, label(b.label), kBasic);
+            const std::string value = (b.percent > 0 ? "+" : "") + std::to_string(b.percent) + "%";
+            screen.text(font, left + 80 - Screen::textWidth(font, value), y + 5, value, kHilite);
+        }
+    };
+    side(analysis.attacker, box.x + 5);
+    side(analysis.defender, box.x + 107);
+}
+
+void drawDialog(Screen& screen, const Art& art, const Dialog& d) {
+    const Rect box{d.x, d.y, boxWidth(d), dialogHeight(d)};
+    const bool hasPortrait = d.portrait >= 0 && static_cast<std::size_t>(d.portrait) < art.portraits.size() &&
+                             !art.portraits[static_cast<std::size_t>(d.portrait)].sprites.empty();
+    if (hasPortrait) {
+        // The portraits' own colours: palette entries 152 to 251.
+        const auto& sheet = art.portraits[static_cast<std::size_t>(d.portrait)];
+        if (sheet.palette) {
+            screen.setColours(*sheet.palette, 152, 251);
+        }
+    }
+    if (hasPortrait && d.portraitBehind) {
+        screen.blit(art.portraits[static_cast<std::size_t>(d.portrait)].sprites.front().image, d.portraitX,
+                    d.portraitY);
+    }
+    drawWoodBox(screen, art, box);
 
     const Font& font = fontOf(art, d);
     bool gold = false;
