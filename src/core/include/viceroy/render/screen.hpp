@@ -52,6 +52,14 @@ public:
     int text(const Font& font, int x, int y, std::string_view s, TextColours colours);
     static int textWidth(const Font& font, std::string_view s);
 
+    // Portraits bring their own colours for part of the palette, as the
+    // original loads them with the picture.
+    void setColours(const Palette& palette, int first, int last);
+    void resetColours() { overridden_.fill(false); }
+    Rgb colour(const Palette& base, std::uint8_t index) const {
+        return overridden_[index] ? colours_[index] : base[index];
+    }
+
 private:
     bool inClip(int x, int y) const {
         return x >= clip_.x && y >= clip_.y && x < clip_.x + clip_.w && y < clip_.y + clip_.h;
@@ -59,6 +67,8 @@ private:
 
     std::vector<std::uint8_t> pixels_;
     Rect clip_{0, 0, kWidth, kHeight};
+    Palette colours_{};
+    std::array<bool, 256> overridden_{};
 };
 
 } // namespace viceroy

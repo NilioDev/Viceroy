@@ -17,7 +17,13 @@ namespace viceroy {
 struct Dialog {
     std::vector<std::string> lines;   // wrapped text, still with {braces}
     std::vector<std::string> options; // the choices, top to bottom
+    std::vector<std::string> values;  // beside a choice, on the right: "(Cost: 600)"
+    std::vector<bool> disabled;       // greyed choices the cursor skips
     int selected = 0;
+    bool small = false; // @smallfont: FONTTINY, for long lists
+    bool help = false;  // "(F1 for Help)" in the corner
+    int optionLeft = 9;
+    bool portraitBehind = false; // the box covers the portrait
     int x = 62;      // the box's top-left corner
     int y = 20;
     int width = 190; // as GAME.TXT gives it; the box is 6 wider
@@ -28,14 +34,29 @@ struct Dialog {
 
 // Portraits in Art::portraits.
 inline constexpr int kNavalAdvisor = 0; // MSS0.SS
+inline constexpr int kEuropeAgent = 1;  // MSS2.SS: the man in the home port
 
-// The box for a GAME.TXT section, with %STRING0, %STRING1, ... filled in.
-// Text is joined and wrapped to the section's @width. A missing section
-// gives an empty box.
-Dialog makeDialog(const Art& art, std::string_view section, const std::vector<std::string>& strings = {});
+// The box for a GAME.TXT section, with %STRING0, %STRING1, ... and
+// %NUMBER0, ... filled in. Text is joined and wrapped to the section's
+// @width. A missing section gives an empty box.
+Dialog makeDialog(const Art& art, std::string_view section, const std::vector<std::string>& strings = {},
+                  const std::vector<int>& numbers = {});
+
+// Adds a choice; a value goes on the right.
+void addOption(Dialog& dialog, std::string text, std::string value = {}, bool disabled = false);
+
+// The questions asked in the home port: the agent stands behind the box,
+// which is centred on the harbour (or on the screen when it is too tall).
+void placeEuropeDialog(Dialog& dialog, bool help = true);
+
+// Moves the bar to the next choice that is not greyed, by +1 or -1.
+void stepSelection(Dialog& dialog, int by);
 
 // The box's height in pixels.
 int dialogHeight(const Dialog& dialog);
+
+// The choice under a point of the screen, or -1.
+int dialogOptionAt(const Dialog& dialog, int x, int y);
 
 void drawDialog(Screen& screen, const Art& art, const Dialog& dialog);
 

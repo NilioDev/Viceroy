@@ -23,6 +23,7 @@ constexpr std::size_t kNationSize = 316;
 constexpr std::size_t kSettlementSize = 18;
 constexpr std::size_t kTribesAndMoreSize = 8 * 78 + 727;
 constexpr std::size_t kTailSize = 1502;
+constexpr std::size_t kResourceSeedAt = 612; // in the block after the map
 
 constexpr int kMaxMapSide = 256;
 constexpr int kMaxRecords = 4096;
@@ -172,6 +173,19 @@ SaveGame readSaveGame(std::span<const std::uint8_t> file) {
         for (std::size_t g = 0; g < kGoodsKinds; ++g) {
             nation.prices[g] = nation.raw[76 + g];
         }
+        for (std::size_t g = 0; g < kGoodsKinds; ++g) {
+            nation.volumes[g] = s16(nation.raw.data() + 92 + 2 * g);
+            nation.tradeGold[g] = s32(nation.raw.data() + 124 + 4 * g);
+            nation.tonsTraded[g] = s32(nation.raw.data() + 188 + 4 * g);
+            nation.tonsTraded2[g] = s32(nation.raw.data() + 252 + 4 * g);
+        }
+        for (std::size_t r = 0; r < nation.recruits.size(); ++r) {
+            nation.recruits[r] = nation.raw[2 + r];
+        }
+        nation.recruitCount = nation.raw[6];
+        nation.artilleryBought = nation.raw[30];
+        nation.crosses = u16(nation.raw.data() + 46);
+        nation.crossesNeeded = u16(nation.raw.data() + 48);
     }
 
     save.settlements.resize(static_cast<std::size_t>(settlementCount));
@@ -205,6 +219,7 @@ SaveGame readSaveGame(std::span<const std::uint8_t> file) {
         throw FormatError("savegame ends early");
     }
     save.tail.assign(rest.begin(), rest.end());
+    save.map.resourceSeed = save.tail[kResourceSeedAt];
     return save;
 }
 
@@ -280,6 +295,19 @@ Bytes writeSaveGame(const SaveGame& save) {
         for (std::size_t g = 0; g < kGoodsKinds; ++g) {
             raw[76 + g] = static_cast<std::uint8_t>(std::clamp(nation.prices[g], 0, 255));
         }
+        for (std::size_t g = 0; g < kGoodsKinds; ++g) {
+            put16(raw.data() + 92 + 2 * g, std::clamp(nation.volumes[g], -32768, 32767));
+            put32(raw.data() + 124 + 4 * g, nation.tradeGold[g]);
+            put32(raw.data() + 188 + 4 * g, nation.tonsTraded[g]);
+            put32(raw.data() + 252 + 4 * g, nation.tonsTraded2[g]);
+        }
+        for (std::size_t r = 0; r < nation.recruits.size(); ++r) {
+            raw[2 + r] = static_cast<std::uint8_t>(nation.recruits[r]);
+        }
+        raw[6] = static_cast<std::uint8_t>(std::clamp(nation.recruitCount, 0, 255));
+        raw[30] = static_cast<std::uint8_t>(std::clamp(nation.artilleryBought, 0, 255));
+        put16(raw.data() + 46, nation.crosses);
+        put16(raw.data() + 48, nation.crossesNeeded);
         append(out, raw);
     }
     for (const auto& settlement : save.settlements) {

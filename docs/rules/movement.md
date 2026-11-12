@@ -37,3 +37,17 @@ colony on land that is not mountains and has no colony or settlement next to
 it (*guess*: the original's exact distance rule is still to be checked). The
 name is the nation's next unused name from `COLONY.TXT`. The founder becomes
 the colony's first colonist, working as a farmer.
+
+## Moving the view
+
+Seen in the original: a click on a map square that is not next to the
+active unit brings that square to the middle of the map window, and a click
+on the small map in the panel does the same for the square under the click.
+The active unit stays where it is.
+
+A moving unit glides into its new square. When it has used up its moves the
+game waits a moment before the next unit starts blinking. The timings
+(160 ms a square, 250 ms pause) are chosen by eye, not yet measured.
+
+Not yet matched: on loading `COLONY00.SAV` the original starts with the
+frigate (unit 51) although the header's active unit is 88.

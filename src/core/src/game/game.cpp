@@ -614,6 +614,98 @@ void Game::addColonist(int x, int y, int nation) {
     refreshUnitFlags();
 }
 
+int Game::addUnitInEurope(int type, int profession) {
+    SaveUnit u;
+    static constexpr std::array<std::uint8_t, 28> kTemplate{0, 0, 0, 0, 0, 0, 0xFF, 0x58, 0, 0, 0, 0, 0, 0,
+                                                            0, 0, 0, 0, 0xFF, 0, 0, 0, 0, 0, 0xFF, 0xFF, 0xFF, 0xFF};
+    u.raw = kTemplate;
+    u.type = type;
+    u.nation = human();
+    u.profession = profession;
+    setEuropeStage(u, kPortStage);
+    save_.units.push_back(u);
+    return unitCount() - 1;
+}
+
+int Game::randomRecruit() {
+    // Who turns up on the docks next. The original's odds are not known;
+    // these favour the unskilled as it seems to. See docs/rules/europe.md.
+    struct Odds {
+        int profession;
+        int weight;
+    };
+    static constexpr Odds kOdds[] = {
+        {kFreeColonist, 20}, {0x19, 10}, {0x1A, 8}, {0x00, 2}, {0x04, 2}, {0x05, 2}, {0x06, 2}, {0x07, 2},
+        {0x08, 2},           {0x09, 2},  {0x0A, 2}, {0x0B, 2}, {0x0C, 2}, {0x0D, 2}, {0x0E, 2}, {0x0F, 2},
+        {0x10, 1},           {0x11, 1},  {0x14, 2}, {0x15, 2}, {0x16, 2}, {0x18, 1},
+    };
+    int total = 0;
+    for (const auto& o : kOdds) {
+        total += o.weight;
+    }
+    if (random_ == 0) {
+        random_ = static_cast<std::uint32_t>(save_.year * 4 + save_.season + save_.turn * 7919) | 1U;
+    }
+    random_ = random_ * 1103515245U + 12345U;
+    int pick = static_cast<int>((random_ >> 16) % static_cast<std::uint32_t>(total));
+    for (const auto& o : kOdds) {
+        if (pick < o.weight) {
+            return o.profession;
+        }
+        pick -= o.weight;
+    }
+    return kFreeColonist;
+}
+
+int Game::recruit(int slot) {
+    auto& nation = save_.nations[static_cast<std::size_t>(human())];
+    if (slot < 0 || slot >= static_cast<int>(nation.recruits.size())) {
+        return -1;
+    }
+    const int price = recruitPrice(nation);
+    if (nation.gold < price) {
+        return -1;
+    }
+    nation.gold -= price;
+    const int profession = nation.recruits[static_cast<std::size_t>(slot)];
+    const int made = addUnitInEurope(professionUnitType(profession), profession);
+    ++nation.recruitCount;
+    nation.crosses = 0;
+    nation.recruits[static_cast<std::size_t>(slot)] = randomRecruit();
+    return made;
+}
+
+int Game::purchase(int unitType) {
+    auto& nation = save_.nations[static_cast<std::size_t>(human())];
+    for (const auto& item : purchaseList(nation)) {
+        if (item.unitType != unitType) {
+            continue;
+        }
+        if (nation.gold < item.price) {
+            return -1;
+        }
+        nation.gold -= item.price;
+        if (unitType == kArtillery) {
+            ++nation.artilleryBought;
+        }
+        return addUnitInEurope(unitType, 0);
+    }
+    return -1;
+}
+
+int Game::train(int jobRow) {
+    auto& nation = save_.nations[static_cast<std::size_t>(human())];
+    if (jobRow < 0 || jobRow >= static_cast<int>(rules_.jobs.size())) {
+        return -1;
+    }
+    const int price = rules_.jobs[static_cast<std::size_t>(jobRow)].europeCost;
+    if (price <= 0 || nation.gold < price) {
+        return -1;
+    }
+    nation.gold -= price;
+    return addUnitInEurope(professionUnitType(jobRow), jobRow);
+}
+
 void Game::refreshUnitFlags() {
     for (auto& sq : save_.map.squares) {
         sq.flags = static_cast<std::uint8_t>(sq.flags & ~MapSquare::kHasUnit);

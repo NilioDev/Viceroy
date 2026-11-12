@@ -9,6 +9,9 @@ add_executable(vcr_tests
     test_game.cpp
     test_colony.cpp
     test_europe.cpp
+    test_resource.cpp
+    test_menu.cpp
+    test_title.cpp
 )
 target_link_libraries(vcr_tests PRIVATE viceroy::core)
 target_compile_definitions(vcr_tests PRIVATE VICEROY_GAMEDATA_DIR="${PROJECT_SOURCE_DIR}/gamedata")

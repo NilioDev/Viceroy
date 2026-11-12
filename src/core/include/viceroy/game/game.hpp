@@ -10,6 +10,7 @@
 #include "viceroy/rules/ruleset.hpp"
 
 #include <array>
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <vector>
@@ -127,6 +128,12 @@ public:
     void leaveShipInPort(int unit);
     // Free places on a ship: holds not used by cargo or passengers.
     int freeHolds(int ship) const;
+    // The Recruit, Purchase and Train buttons. Each pays from the human's
+    // gold and puts the new unit on the docks (a ship in port); it returns
+    // the unit, or -1 when the gold is short.
+    int recruit(int slot);
+    int purchase(int unitType);
+    int train(int jobRow);
 
     // --- Map -----------------------------------------------------------------
     void reveal(int x, int y, int radius, int nation);
@@ -137,10 +144,13 @@ private:
     void sailOn(); // ships between Europe and the New World move on a stage
     void chainPassengers(int ship, const std::vector<int>& passengers);
     void removeUnit(int index);
+    int addUnitInEurope(int type, int profession);
+    int randomRecruit();
 
     SaveGame save_;
     Ruleset rules_;
     std::vector<std::string> lastTurnNews_;
+    std::uint32_t random_ = 0;
 };
 
 } // namespace viceroy

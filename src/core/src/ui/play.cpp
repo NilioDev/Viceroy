@@ -7,6 +7,7 @@
 #include "viceroy/game_files.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <fstream>
 #include <iterator>
 
@@ -15,6 +16,10 @@ namespace viceroy {
 namespace {
 
 constexpr std::uint64_t kBlinkMs = 250;
+// How long a unit takes to glide one square, and the pause before the next
+// unit once one has used its moves. Chosen by eye against the original.
+constexpr std::uint64_t kSlideMs = 160;
+constexpr std::uint64_t kPauseMs = 250;
 constexpr std::uint8_t kGreen = 0x44;
 constexpr std::uint8_t kGold = 0x95;
 constexpr std::uint8_t kBlack = 0x00;
@@ -116,7 +121,26 @@ void PlayScreen::moveActive(Step step) {
     if (index < 0) {
         return;
     }
-    switch (game_.move(index, step)) {
+    const auto result = game_.move(index, step);
+    if (animations_ && (result == MoveResult::Moved || result == MoveResult::Boarded || result == MoveResult::HighSeas)) {
+        slide_ = Slide{index, step.dx, step.dy, 0,
+                       result == MoveResult::Boarded || (result == MoveResult::Moved && game_.movesLeft(index) <= 0)};
+        // Keep the unit in sight while it moves.
+        const auto& u = game_.unit(index);
+        const bool inside = u.x > view_.originX && u.y > view_.originY && u.x < view_.originX + kViewColumns - 1 &&
+                            u.y < view_.originY + kViewRows - 1;
+        if (!inside) {
+            centreOn(view_, game_, u.x, u.y);
+        }
+        view_.slideUnit = index;
+        view_.slideX = -step.dx * kSquare;
+        view_.slideY = -step.dy * kSquare;
+        if (result != MoveResult::HighSeas) {
+            say(result == MoveResult::Boarded ? "Aboard ship." : "");
+            return;
+        }
+    }
+    switch (result) {
     case MoveResult::Moved:
         say("");
         if (game_.movesLeft(index) <= 0) {
@@ -192,6 +216,7 @@ void PlayScreen::ask(std::string_view section, int unit, std::vector<std::string
         return;
     }
     dialog_ = makeDialog(*art_, section, strings);
+    choices_.clear();
     question_ = std::string(section);
     questionUnit_ = unit;
 }
@@ -199,28 +224,51 @@ void PlayScreen::ask(std::string_view section, int unit, std::vector<std::string
 bool PlayScreen::handleDialog(Command command) {
     auto& d = *dialog_;
     const int count = std::max(1, static_cast<int>(d.options.size()));
+    const bool list = !choices_.empty();
     switch (command) {
     case Command::MoveN:
     case Command::Up:
-        d.selected = (d.selected + count - 1) % count;
+        stepSelection(d, -1);
         return true;
     case Command::MoveS:
     case Command::Down:
-        d.selected = (d.selected + 1) % count;
+        stepSelection(d, 1);
         return true;
     case Command::Confirm:
     case Command::Skip:
         break;
     case Command::Cancel:
-        d.selected = count - 1; // the last choice is "no"
+        // The first choice of a list is "None"; elsewhere the last is "no".
+        d.selected = list ? 0 : count - 1;
         break;
     default:
         return true;
     }
-    const bool yes = d.selected == 0;
+    const int choice = d.selected;
     const std::string question = question_;
     const int unit = questionUnit_;
     dialog_.reset();
+    answer(question, unit, choice);
+    return true;
+}
+
+void PlayScreen::answer(const std::string& question, int unit, int choice) {
+    const bool yes = choice == 0;
+    const auto picked = [&]() {
+        return choice >= 0 && static_cast<std::size_t>(choice) < choices_.size() ? choices_[static_cast<std::size_t>(choice)]
+                                                                                 : -1;
+    }();
+    choices_.clear();
+    const auto showOnDocks = [&](int made) {
+        if (made >= 0 && europeScreen_) {
+            europeScreen_->focus = EuropeFocus::Docks;
+            europeScreen_->dock = 0;
+            const auto ships = unitsInEurope(game_.state(), game_.rules(), game_.human(), EuropePlace::InPort, true);
+            if (europeScreen_->ship < 0 && !ships.empty()) {
+                europeScreen_->ship = ships.front();
+            }
+        }
+    };
     if (question == "SAILHOME") {
         if (yes && game_.sailToEurope(unit)) {
             say(game_.unitName(unit) + " sails for Europe.");
@@ -231,13 +279,128 @@ bool PlayScreen::handleDialog(Command command) {
             const auto ships = unitsInEurope(game_.state(), game_.rules(), game_.human(), EuropePlace::InPort, true);
             europeScreen_->ship = ships.empty() ? -1 : ships.front();
         }
+    } else if (question == "RECRUIT") {
+        if (picked >= 0) {
+            showOnDocks(game_.recruit(picked));
+        }
+    } else if (question == "KINGRECRUIT") {
+        if (picked >= 0) {
+            showOnDocks(game_.train(picked));
+        }
+    } else if (question == "PURCHASE") {
+        if (picked >= 0 && art_ != nullptr) {
+            const auto& nation = game_.state().nations[static_cast<std::size_t>(game_.human())];
+            for (const auto& item : purchaseList(nation)) {
+                if (item.unitType == picked) {
+                    dialog_ = makeDialog(*art_, "REALLYBUY", {game_.rules().units[static_cast<std::size_t>(picked)].name},
+                                         {item.price});
+                    placeEuropeDialog(*dialog_, false);
+                    question_ = "REALLYBUY";
+                    questionUnit_ = picked;
+                }
+            }
+        }
+    } else if (question == "REALLYBUY") {
+        if (yes) {
+            const int made = game_.purchase(unit);
+            if (made >= 0 && game_.isShip(made) && europeScreen_) {
+                europeScreen_->ship = made;
+                europeScreen_->focus = EuropeFocus::Ships;
+            } else {
+                showOnDocks(made);
+            }
+        }
     }
-    return true;
+}
+
+namespace {
+
+std::string costText(int price) {
+    return "(Cost: " + std::to_string(price) + ")";
+}
+
+} // namespace
+
+void PlayScreen::tellPriceMove(int good, int move) {
+    if (move == 0 || art_ == nullptr) {
+        return;
+    }
+    const auto& nation = game_.state().nations[static_cast<std::size_t>(game_.human())];
+    const std::string name =
+        static_cast<std::size_t>(good) < game_.rules().cargo.size() ? game_.rules().cargo[static_cast<std::size_t>(good)].name : "";
+    const std::string port = textLine(art_->names, "HOMEPORT", game_.human(), "");
+    dialog_ = makeDialog(*art_, move > 0 ? "PRICEUP" : "PRICEDOWN", {name, port}, {bidPrice(nation, good)});
+    choices_.clear();
+    question_ = "PRICE";
+    questionUnit_ = -1;
+}
+
+void PlayScreen::openRecruit() {
+    if (art_ == nullptr) {
+        return;
+    }
+    const auto& nation = game_.state().nations[static_cast<std::size_t>(game_.human())];
+    const int price = recruitPrice(nation);
+    Dialog d = makeDialog(*art_, "RECRUIT", {}, {price});
+    choices_ = {-1};
+    addOption(d, "(None)");
+    for (std::size_t slot = 0; slot < nation.recruits.size(); ++slot) {
+        const auto job = static_cast<std::size_t>(professionJob(nation.recruits[slot]));
+        addOption(d, job < game_.rules().jobs.size() ? game_.rules().jobs[job].expertName : "?", {},
+                  nation.gold < price);
+        choices_.push_back(static_cast<int>(slot));
+    }
+    d.selected = 0;
+    placeEuropeDialog(d);
+    dialog_ = d;
+    question_ = "RECRUIT";
+    questionUnit_ = -1;
+}
+
+void PlayScreen::openPurchase() {
+    if (art_ == nullptr) {
+        return;
+    }
+    const auto& nation = game_.state().nations[static_cast<std::size_t>(game_.human())];
+    Dialog d = makeDialog(*art_, "PURCHASE");
+    choices_ = {-1};
+    addOption(d, "None");
+    for (const auto& item : purchaseList(nation)) {
+        addOption(d, game_.rules().units[static_cast<std::size_t>(item.unitType)].name, costText(item.price),
+                  nation.gold < item.price);
+        choices_.push_back(item.unitType);
+    }
+    d.selected = 0;
+    placeEuropeDialog(d);
+    dialog_ = d;
+    question_ = "PURCHASE";
+    questionUnit_ = -1;
+}
+
+void PlayScreen::openTrain() {
+    if (art_ == nullptr) {
+        return;
+    }
+    const auto& nation = game_.state().nations[static_cast<std::size_t>(game_.human())];
+    Dialog d = makeDialog(*art_, "KINGRECRUIT");
+    choices_ = {-1};
+    addOption(d, "None");
+    for (const int row : trainingList(game_.rules())) {
+        const auto& job = game_.rules().jobs[static_cast<std::size_t>(row)];
+        addOption(d, job.expertName, costText(job.europeCost), nation.gold < job.europeCost);
+        choices_.push_back(row);
+    }
+    d.selected = 0;
+    placeEuropeDialog(d);
+    dialog_ = d;
+    question_ = "KINGRECRUIT";
+    questionUnit_ = -1;
 }
 
 bool PlayScreen::handleEuropeScreen(Command command) {
     auto& state = *europeScreen_;
     say("");
+    state.receipt.reset();
     auto& save = game_.state();
     const auto ships = unitsInEurope(save, game_.rules(), game_.human(), EuropePlace::InPort, true);
     const auto docks = unitsOnDocks(save, game_.rules(), game_.human());
@@ -267,11 +430,24 @@ bool PlayScreen::handleEuropeScreen(Command command) {
         return true;
     case Command::MoveN:
     case Command::Up:
-        state.focus = state.focus == EuropeFocus::Market ? EuropeFocus::Ships : EuropeFocus::Docks;
+        state.focus = state.focus == EuropeFocus::Market  ? EuropeFocus::Ships
+                      : state.focus == EuropeFocus::Ships ? EuropeFocus::Docks
+                                                          : EuropeFocus::Buttons;
         return true;
     case Command::MoveS:
     case Command::Down:
-        state.focus = state.focus == EuropeFocus::Docks ? EuropeFocus::Ships : EuropeFocus::Market;
+        state.focus = state.focus == EuropeFocus::Buttons ? EuropeFocus::Docks
+                      : state.focus == EuropeFocus::Docks ? EuropeFocus::Ships
+                                                          : EuropeFocus::Market;
+        return true;
+    case Command::Recruit:
+        openRecruit();
+        return true;
+    case Command::Purchase:
+        openPurchase();
+        return true;
+    case Command::Train:
+        openTrain();
         return true;
     case Command::MoveW:
     case Command::Left:
@@ -282,6 +458,8 @@ bool PlayScreen::handleEuropeScreen(Command command) {
             state.good = (state.good + by + kGoodsKinds) % kGoodsKinds;
         } else if (state.focus == EuropeFocus::Ships) {
             state.ship = cycle(ships, state.ship, by);
+        } else if (state.focus == EuropeFocus::Buttons) {
+            state.button = (state.button + by + 3) % 3;
         } else if (!docks.empty()) {
             const int n = static_cast<int>(docks.size());
             state.dock = (state.dock + by + n) % n;
@@ -299,8 +477,8 @@ bool PlayScreen::handleEuropeScreen(Command command) {
             }
             const Trade t = buyGoods(save, game_.rules(), state.ship, state.good, game_.freeHolds(state.ship));
             if (t.amount > 0) {
-                say(std::to_string(t.amount) + " " + goodName(state.good) + " bought for " + std::to_string(t.gold) +
-                    "$.");
+                state.receipt = TradeReceipt{false, t.amount, goodName(state.good), t.price, t.gold, nation.taxRate, 0};
+                tellPriceMove(state.good, t.priceMove);
             } else {
                 say(nation.gold < askPrice(game_.rules(), nation, state.good) ? "Not enough gold."
                                                                               : "No room aboard.");
@@ -309,6 +487,8 @@ bool PlayScreen::handleEuropeScreen(Command command) {
             if (state.ship >= 0) {
                 ask("SAILAWAY", state.ship);
             }
+        } else if (state.focus == EuropeFocus::Buttons) {
+            state.button == 0 ? openRecruit() : state.button == 1 ? openPurchase() : openTrain();
         } else if (!docks.empty() && state.ship >= 0) {
             const int who = docks[static_cast<std::size_t>(state.dock)];
             if (!game_.boardInPort(who, state.ship)) {
@@ -319,10 +499,11 @@ bool PlayScreen::handleEuropeScreen(Command command) {
     case Command::Sentry: // S: sell
     case Command::BuildColony: // X on a gamepad
         if (state.focus == EuropeFocus::Market && state.ship >= 0) {
-            const Trade t = sellGoods(save, state.ship, state.good);
+            const Trade t = sellGoods(save, game_.rules(), state.ship, state.good);
             if (t.amount > 0) {
-                say(std::to_string(t.amount) + " " + goodName(state.good) + " sold for " + std::to_string(t.gold) +
-                    "$ (tax " + std::to_string(t.tax) + "$).");
+                state.receipt =
+                    TradeReceipt{true, t.amount, goodName(state.good), t.price, t.gold + t.tax, nation.taxRate, t.tax};
+                tellPriceMove(state.good, t.priceMove);
             }
         }
         return true;
@@ -413,6 +594,9 @@ bool PlayScreen::handleColonyScreen(Command command) {
 }
 
 void PlayScreen::clickSquare(int x, int y) {
+    if (slide_) {
+        return;
+    }
     if (const auto colony = game_.colonyAt(x, y)) {
         if (game_.state().colonies[static_cast<std::size_t>(*colony)].nation == game_.human()) {
             openColony(*colony);
@@ -424,24 +608,45 @@ void PlayScreen::clickSquare(int x, int y) {
         cursorY_ = y;
         return;
     }
+    // A square next to the active unit moves it there. Any other square
+    // brings the map round to it, as in the original.
     const int active = game_.activeUnit();
-    if (active < 0) {
-        return;
-    }
-    const auto& u = game_.unit(active);
-    const int dx = std::clamp(x - u.x, -1, 1);
-    const int dy = std::clamp(y - u.y, -1, 1);
-    for (const auto& step : kSteps) {
-        if (step.dx == dx && step.dy == dy) {
-            moveActive(step);
-            return;
+    if (active >= 0 && game_.onMap(active)) {
+        const auto& u = game_.unit(active);
+        for (const auto& step : kSteps) {
+            if (u.x + step.dx == x && u.y + step.dy == y) {
+                moveActive(step);
+                return;
+            }
         }
+    }
+    centreOn(view_, game_, x, y);
+}
+
+void PlayScreen::clickMinimap(int x, int y) {
+    centreOn(view_, game_, x, y);
+    if (viewMode_) {
+        cursorX_ = x;
+        cursorY_ = y;
     }
 }
 
+void PlayScreen::scrollView(int dx, int dy) {
+    const auto& map = game_.state().map;
+    view_.originX = std::clamp(view_.originX + dx, 1, std::max(1, map.width - 1 - kViewColumns));
+    view_.originY = std::clamp(view_.originY + dy, 1, std::max(1, map.height - 1 - kViewRows));
+}
+
 bool PlayScreen::handle(Command command) {
+    if (slide_) {
+        // Input waits until the unit has arrived.
+        return true;
+    }
     if (dialog_) {
         return handleDialog(command);
+    }
+    if (menu_) {
+        return handleMenu(command);
     }
     if (europeScreen_) {
         return handleEuropeScreen(command);
@@ -451,6 +656,10 @@ bool PlayScreen::handle(Command command) {
     }
     if (command == Command::Europe) {
         openEurope();
+        return true;
+    }
+    if (command == Command::Menu) {
+        openMenu(0, true);
         return true;
     }
     if (viewMode_) {
@@ -626,10 +835,43 @@ bool PlayScreen::save() {
 void PlayScreen::tick(std::uint64_t milliseconds) {
     clock_ += milliseconds;
     view_.blinkOn = (clock_ / kBlinkMs) % 2 == 0;
+    if (slide_) {
+        slide_->elapsed += milliseconds;
+        const auto t = std::min(slide_->elapsed, kSlideMs);
+        const int left = static_cast<int>((kSlideMs - t) * kSquare / kSlideMs);
+        view_.slideX = -slide_->dx * left;
+        view_.slideY = -slide_->dy * left;
+        view_.blinkOn = true;
+        if (slide_->elapsed >= kSlideMs + (slide_->advanceAfter ? kPauseMs : 0)) {
+            finishSlide();
+        }
+    }
+}
+
+void PlayScreen::finishSlide() {
+    if (!slide_) {
+        return;
+    }
+    const Slide done = *slide_;
+    slide_.reset();
+    view_.slideUnit = -1;
+    view_.slideX = 0;
+    view_.slideY = 0;
+    if (dialog_) {
+        return; // the high seas question is up; it decides what comes next
+    }
+    if (done.advanceAfter) {
+        advance();
+    } else if (game_.activeUnit() == done.unit) {
+        activate(done.unit);
+    }
 }
 
 void PlayScreen::draw(Screen& screen, const Art& art) const {
     drawScreen(screen, art);
+    if (menu_ && !colonyScreen_ && !europeScreen_) {
+        drawMenuBar(screen, art, art.menus, &*menu_);
+    }
     if (dialog_) {
         drawDialog(screen, art, *dialog_);
     }
@@ -715,6 +957,19 @@ std::optional<SaveSlot> LoadMenu::handle(Command command) {
     return std::nullopt;
 }
 
+std::optional<SaveSlot> LoadMenu::click(int x, int y) {
+    // The rows as draw() lays them out: from y 50, 10 apart.
+    if (x < 34 || x >= 286 || y < 48) {
+        return std::nullopt;
+    }
+    const int row = (y - 48) / 10;
+    if (row >= static_cast<int>(slots_.size())) {
+        return std::nullopt;
+    }
+    selected_ = row;
+    return slots_[static_cast<std::size_t>(row)];
+}
+
 void LoadMenu::draw(Screen& screen, const Art& art) const {
     screen.clear(kBlack);
     screen.tile(art.wood, {0, 0, Screen::kWidth, Screen::kHeight});
@@ -734,6 +989,301 @@ void LoadMenu::draw(Screen& screen, const Art& art) const {
         screen.text(art.tiny, box.x + 8, y, slots_[i].label,
                     {selected ? kBlack : kGreen, kNoColour, kNoColour});
     }
+}
+
+} // namespace viceroy
+
+// --- The menu bar -------------------------------------------------------------
+
+namespace viceroy {
+namespace {
+
+// Rows of the menus in MENU.TXT that Viceroy acts on.
+namespace game_menu {
+constexpr int kSave = 4;
+constexpr int kLoad = 5;
+constexpr int kExit = 8;
+} // namespace game_menu
+namespace view_menu {
+constexpr int kMovePieces = 0;
+constexpr int kViewPieces = 1;
+constexpr int kCentre = 11;
+} // namespace view_menu
+namespace orders_menu {
+constexpr int kActivate = 0;
+constexpr int kWait = 1;
+constexpr int kFortify = 2;
+constexpr int kUnfortify = 3; // a second "Fortify" row, not seen yet
+constexpr int kSentry = 4;
+constexpr int kBuildColony = 5;
+constexpr int kJoinColony = 6;
+constexpr int kClearForest = 7;
+constexpr int kPlow = 8;
+constexpr int kRoad = 9;
+constexpr int kLoad = 10;
+constexpr int kUnload = 11;
+constexpr int kPillage = 12;
+constexpr int kGoToPort = 13;
+constexpr int kGoToPlace = 14;
+constexpr int kTradeRoute = 15;
+constexpr int kReturnToEurope = 16;
+constexpr int kNoOrders = 17;
+constexpr int kDump = 18;
+// 19 is Disband, not handled yet.
+} // namespace orders_menu
+constexpr int kHiddenPedia = 6; // Miscellaneous and Complete are not shown
+constexpr std::uint8_t kSeaLaneTerrain = 26;
+
+} // namespace
+
+std::vector<EntryState> PlayScreen::menuStates(int index) const {
+    std::vector<EntryState> states;
+    if (art_ == nullptr || index < 0 || index >= static_cast<int>(art_->menus.size())) {
+        return states;
+    }
+    const auto& def = art_->menus[static_cast<std::size_t>(index)];
+    states.assign(def.entries.size(), EntryState::Enabled);
+    if (def.section == "PEDIA") {
+        for (std::size_t i = kHiddenPedia; i < states.size(); ++i) {
+            states[i] = EntryState::Hidden;
+        }
+    }
+    if (def.section != "ORDERS") {
+        return states;
+    }
+    // The orders depend on the active unit. Seen in the original for a
+    // frigate at sea; the rest follows the manual and is not yet checked.
+    using namespace orders_menu;
+    auto set = [&](int row, EntryState state) {
+        if (row < static_cast<int>(states.size())) {
+            states[static_cast<std::size_t>(row)] = state;
+        }
+    };
+    const int active = game_.activeUnit();
+    set(kUnfortify, EntryState::Hidden);
+    if (active < 0 || !game_.onMap(active)) {
+        for (auto& s : states) {
+            s = s == EntryState::Hidden ? s : EntryState::Disabled;
+        }
+        set(kBuildColony, EntryState::Hidden);
+        set(kJoinColony, EntryState::Hidden);
+        set(kClearForest, EntryState::Hidden);
+        set(kPillage, EntryState::Hidden);
+        set(kGoToPlace, EntryState::Hidden);
+        return states;
+    }
+    const auto& u = game_.unit(active);
+    const bool ship = game_.isShip(active);
+    const bool wagon = u.type == unit_type::kWagonTrain;
+    const bool pioneer = u.type == unit_type::kPioneer;
+    const bool military = game_.rules().units[static_cast<std::size_t>(u.type)].attack > 0;
+    const auto& square = game_.state().map.at(u.x, u.y);
+    const bool inColony = game_.colonyAt(u.x, u.y).has_value();
+
+    if (ship) {
+        set(kBuildColony, EntryState::Hidden);
+        set(kJoinColony, EntryState::Hidden);
+    } else {
+        set(inColony ? kBuildColony : kJoinColony, EntryState::Hidden);
+        const int row = inColony ? kJoinColony : kBuildColony;
+        set(row, game_.canFoundColony(active) == FoundResult::Founded || inColony ? EntryState::Enabled
+                                                                                 : EntryState::Disabled);
+    }
+    set(square.isForest() ? kPlow : kClearForest, EntryState::Hidden);
+    set(square.isForest() ? kClearForest : kPlow, pioneer ? EntryState::Enabled : EntryState::Disabled);
+    set(kRoad, pioneer ? EntryState::Enabled : EntryState::Disabled);
+    const bool cargo = (ship || wagon) && u.holds > 0;
+    set(kLoad, (ship || wagon) && inColony ? EntryState::Enabled : EntryState::Disabled);
+    set(kUnload, cargo && inColony ? EntryState::Enabled : EntryState::Disabled);
+    set(kPillage, military && !ship ? EntryState::Enabled : EntryState::Hidden);
+    set(kGoToPort, ship ? EntryState::Enabled : EntryState::Hidden);
+    set(kGoToPlace, ship ? EntryState::Hidden : EntryState::Enabled);
+    set(kTradeRoute, ship || wagon ? EntryState::Enabled : EntryState::Hidden);
+    set(kReturnToEurope, !ship ? EntryState::Hidden
+                         : square.terrain == kSeaLaneTerrain ? EntryState::Enabled
+                                                             : EntryState::Disabled);
+    set(kDump, !(ship || wagon) ? EntryState::Hidden : cargo ? EntryState::Enabled : EntryState::Disabled);
+    return states;
+}
+
+void PlayScreen::openMenu(int index, bool keyboard) {
+    if (art_ == nullptr || index < 0 || index >= static_cast<int>(art_->menus.size()) || slide_ || dialog_ ||
+        colonyScreen_ || europeScreen_) {
+        return;
+    }
+    OpenMenu open;
+    open.menu = index;
+    open.states = menuStates(index);
+    menu_ = std::move(open);
+    if (keyboard) {
+        stepMenu(1);
+    }
+}
+
+void PlayScreen::stepMenu(int delta) {
+    if (!menu_) {
+        return;
+    }
+    const int n = static_cast<int>(menu_->states.size());
+    int i = menu_->selected;
+    for (int tries = 0; tries < n; ++tries) {
+        i = i < 0 ? (delta > 0 ? 0 : n - 1) : (i + delta + n) % n;
+        if (menu_->states[static_cast<std::size_t>(i)] == EntryState::Enabled) {
+            menu_->selected = i;
+            return;
+        }
+    }
+}
+
+bool PlayScreen::handleMenu(Command command) {
+    const int count = static_cast<int>(art_->menus.size());
+    switch (command) {
+    case Command::MoveN:
+    case Command::Up:
+        stepMenu(-1);
+        return true;
+    case Command::MoveS:
+    case Command::Down:
+        stepMenu(1);
+        return true;
+    case Command::MoveW:
+    case Command::Left:
+        openMenu((menu_->menu + count - 1) % count, true);
+        return true;
+    case Command::MoveE:
+    case Command::Right:
+        openMenu((menu_->menu + 1) % count, true);
+        return true;
+    case Command::Confirm:
+        return pickMenuEntry(menu_->selected);
+    case Command::Cancel:
+    case Command::Menu:
+        menu_.reset();
+        return true;
+    default:
+        return true;
+    }
+}
+
+bool PlayScreen::clickMenu(int x, int y) {
+    if (art_ == nullptr || slide_ || dialog_ || colonyScreen_ || europeScreen_) {
+        return false;
+    }
+    const int title = menuTitleAt(*art_, art_->menus, x, y);
+    if (title >= 0) {
+        if (menu_ && menu_->menu == title) {
+            menu_.reset();
+        } else {
+            openMenu(title, false);
+        }
+        return true;
+    }
+    if (!menu_) {
+        return false;
+    }
+    const auto& def = art_->menus[static_cast<std::size_t>(menu_->menu)];
+    const int entry = menuEntryAt(*art_, def, *menu_, x, y);
+    const Rect box = menuBox(*art_, def, *menu_);
+    if (entry >= 0) {
+        if (!pickMenuEntry(entry)) {
+            quitToLoad_ = true;
+        }
+    } else if (x < box.x || x >= box.x + box.w || y < box.y || y >= box.y + box.h) {
+        menu_.reset(); // a click outside closes the menu
+    }
+    return true;
+}
+
+void PlayScreen::menuLetter(char letter) {
+    if (!menu_ || art_ == nullptr) {
+        return;
+    }
+    const auto& def = art_->menus[static_cast<std::size_t>(menu_->menu)];
+    const char upper = static_cast<char>(std::toupper(static_cast<unsigned char>(letter)));
+    for (int i = 0; i < static_cast<int>(def.entries.size()); ++i) {
+        if (def.entries[static_cast<std::size_t>(i)].hotkey == upper &&
+            menu_->states[static_cast<std::size_t>(i)] == EntryState::Enabled) {
+            menu_->selected = i;
+            if (!pickMenuEntry(i)) {
+                quitToLoad_ = true;
+            }
+            return;
+        }
+    }
+}
+
+void PlayScreen::notYet() {
+    say("Not in Viceroy yet.");
+}
+
+bool PlayScreen::pickMenuEntry(int entry) {
+    if (!menu_ || entry < 0 || entry >= static_cast<int>(menu_->states.size()) ||
+        menu_->states[static_cast<std::size_t>(entry)] != EntryState::Enabled) {
+        return true;
+    }
+    const std::string section = art_->menus[static_cast<std::size_t>(menu_->menu)].section;
+    menu_.reset();
+    if (section == "GAME") {
+        switch (entry) {
+        case game_menu::kSave:
+            if (save()) {
+                say("Game saved.");
+            }
+            return true;
+        case game_menu::kLoad:
+            return false;
+        case game_menu::kExit:
+            quit_ = true;
+            return true;
+        default:
+            notYet();
+            return true;
+        }
+    }
+    if (section == "VIEW") {
+        switch (entry) {
+        case view_menu::kMovePieces:
+            return handle(Command::MoveMode);
+        case view_menu::kViewPieces:
+            return handle(Command::ViewMode);
+        case view_menu::kCentre:
+            return handle(Command::Centre);
+        default:
+            notYet();
+            return true;
+        }
+    }
+    if (section == "ORDERS") {
+        using namespace orders_menu;
+        switch (entry) {
+        case kActivate:
+            return handle(Command::MoveMode);
+        case kWait:
+            return handle(Command::Wait);
+        case kFortify:
+            return handle(Command::Fortify);
+        case kSentry:
+            return handle(Command::Sentry);
+        case kBuildColony:
+        case kJoinColony:
+            return handle(Command::BuildColony);
+        case kNoOrders:
+            return handle(Command::Skip);
+        case kReturnToEurope: {
+            const int active = game_.activeUnit();
+            if (active >= 0 && game_.sailToEurope(active)) {
+                say("Sailing to Europe.");
+                advance();
+            }
+            return true;
+        }
+        default:
+            notYet();
+            return true;
+        }
+    }
+    notYet();
+    return true;
 }
 
 } // namespace viceroy

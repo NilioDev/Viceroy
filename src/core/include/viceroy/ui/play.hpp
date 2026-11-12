@@ -10,6 +10,7 @@
 #include "viceroy/render/dialog.hpp"
 #include "viceroy/render/europe_view.hpp"
 #include "viceroy/render/game_view.hpp"
+#include "viceroy/render/menu_bar.hpp"
 
 #include <cstdint>
 #include <filesystem>
@@ -48,6 +49,10 @@ enum class Command {
     Europe,   // E: the home port
     Left,     // menus and screens that list things side by side
     Right,
+    Recruit,  // R, P, T: the buttons in Europe
+    Purchase,
+    Train,
+    Menu, // F10: the menu bar
 };
 
 // The main map screen while playing.
@@ -60,6 +65,10 @@ public:
     bool handle(Command command);
     // The player clicked this map square.
     void clickSquare(int x, int y);
+    // A click on the small map: the view goes there.
+    void clickMinimap(int x, int y);
+    // Moves the view without moving anyone (the right stick).
+    void scrollView(int dx, int dy);
     // Time passes: the active unit flashes.
     void tick(std::uint64_t milliseconds);
     void draw(Screen& screen, const Art& art) const;
@@ -92,8 +101,42 @@ public:
     // Writes the game to the slot it was loaded from. Returns false and
     // sets the message on failure.
     bool save();
+    // Units glide from square to square, and the game pauses a moment
+    // before the next unit when one has used up its moves. Off by default
+    // (tests); the app turns it on.
+    void setAnimations(bool on) { animations_ = on; }
+    bool animating() const { return slide_.has_value(); }
+
+    // The menu bar. Needs setArt. A menu opened from the keyboard or a
+    // gamepad starts with its first entry highlighted.
+    void openMenu(int index, bool keyboard);
+    void closeMenu() { menu_.reset(); }
+    const std::optional<OpenMenu>& menu() const { return menu_; }
+    // A click while playing on the main screen: the menu bar, an open
+    // menu, or neither (false: the click is for the map).
+    bool clickMenu(int x, int y);
+    // A letter typed while a menu is open picks the entry with that gold
+    // letter.
+    void menuLetter(char letter);
+    // Exit to DOS was picked.
+    bool quitRequested() const { return quit_; }
+    // Load Game was picked with the mouse: back to the load menu.
+    bool loadRequested() const { return quitToLoad_; }
 
 private:
+    struct Slide {
+        int unit = -1;
+        int dx = 0; // the step taken
+        int dy = 0;
+        std::uint64_t elapsed = 0;
+        bool advanceAfter = false; // the unit's moves are used up
+    };
+    void finishSlide();
+    std::vector<EntryState> menuStates(int index) const;
+    bool handleMenu(Command command);
+    bool pickMenuEntry(int entry); // false: back to the load menu
+    void stepMenu(int delta);
+    void notYet();
     void moveActive(Step step);
     void activate(int index);
     void advance(); // to the next unit that needs orders
@@ -103,6 +146,11 @@ private:
     bool handleDialog(Command command);
     void drawScreen(Screen& screen, const Art& art) const;
     void ask(std::string_view section, int unit, std::vector<std::string> strings = {});
+    void tellPriceMove(int good, int move);
+    void openRecruit();
+    void openPurchase();
+    void openTrain();
+    void answer(const std::string& question, int unit, int choice);
 
     Game game_;
     ViewState view_;
@@ -116,11 +164,17 @@ private:
     std::optional<Dialog> dialog_;
     std::string question_; // the GAME.TXT section the dialog asks
     int questionUnit_ = -1;
+    std::vector<int> choices_; // what each choice of a list stands for
     const Art* art_ = nullptr;
     int lastColony_ = -1;
     bool viewMode_ = false;
     int cursorX_ = 0;
     int cursorY_ = 0;
+    bool animations_ = false;
+    std::optional<Slide> slide_;
+    std::optional<OpenMenu> menu_;
+    bool quit_ = false;
+    bool quitToLoad_ = false;
 };
 
 // One line of the load menu.
@@ -137,6 +191,8 @@ public:
     explicit LoadMenu(std::vector<SaveSlot> slots) : slots_(std::move(slots)) {}
     // Returns the chosen slot when the player confirms.
     std::optional<SaveSlot> handle(Command command);
+    // A click on a row picks that savegame.
+    std::optional<SaveSlot> click(int x, int y);
     void draw(Screen& screen, const Art& art) const;
     bool empty() const { return slots_.empty(); }
 

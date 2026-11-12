@@ -19,9 +19,11 @@
 #include "viceroy/render/screen.hpp"
 #include "viceroy/ui/debug_menu.hpp"
 #include "viceroy/ui/play.hpp"
+#include "viceroy/ui/title.hpp"
 #include "viceroy/version.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
@@ -40,7 +42,7 @@ constexpr int kScreenH = viceroy::Screen::kHeight;
 constexpr Uint64 kStickRepeatMs = 220;
 constexpr float kStickThreshold = 0.6f;
 
-enum class Mode { Welcome, Load, Play };
+enum class Mode { Welcome, Intro, Title, Load, Play };
 
 struct App {
     SDL_Window* window = nullptr;
@@ -53,6 +55,11 @@ struct App {
     Uint32 pickedEvent = 0; // our event type for a picked file or folder
 
     std::unique_ptr<viceroy::Art> art;
+    std::unique_ptr<viceroy::TitleArt> title;
+    std::unique_ptr<viceroy::MainMenu> mainMenu;
+    // The opening while it plays, and its last picture behind the menu
+    // when it played to the end.
+    std::unique_ptr<viceroy::Intro> intro;
     std::unique_ptr<viceroy::LoadMenu> load;
     std::unique_ptr<viceroy::ColonyArt> colonyArt;
     std::unique_ptr<viceroy::PlayScreen> play;
@@ -65,7 +72,38 @@ struct App {
     Uint64 stickFired = 0;
     float stickX = 0;
     float stickY = 0;
+    // Right stick: scrolls the map, repeating while held.
+    float lookX = 0;
+    float lookY = 0;
+    Uint64 lookFired = 0;
+
+    // The original draws its own mouse pointer (CURSOR.SS sprite 0) into
+    // the picture; ours shows once the mouse moves and hides again while
+    // the gamepad is used.
+    bool pointerShown = false;
+    float pointerX = 0;
+    float pointerY = 0;
 };
+
+void drawPointer(App& app) {
+    if (!app.pointerShown || app.art->cursor.sprites.empty()) {
+        return;
+    }
+    const auto& image = app.art->cursor.sprites.front().image;
+    const int left = static_cast<int>(app.pointerX);
+    const int top = static_cast<int>(app.pointerY);
+    for (int j = 0; j < image.height; ++j) {
+        for (int i = 0; i < image.width; ++i) {
+            const auto c = image.pixels[static_cast<std::size_t>(j * image.width + i)];
+            // The sheet marks the sprite's box with a pixel of colour 9 in
+            // two corners; the original does not draw those.
+            const bool marker = c == 0x09 && (i == image.width - 1 || j == image.height - 1);
+            if (c != viceroy::kTransparent && !marker) {
+                app.screen.pixel(left + i, top + j, c);
+            }
+        }
+    }
+}
 
 // Where the imported game, savegames and later add-ons live.
 std::filesystem::path libraryFolder() {
@@ -114,13 +152,55 @@ void showLoadMenu(App& app) {
     app.debug = viceroy::DebugMenu{};
 }
 
-// Loads the pictures and rules from the library, then shows the load menu.
+// The day this program was built, the way the original dates itself:
+// "7-Feb-95".
+std::string buildDate() {
+    const std::string date = __DATE__; // "Nov 12 2026"
+    const int day = std::atoi(date.substr(4, 2).c_str());
+    return std::to_string(day) + "-" + date.substr(0, 3) + "-" + date.substr(9, 2);
+}
+
+// The original's main menu, or the load menu when its pictures are missing.
+void showTitle(App& app) {
+    if (!app.title) {
+        showLoadMenu(app);
+        return;
+    }
+    app.play.reset();
+    if (app.intro && !app.intro->finished()) {
+        app.intro.reset(); // skipped: the still title picture instead
+    }
+    app.mainMenu = std::make_unique<viceroy::MainMenu>(*app.art, std::string(viceroy::kVersion), buildDate());
+    app.mode = Mode::Title;
+}
+
+void pickTitle(App& app, viceroy::TitleChoice choice) {
+    if (choice == viceroy::TitleChoice::Load) {
+        showLoadMenu(app);
+    } else {
+        app.mainMenu->say("Not in Viceroy yet.");
+    }
+}
+
+// Loads the pictures and rules from the library, then shows the main menu.
 void openLibrary(App& app) {
     try {
         app.art = std::make_unique<viceroy::Art>(viceroy::loadArt(viceroy::pack::baseFolder(app.library)));
         app.colonyArt =
             std::make_unique<viceroy::ColonyArt>(viceroy::loadColonyArt(viceroy::pack::baseFolder(app.library)));
-        showLoadMenu(app);
+        try {
+            app.title = std::make_unique<viceroy::TitleArt>(
+                viceroy::loadTitleArt(viceroy::pack::baseFolder(app.library)));
+        } catch (const std::exception& e) {
+            SDL_Log("No opening: %s", e.what());
+            app.title.reset();
+        }
+        if (app.title) {
+            app.intro = std::make_unique<viceroy::Intro>(*app.title);
+            app.mode = Mode::Intro;
+        } else {
+            showTitle(app);
+        }
         app.status.clear();
     } catch (const std::exception& e) {
         app.art.reset();
@@ -133,6 +213,7 @@ void startGame(App& app, const viceroy::SaveSlot& slot) {
     try {
         viceroy::Game game(viceroy::readSaveGame(readAll(slot.path)), app.art->rules);
         app.play = std::make_unique<viceroy::PlayScreen>(std::move(game), slot.path);
+        app.play->setAnimations(true);
         app.play->setColonyNames(&app.art->colonyNames);
         app.play->setColonyArt(app.colonyArt.get());
         app.play->setArt(app.art.get());
@@ -271,8 +352,16 @@ std::optional<Command> keyCommand(const SDL_KeyboardEvent& key) {
         return Command::MoveMode;
     case SDLK_E:
         return ctrl ? Command::EndTurn : Command::Europe;
+    case SDLK_R:
+        return Command::Recruit;
+    case SDLK_P:
+        return Command::Purchase;
+    case SDLK_T:
+        return Command::Train;
     case SDLK_TAB:
         return (key.mod & SDL_KMOD_SHIFT) ? Command::PreviousUnit : Command::NextUnit;
+    case SDLK_F10:
+        return Command::Menu;
     default:
         return std::nullopt;
     }
@@ -309,7 +398,7 @@ std::optional<Command> buttonCommand(Uint8 button, bool waitingForEndOfTurn, boo
     case SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER:
         return Command::NextUnit;
     case SDL_GAMEPAD_BUTTON_START:
-        return Command::Save;
+        return Command::Menu;
     case SDL_GAMEPAD_BUTTON_BACK:
         return Command::ViewMode;
     case SDL_GAMEPAD_BUTTON_LEFT_STICK:
@@ -342,8 +431,19 @@ void send(App& app, Command command) {
             chooseFolder(app);
         }
         break;
+    case Mode::Intro:
+        showTitle(app);
+        break;
+    case Mode::Title:
+        if (auto choice = app.mainMenu->handle(command)) {
+            pickTitle(app, *choice);
+        }
+        break;
     case Mode::Load:
         if (command == Command::Cancel) {
+            if (app.title) {
+                showTitle(app);
+            }
             break;
         }
         if (auto slot = app.load->handle(command == Command::Skip ? Command::Confirm : command)) {
@@ -365,12 +465,29 @@ void send(App& app, Command command) {
     }
 }
 
-// A click on the map: open a colony there, or move the active unit one
-// step towards it. Anywhere on the colony screen closes it for now.
+// A click on the map: open a colony there, move the active unit to a square
+// next to it, or bring the map round to any other square. A click on the
+// small map moves the view there.
 void click(App& app, float wx, float wy) {
     float x = 0;
     float y = 0;
     SDL_RenderCoordinatesFromWindow(app.renderer, wx, wy, &x, &y);
+    if (app.mode == Mode::Intro) {
+        showTitle(app);
+        return;
+    }
+    if (app.mode == Mode::Title) {
+        if (auto choice = app.mainMenu->click(static_cast<int>(x), static_cast<int>(y))) {
+            pickTitle(app, *choice);
+        }
+        return;
+    }
+    if (app.mode == Mode::Load) {
+        if (auto slot = app.load->click(static_cast<int>(x), static_cast<int>(y))) {
+            startGame(app, *slot);
+        }
+        return;
+    }
     if (app.mode != Mode::Play) {
         if (app.mode != Mode::Welcome) {
             send(app, Command::Confirm);
@@ -379,10 +496,33 @@ void click(App& app, float wx, float wy) {
     }
     if (app.play->colonyScreen() || app.play->europeScreen()) {
         // The exit button in the lower right corner.
-        if (x >= 300.0f && y >= 178.0f) {
+        if (x >= 300.0f && y >= 178.0f && !app.play->dialog()) {
             send(app, Command::Cancel);
         }
+        if (app.play->europeScreen() && !app.play->dialog()) {
+            static constexpr Command kButtons[] = {Command::Recruit, Command::Purchase, Command::Train};
+            for (int i = 0; i < 3; ++i) {
+                const auto& b = viceroy::kEuropeButtons[i];
+                if (x >= static_cast<float>(b.x) && x < static_cast<float>(b.x + b.w) && y >= static_cast<float>(b.y) &&
+                    y < static_cast<float>(b.y + b.h)) {
+                    send(app, kButtons[i]);
+                }
+            }
+        }
         return;
+    }
+    if (!app.debug.open() && app.play->clickMenu(static_cast<int>(x), static_cast<int>(y))) {
+        if (app.play->loadRequested()) {
+            showLoadMenu(app);
+        }
+        return;
+    }
+    if (!app.play->dialog() && !app.debug.open()) {
+        if (const auto square = viceroy::minimapSquare(app.play->game(), app.play->view(), static_cast<int>(x),
+                                                       static_cast<int>(y))) {
+            app.play->clickMinimap(square->first, square->second);
+            return;
+        }
     }
     const auto& area = viceroy::kMapArea;
     if (x < static_cast<float>(area.x) || y < static_cast<float>(area.y) ||
@@ -406,7 +546,12 @@ void present(App& app) {
         SDL_RenderPresent(app.renderer);
         return;
     }
-    if (app.mode == Mode::Load) {
+    app.screen.resetColours();
+    if (app.mode == Mode::Intro) {
+        app.intro->draw(app.screen, *app.title);
+    } else if (app.mode == Mode::Title) {
+        app.mainMenu->draw(app.screen, *app.art, *app.title, app.intro.get());
+    } else if (app.mode == Mode::Load) {
         app.load->draw(app.screen, *app.art);
         if (!app.status.empty()) {
             app.screen.text(app.art->tiny, 34, 186, app.status, {0x95, viceroy::kNoColour, viceroy::kNoColour});
@@ -415,6 +560,7 @@ void present(App& app) {
         app.play->draw(app.screen, *app.art);
         app.debug.draw(app.screen, *app.art);
     }
+    drawPointer(app);
     // Indexed pixels to colours.
     void* pixels = nullptr;
     int pitch = 0;
@@ -423,7 +569,7 @@ void present(App& app) {
         for (int y = 0; y < kScreenH; ++y) {
             auto* row = static_cast<Uint8*>(pixels) + y * pitch;
             for (int x = 0; x < kScreenW; ++x) {
-                const auto& c = app.art->palette[indexed[static_cast<std::size_t>(y * kScreenW + x)]];
+                const auto c = app.screen.colour(app.art->palette, indexed[static_cast<std::size_t>(y * kScreenW + x)]);
                 row[x * 4 + 0] = c.r;
                 row[x * 4 + 1] = c.g;
                 row[x * 4 + 2] = c.b;
@@ -453,6 +599,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char** argv) {
     }
     SDL_SetRenderLogicalPresentation(app->renderer, kScreenW, kScreenH, SDL_LOGICAL_PRESENTATION_LETTERBOX);
     SDL_SetRenderVSync(app->renderer, 1);
+    SDL_HideCursor();
     app->frame = SDL_CreateTexture(app->renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, kScreenW,
                                    kScreenH);
     SDL_SetTextureScaleMode(app->frame, SDL_SCALEMODE_NEAREST);
@@ -491,8 +638,12 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
             app->debug.toggle(*app->play);
             break;
         }
+        if (app->mode == Mode::Intro) {
+            showTitle(*app);
+            break;
+        }
         if (event->key.key == SDLK_ESCAPE) {
-            if (app->mode == Mode::Play) {
+            if (app->mode == Mode::Play || (app->mode == Mode::Load && app->title)) {
                 send(*app, Command::Cancel);
                 break;
             }
@@ -502,16 +653,62 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
             chooseZip(*app);
             break;
         }
+        if (app->mode == Mode::Play && !app->debug.open()) {
+            // Alt and a title's gold letter open that menu; with a menu
+            // open, a letter picks its entry.
+            const SDL_Keycode k = event->key.key;
+            const bool letter = k >= SDLK_A && k <= SDLK_Z;
+            if (letter && (event->key.mod & SDL_KMOD_ALT) && app->art) {
+                for (std::size_t i = 0; i < app->art->menus.size(); ++i) {
+                    const auto& title = app->art->menus[i].title;
+                    const auto mark = title.find('~');
+                    if (mark != std::string::npos && mark + 1 < title.size() &&
+                        std::toupper(static_cast<unsigned char>(title[mark + 1])) == static_cast<int>('A' + (k - SDLK_A))) {
+                        app->play->openMenu(static_cast<int>(i), true);
+                        break;
+                    }
+                }
+                break;
+            }
+            if (letter && app->play->menu()) {
+                app->play->menuLetter(static_cast<char>('A' + (k - SDLK_A)));
+                if (app->play->loadRequested()) {
+                    showLoadMenu(*app);
+                } else if (app->play->quitRequested()) {
+                    return SDL_APP_SUCCESS;
+                }
+                break;
+            }
+        }
         if (auto command = keyCommand(event->key)) {
             send(*app, *command);
+            if (app->mode == Mode::Play && app->play->quitRequested()) {
+                return SDL_APP_SUCCESS;
+            }
         }
         break;
+    case SDL_EVENT_MOUSE_MOTION:
+        app->pointerShown = true;
+        SDL_RenderCoordinatesFromWindow(app->renderer, event->motion.x, event->motion.y, &app->pointerX,
+                                        &app->pointerY);
+        break;
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
+        app->pointerShown = true;
+        SDL_RenderCoordinatesFromWindow(app->renderer, event->button.x, event->button.y, &app->pointerX,
+                                        &app->pointerY);
         if (event->button.button == SDL_BUTTON_LEFT) {
             click(*app, event->button.x, event->button.y);
+            if (app->mode == Mode::Play && app->play->quitRequested()) {
+                return SDL_APP_SUCCESS;
+            }
         }
         break;
     case SDL_EVENT_GAMEPAD_BUTTON_DOWN: {
+        app->pointerShown = false;
+        if (app->mode == Mode::Intro) {
+            showTitle(*app);
+            break;
+        }
         if (app->mode == Mode::Welcome) {
             if (event->gbutton.button == SDL_GAMEPAD_BUTTON_SOUTH) {
                 chooseFolder(*app);
@@ -520,8 +717,12 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
             }
             break;
         }
-        if (app->mode == Mode::Load && event->gbutton.button == SDL_GAMEPAD_BUTTON_SOUTH) {
+        if ((app->mode == Mode::Load || app->mode == Mode::Title) && event->gbutton.button == SDL_GAMEPAD_BUTTON_SOUTH) {
             send(*app, Command::Confirm);
+            break;
+        }
+        if (app->mode == Mode::Load && event->gbutton.button == SDL_GAMEPAD_BUTTON_EAST) {
+            send(*app, Command::Cancel);
             break;
         }
         if (app->mode == Mode::Play && event->gbutton.button == SDL_GAMEPAD_BUTTON_GUIDE) {
@@ -533,6 +734,7 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
         if (playing && event->gbutton.button == SDL_GAMEPAD_BUTTON_START) {
             SDL_Gamepad* pad = SDL_GetGamepadFromID(event->gbutton.which);
             if (pad != nullptr && SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_BACK)) {
+                app->play->closeMenu();
                 app->debug.toggle(*app->play);
                 break;
             }
@@ -551,9 +753,12 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
         }
         const bool pointing =
             playing && (app->play->colonyScreen() || app->play->europeScreen() || app->play->dialog() ||
-                        app->play->viewMode());
+                        app->play->viewMode() || app->play->menu());
         if (auto command = buttonCommand(event->gbutton.button, playing && app->play->waitingForEndOfTurn(), pointing)) {
             send(*app, *command);
+            if (app->mode == Mode::Play && app->play->quitRequested()) {
+                return SDL_APP_SUCCESS;
+            }
         }
         break;
     }
@@ -563,6 +768,9 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
             app->stickX = value;
         } else if (event->gaxis.axis == SDL_GAMEPAD_AXIS_LEFTY) {
             app->stickY = value;
+        } else if (event->gaxis.axis == SDL_GAMEPAD_AXIS_RIGHTX || event->gaxis.axis == SDL_GAMEPAD_AXIS_RIGHTY) {
+            (event->gaxis.axis == SDL_GAMEPAD_AXIS_RIGHTX ? app->lookX : app->lookY) = value;
+            break;
         } else {
             break;
         }
@@ -596,6 +804,20 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
     app->lastTicks = now;
     if (app->mode == Mode::Play) {
         app->play->tick(elapsed);
+    }
+    if (app->mode == Mode::Intro) {
+        app->intro->tick(elapsed);
+        if (app->intro->finished()) {
+            showTitle(*app);
+        }
+    }
+    // The right stick scrolls the map on the main screen.
+    if (app->mode == Mode::Play && std::hypot(app->lookX, app->lookY) >= kStickThreshold && !app->debug.open() &&
+        !app->play->dialog() && !app->play->colonyScreen() && !app->play->europeScreen() &&
+        now - app->lookFired >= kStickRepeatMs / 2) {
+        app->lookFired = now;
+        const auto axis = [](float v) { return v > kStickThreshold ? 1 : v < -kStickThreshold ? -1 : 0; };
+        app->play->scrollView(axis(app->lookX), axis(app->lookY));
     }
     // Holding the stick keeps moving.
     if (app->stickCommand && now - app->stickFired >= kStickRepeatMs) {

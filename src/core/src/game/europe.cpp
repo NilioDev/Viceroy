@@ -159,29 +159,125 @@ Trade buyGoods(SaveGame& save, const Ruleset& rules, int ship, int good, int fre
     }
     setHold(s, hold, good, holdAmount(s, hold) + amount);
     trade.amount = amount;
+    trade.price = price;
     trade.gold = amount * price;
     nation.gold -= trade.gold;
+    nation.tradeGold[static_cast<std::size_t>(good)] -= trade.gold;
+    nation.tonsTraded[static_cast<std::size_t>(good)] -= amount;
+    nation.tonsTraded2[static_cast<std::size_t>(good)] -= amount;
+    trade.priceMove = moveMarket(rules, nation, good, -amount);
     return trade;
 }
 
-Trade sellGoods(SaveGame& save, int ship, int good) {
+int moveMarket(const Ruleset& rules, SaveNation& nation, int good, int volume) {
+    if (good < 0 || good >= kGoodsKinds || static_cast<std::size_t>(good) >= rules.cargo.size()) {
+        return 0;
+    }
+    const auto& cargo = rules.cargo[static_cast<std::size_t>(good)];
+    auto& v = nation.volumes[static_cast<std::size_t>(good)];
+    auto& price = nation.prices[static_cast<std::size_t>(good)];
+    v += volume;
+    const int fall = std::max(1, cargo.fall) * 100;
+    const int rise = std::max(1, cargo.rise) * 100;
+    if (v >= fall) {
+        v -= fall;
+        if (price > cargo.driftLow) {
+            --price;
+            return -1;
+        }
+    } else if (v <= -rise) {
+        v += rise;
+        if (price < cargo.driftHigh) {
+            ++price;
+            return 1;
+        }
+    }
+    return 0;
+}
+
+Trade sellGoods(SaveGame& save, const Ruleset& rules, int ship, int good) {
     Trade trade;
     auto& s = save.units[static_cast<std::size_t>(ship)];
-    if (europePlace(s) != EuropePlace::InPort || s.nation < 0 || s.nation > 3) {
+    if (europePlace(s) != EuropePlace::InPort || s.nation < 0 || s.nation > 3 || good < 0 || good >= kGoodsKinds) {
         return trade;
     }
     auto& nation = save.nations[static_cast<std::size_t>(s.nation)];
+    // Hold by hold, as the original sells them: the price can move between.
     for (int k = s.holds - 1; k >= 0; --k) {
-        if (holdGood(s, k) == good) {
-            trade.amount += holdAmount(s, k);
-            removeHold(s, k);
+        if (holdGood(s, k) != good) {
+            continue;
+        }
+        const int amount = holdAmount(s, k);
+        removeHold(s, k);
+        const int price = bidPrice(nation, good);
+        const int gross = amount * price;
+        const int tax = gross * nation.taxRate / 100;
+        trade.amount += amount;
+        trade.price = price;
+        trade.tax += tax;
+        trade.gold += gross - tax;
+        nation.gold += gross - tax;
+        nation.tradeGold[static_cast<std::size_t>(good)] += gross - tax;
+        nation.tonsTraded[static_cast<std::size_t>(good)] += amount;
+        nation.tonsTraded2[static_cast<std::size_t>(good)] += amount;
+        trade.priceMove += moveMarket(rules, nation, good, amount);
+    }
+    return trade;
+}
+
+int recruitPrice(const SaveNation& nation) {
+    // At no crosses the price is 140 + 20 per recruit so far. It falls in
+    // a straight line as crosses gather, to a floor reached when they are
+    // all there: about a fifth of the full price, but not much under 100.
+    const int full = 140 + 20 * std::max(0, nation.recruitCount);
+    const int needed = std::max(1, nation.crossesNeeded);
+    const int crosses = std::clamp(nation.crosses, 0, needed);
+    const long long fall = std::min(99LL * (full - 100), 79253LL * full / 1000) ; // in hundredths
+    return full - static_cast<int>(fall * crosses / needed / 100);
+}
+
+int artilleryPrice(const SaveNation& nation) {
+    return 500 + 100 * std::max(0, nation.artilleryBought);
+}
+
+std::vector<PurchaseItem> purchaseList(const SaveNation& nation) {
+    return {{kArtillery, artilleryPrice(nation)}, {13, 1000}, {14, 2000}, {15, 3000}, {16, 2000}, {17, 5000}};
+}
+
+std::vector<int> trainingList(const Ruleset& rules) {
+    std::vector<int> rows;
+    for (std::size_t i = 0; i < rules.jobs.size(); ++i) {
+        if (rules.jobs[i].europeCost > 0) {
+            rows.push_back(static_cast<int>(i));
         }
     }
-    const int gross = trade.amount * bidPrice(nation, good);
-    trade.tax = gross * nation.taxRate / 100;
-    trade.gold = gross - trade.tax;
-    nation.gold += trade.gold;
-    return trade;
+    // A selection sort that takes the last of equal prices: it gives the
+    // order the original shows (carpenters before fishermen).
+    const auto cost = [&](int row) { return rules.jobs[static_cast<std::size_t>(row)].europeCost; };
+    for (std::size_t i = 0; i < rows.size(); ++i) {
+        std::size_t least = i;
+        for (std::size_t j = i + 1; j < rows.size(); ++j) {
+            if (cost(rows[j]) <= cost(rows[least])) {
+                least = j;
+            }
+        }
+        std::swap(rows[i], rows[least]);
+    }
+    return rows;
+}
+
+int professionJob(int profession) {
+    return profession == kFreeColonist ? 19 : profession;
+}
+
+int professionUnitType(int profession) {
+    switch (profession) {
+    case 0x14: return 2; // hardy pioneer
+    case 0x15: return 1; // veteran soldier
+    case 0x16: return 5; // seasoned scout
+    case 0x18: return 3; // jesuit missionary
+    default: return 0;
+    }
 }
 
 } // namespace viceroy

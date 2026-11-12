@@ -16,10 +16,12 @@ touch controls.
 > shows its buildings, people, what they produce and the warehouse; give
 > colonists other jobs with the jobs menu. At the end of the turn colonies
 > store what they make, grow and finish buildings. Ships sail to Europe from
-> the high seas, sell and buy goods there, take colonists from the docks and
-> sail back; recruiting and training come next. The other nations don't
-> move yet, and combat and meeting the natives are still to come. Fish and
-> other resources are not drawn yet.
+> the high seas, sell and buy goods there (prices move as you trade), take colonists from the docks and
+> sail back. In Europe you can recruit colonists, buy artillery and ships,
+> and have specialists trained. The other nations don't
+> move yet, and combat and meeting the natives are still to come. Fish,
+> ore and the other resources show on the map where the original puts them;
+> lost city rumours are not drawn yet.
 
 Viceroy is not affiliated with or endorsed by the makers of the original
 game. It contains none of the original game's files: you need your own copy.
@@ -49,9 +51,17 @@ and download one at the bottom of the page.
 
 ## Controls
 
+When the game files are in place, Viceroy plays the original's opening and
+then shows its main menu. For now only **LOAD Game** works there; starting a
+new game comes later.
+
 | Action | Keyboard | Gamepad |
 | --- | --- | --- |
+| Skip the opening | Any key, or click | Any button |
+| Pick in the main menu or the load menu | Up / Down and Enter, or click | D-pad and A |
+| Back from the load menu to the main menu | Esc | B |
 | Move the active unit | Numeric keypad 1-9, arrow keys, Home / PgUp / End / PgDn for diagonals, or click a square next to it | Left stick or D-pad |
+| Move the map | Click any other square to bring it to the middle, or click the small map | Right stick |
 | No orders this turn | Space | A |
 | End the turn (when asked) | Enter | A |
 | End the turn now | Ctrl+E | Y |
@@ -67,15 +77,20 @@ and download one at the bottom of the page.
 | Give the colonist another job (jobs menu) | Enter, then the arrow keys and Enter | A, then the D-pad and A |
 | Close the colony screen | Esc, or Enter with nobody picked, or click Exit | B |
 | Open the home port in Europe | E | Share / Capture button |
-| In Europe: move between the market, the ships and the docks | Up / Down | D-pad up / down |
+| In Europe: move between the market, the ships, the docks and the buttons | Up / Down | D-pad up / down |
 | In Europe: pick a good, ship or colonist | Left / Right | D-pad left / right |
 | In Europe: buy 100 of the good, send the ship to the New World, put the colonist aboard | Enter | A |
 | In Europe: sell the good from the ship | S | X |
 | In Europe: everyone aboard goes back to the docks | Space | |
+| In Europe: Recruit, Purchase, Train | R, P, T, or click the button | D-pad up to the buttons, then A |
 | Close the Europe screen | Esc, or click Exit | B |
 | Answer a question | Up / Down and Enter | D-pad and A |
-| Save the game | Ctrl+S | Start |
+| Open the menu bar (Game, View, Orders, Reports, Trade, Colonizopedia) | Click a title, F10, or Alt and the title's gold letter; then the arrow keys and Enter, or a gold letter | Start, then the D-pad and A |
+| Save the game | Ctrl+S, or Game, Save Game | Start, then Save Game |
 | Back to the load menu | Esc | Guide |
+
+The mouse pointer is the game's own arrow, drawn in the picture as the
+original does; it hides while you play with a gamepad.
 
 **Debug menu.** F12, or Back and Start together on a gamepad, opens a menu
 for testing that is not part of the original game: reveal the map, add gold,

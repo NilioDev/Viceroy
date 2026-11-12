@@ -9,10 +9,13 @@
 #include "viceroy/data/image.hpp"
 #include "viceroy/data/text_table.hpp"
 #include "viceroy/game/game.hpp"
+#include "viceroy/render/menu_bar.hpp"
 #include "viceroy/render/screen.hpp"
 
 #include <filesystem>
+#include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace viceroy {
@@ -23,6 +26,7 @@ struct Art {
     SpriteSheet phys;    // PHYS0.SS: forests, hills, rivers, roads, fog
     SpriteSheet icons;   // ICONS.SS: units, colonies, settlements, goods
     IndexedImage wood;   // WOODTILE.SS: the wooden background
+    SpriteSheet cursor;  // CURSOR.SS: the mouse pointers
     Font tiny;           // FONTTINY.FF
     Font small;          // FONTSMAL.FF
     Font labels;         // FONTINTR.FF: names on the map
@@ -30,6 +34,7 @@ struct Art {
     TextFile colonyNames; // COLONY.TXT
     TextFile labelText;   // LABELS.TXT: words on the screens
     TextFile gameText;    // GAME.TXT: the messages
+    std::vector<MenuDef> menus; // MENU.TXT: the menu bar
     std::vector<SpriteSheet> portraits; // advisors: MSS0.SS, ...
     Ruleset rules;
 };
@@ -48,12 +53,24 @@ struct ViewState {
     int originX = 0; // map square shown at the top-left of the map window
     int originY = 0;
     bool blinkOn = true; // the active unit flashes
+    // A unit gliding into its square: drawn on top, this many pixels away
+    // from the square it is moving to.
+    int slideUnit = -1;
+    int slideX = 0;
+    int slideY = 0;
     std::string message; // a line shown at the bottom of the panel
 };
 
 // Puts the square in the middle of the map window, as the original does
 // with the active unit.
 void centreOn(ViewState& view, const Game& game, int x, int y);
+
+// The small map of the world in the panel, frame included: map columns 1 to
+// 56 and 39 rows around the view, one pixel each.
+inline constexpr Rect kMinimapArea{251, 8, 58, 41};
+int minimapTop(const Game& game, const ViewState& view);
+// The map square under a point of the small map, if any.
+std::optional<std::pair<int, int>> minimapSquare(const Game& game, const ViewState& view, int x, int y);
 
 void drawGameScreen(Screen& screen, const Art& art, const Game& game, const ViewState& view);
 

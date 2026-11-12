@@ -159,6 +159,7 @@ VCR_TEST("game: colony names come from the nation's list") {
 #include "viceroy/game_files.hpp"
 #include "viceroy/render/game_view.hpp"
 
+#include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -183,6 +184,11 @@ VCR_TEST("original files: the game screen is drawn from a savegame") {
     VCR_CHECK(unitIcon(game, 51) == 15); // a frigate
     // For comparing with the original by eye: VICEROY_DUMP_SCREEN=file.
     if (const char* dump = std::getenv("VICEROY_DUMP_SCREEN")) {
+        // VICEROY_DUMP_ORIGIN=x,y shows another part of the map.
+        if (const char* origin = std::getenv("VICEROY_DUMP_ORIGIN")) {
+            std::sscanf(origin, "%d,%d", &view.originX, &view.originY);
+            drawGameScreen(screen, art, game, view);
+        }
         std::ofstream out(dump, std::ios::binary);
         out.write(reinterpret_cast<const char*>(screen.pixels().data()),
                   static_cast<std::streamsize>(screen.pixels().size()));
@@ -240,4 +246,49 @@ VCR_TEST("original files: a turn can be played and saved") {
     Screen screen;
     play.draw(screen, art);
     std::filesystem::remove_all(work);
+}
+
+VCR_TEST("original files: units glide, and a click far away moves the map") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
+    const Bytes bytes(std::istreambuf_iterator<char>(in), {});
+    Game game(readSaveGame(bytes), art.rules);
+    game.setActiveUnit(51); // the frigate the original shows first
+    PlayScreen play(std::move(game), {});
+    play.setAnimations(true);
+    const int frigate = play.game().activeUnit();
+    VCR_CHECK(frigate == 51);
+    const int x = play.game().unit(frigate).x;
+    const int y = play.game().unit(frigate).y;
+
+    // A click on a square far from the frigate brings the map round to it.
+    play.clickSquare(x - 10, y + 6);
+    VCR_CHECK(play.game().unit(frigate).x == x);
+    VCR_CHECK(play.view().originX == x - 10 - kViewColumns / 2);
+    // A click on the small map does the same, one square up and left of the
+    // pointer's tip, as measured on the original.
+    const int top = minimapTop(play.game(), play.view());
+    const auto square = minimapSquare(play.game(), play.view(), kMinimapArea.x + 20, kMinimapArea.y + 10);
+    VCR_CHECK(square.has_value() && square->first == 19 && square->second == top + 9);
+    play.clickMinimap(square->first, square->second);
+    VCR_CHECK(play.view().originX == 19 - kViewColumns / 2);
+
+    // A move glides; commands wait until the frigate has arrived.
+    play.handle(Command::MoveN);
+    VCR_CHECK(play.animating());
+    VCR_CHECK(play.view().slideUnit == frigate && play.view().slideY == kSquare);
+    VCR_CHECK(play.game().unit(frigate).y == y - 1);
+    play.handle(Command::MoveN);
+    VCR_CHECK(play.game().unit(frigate).y == y - 1);
+    play.tick(80);
+    VCR_CHECK(play.view().slideY > 0 && play.view().slideY < kSquare);
+    play.tick(200);
+    VCR_CHECK(!play.animating() && play.view().slideUnit == -1);
+    VCR_CHECK(play.game().activeUnit() == frigate);
+    play.handle(Command::MoveN);
+    VCR_CHECK(play.game().unit(frigate).y == y - 2);
 }

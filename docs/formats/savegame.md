@@ -21,7 +21,7 @@ understood; the parts marked *opaque* are kept byte for byte.
 | Map: mask | width × height |
 | Map: path | width × height |
 | Map: seen | width × height |
-| Rest | 1502 (*opaque*) |
+| Rest | 1502 (*opaque*; byte 612 is the seed of the resource pattern) |
 
 The three counts come from the header, so the start of the map moves with
 the number of colonies, units and settlements. In all ten saves the blocks
@@ -66,9 +66,12 @@ river on hills, 5 mountains, 6 major river. (Checked: value 5 forms the
 Andes and the Rockies in the saves.)
 
 **Mask.** Flags per square: bit 0 a unit is here, bit 1 a colony is here,
-bit 3 road, bit 6 plowed. The other bits are kept as they are.
+bit 2 no fish on this pattern square of the sea, or silver instead of ore
+on a mountain (see [map drawing](../rules/map-drawing.md)), bit 3 road,
+bit 6 plowed. The other bits are kept as they are.
 
-**Path.** Region numbers used for route finding (kept as they are).
+**Path.** Region numbers used for route finding (kept as they are). Lost
+city rumours were only seen on squares where the high nibble is 0xF.
 
 **Seen.** Bits 4 to 7: explored by the English, French, Spanish and Dutch.
 Checked: in `COLONY00.SAV` (a Dutch game) exactly the squares without bit
@@ -118,8 +121,15 @@ the next and previous unit of a ship's cargo chain at 24 and 26. Units in
 Europe or on the high seas have x = y = 228 + nation + 4 × stage; see
 [Europe](../rules/europe.md) for what the stages mean.
 
-**Nation** (316 bytes): tax rate at 1, gold at 42 (32 bits), and the
-European market at 76: one byte per good in `@CARGO` order, from which the
-bid and asking prices follow (see [Europe](../rules/europe.md)).
+**Nation** (316 bytes): tax rate at 1; the three people waiting to be
+recruited at 2 to 4 (professions, as the unit's byte 23); how many were
+recruited so far at 6; artillery bought so far at 30; gold at 42 (32 bits);
+crosses at 46 and the crosses needed for the next migrant at 48 (16 bits
+each); and the European market at 76: one byte per good in `@CARGO` order,
+from which the bid and asking prices follow (see [Europe](../rules/europe.md)),
+then per good the trade volume at 92 (16 bits), the gold it brought in at 124
+and the tons traded at 188 and again at 252 (32 bits each).
+The recruit, artillery and crosses fields were confirmed by changing them in
+a save and reading the prices the original then asks.
 
 **Native settlement** (18 bytes): x, y, tribe (4 to 11), …, population at 4.

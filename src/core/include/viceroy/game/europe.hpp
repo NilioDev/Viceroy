@@ -64,12 +64,47 @@ struct Trade {
     int amount = 0; // units moved
     int gold = 0;   // paid (buying) or received after tax (selling)
     int tax = 0;
+    int price = 0;  // per unit, before tax
+    int priceMove = 0; // +1 or -1 when the market moved after this trade
 };
+
+// The market answers trade: sales add to a good's volume and purchases
+// take from it. When the volume reaches the good's "fall" (in hundreds)
+// the price drops by one, and at minus its "rise" it goes up by one,
+// within the good's bounds. Returns the move. See docs/rules/europe.md.
+int moveMarket(const Ruleset& rules, SaveNation& nation, int good, int volume);
 
 // Buys up to 100 of a good into a ship in port: tops up a hold of the same
 // good, or fills a free one. Limited by gold and room.
 Trade buyGoods(SaveGame& save, const Ruleset& rules, int ship, int good, int freeHolds);
 // Sells everything of a good aboard a ship in port.
-Trade sellGoods(SaveGame& save, int ship, int good);
+Trade sellGoods(SaveGame& save, const Ruleset& rules, int ship, int good);
+
+// --- Recruit, Purchase and Train --------------------------------------------
+// What the passage of a recruit costs: 140 + 20 for every recruit so far,
+// less a share for the crosses gathered towards the next migrant. Measured
+// on the original; see docs/rules/europe.md.
+int recruitPrice(const SaveNation& nation);
+int artilleryPrice(const SaveNation& nation);
+
+struct PurchaseItem {
+    int unitType = 0; // row of @UNIT
+    int price = 0;
+};
+// The Purchase list: artillery and the ships, in the original's order.
+std::vector<PurchaseItem> purchaseList(const SaveNation& nation);
+
+// The rows of @JOB the Royal University teaches, cheapest first, in the
+// original's order where two cost the same.
+std::vector<int> trainingList(const Ruleset& rules);
+
+// The row of @JOB that names a profession (SaveUnit::profession).
+int professionJob(int profession);
+// The unit a person of a profession arrives as: veteran soldiers come as
+// soldiers, pioneers as pioneers, and so on. The rest are colonists.
+int professionUnitType(int profession);
+
+inline constexpr int kFreeColonist = 0x1C;
+inline constexpr int kArtillery = 11;
 
 } // namespace viceroy

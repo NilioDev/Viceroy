@@ -58,8 +58,76 @@ good's `@CARGO` row, so food 1 shows as 0/8, sugar 7 as 6/8, silver 14 as
 hold of the same good or fills a free one, as far as the gold goes; the
 tax is taken from what a sale brings in.
 
-**Not yet done:** prices moving after trade, boycotts, and the
-Recruit, Purchase and Train buttons.
+### Prices moving
+
+Measured by selling sugar a hundred at a time and saving after each sale.
+Each good has a volume (nation record, 16 bits at 92 + 2 × good). A sale
+adds to it and a purchase takes from it. When it reaches the good's
+`fall` column of `@CARGO` in hundreds (sugar: 600), the price drops by one
+and the volume loses that much again. At minus `rise` hundreds the price
+goes up by one. The price stays within the good's `low` and `high` columns.
+"The price of … has fallen to …" (`@PRICEDOWN`, or `@PRICEUP`) follows.
+
+Seen in the original: COLONY00's sugar at 7 with volume 143 kept its price
+through four sales of 100 and fell to 6 with the fifth, leaving the volume
+at 78. Sales are counted hold by hold, so the price can change between two
+holds of the same good.
+
+The original also keeps the gold and tons traded per good (at 124 and at
+188 and 252, 32 bits each), which we update the same way.
+
+**Not yet known:** a sale of 100 sugar added 107 to the volume, but 100
+furs added exactly 100; we add the amount itself. Also not yet known are
+how the volume recovers each turn (the `attrition` column), what
+`volatility` does, how other nations' trade moves prices, and boycotts.
+
+### The trade note
+
+After each sale or purchase the original writes a note over the sky,
+in the labels font in colour 0x30 with 0x36 for the font's second colour
+and a black shadow; it stays until the next action. A sale shows
+"Sold 100 Sugar at 6$/ton" centred at y 12 (centred on 160 less half of
+the width minus one), then three rows 11 apart: "Price:", "2% Tax:" and,
+below a black line from x 100 to 200 at y 45, "Net:" at y 48. Labels end
+at x 147 and the amounts ("600$", "-12$", "588$") at x 200. A purchase
+shows "Bought 100 Sugar at 8$/ton" and "Price: 800$" centred below it.
+Both were compared pixel for pixel with the original.
+
+## Recruit, Purchase and Train
+
+Measured by changing the nation record of a save and reading what the
+original then asks (43 readings).
+
+- **Recruit** offers the three people waiting at bytes 2 to 4 of the nation
+  record, named by the plural column of `@JOB` (profession 0x1C, a free
+  colonist, uses the Colonist row), after "(None)". The passage costs
+  140 + 20 × the recruits so far (byte 6) with no crosses. As crosses
+  (byte 46) gather towards those needed (byte 48) the price falls in a
+  straight line: price = full − ⌊K × crosses / needed⌋ with
+  K = min(0.99 × (full − 100), 0.79253 × full). This fits 36 of the 39
+  readings exactly and the rest within two gold; the exact rule is not
+  known. After a recruit the count goes up by one and the crosses go back
+  to 0 (the next price was the full one). The recruit's place is taken by
+  someone new; who comes is a guess weighted towards the unskilled, as the
+  original's odds are not known.
+- **Purchase** lists Artillery for 500 + 100 × the artillery bought so far
+  (byte 30), Caravel 1000, Merchantman 2000, Galleon 3000, Privateer 2000
+  and Frigate 5000, then asks "Purchase <unit> for <price>$?" (`@REALLYBUY`).
+- **Train** (`@KINGRECRUIT`, in the small font) lists every `@JOB` row with
+  a price in its fourth column, cheapest first. Where two cost the same the
+  original's order is that of a selection sort that takes the last of equal
+  prices: Master Carpenters before Expert Fishermen, Hardy Pioneers before
+  Master Tobacconists.
+- In all three, choices the gold doesn't cover are grey (0x08) and the bar
+  skips them. Recruit and Train take the gold at once; nothing asks again.
+- The new unit stands on the docks, first in line. Veteran soldiers arrive
+  as soldiers, hardy pioneers as pioneers, Jesuit missionaries as
+  missionaries and seasoned scouts as scouts (seen for soldiers; the others
+  are assumed). Ships bought wait in port.
+- The original shows units on the docks three to a row; a fourth stands on
+  the quay below, about 25 lower.
+
+The boxes themselves are in [dialogs](dialogs.md).
 
 ## The screen
 

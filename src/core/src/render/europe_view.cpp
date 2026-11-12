@@ -34,6 +34,14 @@ constexpr int kHoldsLeft = 147;
 constexpr int kHoldsTop = 165;
 constexpr int kDocksCentre = 239;
 constexpr int kDocksTop = 138;
+constexpr int kDocksPerRow = 3;
+// The trade note over the sky, measured on the original.
+constexpr std::uint8_t kReceiptText = 0x30;
+constexpr std::uint8_t kReceiptShade = 0x36;
+constexpr int kReceiptTop = 12;
+constexpr int kReceiptLabelRight = 147;
+constexpr int kReceiptValueRight = 200;
+constexpr int kDocksRowStep = 25;
 
 // LABELS.TXT @MISC rows.
 constexpr int kExpectedSoon = 9;
@@ -72,9 +80,13 @@ void drawTopLine(Screen& screen, const Art& art, const Game& game) {
     centred(screen, art.tiny, 160, 1, text, kGreen);
 }
 
-void drawButtons(Screen& screen, const Art& art) {
+void drawButtons(Screen& screen, const Art& art, const EuropeViewState& view) {
     for (int i = 0; i < 3; ++i) {
         const Rect& r = kEuropeButtons[i];
+        if (view.focus == EuropeFocus::Buttons && view.button == i) {
+            // Not in the original, which has no keyboard way to the buttons.
+            screen.frame({r.x - 2, r.y - 2, r.w + 4, r.h + 4}, kWhite);
+        }
         screen.fill({r.x, r.y, r.w, 1}, kButtonLight);
         screen.fill({r.x, r.y, 1, r.h}, kButtonLight);
         screen.fill({r.x + 1, r.y + r.h - 1, r.w - 1, 1}, kButtonDark);
@@ -217,16 +229,17 @@ void drawPort(Screen& screen, const Art& art, const Game& game, const EuropeView
         blitSprite(screen, art.icons, kEmptyHold, kHoldsLeft + 12 * k, kHoldsTop);
     }
 
-    // The docks: land units in port.
-    int dockCentre = kDocksCentre;
+    // The docks: land units in port, three to a row; further rows stand
+    // on the quay below.
     const auto docks = unitsOnDocks(save, game.rules(), game.human());
     for (std::size_t i = 0; i < docks.size(); ++i) {
-        drawCentredUnit(screen, art, game, docks[i], dockCentre, kDocksTop);
+        const int dockCentre = kDocksCentre + kUnitStep * static_cast<int>(i % kDocksPerRow);
+        const int top = kDocksTop + kDocksRowStep * static_cast<int>(i / kDocksPerRow);
+        drawCentredUnit(screen, art, game, docks[i], dockCentre, top);
         if (view.focus == EuropeFocus::Docks && static_cast<int>(i) == view.dock) {
             const int x = dockCentre - spriteWidth(art.icons, unitIcon(game, docks[i])) / 2;
-            screen.frame({x - 3, kDocksTop - 1, 18, 18}, kSelected);
+            screen.frame({x - 3, top - 1, 18, 18}, kSelected);
         }
-        dockCentre += kUnitStep;
     }
 }
 
@@ -246,6 +259,29 @@ void drawMarket(Screen& screen, const Art& art, const Game& game, const EuropeVi
     screen.text(art.tiny, 306, 179, "Exit", {kWhite, kNoColour, kNoColour});
 }
 
+void drawReceipt(Screen& screen, const Art& art, const TradeReceipt& r) {
+    const TextColours colours{kReceiptText, kReceiptShade, kBlack};
+    const auto centre = [&](int y, const std::string& text) {
+        // The original centres on the ink, without the last letter's spacing column.
+        screen.text(art.labels, 160 - (Screen::textWidth(art.labels, text) - 1) / 2, y, text, colours);
+    };
+    const auto row = [&](int y, const std::string& label, const std::string& value) {
+        screen.text(art.labels, kReceiptLabelRight - Screen::textWidth(art.labels, label), y, label, colours);
+        screen.text(art.labels, kReceiptValueRight - Screen::textWidth(art.labels, value), y, value, colours);
+    };
+    const std::string what = std::to_string(r.amount) + " " + r.good + " at " + std::to_string(r.perTon) + "$/ton";
+    if (!r.sold) {
+        centre(kReceiptTop, "Bought " + what);
+        centre(kReceiptTop + 11, "Price: " + std::to_string(r.price) + "$");
+        return;
+    }
+    centre(kReceiptTop, "Sold " + what);
+    row(kReceiptTop + 11, "Price:", std::to_string(r.price) + "$");
+    row(kReceiptTop + 22, std::to_string(r.taxRate) + "% Tax:", "-" + std::to_string(r.tax) + "$");
+    screen.fill({100, kReceiptTop + 33, 101, 1}, kBlack);
+    row(kReceiptTop + 36, "Net:", std::to_string(r.price - r.tax) + "$");
+}
+
 } // namespace
 
 void drawEuropeScreen(Screen& screen, const Art& art, const ColonyArt& colonyArt, const Game& game,
@@ -254,12 +290,15 @@ void drawEuropeScreen(Screen& screen, const Art& art, const ColonyArt& colonyArt
     screen.clear(kBlack);
     screen.blit(colonyArt.europe, 0, 0);
     drawTopLine(screen, art, game);
-    drawButtons(screen, art);
+    drawButtons(screen, art, view);
     drawBoxTitles(screen, art, game, view);
     drawSailing(screen, art, game, 0, EuropePlace::ToEurope);
     drawSailing(screen, art, game, 1, EuropePlace::ToNewWorld);
     drawPort(screen, art, game, view);
     drawMarket(screen, art, game, view);
+    if (view.receipt) {
+        drawReceipt(screen, art, *view.receipt);
+    }
 }
 
 } // namespace viceroy

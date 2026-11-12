@@ -49,6 +49,9 @@ struct MapSquare {
 struct SaveMap {
     int width = 0;
     int height = 0;
+    // Shifts the fixed pattern of resources and rumours: byte 612 of the
+    // block after the map, the same for the whole of one game.
+    std::uint8_t resourceSeed = 0;
     std::vector<MapSquare> squares; // row by row
 
     bool inside(int x, int y) const { return x >= 0 && y >= 0 && x < width && y < height; }
@@ -77,6 +80,20 @@ struct SaveNation {
     // original buys at one less and sells at this plus the good's spread;
     // see game/europe.hpp.
     std::array<int, kGoodsKinds> prices{};
+    // The three people waiting on the docks to be recruited (professions,
+    // as SaveUnit::profession), how many were recruited so far, and the
+    // crosses towards the next one coming of their own accord.
+    // How much of each good went over the market since its price last
+    // moved (sales count up, purchases down), and the totals ever traded.
+    std::array<int, kGoodsKinds> volumes{};
+    std::array<int, kGoodsKinds> tradeGold{};
+    std::array<int, kGoodsKinds> tonsTraded{};
+    std::array<int, kGoodsKinds> tonsTraded2{}; // a second copy the original keeps
+    std::array<int, 3> recruits{};
+    int recruitCount = 0;
+    int crosses = 0;
+    int crossesNeeded = 0;
+    int artilleryBought = 0;
     std::array<std::uint8_t, 316> raw{};
 };
 inline constexpr int kMaxColonists = 32;
