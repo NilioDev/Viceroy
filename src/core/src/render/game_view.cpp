@@ -414,8 +414,10 @@ int minimapTop(const Game& game, const ViewState& view) {
 
 std::optional<std::pair<int, int>> minimapSquare(const Game& game, const ViewState& view, int x, int y) {
     const auto& map = game.state().map;
-    const int mx = x - kMinimapArea.x;
-    const int my = minimapTop(game, view) + y - kMinimapArea.y;
+    // Measured on the original: a click lands one square up and to the left
+    // of the square drawn under the pointer's tip.
+    const int mx = x - kMinimapArea.x - 1;
+    const int my = minimapTop(game, view) + y - kMinimapArea.y - 1;
     if (x < kMinimapArea.x || x >= kMinimapArea.x + kMinimapArea.w || y < kMinimapArea.y ||
         y >= kMinimapArea.y + kMinimapArea.h || !map.inside(mx, my)) {
         return std::nullopt;

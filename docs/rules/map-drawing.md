@@ -103,6 +103,13 @@ ground. The view is a white frame of 15 × 12 squares. All but 4 of the
 small map's pixels matched; those are settlements the original leaves out
 (perhaps not yet visited) and one corner of the view frame.
 
+Moving the map (tried on the original with the mouse): there is no
+scrolling at the edges. A click on a map square that is not next to the
+active unit brings that square to the middle (column 7, row 6 of the view).
+A click on the small map does the same for the square one up and to the
+left of the one drawn under the pointer's tip; the small map then follows
+the view.
+
 ## Resources
 
 What 28 captures of a view-mode tour of one map showed (153 squares with a
