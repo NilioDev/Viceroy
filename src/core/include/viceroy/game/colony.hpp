@@ -137,6 +137,7 @@ struct ColonistWork {
     std::optional<BuildingKind> building; // when working inside
     int good = -1;                      // what they make (cargo::), -1 nothing
     int amount = 0;                     // per turn, before any shortage
+    int uses = 0;                       // raw goods a workshop needs for it
 };
 
 struct ColonyProduction {
@@ -169,6 +170,10 @@ WorkModifier workModifier(const SaveColony& colony, int difficulty);
 // A resource on the square (resource.hpp) adds to the job it suits.
 int squareYield(const Ruleset& rules, const MapSquare& square, int jobRow, int skill, WorkModifier modifier = {},
                 bool nearLand = true, Resource resource = Resource::None);
+// What a worker in a building makes (level 1 house, 2 shop, 3 factory);
+// without the factory's extra half when withFactory is false, which is
+// what the worker uses of its raw good.
+int buildingYield(int level, int skill, int jobRow, WorkModifier modifier = {}, bool withFactory = true);
 // How many of the 8 squares around are land.
 int landAround(const SaveMap& map, int x, int y);
 

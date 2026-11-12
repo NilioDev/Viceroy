@@ -17,16 +17,19 @@ be checked against more colonies.
 | Fisherman | yield + 1 where the water has land on 3 or more of its 8 sides, yield − 1 elsewhere |
 
 A river adds 1 to all of them. An expert farmer or fisherman makes 2 more;
-other experts make twice as much. The Sons of Liberty add to all of this or
+other experts make twice as much, the road included for furs and ore but
+not for lumber: an expert lumberjack on a rain forest (yield 2) with a road
+makes 2 × 2 × 2 + 2 = 10 (San Salvador, measured from its hammers over two
+turns). Indian converts make 1 more as farmers, fishermen, planters and fur
+trappers (San Salvador's convert farmer and fisherman), not as ore miners. The Sons of Liberty add to all of this or
 take from it (see [liberty.md](liberty.md)).
 
 Measured on test colonies: the ocean (yield 3) gives a colonist 2 food with
 land on one or two sides, 4 with three or more (also when the land is only
 at the corners); an expert fisherman makes 2 more (6 next to land).
 
-The colony's own square (the town commons) counts as plowed. It makes food
-and one other good: furs in a forest, otherwise its best crop or ore, at its
-yield + 1.
+The colony's own square (the town commons) makes food and one other good;
+see "The colony's own square" below.
 
 Checked: Isabella (savannah commons: 5 food, 4 sugar), Jamestown (tropical
 forest commons: 4 food, 3 furs; farmers on plowed savannah: 5, expert 7;
@@ -46,7 +49,7 @@ without the Sons of Liberty bonus. A resource helps only the job it suits:
 | Grain (plains), oasis (desert) | farmer | yield + 2 |
 | Fish (ocean) | fisherman | yield + 3 |
 | Timber (conifer, tropical forest) | lumberjack | yield + 2 (so 4 more lumber) |
-| Deer (broadleaf, boreal forest) | fur trapper | yield + 2 |
+| Deer (broadleaf, boreal forest) | fur trapper, farmer (seen on the colony square) | yield + 2 |
 | Beaver (mixed forest) | fur trapper | yield + 3 |
 | Ore (hills) | ore miner | yield + 2 |
 | Minerals (swamp, marsh) | ore miner | yield + 3 |
@@ -54,8 +57,12 @@ without the Sons of Liberty bonus. A resource helps only the job it suits:
 
 The additions go in where the Sons of Liberty bonus goes, so an expert who
 doubles doubles them too, and expert farmers and fishermen get them twice
-(grain: a colonist 7, an expert 11). Ore on mountains made no difference to
-an ore miner; silver is not measured yet.
+(grain: a colonist 7, an expert 11).
+
+Silver on mountains: the resource there is a silver deposit, not ore (an
+ore miner gets nothing from it). A silver miner makes 3 on a deposit (an
+expert 6), 1 on a mountain whose mask has bit 2 (with or without the
+pattern: a worked-out deposit), and nothing on other mountains.
 
 **Not yet known:** whether the colony's own square uses a resource under
 it.
@@ -83,10 +90,14 @@ the food. A plowed square makes 1 more (plains 4). Discoverer gives 2 more
 food and Explorer 1; Governor and Viceroy are the same as Conquistador. Our
 ten saves agree (Discoverer: savannah 5, tropical 4, boreal 4, prairie 5).
 
-The other good is the land's own yield of its best crop or ore (furs in a
-forest), 1 more on a minor river and 2 on a major one, and 1 more at
+The other good is the first of the largest yields in the order sugar,
+tobacco, cotton, furs, ore, silver (rain forest, all 1: sugar), at the
+land's own yield, 1 more on a minor river and 2 on a major one, and 1 more at
 Discoverer: plains make 2 cotton at Conquistador, 3 at Discoverer, 3 on a
-minor river. The Sons of Liberty bonus adds to both; the tories' penalty
+minor river. A resource under the colony counts for both, as for a
+worker (grain: 2 more food; deer: 2 more food and furs; prime sugar:
+twice the sugar; minerals in a rain forest: ore 1 + 3 = 4, which then beats
+the sugar). The Sons of Liberty bonus adds to both; the tories' penalty
 does not apply here.
 
 A colony we placed on mountains by editing a save stored 37 more food than
@@ -95,10 +106,25 @@ this explains; that case is not understood yet.
 ## In buildings
 
 A free colonist makes 3, an expert 6, an indentured servant 2 and a petty
-criminal or a convert 1. The lumber mill doubles a carpenter's work and a
-factory adds half. Every colony also makes 1 bell and 1 cross of its own, and the church 1
+criminal or a convert 1. A shop (and the lumber mill) doubles that and a
+factory adds half again: a colonist makes 3 in a house, 6 in a shop and 9
+in a factory. Every colony also makes 1 bell and 1 cross of its own, and the church 1
 more cross for each of its levels (see europe.md for immigration).
-Workshops use up as much of their raw good as they make.
+Workshops use up as much of their raw good as they make, except the
+factory's extra half, which is free (a colonist in a fur factory: 6 furs
+make 9 coats).
+
+In the craft workshops (rum, cigars, cloth, coats, tools, muskets) the Sons
+of Liberty bonus and the tories' penalty go in after the shop and before an
+expert doubles: an expert blacksmith in a house makes 10 tools with +2 and 4
+with a penalty of 1; a colonist in a blacksmith's shop with +1 makes 7. For
+carpenters they are added once at the end (see liberty.md); statesmen and
+preachers are treated the same way until measured.
+
+Measured on test colonies (one worker, one turn, the raw good used and the
+goods made), and in our saves: Santo Domingo's fur trading post (6 coats
+from a colonist), Vlissingen's blacksmith's shop, Fort Nassau's expert
+blacksmith with a penalty.
 
 Checked: Isabella (a criminal and a colonist distil 4 rum), Jamestown (an
 expert carpenter in a lumber mill: 12 hammers; town hall with a colonist: 4

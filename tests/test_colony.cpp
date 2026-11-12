@@ -291,3 +291,61 @@ VCR_TEST("colony square: food by land and difficulty (measured)") {
     VCR_CHECK(centre(8, 0, false, 4) == 2);
     VCR_CHECK(centre(13, 0, false, 0) == 4);
 }
+
+VCR_TEST("silver: only from a deposit or a marked mountain (measured)") {
+    Ruleset r;
+    r.terrain.resize(21);
+    r.terrain[19].yield[7] = 1; // mountains
+    MapSquare m;
+    m.terrain = 2;
+    m.relief = 5;
+    const int colonist = 28;
+    const int expert = 7;
+    VCR_CHECK(squareYield(r, m, 7, colonist) == 0);
+    VCR_CHECK(squareYield(r, m, 7, colonist, {}, true, Resource::Silver) == 3);
+    VCR_CHECK(squareYield(r, m, 7, expert, {}, true, Resource::Silver) == 6);
+    m.flags = 0x04;
+    VCR_CHECK(squareYield(r, m, 7, colonist) == 1);
+    VCR_CHECK(squareYield(r, m, 7, colonist, {}, true, Resource::DepletedSilver) == 1);
+    VCR_CHECK(squareYield(r, m, 7, expert, {}, true, Resource::DepletedSilver) == 2);
+}
+
+VCR_TEST("workshops: house, shop and factory (measured)") {
+    const int colonist = 28;
+    const int furTrader = 12;
+    const int blacksmith = 14;
+    VCR_CHECK(buildingYield(1, colonist, furTrader) == 3);
+    VCR_CHECK(buildingYield(2, colonist, furTrader) == 6);
+    VCR_CHECK(buildingYield(2, furTrader, furTrader) == 12);
+    VCR_CHECK(buildingYield(3, colonist, furTrader) == 9);
+    VCR_CHECK(buildingYield(3, colonist, furTrader, {}, false) == 6);
+    // Bonus and penalty go in before an expert doubles.
+    VCR_CHECK(buildingYield(1, blacksmith, blacksmith, {2, 0}) == 10);
+    VCR_CHECK(buildingYield(1, blacksmith, blacksmith, {0, 1}) == 4);
+    VCR_CHECK(buildingYield(1, colonist, blacksmith, {0, 1}) == 2);
+    VCR_CHECK(buildingYield(2, colonist, blacksmith, {1, 0}) == 7);
+}
+
+VCR_TEST("construction: finishes with the hammers and tools the ruleset lists") {
+    Ruleset r;
+    r.buildings.resize(3);
+    r.buildings[2].hammers = 320;
+    r.buildings[2].tools = 200; // NAMES.TXT says 20: tens of tools
+    SaveColony c;
+    c.construction = 2;
+    c.hammers = 319;
+    c.stock[cargo::kTools] = 200;
+    c.raw[149] = 1;
+    setBuildingLevel(c, BuildingKind::Fortification, 2);
+    SaveMap map;
+    // One hammer short: nothing yet (the colony's own hammers come from
+    // nobody here).
+    auto turn = runColonyTurn(c, map, r);
+    VCR_CHECK(turn.built == -1);
+    c.hammers = 320;
+    turn = runColonyTurn(c, map, r);
+    VCR_CHECK(turn.built == 2);
+    VCR_CHECK(c.hammers == 0);
+    VCR_CHECK(c.stock[cargo::kTools] == 0);
+    VCR_CHECK(buildingLevel(c, BuildingKind::Fortification) == 3);
+}
