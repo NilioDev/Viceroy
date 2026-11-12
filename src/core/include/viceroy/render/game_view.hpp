@@ -64,9 +64,9 @@ struct ViewState {
 // with the active unit.
 void centreOn(ViewState& view, const Game& game, int x, int y);
 
-// The small map of the world in the panel: 58 squares wide and 40 high
-// around the view, one pixel each.
-inline constexpr Rect kMinimapArea{251, 8, 60, 41};
+// The small map of the world in the panel, frame included: map columns 1 to
+// 56 and 39 rows around the view, one pixel each.
+inline constexpr Rect kMinimapArea{251, 8, 58, 41};
 int minimapTop(const Game& game, const ViewState& view);
 // The map square under a point of the small map, if any.
 std::optional<std::pair<int, int>> minimapSquare(const Game& game, const ViewState& view, int x, int y);

@@ -49,6 +49,9 @@ constexpr std::uint8_t kWhite = 0x0F;
 constexpr std::uint8_t kGreen = 0x44;
 constexpr std::uint8_t kGold = 0x95;
 constexpr std::uint8_t kMinimapFrame = 0x06;
+// Colonies and units on the small map, seen in the original for the French,
+// Spanish and Dutch; the English red is a guess.
+constexpr std::array<std::uint8_t, 4> kMinimapNation{0x0C, 0x09, 0x0E, 0x0D};
 
 const IndexedImage* sprite(const SpriteSheet& sheet, int index) {
     if (index < 0 || index >= static_cast<int>(sheet.sprites.size())) {
@@ -279,15 +282,14 @@ std::string terrainName(const Art& art, const MapSquare& sq) {
 }
 
 std::uint8_t minimapColour(const Art& art, const MapSquare& sq) {
-    // The middle pixel of the square's picture stands for it.
+    // The middle pixel of the ground, or of the hills or mountains, stands
+    // for the square (forests show their ground). Checked on the original.
     int tile = baseTile(sq);
     const IndexedImage* img = nullptr;
     if (sq.mountains()) {
         img = sprite(art.phys, kMountains);
     } else if (sq.hills()) {
         img = sprite(art.phys, kHills);
-    } else if (forestShown(sq)) {
-        img = sprite(art.phys, kForest);
     }
     if (img == nullptr || img->pixels.empty()) {
         img = sprite(art.terrain, tile);
@@ -376,7 +378,7 @@ int minimapTop(const Game& game, const ViewState& view) {
 
 std::optional<std::pair<int, int>> minimapSquare(const Game& game, const ViewState& view, int x, int y) {
     const auto& map = game.state().map;
-    const int mx = x - (kMinimapArea.x + 1);
+    const int mx = x - kMinimapArea.x;
     const int my = minimapTop(game, view) + y - kMinimapArea.y;
     if (x < kMinimapArea.x || x >= kMinimapArea.x + kMinimapArea.w || y < kMinimapArea.y ||
         y >= kMinimapArea.y + kMinimapArea.h || !map.inside(mx, my)) {
@@ -510,21 +512,41 @@ void drawPanel(Screen& screen, const Art& art, const Game& game, const ViewState
     const Rect mini = kMinimapArea;
     screen.frame({mini.x, mini.y, mini.w, mini.h}, kMinimapFrame);
     const int top = minimapTop(game, view);
-    for (int y = 0; y < 40; ++y) {
-        for (int x = 0; x < std::min(58, save.map.width); ++x) {
-            const int mx = x;
-            const int my = top + y;
-            std::uint8_t c = kBlack;
-            if (save.map.inside(mx, my) && save.map.at(mx, my).seenBy(game.human())) {
-                c = minimapColour(art, save.map.at(mx, my));
-                if (save.map.at(mx, my).flags & MapSquare::kHasColony) {
-                    c = kWhite;
-                }
-            }
-            screen.pixel(mini.x + 1 + x, mini.y + y, c);
+    // Who is on each square: colonies and units in their nation's colour,
+    // settlements in their tribe's.
+    std::map<std::pair<int, int>, std::uint8_t> marks;
+    auto owner = [&](int nation) -> std::uint8_t {
+        if (nation >= 0 && nation < kEuropeanNations) {
+            return kMinimapNation[static_cast<std::size_t>(nation)];
+        }
+        const auto tribe = static_cast<std::size_t>(nation - kEuropeanNations);
+        return tribe < art.rules.tribes.size() ? static_cast<std::uint8_t>(art.rules.tribes[tribe].colour) : kWhite;
+    };
+    for (const auto& s : save.settlements) {
+        marks[{s.x, s.y}] = owner(s.nation);
+    }
+    for (int i = 0; i < game.unitCount(); ++i) {
+        if (game.onMap(i)) {
+            marks[{game.unit(i).x, game.unit(i).y}] = owner(game.unit(i).nation);
         }
     }
-    screen.frame({mini.x + 1 + view.originX, mini.y + view.originY - top, kViewColumns, kViewRows}, kWhite);
+    for (const auto& c : save.colonies) {
+        marks[{c.x, c.y}] = owner(c.nation);
+    }
+    // Inside the frame: map columns 1 to 56, and 39 rows below the top one.
+    for (int y = mini.y + 1; y < mini.y + mini.h - 1; ++y) {
+        for (int x = mini.x + 1; x < mini.x + mini.w - 1; ++x) {
+            const int mx = x - mini.x;
+            const int my = top + (y - mini.y);
+            std::uint8_t c = kBlack;
+            if (save.map.inside(mx, my) && save.map.at(mx, my).seenBy(game.human())) {
+                const auto mark = marks.find({mx, my});
+                c = mark != marks.end() ? mark->second : minimapColour(art, save.map.at(mx, my));
+            }
+            screen.pixel(x, y, c);
+        }
+    }
+    screen.frame({mini.x + view.originX, mini.y + view.originY - top, kViewColumns, kViewRows}, kWhite);
     screen.fill({241, 49, 79, 1}, kBlack);
 
     const TextColours green{kGreen, kNoColour, kNoColour};

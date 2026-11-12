@@ -270,8 +270,7 @@ VCR_TEST("original files: units glide, and a click far away moves the map") {
     VCR_CHECK(play.game().unit(frigate).x == x);
     VCR_CHECK(play.view().originX == x - 10 - kViewColumns / 2);
     // A click on the small map does the same.
-    const auto square = minimapSquare(play.game(), play.view(), kMinimapArea.x + 1 + 20,
-                                      kMinimapArea.y + 10);
+    const auto square = minimapSquare(play.game(), play.view(), kMinimapArea.x + 20, kMinimapArea.y + 10);
     VCR_CHECK(square.has_value() && square->first == 20);
     play.clickMinimap(square->first, square->second);
     VCR_CHECK(play.view().originX == 20 - kViewColumns / 2);

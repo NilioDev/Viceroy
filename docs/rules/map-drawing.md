@@ -65,3 +65,17 @@ tile (the first side if it is land, else the second, else the corner).
 
 - Where fish and other resources appear (not a simple lattice).
 - The recolouring of a colony's flag to the nation's colour.
+
+## The small map
+
+Measured on the original: a frame (colour 0x06) from x 251 to 308 and y 8
+to 48; inside, one pixel per square for map columns 1 to 56 and 39 rows, the
+frame's top row standing for the row `top` = view's middle row − 20
+(clamped to the map). Unexplored squares are black. A square with a colony
+or a unit shows its nation's colour (French 0x09, Spanish 0x0E, Dutch 0x0D;
+English 0x0C is a guess), a native settlement its tribe's colour (last
+column of `@TRIBES`), any other square the middle pixel (8, 8) of its ground
+tile, or of hills sprite 48 or mountains sprite 32. Forests show their
+ground. The view is a white frame of 15 × 12 squares. All but 4 of the
+small map's pixels matched; those are settlements the original leaves out
+(perhaps not yet visited) and one corner of the view frame.
