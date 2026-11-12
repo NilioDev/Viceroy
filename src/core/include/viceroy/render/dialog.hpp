@@ -36,12 +36,15 @@ struct Dialog {
 inline constexpr int kNavalAdvisor = 0; // MSS0.SS
 inline constexpr int kEuropeAgent = 1;  // MSS2.SS: the man in the home port
 inline constexpr int kFrontiersman = 2; // MSS3.SS: tells about pioneers' work
+inline constexpr int kReligiousAdvisor = 3; // MSS4.SS: immigration
 
 // The box for a GAME.TXT section, with %STRING0, %STRING1, ... and
 // %NUMBER0, ... filled in. Text is joined and wrapped to the section's
 // @width. A missing section gives an empty box.
+// %COUNTRY is the nation's country ("the Netherlands" for the Dutch) when
+// `nation` is given.
 Dialog makeDialog(const Art& art, std::string_view section, const std::vector<std::string>& strings = {},
-                  const std::vector<int>& numbers = {});
+                  const std::vector<int>& numbers = {}, int nation = -1);
 
 // Adds a choice; a value goes on the right.
 void addOption(Dialog& dialog, std::string text, std::string value = {}, bool disabled = false);
@@ -53,6 +56,10 @@ void placeEuropeDialog(Dialog& dialog, bool help = true);
 // Messages about the land (a pioneer's work): the box centred on row 144,
 // the frontiersman standing behind it.
 void placeFrontiersmanDialog(Dialog& dialog);
+
+// Religious unrest brings an immigrant: the box centred on row 126, the
+// religious adviser over its top edge.
+void placeReligiousDialog(Dialog& dialog);
 
 // Moves the bar to the next choice that is not greyed, by +1 or -1.
 void stepSelection(Dialog& dialog, int by);

@@ -38,7 +38,8 @@ gives 5.
 
 A free colonist makes 3, an expert 6, an indentured servant 2 and a petty
 criminal or a convert 1. The lumber mill doubles a carpenter's work and a
-factory adds half. Every colony also makes 1 bell and 1 cross of its own.
+factory adds half. Every colony also makes 1 bell and 1 cross of its own, and the church 1
+more cross for each of its levels (see europe.md for immigration).
 Workshops use up as much of their raw good as they make.
 
 Checked: Isabella (a criminal and a colonist distil 4 rum), Jamestown (an
@@ -63,7 +64,7 @@ Every colony, the computer's too, stores what it made:
 - The warehouse holds 100 of each good, 200 with a warehouse and 300 with
   the expansion; the rest is thrown away. Food is not limited this way.
 
-**Not yet done:** bells (Sons of Liberty), crosses (immigration), horses
+**Not yet done:** bells (Sons of Liberty), horses
 breeding, building ships and units, and the warnings before goods are lost.
 
 ## The jobs menu

@@ -433,6 +433,7 @@ void Game::endTurn() {
                                     " finished.");
         }
     }
+    gatherCrosses();
     sailOn();
     for (int i = 0; i < unitCount(); ++i) {
         auto& u = save_.units[static_cast<std::size_t>(i)];
@@ -726,6 +727,33 @@ int Game::randomRecruit() {
         pick -= o.weight;
     }
     return kFreeColonist;
+}
+
+void Game::gatherCrosses() {
+    // Measured: 2 crosses a turn with no colony at all, plus what the
+    // colonies make. When they reach the number needed, one of the three
+    // on the docks comes over for free and the crosses start again at 0.
+    auto& nation = save_.nations[static_cast<std::size_t>(human())];
+    int crosses = 2;
+    for (const auto& colony : save_.colonies) {
+        if (colony.nation == human()) {
+            crosses += colonyProduction(colony, save_.map, rules_).produced[cargo::kCrosses];
+        }
+    }
+    nation.crosses += crosses;
+    if (nation.crosses < nation.crossesNeeded || nation.crossesNeeded <= 0) {
+        return;
+    }
+    nation.crosses = 0;
+    // Guess: which of the three comes is chance (the original took the
+    // second in the one case measured).
+    random_ = random_ == 0 ? static_cast<std::uint32_t>(save_.turn * 7919 + 17) | 1U : random_;
+    random_ = random_ * 1103515245U + 12345U;
+    const auto slot = static_cast<std::size_t>((random_ >> 16) % 3U);
+    const int profession = nation.recruits[slot];
+    addUnitInEurope(professionUnitType(profession), profession);
+    nation.recruits[slot] = randomRecruit();
+    notices_.push_back({"UNREST", {}, profession});
 }
 
 int Game::recruit(int slot) {

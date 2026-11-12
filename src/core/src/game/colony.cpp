@@ -271,9 +271,10 @@ ColonyProduction colonyProduction(const SaveColony& colony, const SaveMap& map, 
         }
     }
 
-    // Every colony makes a bell and a cross of its own.
+    // Every colony makes a bell and a cross of its own (its chapel); a
+    // church makes one more (measured: Fort Orange in COLONY06).
     p.produced[cargo::kBells] += 1;
-    p.produced[cargo::kCrosses] += 1;
+    p.produced[cargo::kCrosses] += 1 + buildingLevel(colony, BuildingKind::Church);
     p.foodEaten = 2 * population;
     return p;
 }

@@ -93,6 +93,28 @@ at x 147 and the amounts ("600$", "-12$", "588$") at x 200. A purchase
 shows "Bought 100 Sugar at 8$/ton" and "Price: 800$" centred below it.
 Both were compared pixel for pixel with the original.
 
+## Crosses and immigration
+
+Measured by ending turns in the original with changed saves.
+
+- The nation gathers 2 crosses a turn (byte 46) even without a colony, plus
+  what its colonies make: every colony makes 1 cross, and 1 more for each
+  level of its church.
+- When the crosses reach the number needed (byte 48) one of the three people
+  on the docks (bytes 2 to 4) comes over for free, the crosses go back to 0
+  and someone new takes the empty place. Which of the three comes is a guess
+  (chance); the original took the second in the one case measured.
+- The number needed does not change when someone comes. It is a running
+  value the original moves in other ways (it was 2 lower after an artillery
+  was lost, and the English need 2/3 of what the others do); the rule for
+  it is not known, so Viceroy keeps the save's number.
+- The religious adviser tells you in `@UNREST`: %COUNTRY is the nation's
+  name ("the Netherlands"), STRING0 the home port and STRING1 the expert
+  name of whoever came. The box is centred across the screen and its top
+  is at (252 − height) / 2; the adviser's portrait (`MSS4.SS`) is drawn over
+  it at (114, top − 52). The date in the panel stays on the old turn until
+  the box is closed.
+
 ## Recruit, Purchase and Train
 
 Measured by changing the nation record of a save and reading what the

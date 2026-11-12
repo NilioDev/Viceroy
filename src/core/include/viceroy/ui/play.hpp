@@ -146,7 +146,7 @@ private:
     bool handleEuropeScreen(Command command);
     bool handleDialog(Command command);
     void drawScreen(Screen& screen, const Art& art) const;
-    void ask(std::string_view section, int unit, std::vector<std::string> strings = {});
+    void ask(std::string_view section, int unit, std::vector<std::string> strings = {}, int nation = -1);
     void tellPriceMove(int good, int move);
     void openRecruit();
     void openPurchase();

@@ -58,6 +58,12 @@ PlayScreen::PlayScreen(Game game, std::filesystem::path savePath)
     : game_(std::move(game)), savePath_(std::move(savePath)) {
     // Start with the unit the save had active if it still needs orders.
     const int active = game_.activeUnit();
+    if (active >= 0 && active < game_.unitCount() && game_.onMap(active)) {
+        // Seen with nothing to move: the view and the panel are on it.
+        view_.lookX = game_.unit(active).x;
+        view_.lookY = game_.unit(active).y;
+        centreOn(view_, game_, view_.lookX, view_.lookY);
+    }
     if (active >= 0 && active < game_.unitCount() && game_.needsOrders(active)) {
         activate(active);
     } else {
@@ -222,11 +228,11 @@ void PlayScreen::openEurope() {
     europeScreen_ = state;
 }
 
-void PlayScreen::ask(std::string_view section, int unit, std::vector<std::string> strings) {
+void PlayScreen::ask(std::string_view section, int unit, std::vector<std::string> strings, int nation) {
     if (art_ == nullptr) {
         return;
     }
-    dialog_ = makeDialog(*art_, section, strings);
+    dialog_ = makeDialog(*art_, section, strings, {}, nation);
     choices_.clear();
     question_ = std::string(section);
     questionUnit_ = unit;
@@ -270,11 +276,27 @@ void PlayScreen::tell(GameNotice notice) {
 }
 
 void PlayScreen::showNotices() {
+    if (!dialog_ && notices_.empty()) {
+        view_.shownYear = -1; // the new turn's date
+    }
     if (dialog_ || notices_.empty() || art_ == nullptr) {
         return;
     }
-    const GameNotice notice = notices_.front();
+    GameNotice notice = notices_.front();
     notices_.erase(notices_.begin());
+    if (notice.section == "UNREST") {
+        // "Colonists (%STRING1) now available in %STRING0."
+        const auto& jobs = game_.rules().jobs;
+        constexpr std::size_t kColonistRow = 19;
+        const auto row = notice.value >= 0 && notice.value < 28 ? static_cast<std::size_t>(notice.value) : kColonistRow;
+        notice.strings = {textLine(art_->names, "HOMEPORT", game_.human(), ""),
+                          row < jobs.size() ? jobs[row].expertName : ""};
+        ask(notice.section, -1, notice.strings, game_.human());
+        if (dialog_) {
+            placeReligiousDialog(*dialog_);
+        }
+        return;
+    }
     ask(notice.section, -1, notice.strings);
     if (dialog_) {
         placeFrontiersmanDialog(*dialog_);
@@ -771,7 +793,9 @@ bool PlayScreen::handle(Command command) {
             handle(Command::EndTurn);
         }
         break;
-    case Command::EndTurn:
+    case Command::EndTurn: {
+        const int year = game_.state().year;
+        const int season = game_.state().season;
         game_.endTurn();
         waiting_.clear();
         {
@@ -782,10 +806,16 @@ bool PlayScreen::handle(Command command) {
             say(news);
         }
         activate(game_.activeUnit());
-        for (auto& notice : game_.takeNotices()) {
+        auto notices = game_.takeNotices();
+        if (!notices.empty()) {
+            view_.shownYear = year;
+            view_.shownSeason = season;
+        }
+        for (auto& notice : notices) {
             tell(std::move(notice));
         }
         break;
+    }
     case Command::Skip:
         if (active >= 0) {
             game_.skipUnit(active);

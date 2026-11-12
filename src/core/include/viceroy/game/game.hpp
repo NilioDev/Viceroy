@@ -64,6 +64,7 @@ enum class WorkResult {
 struct GameNotice {
     std::string section;
     std::vector<std::string> strings;
+    int value = -1; // what the screen needs to fill in the rest: a profession, ...
 };
 
 enum class FoundResult {
@@ -179,6 +180,7 @@ private:
     void removeUnit(int index);
     int addUnitInEurope(int type, int profession);
     int randomRecruit();
+    void gatherCrosses(); // immigration at the end of the turn
 
     SaveGame save_;
     Ruleset rules_;
