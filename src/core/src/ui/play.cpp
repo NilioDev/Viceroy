@@ -957,6 +957,19 @@ std::optional<SaveSlot> LoadMenu::handle(Command command) {
     return std::nullopt;
 }
 
+std::optional<SaveSlot> LoadMenu::click(int x, int y) {
+    // The rows as draw() lays them out: from y 50, 10 apart.
+    if (x < 34 || x >= 286 || y < 48) {
+        return std::nullopt;
+    }
+    const int row = (y - 48) / 10;
+    if (row >= static_cast<int>(slots_.size())) {
+        return std::nullopt;
+    }
+    selected_ = row;
+    return slots_[static_cast<std::size_t>(row)];
+}
+
 void LoadMenu::draw(Screen& screen, const Art& art) const {
     screen.clear(kBlack);
     screen.tile(art.wood, {0, 0, Screen::kWidth, Screen::kHeight});

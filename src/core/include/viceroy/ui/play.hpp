@@ -191,6 +191,8 @@ public:
     explicit LoadMenu(std::vector<SaveSlot> slots) : slots_(std::move(slots)) {}
     // Returns the chosen slot when the player confirms.
     std::optional<SaveSlot> handle(Command command);
+    // A click on a row picks that savegame.
+    std::optional<SaveSlot> click(int x, int y);
     void draw(Screen& screen, const Art& art) const;
     bool empty() const { return slots_.empty(); }
 

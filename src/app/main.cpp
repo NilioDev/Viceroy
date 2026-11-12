@@ -455,6 +455,12 @@ void click(App& app, float wx, float wy) {
         }
         return;
     }
+    if (app.mode == Mode::Load) {
+        if (auto slot = app.load->click(static_cast<int>(x), static_cast<int>(y))) {
+            startGame(app, *slot);
+        }
+        return;
+    }
     if (app.mode != Mode::Play) {
         if (app.mode != Mode::Welcome) {
             send(app, Command::Confirm);
