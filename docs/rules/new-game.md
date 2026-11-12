@@ -50,3 +50,25 @@ Dutch. The colonists' professions were the same in both games:
 The natives start with 56 settlements, in the same order and tribes in both
 games but at places that differ by a square or so, and one brave (type 19)
 for each settlement.
+
+## The nations at the start
+
+Compared over four new games (bytes of the nation record, see
+[the savegame](../formats/savegame.md)):
+
+- Only the human player has gold: 1,000 (bytes 42-43). The tax rate is 0.
+- The market prices (bytes 76 to 91) are drawn once per game and are the
+  same for all four nations. Most lie within the first two numbers of the
+  good's `@CARGO` row; cigars were seen at 10 and 14 (range 11-13), so the
+  draw is not simply uniform. Lumber 2, silver 20, tools 2 and muskets 3
+  never changed.
+- The trade volumes (bytes 92 to 117, 16 bits) start at the same values in
+  every game: −13, −16, −16, −25, 0, −7, −8, −2, −11, −12, −3, −11, −13 for
+  the first thirteen goods, and 4, 5, 6 for trade goods, tools and muskets.
+- Byte 46 (crosses) is 2; byte 48 (crosses needed) is 9 for the English and
+  14 for the others.
+- Bytes 50-51, the square the ships sail to from Europe, take the four
+  values (51, 56), (37, 14), (56, 42) and (47, 28), dealt out to the nations
+  at random.
+- The three recruits waiting on the docks are random for the computer
+  nations. For the Dutch human player they were the same in all four games.
