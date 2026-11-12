@@ -400,6 +400,10 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
                 }
             }
         }
+    } else if (question == "BUYME1") {
+        if (choice == 1) {
+            game_.buyConstruction(unit);
+        }
     } else if (question == "REALLYBUY") {
         if (yes) {
             const int made = game_.purchase(unit);
@@ -634,6 +638,22 @@ void PlayScreen::openBuildList() {
     }
 }
 
+// BUY on the Make panel: the price to finish now, and the treasury.
+void PlayScreen::openBuy() {
+    auto& state = *colonyScreen_;
+    const auto& save = game_.state();
+    const auto& colony = save.colonies[static_cast<std::size_t>(state.colony)];
+    const auto& nation = save.nations[static_cast<std::size_t>(game_.human())];
+    const int price = constructionPrice(colony, game_.rules(), nation);
+    if (price <= 0 || art_ == nullptr) {
+        return;
+    }
+    state.panel = ColonyPanel::Make;
+    ask(nation.gold >= price ? "BUYME1" : "BUYME0", state.colony, {constructionName(game_.rules(), colony.construction)},
+        game_.human(), {price, nation.gold});
+    placeBuyDialog(*dialog_);
+}
+
 bool PlayScreen::handleBuildList(Command command) {
     auto& state = *colonyScreen_;
     auto& save = game_.state();
@@ -707,6 +727,10 @@ bool PlayScreen::clickColonyScreen(int x, int y) {
         openBuildList();
         return true;
     }
+    if (state.panel == ColonyPanel::Make && inside(kBuyButton)) {
+        openBuy();
+        return true;
+    }
     return false;
 }
 
@@ -752,6 +776,10 @@ bool PlayScreen::handleColonyScreen(Command command) {
         break;
     case Command::BuildColony: // B, or X on a gamepad: choose what to build
         openBuildList();
+        break;
+    case Command::Purchase: // P, or Y on a gamepad: buy it
+    case Command::EndTurn:
+        openBuy();
         break;
     case Command::Confirm:
     case Command::Skip:

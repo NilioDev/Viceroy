@@ -512,3 +512,60 @@ VCR_TEST("original files: choosing what a colony builds") {
     VCR_CHECK(colony.construction == options[static_cast<std::size_t>(pick)].construction);
     VCR_CHECK(play.colonyScreen()->buildList == -1);
 }
+
+VCR_TEST("buy: what finishing a construction costs (measured)") {
+    Ruleset r;
+    r.buildings.resize(42);
+    r.buildings[1].hammers = 120; // fort
+    r.buildings[1].tools = 100;
+    r.units.resize(19);
+    r.units[12].cost = 1; // wagon train: 40 hammers
+    SaveNation nation;
+    nation.prices[cargo::kTools] = 2; // Europe asks 2 for tools
+    SaveColony c;
+    c.construction = 43;
+    c.hammers = 39;
+    VCR_CHECK(constructionPrice(c, r, nation) == 13);
+    c.hammers = 0; // twice as much before the first hammer
+    VCR_CHECK(constructionPrice(c, r, nation) == 1040);
+    c.construction = 1;
+    c.stock[cargo::kTools] = 9;
+    c.hammers = 119;
+    VCR_CHECK(constructionPrice(c, r, nation) == 13 + 6 * 91);
+    c.hammers = 0;
+    VCR_CHECK(constructionPrice(c, r, nation) == 4212);
+    c.hammers = 119;
+    nation.prices[cargo::kTools] = 20;
+    VCR_CHECK(constructionPrice(c, r, nation) == 13 + 24 * 91);
+    nation.taxRate = 30; // no part in it
+    VCR_CHECK(constructionPrice(c, r, nation) == 13 + 24 * 91);
+    c.construction = -1;
+    VCR_CHECK(constructionPrice(c, r, nation) == 0);
+}
+
+VCR_TEST("original files: BUY finishes the construction for gold") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    const ColonyArt colonyArt = loadColonyArt(dir);
+    std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
+    auto save = readSaveGame(Bytes(std::istreambuf_iterator<char>(in), {}));
+    save.colonies[1].construction = 43; // a wagon train
+    save.colonies[1].hammers = 30;
+    save.nations[static_cast<std::size_t>(save.humanNation)].gold = 1000;
+    PlayScreen play(Game(std::move(save), art.rules), dir / "unused.sav");
+    play.setColonyArt(&colonyArt);
+    play.setArt(&art);
+    play.openColony(1);
+    play.handle(Command::Purchase);
+    VCR_CHECK(play.dialog().has_value());
+    VCR_CHECK(play.dialog()->options.size() == 2);
+    VCR_CHECK(play.dialog()->selected == 0); // "Never mind." first
+    play.handle(Command::Down);
+    play.handle(Command::Confirm);
+    const auto& colony = play.game().state().colonies[1];
+    VCR_CHECK(colony.hammers == 40);
+    VCR_CHECK(play.game().state().nations[static_cast<std::size_t>(play.game().human())].gold == 1000 - 130);
+}

@@ -188,6 +188,25 @@ added and taken away):
   merchantman, galleon, privateer and frigate with a shipyard (docks
   level 3).
 
+## Buying the construction
+
+BUY on the Make panel asks `@BUYME1` ("Cost to complete …", "Never mind." /
+"Complete it."), or `@BUYME0` without the choices when the treasury is too
+small. Measured on Curacao with a wagon train, the fort, the fortress and
+artillery at many amounts of hammers, tools in the warehouse, tools prices
+and tax rates:
+
+- each missing hammer costs 13;
+- each missing tool (needed minus those in the warehouse) costs 4 more
+  than Europe asks for tools (5 at 1, 6 at 2, 24 at 20);
+- the whole is doubled while the colony has no hammers at all;
+- the tax rate plays no part.
+
+Completing it takes the gold, raises the hammers to what is needed and the
+tools in the warehouse to what is needed; the construction then finishes
+at the end of the turn as usual.
+
+## Horses
 
 Horses breed from the food left over after the colonists have eaten, and
 each new horse uses one of those food. Measured on test colonies, one turn

@@ -679,6 +679,26 @@ std::vector<BuildOption> buildOptions(const SaveColony& colony, const SaveMap& m
     return options;
 }
 
+int constructionPrice(const SaveColony& colony, const Ruleset& rules, const SaveNation& nation) {
+    const int hammers = constructionHammers(rules, colony.construction);
+    if (hammers <= 0) {
+        return 0;
+    }
+    const int missingHammers = std::max(0, hammers - colony.hammers);
+    const int missingTools = std::max(0, constructionTools(rules, colony.construction) - colony.stock[cargo::kTools]);
+    // Measured: 13 a hammer, and each tool 4 more than Europe asks for it;
+    // the tax rate plays no part. Twice as much before the first hammer.
+    const int burden = static_cast<std::size_t>(cargo::kTools) < rules.cargo.size()
+                           ? rules.cargo[static_cast<std::size_t>(cargo::kTools)].burden
+                           : 0;
+    const int toolPrice = nation.prices[static_cast<std::size_t>(cargo::kTools)] + burden + 4;
+    int price = 13 * missingHammers + toolPrice * missingTools;
+    if (colony.hammers == 0) {
+        price *= 2;
+    }
+    return price;
+}
+
 ColonyTurn runColonyTurn(SaveColony& colony, const SaveMap& map, const Ruleset& rules, int difficulty) {
     ColonyTurn turn;
     const auto p = colonyProduction(colony, map, rules, difficulty);

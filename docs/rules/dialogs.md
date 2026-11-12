@@ -13,7 +13,9 @@ The text lines are joined and wrapped again to fit the width. `%STRING0`,
 drawn in gold. A line is wrapped when the next word would make it wider
 than `@width` − 5. `@y=91` puts the box's top at that row instead of
 centring it, and `@options` starts the choices with no blank line before
-them (the main menu, see [opening.md](opening.md)).
+them (the main menu, see [opening.md](opening.md)). A text line starting
+with `^` starts a new line in the box (`@BUYME1`: "Treasury" on a line of
+its own).
 
 The font is `FONTINTR.FF`. Its pixel values 1, 2 and 3 take the colours
 from `@COLORS` in `NAMES.TXT`: the letter (basic 0x44, or hilite 0x95 in

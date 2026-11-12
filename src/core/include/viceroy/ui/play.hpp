@@ -148,6 +148,7 @@ private:
     bool handleColonyScreen(Command command);
     bool handleBuildList(Command command);
     void openBuildList();
+    void openBuy();
     bool handleEuropeScreen(Command command);
     bool handleDialog(Command command);
     void drawScreen(Screen& screen, const Art& art) const;

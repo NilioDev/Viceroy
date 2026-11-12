@@ -169,6 +169,9 @@ public:
     // the unit, or -1 when the gold is short.
     int recruit(int slot);
     int purchase(int unitType);
+    // BUY on a colony's Make panel: pays constructionPrice() and finishes
+    // the construction. False when it cannot be paid.
+    bool buyConstruction(int colony);
     int train(int jobRow);
 
     // --- Map -----------------------------------------------------------------
