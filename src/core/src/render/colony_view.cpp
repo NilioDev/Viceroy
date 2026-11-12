@@ -37,7 +37,8 @@ constexpr std::uint8_t kMenuBar = 0x8A;
 constexpr std::uint8_t kPanelInk = 0x39;   // the Make panel: words and the dark edge of buttons
 constexpr std::uint8_t kPanelLight = 0x30; // the light edge of buttons
 constexpr std::uint8_t kButtonShadow = 0x3F;
-constexpr std::uint8_t kUnitFrame = 0x0A; // bright green
+constexpr std::uint8_t kUnitFrame = 0x0A;     // bright green
+constexpr std::uint8_t kSelectedFrame = 0x0F; // white: the unit clicked
 
 // Screen areas.
 constexpr Rect kTown{0, 8, 200, 120};
@@ -429,27 +430,51 @@ void drawPanelBox(Screen& screen, const Art& art, const PanelButton& b, const st
 
 // "Units Present": the land units standing in the colony, in a row along
 // the bottom of the panel, the first one framed.
-void drawUnitsPanel(Screen& screen, const Art& art, const Game& game, const SaveColony& colony) {
+constexpr int kUnitsPanelRight = 302; // the buttons start at x 303
+
+} // namespace
+
+std::vector<int> unitsPresent(const Game& game, const SaveColony& colony) {
+    std::vector<int> out;
+    const auto here = game.unitsAt(colony.x, colony.y);
+    for (auto it = here.rbegin(); it != here.rend(); ++it) {
+        if (!game.isShip(*it)) {
+            out.push_back(*it);
+        }
+    }
+    return out;
+}
+
+int unitPresentAt(int x, int y) {
+    // The five units in front, 18 pixels apart from x 213 at row 158.
+    if (y < 157 || y >= 175 || x < 212) {
+        return -1;
+    }
+    const int k = (x - 212) / 18;
+    return k < 5 ? k : -1;
+}
+
+namespace {
+
+void drawUnitsPanel(Screen& screen, const Art& art, const Game& game, const SaveColony& colony, int selected) {
     const std::string title = textLine(art.labelText, "CMISC", 1, "Units Present");
     screen.text(art.tiny, 256 - (Screen::textWidth(art.tiny, title) - 1) / 2, 132, title, {kPanelInk, kNoColour, kNoColour});
     int k = 0;
-    const auto here = game.unitsAt(colony.x, colony.y);
-    for (auto it = here.rbegin(); it != here.rend(); ++it) {
-        const int u = *it;
-        if (game.isShip(u)) {
+    for (const int u : unitsPresent(game, colony)) {
+        // Measured: five units 18 pixels apart at row 158, the first framed
+        // in bright green. The rest stand small on the horizon behind them,
+        // 5 pixels apart.
+        if (k >= 5) {
+            drawSmallUnit(screen, art, game, u, 214 + 5 * (k - 5), 151, kUnitsPanelRight);
+            ++k;
             continue;
-        }
-        // Measured: 18 pixels apart at row 158, the first framed in bright
-        // green.
-        // How the original goes on past five is not known yet; stop
-        // before the buttons.
-        if (k == 5) {
-            break;
         }
         const int x = 213 + 18 * k;
         drawUnitInColonyList(screen, art, game, u, x, 158);
-        if (k == 0) {
-            screen.frame({x - 1, 157, 18, 18}, kUnitFrame);
+        // Measured: once a unit is clicked, a white frame stays on it (and
+        // follows it to the front); until then the first is framed green.
+        if (selected >= 0 ? u == selected : k == 0) {
+            screen.frame({x - 1, 157, 18, 18}, selected >= 0 ? kSelectedFrame : kUnitFrame);
         }
         ++k;
     }
@@ -670,7 +695,7 @@ void drawColonyScreen(Screen& screen, const Art& art, const ColonyArt& colonyArt
     if (view.panel == ColonyPanel::Make) {
         drawMakePanel(screen, art, game, colony);
     } else if (view.panel == ColonyPanel::Units) {
-        drawUnitsPanel(screen, art, game, colony);
+        drawUnitsPanel(screen, art, game, colony, view.selectedUnit);
     } else {
         drawProductionView(screen, art, production);
     }

@@ -18,7 +18,8 @@ touch controls.
 > shows its buildings, people, what they produce and the warehouse; give
 > colonists other jobs with the jobs menu, and choose what the colony builds
 > on its Make panel or pay to finish it there; the musket button lists the
-> units in the colony. At the end of the turn colonies
+> units in the colony; click one to move it to the front, clear its orders,
+> sentry or fortify it. At the end of the turn colonies
 > store what they make, breed horses from spare food, grow and finish
 > the buildings, wagon trains, artillery and ships under way, and your
 > advisors report full warehouses, waste, food running low and workshops
@@ -94,6 +95,7 @@ saved in the first free slot, or over the savegame saved longest ago.
 | Open your colony | Click it, or Enter on it in view mode | A on it in view mode |
 | Pick a colonist on the colony screen | Arrow keys, Tab | D-pad, LB / RB |
 | Give the colonist another job (jobs menu) | Enter, then the arrow keys and Enter | A, then the D-pad and A |
+| Give a unit in the colony orders | Click it on the musket panel, then the arrow keys and Enter | |
 | Choose what the colony builds | B, then the arrow keys and Enter; or click the hammer button, then CHANGE and a line | X, then the D-pad and A |
 | Pay to finish what the colony builds (BUY) | P, or click BUY on the Make panel | Y |
 | Show what the colony produces again | Click the house button | |

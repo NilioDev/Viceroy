@@ -184,6 +184,10 @@ private:
     std::string question_; // the GAME.TXT section the dialog asks
     int questionUnit_ = -1;
     std::vector<int> choices_; // what each choice of a list stands for
+    // The rows of @UNITOPTIONS a unit's options box offers, top to bottom.
+    enum UnitOption { kUnitFront, kUnitClear, kUnitSentry, kUnitFortify, kUnitNoChange };
+    std::vector<int> unitOptions_;
+    void openUnitOptions(int unit, bool first);
     std::vector<GameNotice> notices_; // messages still to show, first first
     const Art* art_ = nullptr;
     int lastColony_ = -1;

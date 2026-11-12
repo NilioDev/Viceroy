@@ -21,6 +21,7 @@ constexpr TextColours kGrey{0x08, 0x80, 0x2F};
 constexpr std::uint8_t kGold = 0x95;
 
 constexpr int kTextLeft = 5;
+constexpr int kUnitIndent = 22; // a unit's picture beside the text
 constexpr int kTextTop = 6;
 constexpr int kLineStep = 10;
 constexpr int kOptionGap = 4;
@@ -130,7 +131,7 @@ void drawMarkedLine(Screen& screen, const Font& font, int x, int y, const std::s
 }
 
 int boxWidth(const Dialog& d) {
-    return d.width + 6;
+    return d.width + 6 + d.indent;
 }
 
 } // namespace
@@ -283,6 +284,14 @@ void placeBuyDialog(Dialog& d) {
     d.portraitY = d.y - 62;
 }
 
+void placeUnitDialog(Dialog& d, int unit) {
+    d.unit = unit;
+    d.indent = kUnitIndent;
+    d.portrait = -1;
+    d.x = (Screen::kWidth - boxWidth(d) + 1) / 2;
+    d.y = (Screen::kHeight - dialogHeight(d)) / 2;
+}
+
 void placeTradeDialog(Dialog& d) {
     placeBuyDialog(d);
     d.y = (262 - dialogHeight(d)) / 2;
@@ -412,18 +421,18 @@ void drawDialog(Screen& screen, const Art& art, const Dialog& d) {
     bool gold = false;
     int y = box.y + kTextTop;
     for (const auto& line : d.lines) {
-        drawMarkedLine(screen, font, box.x + kTextLeft, y, line, gold);
+        drawMarkedLine(screen, font, box.x + kTextLeft + d.indent, y, line, gold);
         y += d.small ? kSmallLineStep : kLineStep;
     }
     y += kOptionGap;
     for (std::size_t i = 0; i < d.options.size(); ++i) {
         if (static_cast<int>(i) == d.selected) {
-            screen.fill({box.x + 4, y - 1, box.w - 8, d.small ? 7 : 11}, kBar);
+            screen.fill({box.x + 4 + d.indent, y - 1, box.w - 8 - d.indent, d.small ? 7 : 11}, kBar);
         }
         const bool grey = i < d.disabled.size() && d.disabled[i];
         const TextColours& colours = grey ? kGrey : kBasic;
         bool optionGold = false;
-        drawMarkedLine(screen, font, box.x + d.optionLeft, y, d.options[i], optionGold, colours);
+        drawMarkedLine(screen, font, box.x + d.optionLeft + d.indent, y, d.options[i], optionGold, colours);
         if (i < d.values.size() && !d.values[i].empty()) {
             const int right = box.x + box.w - kValueRight;
             screen.text(font, right - Screen::textWidth(font, d.values[i]), y, d.values[i], colours);

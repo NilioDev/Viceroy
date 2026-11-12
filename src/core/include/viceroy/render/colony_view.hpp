@@ -10,6 +10,8 @@
 #include "viceroy/game/game.hpp"
 #include "viceroy/render/game_view.hpp"
 
+#include <vector>
+
 namespace viceroy {
 
 struct ColonyArt {
@@ -31,6 +33,7 @@ struct ColonyViewState {
     int jobsMenu = -1;        // the highlighted line of the jobs menu, -1 when closed
     ColonyPanel panel = ColonyPanel::Production;
     int buildList = -1;       // the highlighted line of the list of things to build, -1 when closed
+    int selectedUnit = -1;    // the unit clicked on the Units Present panel, -1 for none
 };
 
 // Where the panel's parts are, for clicks.
@@ -51,5 +54,12 @@ BuildListBox buildListBox(int items);
 
 void drawColonyScreen(Screen& screen, const Art& art, const ColonyArt& colonyArt, const Game& game,
                       const ColonyViewState& view);
+
+// The land units in a colony as the Units Present panel shows them: the
+// last on the square first.
+std::vector<int> unitsPresent(const Game& game, const SaveColony& colony);
+// Which of the five units in front of the Units Present panel is at a
+// point on the screen, or -1.
+int unitPresentAt(int x, int y);
 
 } // namespace viceroy

@@ -125,6 +125,12 @@ public:
     // Space bar: the unit does nothing more this turn.
     void skipUnit(int index);
     void setOrders(int index, int orders);
+    // "Move to front." in a colony: the unit comes first among the units on
+    // its square. The original keeps a list of units for each square and
+    // puts the unit at its end; we keep the savegame's order instead, so
+    // the unit moves to the end of the units (other units' numbers shift).
+    // Returns the unit's new number.
+    int moveToFront(int index);
 
     // --- Pioneers ----------------------------------------------------------
     // P and R: a pioneer plows the square or clears its forest

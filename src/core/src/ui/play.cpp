@@ -538,6 +538,23 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
                 }
             }
         }
+    } else if (question == "COLONYUNIT") {
+        const int option = choice >= 0 && choice < static_cast<int>(unitOptions_.size())
+                               ? unitOptions_[static_cast<std::size_t>(choice)]
+                               : kUnitNoChange;
+        switch (option) {
+        case kUnitFront: {
+            const int moved = game_.moveToFront(unit);
+            if (colonyScreen_) {
+                colonyScreen_->selectedUnit = moved;
+            }
+            break;
+        }
+        case kUnitClear: game_.setOrders(unit, SaveUnit::kNoOrders); break;
+        case kUnitSentry: game_.setOrders(unit, SaveUnit::kSentry); break;
+        case kUnitFortify: game_.setOrders(unit, SaveUnit::kFortify); break; // measured: orders 5
+        default: break;
+        }
     } else if (question == "BUYME1") {
         if (choice == 1) {
             game_.buyConstruction(unit);
@@ -776,6 +793,40 @@ void PlayScreen::openBuildList() {
     }
 }
 
+// A click on a unit of the Units Present panel: "Options for Colonists
+// (Indentured Servants):". Measured: "Move to front." is left out for the
+// first unit, "Sentry / Board ship." for one already sentried (or without
+// orders: the panel shows those as sentried), "Fortify." for one fortifying
+// or fortified.
+void PlayScreen::openUnitOptions(int unit, bool first) {
+    if (art_ == nullptr) {
+        return;
+    }
+    const auto& u = game_.unit(unit);
+    std::string profession;
+    constexpr int kFreeColonistJob = 19;
+    const int job = professionJob(u.profession);
+    const auto& jobs = game_.rules().jobs;
+    if (job != kFreeColonistJob && job >= 0 && job < static_cast<int>(jobs.size())) {
+        profession = " (" + jobs[static_cast<std::size_t>(job)].expertName + ")";
+    }
+    ask("COLONYUNIT", unit, {game_.unitName(unit), profession});
+    if (!dialog_) {
+        return;
+    }
+    unitOptions_.clear();
+    const bool sentried = u.orders == SaveUnit::kNoOrders || u.orders == SaveUnit::kSentry;
+    const bool fortified = u.orders == SaveUnit::kFortify || u.orders == SaveUnit::kFortified;
+    for (int option = kUnitFront; option <= kUnitNoChange; ++option) {
+        if ((option == kUnitFront && first) || (option == kUnitSentry && sentried) || (option == kUnitFortify && fortified)) {
+            continue;
+        }
+        addOption(*dialog_, textLine(art_->gameText, "UNITOPTIONS", option, ""));
+        unitOptions_.push_back(option);
+    }
+    placeUnitDialog(*dialog_, unit);
+}
+
 // BUY on the Make panel: the price to finish now, and the treasury.
 void PlayScreen::openBuy() {
     auto& state = *colonyScreen_;
@@ -868,6 +919,15 @@ bool PlayScreen::clickColonyScreen(int x, int y) {
     if (state.panel == ColonyPanel::Make && inside(kChangeButton)) {
         openBuildList();
         return true;
+    }
+    if (state.panel == ColonyPanel::Units) {
+        const auto& colony = game_.state().colonies[static_cast<std::size_t>(state.colony)];
+        const auto units = unitsPresent(game_, colony);
+        if (const int k = unitPresentAt(x, y); k >= 0 && k < static_cast<int>(units.size())) {
+            state.selectedUnit = units[static_cast<std::size_t>(k)];
+            openUnitOptions(state.selectedUnit, k == 0);
+            return true;
+        }
     }
     if (state.panel == ColonyPanel::Make && inside(kBuyButton)) {
         openBuy();
@@ -1266,6 +1326,9 @@ void PlayScreen::draw(Screen& screen, const Art& art) const {
     }
     if (dialog_) {
         drawDialog(screen, art, *dialog_);
+        if (dialog_->unit >= 0 && dialog_->unit < game_.unitCount()) {
+            drawUnitInColonyList(screen, art, game_, dialog_->unit, dialog_->x + 5, dialog_->y + 6);
+        }
     }
 }
 

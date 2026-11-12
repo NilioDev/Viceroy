@@ -109,9 +109,39 @@ on the Dutch orange too (0x05, unlike the map). Damaged artillery is the
 small picture `ICONS.SS` 65, two pixels right of the place, with its box at
 +6, +2, as on the map (both artillery on Curacao were damaged). The first unit has a frame of colour 0x0A at x − 1, y 157, 18 × 18.
 
-Measured on Curacao in a save with two colonists and two artillery.
-**Not yet known:** how the row goes on past five units, and what clicking
-a unit does.
+Measured on Curacao in a save with two colonists and two artillery, and
+with up to twelve units moved there.
+
+The order is that of the original's list of units on the square (each
+unit's bytes 24-27 link it to the next and previous unit there): the last
+unit on the list stands first. We keep the savegame's order of units
+instead, which is the same in the saves we measured.
+
+Past five, the rest stand small on the horizon behind the row, 5 pixels
+apart, each centred on x 214 + 5k (k from 0) with its top at y 151: the
+unit's own picture shrunk to three eighths, taking rows and columns 1, 4,
+7, 9, 12 and 15 of the 16. Where the original stops when there are very
+many is not known; we stop at the buttons.
+
+Clicking one of the five in front frames it in white (colour 0x0F) instead
+of the green on the first unit, and asks `@COLONYUNIT` ("Options for
+Colonists (Indentured Servants):", the profession in brackets except for a
+free colonist) with the choices of `@UNITOPTIONS`:
+
+- "Move to front." is left out for the first unit. It puts the unit at the
+  end of the square's list, so it stands first; the white frame follows it.
+- "Clear orders." is always offered.
+- "Sentry / Board ship." is left out when the unit is sentried or has no
+  orders (shown as sentried here).
+- "Fortify." is left out when it is fortifying or fortified; it gives
+  orders 5 (fortifying). Here its F is black, while the F of a fortified
+  unit is dark orange like the other letters.
+- "No changes."
+
+The box is 22 pixels wider than the section's width for the unit, which
+stands at (x + 5, y + 6) as in the panel's row; text and choices move 22
+to the right, and so does the left end of the bar. The box is centred on
+the screen (x = (320 − w + 1) / 2).
 
 ## Make panel
 
