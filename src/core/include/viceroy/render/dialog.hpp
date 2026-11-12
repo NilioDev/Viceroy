@@ -65,6 +65,9 @@ void placeReligiousDialog(Dialog& dialog);
 // A report about a colony (Sons of Liberty): the box at x 39, its middle
 // at row 139, the man with the musket at (210, top - 77) in front of it.
 void placeColonialDialog(Dialog& dialog);
+// The same man for news on the map (a battle, a treaty, an offer of
+// mercenaries): the box at x 54, its middle at row 139.
+void placeMapDialog(Dialog& dialog);
 // BUY on the colony screen: the box centred across the screen with its
 // bottom at row 163, the woman in the white cap leaning on its top edge.
 // The same woman for the warehouse and food reports about a colony: the box
@@ -73,6 +76,11 @@ void placeTradeDialog(Dialog& d);
 void placeBuyDialog(Dialog& dialog);
 // The name of a European nation as the messages use it ("the Netherlands").
 std::string countryName(const Art& art, int nation);
+
+// The wooden box with its frame that messages are drawn on.
+void drawWoodBox(Screen& screen, const Art& art, Rect box);
+// The Combat Analysis box shown before a fight when the game option is on.
+void drawCombatAnalysis(Screen& screen, const Art& art, const Game& game, const CombatAnalysis& analysis);
 
 // Moves the bar to the next choice that is not greyed, by +1 or -1.
 void stepSelection(Dialog& dialog, int by);

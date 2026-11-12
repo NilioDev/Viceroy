@@ -12,6 +12,7 @@ add_library(vcr_core STATIC
     src/util/zip.cpp
     src/pack/library.cpp
     src/game/game.cpp
+    src/game/combat.cpp
     src/game/colony.cpp
     src/game/europe.cpp
     src/game/resource.cpp

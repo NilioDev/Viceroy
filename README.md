@@ -28,8 +28,11 @@ touch controls.
 > and have specialists trained. Crosses made in your colonies and churches
 > bring colonists over from the docks for free. Liberty bells win colonists
 > for the Sons of Liberty: at 50% and 100% membership a colony works
-> better, and too many tories slow it down. The other nations don't
-> move yet, and combat and meeting the natives are still to come. Fish,
+> better, and too many tories slow it down. Soldiers, dragoons and
+> artillery can attack the other nations' units on the map: you are asked
+> before breaking a peace treaty, the Combat Analysis option shows the
+> odds, and the loser is demoted, damaged or captured. The other nations don't
+> move yet, and meeting the natives is still to come. Fish,
 > ore and the other resources show on the map where the original puts them
 > and add to what your colonists make there;
 > lost city rumours are not drawn yet.
@@ -77,6 +80,7 @@ saved in the first free slot, or over the savegame saved longest ago.
 | Move the active unit | Numeric keypad 1-9, arrow keys, Home / PgUp / End / PgDn for diagonals, or click a square next to it | Left stick or D-pad |
 | Move the map | Click any other square to bring it to the middle, or click the small map | Right stick |
 | No orders this turn | Space | A |
+| Attack a foreign unit | Move a soldier, dragoon or artillery onto its square; any key closes the Combat Analysis | Left stick or D-pad |
 | End the turn (when asked) | Enter | A |
 | End the turn now | Ctrl+E | Y |
 | Wait (come back to this unit later) | W | |
