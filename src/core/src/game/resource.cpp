@@ -55,7 +55,7 @@ Resource resourceAt(const SaveMap& map, int x, int y) {
         return Resource::None;
     }
     if (sq.mountains()) {
-        return onResourcePattern(x, y, map.resourceSeed) ? (marked ? Resource::Silver : Resource::Ore) : Resource::None;
+        return onResourcePattern(x, y, map.resourceSeed) ? (marked ? Resource::DepletedSilver : Resource::Silver) : Resource::None;
     }
     if (sq.hills()) {
         return onResourcePattern(x, y, map.resourceSeed) ? Resource::HillsOre : Resource::None;

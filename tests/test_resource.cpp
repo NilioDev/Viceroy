@@ -50,9 +50,9 @@ VCR_TEST("resources: what a square holds") {
     auto& mountain = map.at(4, 15);
     mountain.terrain = 3;
     mountain.relief = 5;
-    VCR_CHECK(resourceAt(map, 4, 15) == Resource::Ore);
-    mountain.flags = 0x04;
     VCR_CHECK(resourceAt(map, 4, 15) == Resource::Silver);
+    mountain.flags = 0x04;
+    VCR_CHECK(resourceAt(map, 4, 15) == Resource::DepletedSilver);
     map.at(6, 12).terrain = 12; // conifer forest
     VCR_CHECK(resourceAt(map, 6, 12) == Resource::Timber);
     map.at(6, 12).terrain = 4; // the same square cleared

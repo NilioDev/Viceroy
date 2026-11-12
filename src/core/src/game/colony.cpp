@@ -31,27 +31,6 @@ int yieldOf(const Ruleset& rules, int row, int jobRow) {
     return rules.terrain[static_cast<std::size_t>(row)].yield[static_cast<std::size_t>(jobRow)];
 }
 
-// Workers per building output: 3 for a colonist in a house or shop, more in
-// a factory; experts make twice as much, servants and criminals less.
-int buildingYield(int level, int skill, int jobRow) {
-    int base = 3;
-    if (skill == skill::kServant) {
-        base = 2;
-    } else if (skill == skill::kCriminal || skill == skill::kConvert) {
-        base = 1;
-    }
-    if (isExpert(skill, jobRow)) {
-        base *= 2;
-    }
-    if (jobRow == job::kCarpenter && level >= 2) {
-        base *= 2; // the lumber mill
-    }
-    if (level >= 3) {
-        base += base / 2; // factories
-    }
-    return base;
-}
-
 } // namespace
 
 int buildingLevel(const SaveColony& colony, BuildingKind kind) {
@@ -121,13 +100,15 @@ int resourceAdds(Resource resource, int jobRow) {
     case Resource::Timber:
         return jobRow == 5 ? 2 : 0;
     case Resource::Deer:
-        return jobRow == 4 ? 2 : 0;
+        return jobRow == 4 || jobRow == job::kFarmer ? 2 : 0;
     case Resource::Beaver:
         return jobRow == 4 ? 3 : 0;
     case Resource::HillsOre:
         return jobRow == 6 ? 2 : 0;
     case Resource::Minerals:
         return jobRow == 6 ? 3 : 0;
+    case Resource::Silver:
+        return jobRow == 7 ? 2 : 0;
     default:
         return 0;
     }
@@ -141,11 +122,51 @@ bool resourceDoubles(Resource resource, int jobRow) {
 
 } // namespace
 
+// What a worker in a building makes. Measured: a colonist makes 3 in a
+// house, a shop (or the lumber mill) doubles that and a factory adds half
+// again (3, 6, 9); servants make 2 and criminals and converts 1. In the
+// craft workshops (rum to muskets) the liberty bonus and the tories'
+// penalty go in after the shop and before an expert doubles (a colonist in
+// a shop with +1: 7; an expert in a house with +2: 10); for carpenters,
+// statesmen and preachers they are added once at the end.
+int buildingYield(int level, int skill, int jobRow, WorkModifier modifier, bool withFactory) {
+    int base = 3;
+    if (skill == skill::kServant) {
+        base = 2;
+    } else if (skill == skill::kCriminal || skill == skill::kConvert) {
+        base = 1;
+    }
+    if (level >= 2) {
+        base *= 2;
+    }
+    const bool craft = jobRow >= 9 && jobRow <= 15 && jobRow != job::kCarpenter;
+    const int modified = modifier.bonus - modifier.penalty;
+    if (craft) {
+        base += modified;
+    }
+    if (isExpert(skill, jobRow)) {
+        base *= 2;
+    }
+    if (level >= 3 && withFactory) {
+        base += base / 2;
+    }
+    if (!craft) {
+        base += modified;
+    }
+    return std::max(0, base);
+}
+
 int squareYield(const Ruleset& rules, const MapSquare& square, int jobRow, int skill, WorkModifier modifier,
                 bool nearLand, Resource resource) {
     const int row = terrainRow(square);
     int amount = yieldOf(rules, row, jobRow);
     if (amount <= 0) {
+        return 0;
+    }
+    // Measured: mountains give silver only with a deposit (pattern square)
+    // or with mask bit 2, which on a pattern square is a worked-out deposit.
+    constexpr std::uint8_t kSilverMark = 0x04;
+    if (jobRow == 7 && square.mountains() && resource != Resource::Silver && (square.flags & kSilverMark) == 0) {
         return 0;
     }
     // Measured: the bonus and most resources are added to the land's own
@@ -297,30 +318,38 @@ ColonyProduction colonyProduction(const SaveColony& colony, const SaveMap& map, 
     const int population = std::clamp(colony.population, 0, kMaxColonists);
     p.colonists.resize(static_cast<std::size_t>(population));
 
-    // The colony's own square works itself: food, and the best other crop
-    // it has (furs in a forest). Measured, see docs/rules/production.md.
+    // The colony's own square works itself: food, and its best crop or
+    // ore. Measured, see docs/rules/production.md.
     if (map.inside(colony.x, colony.y)) {
         const MapSquare centre = map.at(colony.x, colony.y);
-        p.centreFood = centreFoodYield(rules, centre, difficulty) + centreModifier.bonus;
+        const Resource resource = resourceAt(map, colony.x, colony.y);
+        p.centreFood = centreFoodYield(rules, centre, difficulty) + resourceAdds(resource, job::kFarmer) +
+                       centreModifier.bonus;
         const int row = terrainRow(centre);
+        // Measured: the first of the largest yields, resource included, in
+        // the order sugar, tobacco, cotton, furs, ore, silver.
         int best = -1;
         int bestAmount = 0;
-        if (centre.isForest() && !centre.hills() && !centre.mountains()) {
-            best = 4; // furs
-        } else {
-            for (const int j : {1, 2, 3, 6, 7}) {
-                if (yieldOf(rules, row, j) > bestAmount) {
-                    best = j;
-                    bestAmount = yieldOf(rules, row, j);
-                }
+        for (const int j : {1, 2, 3, 4, 6, 7}) {
+            int amount = yieldOf(rules, row, j);
+            if (amount <= 0) {
+                continue;
+            }
+            amount += resourceAdds(resource, j);
+            if (resourceDoubles(resource, j)) {
+                amount *= 2;
+            }
+            if (amount > bestAmount) {
+                best = j;
+                bestAmount = amount;
             }
         }
-        if (best >= 0 && yieldOf(rules, row, best) > 0) {
+        if (best >= 0) {
             p.centreGood = jobOutput(best);
-            // Measured: the land's own yield, 1 more on a minor river and 2
-            // on a major one, and 1 more at Discoverer.
+            // Measured: 1 more on a minor river, 2 on a major one, and 1
+            // more at Discoverer.
             const int river = centre.majorRiver() ? 2 : (centre.minorRiver() ? 1 : 0);
-            p.centreAmount = yieldOf(rules, row, best) + river + (difficulty <= 0 ? 1 : 0) + centreModifier.bonus;
+            p.centreAmount = bestAmount + river + (difficulty <= 0 ? 1 : 0) + centreModifier.bonus;
         }
         p.produced[cargo::kFood] += p.centreFood;
         if (p.centreGood >= 0) {
@@ -354,13 +383,14 @@ ColonyProduction colonyProduction(const SaveColony& colony, const SaveMap& map, 
             if (work.building) {
                 const int level = std::max(1, buildingLevel(colony, *work.building));
                 work.good = jobOutput(jobRow);
-                // Measured: in a building the bonus and the penalty count
-                // once for each worker, expert or not.
-                const int base = buildingYield(level, colony.skills[static_cast<std::size_t>(i)], jobRow);
-                work.amount = work.good >= 0 ? std::max(0, base + modifier.bonus - modifier.penalty) : 0;
+                const int skillOf = colony.skills[static_cast<std::size_t>(i)];
+                const int base = buildingYield(level, skillOf, jobRow, modifier);
+                work.amount = work.good >= 0 ? base : 0;
+                // Measured: a factory's extra half needs no raw goods.
+                work.uses = work.good >= 0 ? buildingYield(level, skillOf, jobRow, modifier, false) : 0;
                 const int input = jobInput(jobRow);
                 if (input >= 0) {
-                    p.needed[static_cast<std::size_t>(input)] += work.amount;
+                    p.needed[static_cast<std::size_t>(input)] += work.uses;
                 }
             }
         }
@@ -463,8 +493,8 @@ JobChoice choiceFor(const SaveColony& colony, const SaveMap& map, const Ruleset&
     if (!building || buildingLevel(colony, *building) == 0 || workersIn(colony, *building, colonist) >= 3) {
         return choice;
     }
-    const int base = buildingYield(buildingLevel(colony, *building), skillOf, jobRow);
-    choice.amount = jobRow == job::kTeacher ? 0 : std::max(0, base + modifier.bonus - modifier.penalty);
+    const int base = buildingYield(buildingLevel(colony, *building), skillOf, jobRow, modifier);
+    choice.amount = jobRow == job::kTeacher ? 0 : base;
     return choice;
 }
 
@@ -535,6 +565,7 @@ ColonyTurn runColonyTurn(SaveColony& colony, const SaveMap& map, const Ruleset& 
     // Workshops: as much as their raw good allows, from this turn's
     // harvest first and then from the warehouse.
     std::array<int, cargo::kCount> wanted{};
+    std::array<int, cargo::kCount> wantedOutput{};
     std::array<int, cargo::kCount> outputOf{};
     for (std::size_t i = 0; i < p.colonists.size(); ++i) {
         const auto& work = p.colonists[i];
@@ -543,7 +574,8 @@ ColonyTurn runColonyTurn(SaveColony& colony, const SaveMap& map, const Ruleset& 
         }
         const int input = jobInput(colony.jobs[i]);
         if (input >= 0) {
-            wanted[static_cast<std::size_t>(input)] += work.amount;
+            wanted[static_cast<std::size_t>(input)] += work.uses;
+            wantedOutput[static_cast<std::size_t>(input)] += work.amount;
             outputOf[static_cast<std::size_t>(input)] = work.good;
         }
     }
@@ -554,8 +586,9 @@ ColonyTurn runColonyTurn(SaveColony& colony, const SaveMap& map, const Ruleset& 
         }
         const int available = made[r] + (raw < kGoodsKinds ? std::max(0, colony.stock[r]) : 0);
         const int used = std::min(wanted[r], available);
-        const int shortfall = wanted[r] - used;
-        made[static_cast<std::size_t>(outputOf[r])] -= shortfall;
+        // A factory makes half as much again from what it gets.
+        const int output = static_cast<int>(static_cast<long long>(wantedOutput[r]) * used / wanted[r]);
+        made[static_cast<std::size_t>(outputOf[r])] -= wantedOutput[r] - output;
         made[r] -= used; // negative: taken from the warehouse
     }
 

@@ -182,7 +182,8 @@ all fit.
 - Ocean: no fish when bit 2 of the square's mask is set. The original sets
   it on every pattern square three or more squares from land and on some
   two from land.
-- Mountains: silver (sprite 89) when mask bit 2 is set, ore otherwise.
+- Mountains: a silver deposit (sprite 101), or sprite 89 when mask bit 2 is
+  set, which works like a worked-out deposit (see production.md).
 
 **Which sprite** (`PHYS0.SS`, drawn last on the square):
 
@@ -199,7 +200,7 @@ all fit.
 | Broadleaf and boreal forest | 98 (deer) |
 | Conifer and tropical forest | 99 (timber) |
 | Hills | 102 |
-| Mountains | 101, or 89 (silver) with mask bit 2 |
+| Mountains | 101 (silver deposit), or 89 with mask bit 2 |
 
 *Guess:* tundra never came up on a pattern square in the tours; we draw
 grain (91). Marsh has minerals (95): an ore miner there makes 3 more, as on

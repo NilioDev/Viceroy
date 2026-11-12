@@ -15,7 +15,7 @@ namespace viceroy {
 
 enum class Resource {
     None,
-    Silver,    // mountains with mask bit 2
+    Silver,    // mountains: a silver deposit (silver miners make 2 more)
     Oasis,     // desert, scrub
     Grain,     // plains
     Cotton,    // prairie
@@ -26,7 +26,7 @@ enum class Resource {
     Beaver,    // mixed forest
     Deer,      // broadleaf and boreal forest
     Timber,    // conifer and tropical forest
-    Ore,       // mountains
+    DepletedSilver, // mountains with mask bit 2: silver 1, no more
     HillsOre,  // hills
 };
 

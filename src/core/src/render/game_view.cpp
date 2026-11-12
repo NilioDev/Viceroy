@@ -256,7 +256,7 @@ namespace {
 // PHYS0.SS sprite of each resource (89 to 102), drawn last on its square.
 int resourceSprite(Resource r) {
     switch (r) {
-    case Resource::Silver: return 89;
+    case Resource::DepletedSilver: return 89;
     case Resource::Oasis: return 90;
     case Resource::Grain: return 91;
     case Resource::Cotton: return 92;
@@ -267,7 +267,7 @@ int resourceSprite(Resource r) {
     case Resource::Beaver: return 97;
     case Resource::Deer: return 98;
     case Resource::Timber: return 99;
-    case Resource::Ore: return 101;
+    case Resource::Silver: return 101;
     case Resource::HillsOre: return 102;
     case Resource::None: break;
     }
