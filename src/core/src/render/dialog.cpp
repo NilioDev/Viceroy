@@ -65,17 +65,43 @@ int plainWidth(const Font& font, const std::string& s) {
 }
 
 std::vector<std::string> wrap(const Font& font, const std::string& text, int limit) {
+    // The lines are drawn with one space between words. Measured: where
+    // the text file breaks a line the original measures two spaces, so
+    // "Your Excellency. Our fur traders" + "cannot" (one pixel short of
+    // the limit with one space) goes onto the next line; spaces inside a
+    // line count once.
     std::vector<std::string> lines;
-    std::istringstream words(text);
-    std::string word;
-    std::string line;
-    while (words >> word) {
-        const std::string candidate = line.empty() ? word : line + " " + word;
-        if (!line.empty() && plainWidth(font, candidate) > limit) {
+    std::string line;     // as drawn
+    std::string measured; // with the line breaks as two spaces
+    std::size_t i = 0;
+    while (i < text.size()) {
+        bool lineBreak = false;
+        while (i < text.size() && (text[i] == ' ' || text[i] == '\n')) {
+            lineBreak = lineBreak || text[i] == '\n';
+            ++i;
+        }
+        std::size_t end = text.find_first_of(" \n", i);
+        if (end == std::string::npos) {
+            end = text.size();
+        }
+        const std::string word = text.substr(i, end - i);
+        i = end;
+        if (word.empty()) {
+            continue;
+        }
+        if (line.empty()) {
+            line = word;
+            measured = word;
+            continue;
+        }
+        const std::string candidate = measured + (lineBreak ? "  " : " ") + word;
+        if (plainWidth(font, candidate) > limit) {
             lines.push_back(line);
             line = word;
+            measured = word;
         } else {
-            line = candidate;
+            line += " " + word;
+            measured = candidate;
         }
     }
     if (!line.empty()) {
@@ -167,7 +193,7 @@ Dialog makeDialog(const Art& art, std::string_view section, const std::vector<st
             if (line[0] == '^' || paragraphs.empty()) {
                 paragraphs.push_back(line[0] == '^' ? line.substr(1) : line);
             } else {
-                paragraphs.back() += " " + line;
+                paragraphs.back() += "\n" + line;
             }
         } else {
             if (blank) {
@@ -248,6 +274,12 @@ void placeBuyDialog(Dialog& d) {
     d.x = (Screen::kWidth - boxWidth(d)) / 2;
     d.y = 164 - dialogHeight(d);
     d.portraitX = 130;
+    d.portraitY = d.y - 62;
+}
+
+void placeTradeDialog(Dialog& d) {
+    placeBuyDialog(d);
+    d.y = (262 - dialogHeight(d)) / 2;
     d.portraitY = d.y - 62;
 }
 

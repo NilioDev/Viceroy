@@ -701,6 +701,7 @@ int constructionPrice(const SaveColony& colony, const Ruleset& rules, const Save
 
 ColonyTurn runColonyTurn(SaveColony& colony, const SaveMap& map, const Ruleset& rules, int difficulty) {
     ColonyTurn turn;
+    const auto before = colony.stock;
     const auto p = colonyProduction(colony, map, rules, difficulty);
     std::array<int, cargo::kCount> made = p.produced;
 
@@ -728,6 +729,11 @@ ColonyTurn runColonyTurn(SaveColony& colony, const SaveMap& map, const Ruleset& 
         }
         const int available = made[r] + (raw < kGoodsKinds ? std::max(0, colony.stock[r]) : 0);
         const int used = std::min(wanted[r], available);
+        // Measured: with 1 fur for a fur trader the coat is made and nothing
+        // is said; the turn after, with none, "has run out of furs".
+        if (available <= 0 && raw < kGoodsKinds) {
+            turn.ranOut[r] = true;
+        }
         // A factory makes half as much again from what it gets.
         const int output = static_cast<int>(static_cast<long long>(wantedOutput[r]) * used / wanted[r]);
         made[static_cast<std::size_t>(outputOf[r])] -= wantedOutput[r] - output;
@@ -740,6 +746,7 @@ ColonyTurn runColonyTurn(SaveColony& colony, const SaveMap& map, const Ruleset& 
     made[cargo::kFood] -= born;
     made[cargo::kHorses] += born;
     turn.horsesBred = born;
+    turn.foodShort = std::max(0, -made[cargo::kFood]);
     for (int good = 0; good < kGoodsKinds; ++good) {
         colony.stock[static_cast<std::size_t>(good)] += made[static_cast<std::size_t>(good)];
     }
@@ -749,7 +756,8 @@ ColonyTurn runColonyTurn(SaveColony& colony, const SaveMap& map, const Ruleset& 
         turn.grew = true;
     } else if (food < 0) {
         food = 0;
-        turn.starved = colony.population > 1;
+        // Measured: ten turns without food and nobody starved.
+        turn.foodRanOut = true;
     }
 
     // Construction. Measured: whatever hammers are left over are lost when
@@ -794,6 +802,10 @@ ColonyTurn runColonyTurn(SaveColony& colony, const SaveMap& map, const Ruleset& 
             amount = limit;
         }
         amount = std::max(0, amount);
+        // Measured: 99 to 102 cotton, 199 to 200 and 299 to 300 each make
+        // a new cargo; 150 down to 100 does not.
+        const int was = std::max(0, before[static_cast<std::size_t>(good)]);
+        turn.cargoReady[static_cast<std::size_t>(good)] = amount / 100 > was / 100;
     }
 
     // Bells: membership moves, and then the bonus the next turn works with.

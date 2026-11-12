@@ -67,6 +67,9 @@ void placeReligiousDialog(Dialog& dialog);
 void placeColonialDialog(Dialog& dialog);
 // BUY on the colony screen: the box centred across the screen with its
 // bottom at row 163, the woman in the white cap leaning on its top edge.
+// The same woman for the warehouse and food reports about a colony: the box
+// centred across the screen and on row 130.
+void placeTradeDialog(Dialog& d);
 void placeBuyDialog(Dialog& dialog);
 // The name of a European nation as the messages use it ("the Netherlands").
 std::string countryName(const Art& art, int nation);

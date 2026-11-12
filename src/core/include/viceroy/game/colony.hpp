@@ -216,7 +216,6 @@ bool squareFree(const SaveColony& colony, const SaveMap& map, const std::vector<
 
 struct ColonyTurn {
     bool grew = false;    // 200 food: a new colonist is born
-    bool starved = false; // no food left: a colonist died
     int built = -1;       // row of @BUILDING finished this turn
     std::array<int, kGoodsKinds> wasted{}; // goods the warehouse could not hold
     int libertyBefore = 0; // the production bonus before and after the turn
@@ -224,6 +223,14 @@ struct ColonyTurn {
     int horsesBred = 0;    // new horses, each fed with one food of the surplus
     int builtUnit = -1;    // row of @UNIT finished this turn (wagon, artillery, ships)
     int toolsNeeded = 0;   // the hammers are there but the tools are not: how many
+    // Goods whose store passed a hundred (100, 200, 300) this turn: "a new
+    // cargo is ready". Food is not counted.
+    std::array<bool, kGoodsKinds> cargoReady{};
+    // Raw goods a workshop wanted and found none of, neither made this turn
+    // nor in the warehouse.
+    std::array<bool, kGoodsKinds> ranOut{};
+    bool foodRanOut = false; // the colony ate more food than it had
+    int foodShort = 0;       // how much more food it eats than it makes
 };
 
 // What the colony builds is a building (row of @BUILDING, 0-41) or, from

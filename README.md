@@ -20,7 +20,9 @@ touch controls.
 > on its Make panel or pay to finish it there; the musket button lists the
 > units in the colony. At the end of the turn colonies
 > store what they make, breed horses from spare food, grow and finish
-> the buildings, wagon trains, artillery and ships under way. Ships sail to Europe from
+> the buildings, wagon trains, artillery and ships under way, and your
+> advisors report full warehouses, waste, food running low and workshops
+> out of raw goods. Ships sail to Europe from
 > the high seas, sell and buy goods there (prices move as you trade), take colonists from the docks and
 > sail back. In Europe you can recruit colonists, buy artillery and ships,
 > and have specialists trained. Crosses made in your colonies and churches
