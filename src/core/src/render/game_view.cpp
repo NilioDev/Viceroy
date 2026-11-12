@@ -342,19 +342,22 @@ void drawTerrain(Screen& screen, const Art& art, const Game& game, int x, int y,
 namespace {
 
 // The small box with the unit's nation's colour and its orders letter.
-void drawOrdersBox(Screen& screen, const Art& art, const Game& game, int index, Rect box) {
+void drawOrdersBox(Screen& screen, const Art& art, const Game& game, int index, Rect box, int orders,
+                   bool listInk = false) {
     const auto& u = game.unit(index);
     const std::uint8_t colour = nationColour(art, u.nation);
     screen.fill(box, colour);
     screen.frame(box, kBlack);
     static constexpr const char* kLetters = "-STGLFFBPR-";
-    const char letter = (u.orders >= 0 && u.orders < 11) ? kLetters[u.orders] : '-';
+    const char letter = (orders >= 0 && orders < 11) ? kLetters[orders] : '-';
     const char text[2] = {letter, 0};
     // A unit with orders shows its letter in the darker half of the
     // nation's colour; the dash of a unit without orders is black, and so
-    // are the Dutch letters (seen for P and R on orange).
+    // are the Dutch letters on the map (seen for P and R on orange). In the
+    // colony's list of units the Dutch letters are dark orange too.
     constexpr std::uint8_t kDutchOrange = 0x0D;
-    const std::uint8_t ink = u.orders != SaveUnit::kNoOrders && colour >= 8 && colour < 16 && colour != kDutchOrange
+    const std::uint8_t ink = orders != SaveUnit::kNoOrders && colour >= 8 && colour < 16 &&
+                                     (colour != kDutchOrange || listInk)
                                  ? static_cast<std::uint8_t>(colour - 8)
                                  : kBlack;
     const int w = Screen::textWidth(art.tiny, text);
@@ -398,6 +401,21 @@ UnitPlacement unitPlacement(const Game& game, int index, int icon, int width) {
     return {x, x + width - 2, 7};
 }
 
+// The black shadow two pixels left of the sprite, the orders box, then the
+// sprite.
+void drawUnitParts(Screen& screen, const Art& art, const Game& game, int index, const IndexedImage& image, int x,
+                   int y, Rect box, int orders, bool listInk) {
+    for (int j = 0; j < image.height; ++j) {
+        for (int i = 0; i < image.width; ++i) {
+            if (image.pixels[static_cast<std::size_t>(j * image.width + i)] != kTransparent) {
+                screen.pixel(x - 2 + i, y + j, kBlack);
+            }
+        }
+    }
+    drawOrdersBox(screen, art, game, index, box, orders, listInk);
+    screen.blit(image, x, y);
+}
+
 void drawUnitOnSquare(Screen& screen, const Art& art, const Game& game, int index, int px, int py) {
     const int icon = unitIcon(game, index);
     const auto* image = sprite(art.icons, icon);
@@ -405,17 +423,8 @@ void drawUnitOnSquare(Screen& screen, const Art& art, const Game& game, int inde
         return;
     }
     const auto place = unitPlacement(game, index, icon, image->width);
-    const int x = px + place.spriteX;
-    for (int j = 0; j < image->height; ++j) {
-        for (int i = 0; i < image->width; ++i) {
-            if (image->pixels[static_cast<std::size_t>(j * image->width + i)] != kTransparent) {
-                screen.pixel(x - 2 + i, py + j, kBlack);
-            }
-        }
-    }
     const Rect box{px + place.boxX, py + place.boxY, 7, 9};
-    drawOrdersBox(screen, art, game, index, box);
-    screen.blit(*image, x, py);
+    drawUnitParts(screen, art, game, index, *image, px + place.spriteX, py, box, game.unit(index).orders, false);
 }
 
 void drawCentredText(Screen& screen, const Font& font, int cx, int y, const std::string& s, TextColours colours) {
@@ -506,6 +515,30 @@ int colonistIcon(int skill) {
 
 void drawUnitOrders(Screen& screen, const Art& art, const Game& game, int index, int px, int py) {
     drawUnitOnSquare(screen, art, game, index, px, py);
+}
+
+void drawUnitInColonyList(Screen& screen, const Art& art, const Game& game, int index, int px, int py) {
+    int orders = game.unit(index).orders;
+    if (orders == SaveUnit::kNoOrders) {
+        orders = SaveUnit::kSentry;
+    }
+    // Artillery is the smaller picture here, with its box two pixels lower
+    // than on the map.
+    constexpr int kSmallArtilleryIcon = 65;
+    if (game.unit(index).type == kArtillery) {
+        if (const auto* image = sprite(art.icons, kSmallArtilleryIcon); image != nullptr && image->width > 0) {
+            drawUnitParts(screen, art, game, index, *image, px + 2, py, {px + 6, py + 2, 7, 9}, orders, true);
+            return;
+        }
+    }
+    const int icon = unitIcon(game, index);
+    const auto* image = sprite(art.icons, icon);
+    if (image == nullptr || image->width <= 0) {
+        return;
+    }
+    const auto place = unitPlacement(game, index, icon, image->width);
+    drawUnitParts(screen, art, game, index, *image, px + place.spriteX, py, {px + place.boxX, py + place.boxY, 7, 9},
+                  orders, true);
 }
 
 std::string textLine(const TextFile& file, const char* section, int row, const char* fallback) {

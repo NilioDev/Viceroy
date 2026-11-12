@@ -103,6 +103,9 @@ std::uint8_t nationColour(const Art& art, int nation);
 // The box with the nation's colour and the orders letter beside a unit
 // drawn at (px, py).
 void drawUnitOrders(Screen& screen, const Art& art, const Game& game, int index, int px, int py);
+// The same in the colony's list of units present: a unit without orders
+// shows as on sentry, and artillery has a smaller picture.
+void drawUnitInColonyList(Screen& screen, const Art& art, const Game& game, int index, int px, int py);
 // The first field of a row of a section of a text file, or `fallback`.
 std::string textLine(const TextFile& file, const char* section, int row, const char* fallback);
 
