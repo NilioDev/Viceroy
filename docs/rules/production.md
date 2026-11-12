@@ -142,7 +142,9 @@ Every colony, the computer's too, stores what it made:
   the warehouse. What they can't get is not made.
 - Food left after eating goes into the warehouse. At 200 food, 200 are used
   up and a free colonist appears on the colony's square. When the food runs
-  out, the last colonist starves (a colony never starves to nothing).
+  out the store stays at 0 and nobody starves: a colony of eight with 10
+  food short a turn kept all eight for ten turns. (`@STARVE1/2` exist, so
+  starving happens somewhere; when is not known yet.)
 - Hammers add up towards the building under way. It is finished when there
   are enough hammers and tools (`@BUILDING` lists both, the tools in tens).
   The tools are used up and the hammers go back to 0: what is left over is
@@ -166,10 +168,36 @@ Every colony, the computer's too, stores what it made:
 - The warehouse holds 100 of each good, 200 with a warehouse and 300 with
   the expansion; the rest is thrown away. Food is not limited this way.
 
-**Not yet done:** choosing what to build on the colony screen, and the
-other colony messages of `GAME.TXT` (`@CARGOREADY*`, `@SPOIL*`,
-`@FOODLOW`, `@FOOD1/2`, `@STARVE*`, `@LUMBER` and the other run-outs); the
-original showed `@FOODLOW` and `@CARGOREADY1` in the same test turns.
+- Reports about the warehouse and the food, from the woman in the white
+  bonnet (`MSS5.SS`, the box centred on row 130), with "Continue turn." and
+  "Zoom to colony.". Measured on test colonies, one or more turns each:
+  - a workshop that finds none of its raw good, neither made this turn nor
+    stored, reports `@FURS`, `@ORE`, `@LUMBER`, `@COTTON`, `@TOBACCO`,
+    `@CANESUGAR` or `@TOOLS` every turn; one that finds some but not
+    enough says nothing;
+  - a good (not food) whose store passes a hundred (99 to 102, 199 to 200)
+    gives `@CARGOREADY0`, or at the warehouse's limit `@CARGOREADY1` (a
+    larger warehouse can still be built) or `@CARGOREADY2`, with the limit;
+    what was thrown away then is not reported again;
+  - other goods thrown away: `@SPOIL1` with the amount and the good when it
+    is one good, `@SPOIL2` for more; `@SPOIL3/4` once the expansion stands;
+  - food short and fewer than four turns of it left (10 short: 39 left
+    warns, 49 does not): `@FOODLOW` with what is left;
+  - food gone: `@FOOD1`, or `@FOOD2` ("Winter is coming") after a spring
+    turn from 1600 on.
+- `@NEWCOLONIST` comes from the priest (`MSS4.SS`), placed as the
+  immigration reports.
+
+In our test turns the Sons of Liberty report came first. The order of the
+other reports among themselves is not measured; Viceroy gives run-outs,
+then cargo and waste, then food.
+
+A line break in `GAME.TXT` counts as two spaces when the original wraps a
+report (it is drawn as one): "Your Excellency. Our fur traders" leaves
+"cannot" for the next line although one space would just fit.
+
+**Not yet done:** the tutorial's hints (`@TUTORIAL6` "there are 100 Cotton
+in ..." followed the cargo report in our test game).
 
 ## What a colony can build
 

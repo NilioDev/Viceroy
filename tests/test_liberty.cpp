@@ -141,6 +141,7 @@ VCR_TEST("liberty: reaching 50% is reported after the turn") {
     c.y = 1;
     c.nation = 3;
     c.name = "Fort Orange";
+    c.stock[cargo::kFood] = 100; // no food reports
     s.colonies.push_back(c);
     s.nations[3].crossesNeeded = 1000;
     Game g(std::move(s), Ruleset{});

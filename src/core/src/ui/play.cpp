@@ -271,6 +271,12 @@ bool PlayScreen::handleDialog(Command command) {
     return true;
 }
 
+namespace {
+// The question of every report about a colony: "Continue turn." or "Zoom
+// to colony.".
+constexpr const char* kColonyReport = "COLONYREPORT";
+} // namespace
+
 void PlayScreen::tell(GameNotice notice) {
     notices_.push_back(std::move(notice));
     showNotices();
@@ -312,7 +318,21 @@ void PlayScreen::showNotices() {
         if (dialog_) {
             addOption(*dialog_, textLine(art_->labelText, "MISC", 34, "Continue turn."));
             addOption(*dialog_, textLine(art_->labelText, "MISC", 35, "Zoom to colony."));
-            placeColonialDialog(*dialog_);
+            // Measured: the warehouse and food reports come from the woman
+            // in the white bonnet, a new colonist from the priest, the rest
+            // from the colonial advisor.
+            const auto& section = notice.section;
+            const auto startsWith = [&](std::string_view prefix) { return section.rfind(prefix, 0) == 0; };
+            constexpr std::string_view kRunOuts[] = {"CANESUGAR", "TOBACCO", "COTTON", "FURS", "LUMBER", "ORE", "TOOLS"};
+            const bool runOut = std::find(std::begin(kRunOuts), std::end(kRunOuts), section) != std::end(kRunOuts);
+            if (runOut || startsWith("CARGOREADY") || startsWith("SPOIL") || startsWith("FOOD") || startsWith("STARVE")) {
+                placeTradeDialog(*dialog_);
+            } else if (section == "NEWCOLONIST") {
+                placeReligiousDialog(*dialog_);
+            } else {
+                placeColonialDialog(*dialog_);
+            }
+            question_ = kColonyReport;
         }
         return;
     }
@@ -364,8 +384,7 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
             }
         }
     };
-    if (question == "REBELMAJORITY" || question == "REBELUNANIMOUS" || question == "TORYMINORITY" ||
-        question == "TORYMAJORITY") {
+    if (question == kColonyReport) {
         if (choice == 1) {
             openColony(unit);
         }

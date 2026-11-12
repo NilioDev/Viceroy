@@ -18,6 +18,8 @@
 
 namespace viceroy {
 
+struct ColonyTurn;
+
 struct Step {
     int dx = 0;
     int dy = 0;
@@ -193,6 +195,10 @@ private:
     Ruleset rules_;
     std::vector<std::string> lastTurnNews_;
     std::vector<GameNotice> notices_;
+    // The messages about a colony's warehouse after its turn.
+    void storageNotices(const ColonyTurn& turn, int colony);
+    void foodNotices(const ColonyTurn& turn, int colony);
+    void runOutNotices(const ColonyTurn& turn, int colony);
     std::uint32_t random_ = 0;
 };
 

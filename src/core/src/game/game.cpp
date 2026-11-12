@@ -382,6 +382,68 @@ FoundResult Game::foundColony(int index, const std::string& name) {
     return FoundResult::Founded;
 }
 
+void Game::runOutNotices(const ColonyTurn& turn, int c) {
+    // GAME.TXT has one report for each raw good a workshop uses.
+    static constexpr std::pair<int, const char*> kSections[] = {
+        {cargo::kSugar, "CANESUGAR"}, {cargo::kTobacco, "TOBACCO"}, {cargo::kCotton, "COTTON"}, {cargo::kFurs, "FURS"},
+        {cargo::kLumber, "LUMBER"},   {cargo::kOre, "ORE"},         {cargo::kTools, "TOOLS"},
+    };
+    for (const auto& [good, section] : kSections) {
+        if (turn.ranOut[static_cast<std::size_t>(good)]) {
+            notices_.push_back(GameNotice{section, {save_.colonies[static_cast<std::size_t>(c)].name}, -1, {}, c});
+        }
+    }
+}
+
+void Game::foodNotices(const ColonyTurn& turn, int c) {
+    const auto& colony = save_.colonies[static_cast<std::size_t>(c)];
+    const int food = colony.stock[cargo::kFood];
+    // Measured: a colony 10 food short warns with 39 left but not with 49,
+    // one 4 short not yet with 19; when the food is gone it says so, with
+    // winter coming when the next turn is autumn.
+    if (turn.foodRanOut) {
+        const bool autumnNext = save_.year >= 1600 && save_.season == 0;
+        notices_.push_back(GameNotice{autumnNext ? "FOOD2" : "FOOD1", {colony.name}, -1, {}, c});
+    } else if (turn.foodShort > 0 && food < 4 * turn.foodShort) {
+        notices_.push_back(GameNotice{"FOODLOW", {colony.name}, -1, {food}, c});
+    }
+}
+
+void Game::storageNotices(const ColonyTurn& turn, int c) {
+    const auto& colony = save_.colonies[static_cast<std::size_t>(c)];
+    const int limit = storageLimit(colony);
+    const bool canExpand = colony.raw[149] < 2;
+    const auto goodName = [&](int good) {
+        return static_cast<std::size_t>(good) < rules_.cargo.size() ? rules_.cargo[static_cast<std::size_t>(good)].name
+                                                                    : std::string();
+    };
+    // Measured: a cargo that is ready reports the full warehouse with it
+    // (and then not as thrown away); the rest that was thrown away is
+    // reported once, by name when it was one good.
+    int spoiled = -1;
+    int spoiledKinds = 0;
+    for (int good = 1; good < kGoodsKinds; ++good) {
+        const auto g = static_cast<std::size_t>(good);
+        if (turn.cargoReady[g]) {
+            const bool full = colony.stock[g] >= limit;
+            const char* section = !full ? "CARGOREADY0" : canExpand ? "CARGOREADY1" : "CARGOREADY2";
+            notices_.push_back(GameNotice{section, {colony.name, goodName(good)}, -1, {limit}, c});
+        } else if (turn.wasted[g] > 0) {
+            spoiled = good;
+            ++spoiledKinds;
+        }
+    }
+    if (spoiledKinds == 1) {
+        notices_.push_back(GameNotice{canExpand ? "SPOIL1" : "SPOIL3",
+                                      {colony.name, goodName(spoiled)},
+                                      -1,
+                                      {turn.wasted[static_cast<std::size_t>(spoiled)]},
+                                      c});
+    } else if (spoiledKinds > 1) {
+        notices_.push_back(GameNotice{canExpand ? "SPOIL2" : "SPOIL4", {colony.name}, -1, {}, c});
+    }
+}
+
 std::string Game::suggestColonyName(const TextFile& colonyNames) const {
     // COLONY.TXT: a section per nation, one "name,year" per line.
     static constexpr const char* kSections[] = {"ENGLISH", "FRENCH", "SPANISH", "DUTCH"};
@@ -420,22 +482,15 @@ void Game::endTurn() {
             GameNotice notice{section, {colony.name}, -1, {sonsOfLibertyPercent(colony)}, static_cast<int>(c)};
             notices_.push_back(std::move(notice));
         }
+        if (ours) {
+            runOutNotices(turn, static_cast<int>(c));
+            storageNotices(turn, static_cast<int>(c));
+            foodNotices(turn, static_cast<int>(c));
+        }
         if (turn.grew) {
             addColonist(colony.x, colony.y, colony.nation);
             if (ours) {
                 notices_.push_back(GameNotice{"NEWCOLONIST", {colony.name}, -1, {}, static_cast<int>(c)});
-            }
-        }
-        if (turn.starved) {
-            const auto last = static_cast<std::size_t>(colony.population - 1);
-            for (auto& who : colony.squares) {
-                if (who == static_cast<int>(last)) {
-                    who = -1;
-                }
-            }
-            --colony.population;
-            if (ours) {
-                lastTurnNews_.push_back(colony.name + ": a colonist starved.");
             }
         }
         if (turn.builtUnit >= 0) {
