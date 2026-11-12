@@ -210,3 +210,84 @@ VCR_TEST("original files: a colony stores what it makes at the end of the turn")
     VCR_CHECK(game.unit(units).x == isabella.x && game.unit(units).nation == 3);
     VCR_CHECK(!game.lastTurnNews().empty());
 }
+
+namespace {
+
+int bred(int horses, int surplus, bool stables, int warehouse = 0) {
+    SaveColony c;
+    c.stock[cargo::kHorses] = horses;
+    c.raw[149] = static_cast<std::uint8_t>(warehouse);
+    if (stables) {
+        setBuildingLevel(c, BuildingKind::Stables, 1);
+    }
+    return horsesBred(c, surplus);
+}
+
+} // namespace
+
+VCR_TEST("horses: breeding from the food surplus (measured)") {
+    // Two for every started herd of 50, or 25 with stables.
+    VCR_CHECK(bred(1, 29, false) == 0);
+    VCR_CHECK(bred(2, 29, false) == 2);
+    VCR_CHECK(bred(50, 29, false) == 2);
+    VCR_CHECK(bred(51, 29, false) == 4);
+    VCR_CHECK(bred(25, 29, true) == 2);
+    VCR_CHECK(bred(26, 29, true) == 4);
+    VCR_CHECK(bred(75, 29, true, 2) == 6);
+    VCR_CHECK(bred(76, 29, true, 2) == 8);
+    VCR_CHECK(bred(150, 29, false, 2) == 6);
+    VCR_CHECK(bred(151, 29, false, 2) == 8);
+    // At most half the surplus, rounded up; nothing without a surplus.
+    VCR_CHECK(bred(87, 5, true) == 3);
+    VCR_CHECK(bred(120, 4, false, 2) == 2);
+    VCR_CHECK(bred(50, 0, false) == 0);
+    VCR_CHECK(bred(50, -1, false) == 0);
+    // The warehouse is the limit.
+    VCR_CHECK(bred(99, 29, false) == 1);
+    VCR_CHECK(bred(97, 29, false) == 3);
+    VCR_CHECK(bred(100, 29, false) == 0);
+}
+
+namespace {
+
+int centre(int terrain, int relief, bool plowed, int difficulty) {
+    Ruleset r;
+    r.terrain.resize(21);
+    r.terrain[0].yield[job::kFarmer] = 2;  // tundra
+    r.terrain[1].yield[job::kFarmer] = 1;  // desert
+    r.terrain[2].yield[job::kFarmer] = 4;  // plains
+    r.terrain[4].yield[job::kFarmer] = 2;  // grassland
+    r.terrain[5].yield[job::kFarmer] = 3;  // savannah
+    r.terrain[8].yield[job::kFarmer] = 1;  // boreal
+    r.terrain[9].yield[job::kFarmer] = 1;  // scrub
+    r.terrain[13].yield[job::kFarmer] = 2; // tropical
+    MapSquare sq;
+    sq.terrain = static_cast<std::uint8_t>(terrain);
+    sq.relief = static_cast<std::uint8_t>(relief);
+    sq.flags = plowed ? MapSquare::kPlowed : 0;
+    return centreFoodYield(r, sq, difficulty);
+}
+
+} // namespace
+
+VCR_TEST("colony square: food by land and difficulty (measured)") {
+    // Conquistador.
+    VCR_CHECK(centre(0, 0, false, 2) == 3);
+    VCR_CHECK(centre(1, 0, false, 2) == 1);
+    VCR_CHECK(centre(2, 0, false, 2) == 3);
+    VCR_CHECK(centre(2, 0, true, 2) == 4);
+    VCR_CHECK(centre(2, 2, false, 2) == 3);
+    VCR_CHECK(centre(4, 0, false, 2) == 3);
+    VCR_CHECK(centre(4, 0, true, 2) == 4);
+    VCR_CHECK(centre(8, 0, false, 2) == 2);
+    VCR_CHECK(centre(9, 0, false, 2) == 1);
+    VCR_CHECK(centre(13, 0, false, 2) == 2);
+    // Discoverer 2 more, Explorer 1, the harder levels as Conquistador.
+    VCR_CHECK(centre(2, 0, false, 0) == 5);
+    VCR_CHECK(centre(2, 0, false, 1) == 4);
+    VCR_CHECK(centre(2, 0, false, 4) == 3);
+    VCR_CHECK(centre(5, 0, false, 0) == 5);
+    VCR_CHECK(centre(8, 0, false, 0) == 4);
+    VCR_CHECK(centre(8, 0, false, 4) == 2);
+    VCR_CHECK(centre(13, 0, false, 0) == 4);
+}

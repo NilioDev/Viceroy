@@ -58,11 +58,39 @@ doubles doubles them too, and expert farmers and fishermen get them twice
 an ore miner; silver is not measured yet.
 
 **Not yet known:** whether the colony's own square uses a resource under
-it. At higher difficulty the colony's own square
-makes less food (5, 4, 3, 3, 3 on plains from Discoverer to Viceroy); the
-rule is not known yet and Viceroy does not do this. The commons on a
-forest with little food (boreal, conifer) make 4 food in the original where
-this model gives 3.
+it.
+
+## The colony's own square
+
+The square the colony stands on makes food and one other good by itself.
+Measured on test colonies (eight farmers on plains around it, one turn
+each, the food the colony stored afterwards):
+
+| At Conquistador | Food |
+| --- | --- |
+| Tundra, grassland, prairie, marsh, swamp | 3 |
+| Plains, savannah | 3 |
+| Desert | 1 |
+| Hills | 2 |
+| Boreal, conifer, wetland, rain forest | 2 |
+| Mixed, tropical forest | 2 |
+| Scrub | 1 |
+| Arctic | 0 |
+
+That is the land's farming yield plus 1, 1 less on desert, plains and
+savannah and their forests, and never more than 3. Rivers add nothing to
+the food. A plowed square makes 1 more (plains 4). Discoverer gives 2 more
+food and Explorer 1; Governor and Viceroy are the same as Conquistador. Our
+ten saves agree (Discoverer: savannah 5, tropical 4, boreal 4, prairie 5).
+
+The other good is the land's own yield of its best crop or ore (furs in a
+forest), 1 more on a minor river and 2 on a major one, and 1 more at
+Discoverer: plains make 2 cotton at Conquistador, 3 at Discoverer, 3 on a
+minor river. The Sons of Liberty bonus adds to both; the tories' penalty
+does not apply here.
+
+A colony we placed on mountains by editing a save stored 37 more food than
+this explains; that case is not understood yet.
 
 ## In buildings
 
@@ -94,8 +122,24 @@ Every colony, the computer's too, stores what it made:
 - The warehouse holds 100 of each good, 200 with a warehouse and 300 with
   the expansion; the rest is thrown away. Food is not limited this way.
 
-**Not yet done:** horses
-breeding, building ships and units, and the warnings before goods are lost.
+**Not yet done:** building ships and units, and the warnings before goods
+are lost.
+
+## Horses
+
+Horses breed from the food left over after the colonists have eaten, and
+each new horse uses one of those food. Measured on test colonies, one turn
+each:
+
+- A colony with fewer than 2 horses, or no surplus, breeds none.
+- At most 2 horses for every started herd of 50 (2 to 50 horses: 2, 51 to
+  100: 4, 151: 8). With stables the herd is 25 (26 horses: 4, 76: 8).
+- At most half the surplus, rounded up (a surplus of 5 gives 3 horses and
+  keeps 2 food).
+- No more than the warehouse holds (99 horses in a warehouse of 100 breed 1).
+
+The original's own turns agree: Guadeloupe (87 horses, stables, 5 food over)
+gets 3, Plymouth (54, stables, 5 over) 3, New Holland (15, 4 over) 2.
 
 ## The jobs menu
 

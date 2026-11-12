@@ -266,6 +266,28 @@ int jobInput(int jobRow) {
     }
 }
 
+int centreFoodYield(const Ruleset& rules, const MapSquare& square, int difficulty) {
+    const int row = terrainRow(square);
+    const int yield = yieldOf(rules, row, job::kFarmer);
+    if (yield <= 0) {
+        return 0;
+    }
+    // Measured on test colonies at Conquistador: the land's food and 1 more,
+    // 1 less on desert, plains and savannah and their forests, at most 3.
+    int food = yield + 1;
+    const bool plainLand = !square.hills() && !square.mountains() && square.terrain < 24;
+    const int open = square.terrain & 7;
+    if (plainLand && (open == 1 || open == 2 || open == 5)) {
+        food -= 1;
+    }
+    food = std::min(food, 3);
+    if ((square.flags & MapSquare::kPlowed) != 0) {
+        food += 1;
+    }
+    // Discoverer gives 2 more, Explorer 1.
+    return food + std::max(0, 2 - difficulty);
+}
+
 ColonyProduction colonyProduction(const SaveColony& colony, const SaveMap& map, const Ruleset& rules,
                                   int difficulty) {
     ColonyProduction p;
@@ -275,12 +297,11 @@ ColonyProduction colonyProduction(const SaveColony& colony, const SaveMap& map, 
     const int population = std::clamp(colony.population, 0, kMaxColonists);
     p.colonists.resize(static_cast<std::size_t>(population));
 
-    // The colony's own square works itself as if plowed: food, and the
-    // best other crop it has (furs in a forest).
+    // The colony's own square works itself: food, and the best other crop
+    // it has (furs in a forest). Measured, see docs/rules/production.md.
     if (map.inside(colony.x, colony.y)) {
-        MapSquare centre = map.at(colony.x, colony.y);
-        centre.flags = static_cast<std::uint8_t>(centre.flags | MapSquare::kPlowed);
-        p.centreFood = squareYield(rules, centre, job::kFarmer, -1, centreModifier);
+        const MapSquare centre = map.at(colony.x, colony.y);
+        p.centreFood = centreFoodYield(rules, centre, difficulty) + centreModifier.bonus;
         const int row = terrainRow(centre);
         int best = -1;
         int bestAmount = 0;
@@ -296,7 +317,10 @@ ColonyProduction colonyProduction(const SaveColony& colony, const SaveMap& map, 
         }
         if (best >= 0 && yieldOf(rules, row, best) > 0) {
             p.centreGood = jobOutput(best);
-            p.centreAmount = yieldOf(rules, row, best) + 1 + centreModifier.bonus;
+            // Measured: the land's own yield, 1 more on a minor river and 2
+            // on a major one, and 1 more at Discoverer.
+            const int river = centre.majorRiver() ? 2 : (centre.minorRiver() ? 1 : 0);
+            p.centreAmount = yieldOf(rules, row, best) + river + (difficulty <= 0 ? 1 : 0) + centreModifier.bonus;
         }
         p.produced[cargo::kFood] += p.centreFood;
         if (p.centreGood >= 0) {
@@ -491,6 +515,18 @@ int storageLimit(const SaveColony& colony) {
     return 100 * (1 + std::clamp<int>(colony.raw[149], 0, 2));
 }
 
+int horsesBred(const SaveColony& colony, int foodSurplus) {
+    // Measured: two horses for every started herd of 50 (25 with stables),
+    // at most half the surplus rounded up, and nothing from a single horse.
+    const int horses = colony.stock[cargo::kHorses];
+    if (horses < 2 || foodSurplus <= 0) {
+        return 0;
+    }
+    const int herd = buildingLevel(colony, BuildingKind::Stables) > 0 ? 25 : 50;
+    const int bred = std::min(2 * ((horses + herd - 1) / herd), (foodSurplus + 1) / 2);
+    return std::clamp(bred, 0, std::max(0, storageLimit(colony) - horses));
+}
+
 ColonyTurn runColonyTurn(SaveColony& colony, const SaveMap& map, const Ruleset& rules, int difficulty) {
     ColonyTurn turn;
     const auto p = colonyProduction(colony, map, rules, difficulty);
@@ -523,8 +559,12 @@ ColonyTurn runColonyTurn(SaveColony& colony, const SaveMap& map, const Ruleset& 
         made[r] -= used; // negative: taken from the warehouse
     }
 
-    // Food.
+    // Food, and the horses bred from what is left over.
     made[cargo::kFood] -= p.foodEaten;
+    const int born = horsesBred(colony, made[cargo::kFood]);
+    made[cargo::kFood] -= born;
+    made[cargo::kHorses] += born;
+    turn.horsesBred = born;
     for (int good = 0; good < kGoodsKinds; ++good) {
         colony.stock[static_cast<std::size_t>(good)] += made[static_cast<std::size_t>(good)];
     }

@@ -17,7 +17,8 @@ touch controls.
 > clear forests and build roads with your pioneers, found colonies, look inside your colonies, end turns and save. The colony screen
 > shows its buildings, people, what they produce and the warehouse; give
 > colonists other jobs with the jobs menu. At the end of the turn colonies
-> store what they make, grow and finish buildings. Ships sail to Europe from
+> store what they make, breed horses from spare food, grow and finish
+> buildings. Ships sail to Europe from
 > the high seas, sell and buy goods there (prices move as you trade), take colonists from the docks and
 > sail back. In Europe you can recruit colonists, buy artillery and ships,
 > and have specialists trained. Crosses made in your colonies and churches
