@@ -35,6 +35,9 @@ constexpr int kPlowed = 149;
 constexpr int kCoast = 108; // + 4 × group + quadrant; see drawCoast
 constexpr int kUnexplored = 148;
 constexpr int kGroundBlend = 104; // + side: north, east, south, west
+constexpr int kMajorMouth = 140;  // + side the river comes from: north, east, south, west
+constexpr int kMinorMouth = 144;
+constexpr int kBeach = 150;       // land north-west, north-east, south-west, south-east
 constexpr int kScrub = 9;     // desert forest
 constexpr int kScrubTile = 8; // TERRAIN.SS: desert with cacti
 
@@ -133,6 +136,38 @@ void drawCoast(Screen& screen, const Art& art, const SaveMap& map, int x, int y,
     }
 }
 
+// Measured on the original's view-mode captures. A water square that has
+// land on two sides and the corner between them, and water on the other two
+// sides and the corner between those, gets a sandy beach across it. A water
+// square with a river (relief in the save) gets the river's mouth from each
+// side where a land square with a river joins it.
+void drawBeachAndMouth(Screen& screen, const Art& art, const SaveMap& map, int x, int y, int px, int py) {
+    auto land = [&](int dx, int dy) { return map.inside(x + dx, y + dy) && map.at(x + dx, y + dy).isLand(); };
+    struct Corner {
+        int dx, dy;
+    };
+    static constexpr Corner kCorners[4] = {{-1, -1}, {1, -1}, {-1, 1}, {1, 1}};
+    for (int c = 0; c < 4; ++c) {
+        const int dx = kCorners[c].dx;
+        const int dy = kCorners[c].dy;
+        if (land(dx, 0) && land(0, dy) && land(dx, dy) && !land(-dx, 0) && !land(0, -dy) && !land(-dx, -dy)) {
+            blitSprite(screen, art.phys, kBeach + c, px, py);
+        }
+    }
+    const auto& sq = map.at(x, y);
+    if (!sq.river()) {
+        return;
+    }
+    static constexpr Step kSides[4] = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}};
+    for (int side = 0; side < 4; ++side) {
+        const int nx = x + kSides[side].dx;
+        const int ny = y + kSides[side].dy;
+        if (map.inside(nx, ny) && map.at(nx, ny).isLand() && map.at(nx, ny).river()) {
+            blitSprite(screen, art.phys, (sq.majorRiver() ? kMajorMouth : kMinorMouth) + side, px, py);
+        }
+    }
+}
+
 // Where two kinds of ground meet, the original lets the neighbour's ground
 // show through a sparse dither along the shared side. The dither is in
 // PHYS0.SS sprites 104 to 107 (north, east, south, west): pixel 0 takes the
@@ -195,6 +230,7 @@ void drawTerrain(Screen& screen, const Art& art, const Game& game, int x, int y,
     if (!sq.isLand()) {
         blendGround(screen, art, map, x, y, px, py, game.human());
         drawCoast(screen, art, map, x, y, px, py);
+        drawBeachAndMouth(screen, art, map, x, y, px, py);
         return;
     }
     blendGround(screen, art, map, x, y, px, py, game.human());
@@ -252,15 +288,50 @@ void drawOrdersBox(Screen& screen, const Art& art, const Game& game, int index, 
     screen.text(art.tiny, box.x + (box.w - w) / 2 + 1, box.y + 2, text, {ink, kNoColour, kNoColour});
 }
 
-// A unit on its square at (px, py), as measured on the original: the
-// sprite two pixels in (a narrow person centred on the next eight), a black
-// shadow two pixels left of it, then the orders box, then the unit.
+// A unit on its square at (px, py), as measured on the original: the sprite
+// a few pixels into the square, a black shadow two pixels left of it, then
+// the orders box, then the unit. Where the sprite and the box go depends on
+// the picture; these were measured in about 250 captures.
+struct UnitPlacement {
+    int spriteX;  // from the square's left
+    int boxX;     // the orders box, from the square's top-left
+    int boxY;
+};
+
+UnitPlacement unitPlacement(const Game& game, int index, int icon, int width) {
+    switch (icon) {
+    case 6: return {3, 0, 0}; // merchantman: the box sits behind the stern
+    case 14:
+    case 15: return {2, 9, 0}; // privateer, frigate: by the mast
+    case 9:                    // artillery
+    case 16: return {2, 6, 0}; // treasure
+    case 76: return {2, 0, 0}; // dragoon: behind the rider
+    default: break;
+    }
+    const int type = game.unit(index).type;
+    if (isShipType(game.rules(), type)) {
+        return {2, 9, 0};
+    }
+    if (type == unit_type::kDragoon || type == unit_type::kScout || type == 7 || type == 8 || type == 21 ||
+        type == 22) {
+        return {2, 0, 0};
+    }
+    if (type == unit_type::kWagonTrain) {
+        return {2, 6, 0};
+    }
+    // People: six wide stand three in, eight wide two in; the box at the feet.
+    const int x = width <= 6 ? 3 : 2;
+    return {x, x + width - 2, 7};
+}
+
 void drawUnitOnSquare(Screen& screen, const Art& art, const Game& game, int index, int px, int py) {
-    const auto* image = sprite(art.icons, unitIcon(game, index));
+    const int icon = unitIcon(game, index);
+    const auto* image = sprite(art.icons, icon);
     if (image == nullptr || image->width <= 0) {
         return;
     }
-    const int x = px + 2 + std::max(0, (8 - image->width) / 2);
+    const auto place = unitPlacement(game, index, icon, image->width);
+    const int x = px + place.spriteX;
     for (int j = 0; j < image->height; ++j) {
         for (int i = 0; i < image->width; ++i) {
             if (image->pixels[static_cast<std::size_t>(j * image->width + i)] != kTransparent) {
@@ -268,16 +339,7 @@ void drawUnitOnSquare(Screen& screen, const Art& art, const Game& game, int inde
             }
         }
     }
-    const int type = game.unit(index).type;
-    Rect box{x + image->width - 2, py + 7, 7, 9}; // at a person's feet
-    if (isShipType(game.rules(), type)) {
-        box = {x + 7, py, 7, 9}; // by the mast
-    } else if (type == unit_type::kDragoon || type == unit_type::kScout || type == 7 || type == 8 || type == 21 ||
-               type == 22) {
-        box = {x - 2, py, 7, 9}; // behind the rider
-    } else if (type == unit_type::kTreasure || type == 11 || type == unit_type::kWagonTrain) {
-        box = {x + 4, py, 7, 9}; // above the wheels
-    }
+    const Rect box{px + place.boxX, py + place.boxY, 7, 9};
     drawOrdersBox(screen, art, game, index, box);
     screen.blit(*image, x, py);
 }
@@ -434,17 +496,11 @@ void centreOn(ViewState& view, const Game& game, int x, int y) {
 }
 
 std::uint8_t nationColour(const Art& art, int nation) {
+    // Measured on the original (orders boxes, the small map, missions):
+    // French 0x09, Spanish 0x0E, Dutch 0x0D. The English red is a guess.
+    static constexpr std::uint8_t kNations[kEuropeanNations] = {0x0C, 0x09, 0x0E, 0x0D};
     if (nation >= 0 && nation < kEuropeanNations) {
-        if (const auto* img = sprite(art.icons, kNationFlagBase + nation)) {
-            // The pennant's most used colour.
-            std::array<int, 256> count{};
-            for (const auto c : img->pixels) {
-                if (c != kTransparent && c != kBlack) {
-                    ++count[c];
-                }
-            }
-            return static_cast<std::uint8_t>(std::max_element(count.begin(), count.end()) - count.begin());
-        }
+        return kNations[nation];
     }
     const auto tribe = static_cast<std::size_t>(nation - kEuropeanNations);
     if (tribe < art.rules.tribes.size()) {
@@ -479,6 +535,17 @@ int unitIcon(const Game& game, int index) {
     return u.profession == expert ? icon : icon - 28;
 }
 
+namespace {
+bool settlementAt(const SaveGame& save, int x, int y) {
+    for (const auto& s : save.settlements) {
+        if (s.x == x && s.y == y) {
+            return true;
+        }
+    }
+    return false;
+}
+} // namespace
+
 void drawMap(Screen& screen, const Art& art, const Game& game, const ViewState& view) {
     screen.setClip(kMapArea);
     const auto& save = game.state();
@@ -499,7 +566,32 @@ void drawMap(Screen& screen, const Art& art, const Game& game, const ViewState& 
         if (visible(s.x, s.y)) {
             const auto tribe = static_cast<std::size_t>(s.nation - kEuropeanNations);
             const int level = tribe < art.rules.tribes.size() ? art.rules.tribes[tribe].level : 0;
-            blitSprite(screen, art.icons, kSettlementBase + std::clamp(level, 0, 3), screenX(s.x), screenY(s.y));
+            // Centred on the square like a colony.
+            const int px = screenX(s.x);
+            const int py = screenY(s.y);
+            if (const auto* image = sprite(art.icons, kSettlementBase + std::clamp(level, 0, 3))) {
+                screen.blit(*image, px + (kSquare - image->width) / 2, py);
+            }
+            // A mission: a cross in the colour of the nation that sent it on
+            // a black plate (byte 5: 0xFF none, else the nation in the low
+            // four bits). Seen on the original for a French mission.
+            const int mission = s.raw[5];
+            if (mission != 0xFF && (mission & 15) < kEuropeanNations) {
+                const std::uint8_t colour = nationColour(art, mission & 15);
+                // The plate's rim, colours 0x88 and 0x93, as seen.
+                screen.pixel(px + 8, py + 4, 0x88);
+                for (int j = 6; j <= 10; ++j) {
+                    const std::uint8_t rim = j == 8 ? 0x93 : 0x88;
+                    screen.pixel(px + 5, py + j, rim);
+                    screen.pixel(px + 11, py + j, rim);
+                }
+                for (int i = 6; i <= 10; ++i) {
+                    screen.pixel(px + i, py + 11, i == 8 ? 0x93 : 0x88);
+                }
+                screen.fill({px + 6, py + 5, 5, 6}, kBlack);
+                screen.fill({px + 8, py + 6, 1, 4}, colour);
+                screen.fill({px + 7, py + 7, 3, 1}, colour);
+            }
         }
     }
 
@@ -527,7 +619,8 @@ void drawMap(Screen& screen, const Art& art, const Game& game, const ViewState& 
     std::map<std::pair<int, int>, int> top;
     auto shown = [&](int i) {
         const auto& u = game.unit(i);
-        return game.onMap(i) && !game.isAboard(i) && !game.colonyAt(u.x, u.y);
+        // Units inside a colony or a native settlement are not drawn.
+        return game.onMap(i) && !game.isAboard(i) && !game.colonyAt(u.x, u.y) && !settlementAt(save, u.x, u.y);
     };
     const int sliding = view.slideUnit >= 0 && view.slideUnit < game.unitCount() ? view.slideUnit : -1;
     for (int i = 0; i < game.unitCount(); ++i) {
