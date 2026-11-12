@@ -21,7 +21,7 @@ understood; the parts marked *opaque* are kept byte for byte.
 | Map: mask | width × height |
 | Map: path | width × height |
 | Map: seen | width × height |
-| Rest | 1502 (*opaque*) |
+| Rest | 1502 (*opaque*; byte 612 is the seed of the resource pattern) |
 
 The three counts come from the header, so the start of the map moves with
 the number of colonies, units and settlements. In all ten saves the blocks
@@ -66,9 +66,12 @@ river on hills, 5 mountains, 6 major river. (Checked: value 5 forms the
 Andes and the Rockies in the saves.)
 
 **Mask.** Flags per square: bit 0 a unit is here, bit 1 a colony is here,
-bit 3 road, bit 6 plowed. The other bits are kept as they are.
+bit 2 no fish on this pattern square of the sea, or silver instead of ore
+on a mountain (see [map drawing](../rules/map-drawing.md)), bit 3 road,
+bit 6 plowed. The other bits are kept as they are.
 
-**Path.** Region numbers used for route finding (kept as they are).
+**Path.** Region numbers used for route finding (kept as they are). Lost
+city rumours were only seen on squares where the high nibble is 0xF.
 
 **Seen.** Bits 4 to 7: explored by the English, French, Spanish and Dutch.
 Checked: in `COLONY00.SAV` (a Dutch game) exactly the squares without bit

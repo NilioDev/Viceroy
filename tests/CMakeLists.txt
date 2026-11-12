@@ -9,6 +9,7 @@ add_executable(vcr_tests
     test_game.cpp
     test_colony.cpp
     test_europe.cpp
+    test_resource.cpp
     test_menu.cpp
     test_title.cpp
 )

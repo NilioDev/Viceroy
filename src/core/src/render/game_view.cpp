@@ -3,6 +3,7 @@
 
 #include "viceroy/data/reader.hpp"
 #include "viceroy/game/europe.hpp"
+#include "viceroy/game/resource.hpp"
 #include "viceroy/game_files.hpp"
 
 #include <algorithm>
@@ -250,6 +251,38 @@ bool forestShown(const MapSquare& sq) {
 
 } // namespace
 
+namespace {
+
+// PHYS0.SS sprite of each resource (89 to 102), drawn last on its square.
+int resourceSprite(Resource r) {
+    switch (r) {
+    case Resource::Silver: return 89;
+    case Resource::Oasis: return 90;
+    case Resource::Grain: return 91;
+    case Resource::Cotton: return 92;
+    case Resource::Tobacco: return 93;
+    case Resource::Sugar: return 94;
+    case Resource::Minerals: return 95;
+    case Resource::Fish: return 96;
+    case Resource::Beaver: return 97;
+    case Resource::Deer: return 98;
+    case Resource::Timber: return 99;
+    case Resource::Ore: return 101;
+    case Resource::HillsOre: return 102;
+    case Resource::None: break;
+    }
+    return -1;
+}
+
+void drawResource(Screen& screen, const Art& art, const SaveMap& map, int x, int y, int px, int py) {
+    const int s = resourceSprite(resourceAt(map, x, y));
+    if (s >= 0) {
+        blitSprite(screen, art.phys, s, px, py);
+    }
+}
+
+} // namespace
+
 void drawTerrain(Screen& screen, const Art& art, const Game& game, int x, int y, int px, int py) {
     const auto& map = game.state().map;
     if (!map.inside(x, y)) {
@@ -267,6 +300,7 @@ void drawTerrain(Screen& screen, const Art& art, const Game& game, int x, int y,
         blendGround(screen, art, map, x, y, px, py, game.human());
         drawCoast(screen, art, map, x, y, px, py);
         drawBeachAndMouth(screen, art, map, x, y, px, py);
+        drawResource(screen, art, map, x, y, px, py);
         return;
     }
     blendGround(screen, art, map, x, y, px, py, game.human());
@@ -302,6 +336,7 @@ void drawTerrain(Screen& screen, const Art& art, const Game& game, int x, int y,
             blitSprite(screen, art.phys, kRoad, px, py);
         }
     }
+    drawResource(screen, art, map, x, y, px, py);
 }
 
 namespace {

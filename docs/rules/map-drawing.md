@@ -153,32 +153,67 @@ second pointer whose use is not yet known.
 
 ## Resources
 
-What 28 captures of a view-mode tour of one map showed (153 squares with a
-resource out of about 1,800 explored ones). The resource sprite is drawn over
-the finished square; which sprite depends on the ground:
+Measured on the original with two savegames revealed in full (every square
+explored) and a view-mode tour over each map, plus one view of seven other
+saves. All 152 resources of COLONY00 and 257 of COLONY09 lie on the rule
+below; the squares where it predicts one and none shows are colonies and
+settlements (their pictures cover it) and arctic squares.
 
-| Ground | PHYS0.SS sprite |
-|--------|-----------------|
+**The pattern.** Cut the map into blocks of 4 × 4 squares. Each block holds
+two pattern squares, (a, b) and (a + 2, b + 2) inside the block, the column
+taken modulo 4. With bx, by the block's column and row:
+
+- b = (bx + by + 1) mod 2;
+- e = ((bx − b − by + 9) / 2) mod 8, and
+  a = (2 × bit 0 of e + bit 1 of e + 2 × bit 2 of e + by) mod 4.
+
+The whole pattern is moved by a seed kept with each game: byte 612 of the
+block after the map. A square (x, y) is on the pattern when (x + 4 × (seed +
+7) mod 64, y) is on the one above. The seed stays the same through a game
+(four saves of one game have the same one); five games gave five seeds that
+all fit.
+
+**Which squares use it.**
+
+- Open ground, hills, mountains and ocean: the square itself.
+- Forest (without hills or mountains): the square 4 to the west, so clearing
+  a forest moves the resource away.
+- Sea lanes and arctic: never.
+- Ocean: no fish when bit 2 of the square's mask is set. The original sets
+  it on every pattern square three or more squares from land and on some
+  two from land.
+- Mountains: silver (sprite 89) when mask bit 2 is set, ore otherwise.
+
+**Which sprite** (`PHYS0.SS`, drawn last on the square):
+
+| Ground | Sprite |
+|--------|--------|
 | Ocean | 96 (fish) |
 | Desert, scrub | 90 (oasis) |
 | Plains | 91 |
 | Prairie | 92 |
 | Grassland | 93 |
 | Savannah | 94 |
-| Swamp, wetland and rain forest | 95 |
+| Swamp, wetland, rain forest | 95 |
 | Mixed forest | 97 (beaver) |
-| Broadleaf forest | 98 (deer), seen twice |
+| Broadleaf and boreal forest | 98 (deer) |
 | Conifer and tropical forest | 99 (timber) |
 | Hills | 102 |
-| Mountains | 101, and 89 twice |
+| Mountains | 101, or 89 (silver) with mask bit 2 |
 
-Tundra, marsh and boreal forest showed none in this map; sea lanes never
-have one.
+*Guess:* tundra and marsh never came up on a pattern square in the tours; we
+draw grain (91) and minerals (95).
 
-Where they appear is not stored in the savegame: no bit of the four map
-layers, nor any bit array elsewhere in the file, matches. It is computed, and
-not with a simple period: no 4×4 or 8×8 block holds a fixed number. The one
-strong clue is `(x + 19 × y) mod 64`: open ground, hills and ocean only take
-a resource on 21 of the 64 values, forests on another 18, but even then only
-a quarter to a half of those squares have one. The rest of the rule is
-still unknown, so Viceroy does not draw resources yet.
+## Lost city rumours
+
+Sprite 103. Seen on 36 squares in two games: every one is on the resource
+pattern moved by (8, 8), so (x + 8, y + 8) is on the pattern, on land, and
+the high nibble of the third map layer is 0xF there. About 40 % of the
+squares that meet all of that have one; what decides the rest is not yet
+known (no layer, bit array or list in the savegame matches), so Viceroy does
+not draw rumours yet.
+
+## Water colour cycling
+
+With the game option for it on, the original cycles the palette colours of
+the water, so captures of open sea differ from frame to frame. Not done yet.

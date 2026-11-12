@@ -23,6 +23,7 @@ constexpr std::size_t kNationSize = 316;
 constexpr std::size_t kSettlementSize = 18;
 constexpr std::size_t kTribesAndMoreSize = 8 * 78 + 727;
 constexpr std::size_t kTailSize = 1502;
+constexpr std::size_t kResourceSeedAt = 612; // in the block after the map
 
 constexpr int kMaxMapSide = 256;
 constexpr int kMaxRecords = 4096;
@@ -218,6 +219,7 @@ SaveGame readSaveGame(std::span<const std::uint8_t> file) {
         throw FormatError("savegame ends early");
     }
     save.tail.assign(rest.begin(), rest.end());
+    save.map.resourceSeed = save.tail[kResourceSeedAt];
     return save;
 }
 

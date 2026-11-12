@@ -49,6 +49,9 @@ struct MapSquare {
 struct SaveMap {
     int width = 0;
     int height = 0;
+    // Shifts the fixed pattern of resources and rumours: byte 612 of the
+    // block after the map, the same for the whole of one game.
+    std::uint8_t resourceSeed = 0;
     std::vector<MapSquare> squares; // row by row
 
     bool inside(int x, int y) const { return x >= 0 && y >= 0 && x < width && y < height; }
