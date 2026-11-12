@@ -19,8 +19,9 @@ touch controls.
 > the high seas, sell and buy goods there (prices move as you trade), take colonists from the docks and
 > sail back. In Europe you can recruit colonists, buy artillery and ships,
 > and have specialists trained. The other nations don't
-> move yet, and combat and meeting the natives are still to come. Fish and
-> other resources are not drawn yet.
+> move yet, and combat and meeting the natives are still to come. Fish,
+> ore and the other resources show on the map where the original puts them;
+> lost city rumours are not drawn yet.
 
 Viceroy is not affiliated with or endorsed by the makers of the original
 game. It contains none of the original game's files: you need your own copy.
