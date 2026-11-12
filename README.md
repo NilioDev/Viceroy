@@ -25,7 +25,8 @@ touch controls.
 > for the Sons of Liberty: at 50% and 100% membership a colony works
 > better, and too many tories slow it down. The other nations don't
 > move yet, and combat and meeting the natives are still to come. Fish,
-> ore and the other resources show on the map where the original puts them;
+> ore and the other resources show on the map where the original puts them
+> and add to what your colonists make there;
 > lost city rumours are not drawn yet.
 
 Viceroy is not affiliated with or endorsed by the makers of the original

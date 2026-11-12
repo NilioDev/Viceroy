@@ -152,3 +152,44 @@ VCR_TEST("liberty: reaching 50% is reported after the turn") {
     VCR_CHECK(notices[0].numbers == std::vector<int>{50});
     VCR_CHECK(notices[0].colony == 0);
 }
+
+VCR_TEST("resources: what they add to work on the land (measured)") {
+    Ruleset r;
+    r.terrain.resize(21);
+    r.terrain[2].yield[job::kFarmer] = 4;     // plains
+    r.terrain[3].yield[3] = 3;                // prairie: cotton
+    r.terrain[12].yield[5] = 3;               // conifer: lumber
+    r.terrain[10].yield[4] = 3;               // mixed forest: furs
+    r.terrain[17].yield[job::kFisherman] = 3; // ocean
+    MapSquare plains;
+    plains.terrain = 2;
+    MapSquare prairie;
+    prairie.terrain = 3;
+    MapSquare conifer;
+    conifer.terrain = 12;
+    MapSquare mixed;
+    mixed.terrain = 10;
+    MapSquare ocean;
+    ocean.terrain = 25;
+    constexpr int kColonist = skill::kFreeColonist;
+    // Grain: 5 -> 7, the expert 7 -> 11, with +2 15.
+    VCR_CHECK(squareYield(r, plains, job::kFarmer, kColonist, {}, true, Resource::Grain) == 7);
+    VCR_CHECK(squareYield(r, plains, job::kFarmer, 0, {}, true, Resource::Grain) == 11);
+    VCR_CHECK(squareYield(r, plains, job::kFarmer, 0, {2, 0}, true, Resource::Grain) == 15);
+    // Fish: 4 -> 7, the expert 12, with +2 16.
+    VCR_CHECK(squareYield(r, ocean, job::kFisherman, kColonist, {}, true, Resource::Fish) == 7);
+    VCR_CHECK(squareYield(r, ocean, job::kFisherman, 8, {}, true, Resource::Fish) == 12);
+    VCR_CHECK(squareYield(r, ocean, job::kFisherman, 8, {2, 0}, true, Resource::Fish) == 16);
+    // Timber: 6 -> 10, the expert 20, with +2 28.
+    VCR_CHECK(squareYield(r, conifer, 5, kColonist, {}, true, Resource::Timber) == 10);
+    VCR_CHECK(squareYield(r, conifer, 5, 5, {2, 0}, true, Resource::Timber) == 28);
+    // Beaver: the expert 12, with +2 16.
+    VCR_CHECK(squareYield(r, mixed, 4, 4, {}, true, Resource::Beaver) == 12);
+    VCR_CHECK(squareYield(r, mixed, 4, 4, {2, 0}, true, Resource::Beaver) == 16);
+    // Cotton doubles after the bonus: the expert 12, with +2 20.
+    VCR_CHECK(squareYield(r, prairie, 3, kColonist, {}, true, Resource::Cotton) == 6);
+    VCR_CHECK(squareYield(r, prairie, 3, 3, {}, true, Resource::Cotton) == 12);
+    VCR_CHECK(squareYield(r, prairie, 3, 3, {2, 0}, true, Resource::Cotton) == 20);
+    // A resource does nothing for another job.
+    VCR_CHECK(squareYield(r, prairie, 3, kColonist, {}, true, Resource::Grain) == 3);
+}

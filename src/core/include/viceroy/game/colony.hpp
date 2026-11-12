@@ -11,6 +11,7 @@
 #pragma once
 
 #include "viceroy/data/savegame.hpp"
+#include "viceroy/game/resource.hpp"
 #include "viceroy/rules/ruleset.hpp"
 
 #include <array>
@@ -165,8 +166,9 @@ WorkModifier workModifier(const SaveColony& colony, int difficulty);
 // What a colonist of this skill makes doing this job on a square. Fishing
 // gives 1 more than the yield where the water has land on at least 3 of its
 // 8 sides, and 1 less elsewhere.
+// A resource on the square (resource.hpp) adds to the job it suits.
 int squareYield(const Ruleset& rules, const MapSquare& square, int jobRow, int skill, WorkModifier modifier = {},
-                bool nearLand = true);
+                bool nearLand = true, Resource resource = Resource::None);
 // How many of the 8 squares around are land.
 int landAround(const SaveMap& map, int x, int y);
 

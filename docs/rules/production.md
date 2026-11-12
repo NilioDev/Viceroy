@@ -35,11 +35,34 @@ lumberjacks: 4, with a road 6).
 The original's jobs menu for a petty criminal in Isabella agrees: farmer 3
 (tropical forest), sugar 1, furs 4 and lumber 6 (forest with a road), fish 5.
 
-**Not yet known:** what fish and the other resources add (where they are
-is in map-drawing.md). Jamestown's fisherman makes 7 on an ocean square
-where this model gives 5. At higher difficulty the colony's own square
+## Resources
+
+Measured on test colonies with a resource placed by the game's seed (where
+resources lie is in map-drawing.md), with colonists and experts, with and
+without the Sons of Liberty bonus. A resource helps only the job it suits:
+
+| Resource | Job | Effect |
+| --- | --- | --- |
+| Grain (plains), oasis (desert) | farmer | yield + 2 |
+| Fish (ocean) | fisherman | yield + 3 |
+| Timber (conifer, tropical forest) | lumberjack | yield + 2 (so 4 more lumber) |
+| Deer (broadleaf, boreal forest) | fur trapper | yield + 2 |
+| Beaver (mixed forest) | fur trapper | yield + 3 |
+| Ore (hills) | ore miner | yield + 2 |
+| Minerals (swamp, marsh) | ore miner | yield + 3 |
+| Cotton, tobacco, sugar | planter of that crop | twice the crop, after the bonus |
+
+The additions go in where the Sons of Liberty bonus goes, so an expert who
+doubles doubles them too, and expert farmers and fishermen get them twice
+(grain: a colonist 7, an expert 11). Ore on mountains made no difference to
+an ore miner; silver is not measured yet.
+
+**Not yet known:** whether the colony's own square uses a resource under
+it. At higher difficulty the colony's own square
 makes less food (5, 4, 3, 3, 3 on plains from Discoverer to Viceroy); the
-rule is not known yet and Viceroy does not do this.
+rule is not known yet and Viceroy does not do this. The commons on a
+forest with little food (boreal, conifer) make 4 food in the original where
+this model gives 3.
 
 ## In buildings
 

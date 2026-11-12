@@ -201,8 +201,9 @@ all fit.
 | Hills | 102 |
 | Mountains | 101, or 89 (silver) with mask bit 2 |
 
-*Guess:* tundra and marsh never came up on a pattern square in the tours; we
-draw grain (91) and minerals (95).
+*Guess:* tundra never came up on a pattern square in the tours; we draw
+grain (91). Marsh has minerals (95): an ore miner there makes 3 more, as on
+swamp (see production.md).
 
 ## Lost city rumours
 
