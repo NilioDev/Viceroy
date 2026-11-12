@@ -38,6 +38,7 @@ inline constexpr int kEuropeAgent = 1;  // MSS2.SS: the man in the home port
 inline constexpr int kFrontiersman = 2; // MSS3.SS: tells about pioneers' work
 inline constexpr int kReligiousAdvisor = 3; // MSS4.SS: immigration
 inline constexpr int kColonialAdvisor = 4;  // MSS1.SS: Sons of Liberty
+inline constexpr int kBuyAdvisor = 5;       // MSS5.SS: buying a construction
 
 // The box for a GAME.TXT section, with %STRING0, %STRING1, ... and
 // %NUMBER0, ... filled in. Text is joined and wrapped to the section's
@@ -64,6 +65,9 @@ void placeReligiousDialog(Dialog& dialog);
 // A report about a colony (Sons of Liberty): the box at x 39, its middle
 // at row 139, the man with the musket at (210, top - 77) in front of it.
 void placeColonialDialog(Dialog& dialog);
+// BUY on the colony screen: the box centred across the screen with its
+// bottom at row 163, the woman in the white cap leaning on its top edge.
+void placeBuyDialog(Dialog& dialog);
 // The name of a European nation as the messages use it ("the Netherlands").
 std::string countryName(const Art& art, int nation);
 

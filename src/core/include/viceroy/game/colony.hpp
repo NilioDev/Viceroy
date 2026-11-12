@@ -251,6 +251,10 @@ struct BuildOption {
 // then units), measured on its colony screen; see docs/rules/colony-screen.md.
 std::vector<BuildOption> buildOptions(const SaveColony& colony, const SaveMap& map, const Ruleset& rules);
 
+// What BUY on the Make panel asks to finish the construction now, or 0 when
+// there is nothing to buy. See docs/rules/production.md.
+int constructionPrice(const SaveColony& colony, const Ruleset& rules, const SaveNation& nation);
+
 // The food the colony's own square makes without the liberty bonus.
 int centreFoodYield(const Ruleset& rules, const MapSquare& square, int difficulty);
 

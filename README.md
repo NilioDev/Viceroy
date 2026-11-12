@@ -17,7 +17,7 @@ touch controls.
 > clear forests and build roads with your pioneers, found colonies, look inside your colonies, end turns and save. The colony screen
 > shows its buildings, people, what they produce and the warehouse; give
 > colonists other jobs with the jobs menu, and choose what the colony builds
-> on its Make panel. At the end of the turn colonies
+> on its Make panel or pay to finish it there. At the end of the turn colonies
 > store what they make, breed horses from spare food, grow and finish
 > the buildings, wagon trains, artillery and ships under way. Ships sail to Europe from
 > the high seas, sell and buy goods there (prices move as you trade), take colonists from the docks and
@@ -88,6 +88,7 @@ saved in the first free slot, or over the savegame saved longest ago.
 | Pick a colonist on the colony screen | Arrow keys, Tab | D-pad, LB / RB |
 | Give the colonist another job (jobs menu) | Enter, then the arrow keys and Enter | A, then the D-pad and A |
 | Choose what the colony builds | B, then the arrow keys and Enter; or click the hammer button, then CHANGE and a line | X, then the D-pad and A |
+| Pay to finish what the colony builds (BUY) | P, or click BUY on the Make panel | Y |
 | Show what the colony produces again | Click the house button | |
 | Close the colony screen | Esc, or Enter with nobody picked, or click Exit | B |
 | Open the home port in Europe | E | Share / Capture button |

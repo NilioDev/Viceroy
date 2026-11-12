@@ -122,6 +122,11 @@ amounts of hammers, and "Nothing"; our drawing matches pixel for pixel.
 - "(Requires N Tools)" in white centred the same way at y 170 when tools are
   needed.
 
+BUY (or P, or Y on a gamepad) opens its question in a box centred across the
+screen with its bottom edge at row 163, and the woman of `MSS5.SS` at
+(130, top − 62) in front of it, her hands over its top edge. The price is in
+[production.md](production.md#buying-the-construction).
+
 ## Select An Item To Build
 
 CHANGE (or B) opens a wooden box like the jobs menu, 184 wide at x 68,

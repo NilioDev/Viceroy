@@ -132,7 +132,7 @@ Dialog makeDialog(const Art& art, std::string_view section, const std::vector<st
     if (found == nullptr) {
         return d;
     }
-    std::string text;
+    std::vector<std::string> paragraphs; // a line starting with ^ starts a new one
     bool inOptions = false;
     bool seenText = false;
     int fixedY = -1;
@@ -164,7 +164,11 @@ Dialog makeDialog(const Art& art, std::string_view section, const std::vector<st
                 continue;
             }
             seenText = true;
-            text += (text.empty() ? "" : " ") + line;
+            if (line[0] == '^' || paragraphs.empty()) {
+                paragraphs.push_back(line[0] == '^' ? line.substr(1) : line);
+            } else {
+                paragraphs.back() += " " + line;
+            }
         } else {
             if (blank) {
                 if (!d.options.empty()) {
@@ -175,7 +179,11 @@ Dialog makeDialog(const Art& art, std::string_view section, const std::vector<st
             addOption(d, line);
         }
     }
-    d.lines = wrap(fontOf(art, d), text, d.width - kTextLeft);
+    for (const auto& paragraph : paragraphs) {
+        for (auto& l : wrap(fontOf(art, d), paragraph, d.width - kTextLeft)) {
+            d.lines.push_back(std::move(l));
+        }
+    }
     d.selected = d.options.empty() ? 0 : std::min(d.selected, static_cast<int>(d.options.size()) - 1);
     d.x = (Screen::kWidth - boxWidth(d)) / 2;
     d.y = fixedY >= 0 ? fixedY : (Screen::kHeight - dialogHeight(d)) / 2;
@@ -232,6 +240,15 @@ void placeColonialDialog(Dialog& d) {
     d.y = (278 - dialogHeight(d)) / 2;
     d.portraitX = 210;
     d.portraitY = d.y - 77;
+}
+
+void placeBuyDialog(Dialog& d) {
+    d.portrait = kBuyAdvisor;
+    d.portraitBehind = false; // her hands lie over the box
+    d.x = (Screen::kWidth - boxWidth(d)) / 2;
+    d.y = 164 - dialogHeight(d);
+    d.portraitX = 130;
+    d.portraitY = d.y - 62;
 }
 
 std::string countryName(const Art& art, int nation) {

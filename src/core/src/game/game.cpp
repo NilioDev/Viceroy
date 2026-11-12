@@ -832,6 +832,22 @@ int Game::purchase(int unitType) {
     return -1;
 }
 
+bool Game::buyConstruction(int colonyIndex) {
+    if (colonyIndex < 0 || static_cast<std::size_t>(colonyIndex) >= save_.colonies.size()) {
+        return false;
+    }
+    auto& colony = save_.colonies[static_cast<std::size_t>(colonyIndex)];
+    auto& nation = save_.nations[static_cast<std::size_t>(colony.nation)];
+    const int price = constructionPrice(colony, rules_, nation);
+    if (price <= 0 || nation.gold < price) {
+        return false;
+    }
+    nation.gold -= price;
+    colony.hammers = std::max(colony.hammers, constructionHammers(rules_, colony.construction));
+    colony.stock[cargo::kTools] = std::max(colony.stock[cargo::kTools], constructionTools(rules_, colony.construction));
+    return true;
+}
+
 int Game::train(int jobRow) {
     auto& nation = save_.nations[static_cast<std::size_t>(human())];
     if (jobRow < 0 || jobRow >= static_cast<int>(rules_.jobs.size())) {
