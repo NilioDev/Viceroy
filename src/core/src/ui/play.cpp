@@ -1029,7 +1029,7 @@ constexpr int kTradeRoute = 15;
 constexpr int kReturnToEurope = 16;
 constexpr int kNoOrders = 17;
 constexpr int kDump = 18;
-constexpr int kDisband = 19;
+// 19 is Disband, not handled yet.
 } // namespace orders_menu
 constexpr int kHiddenPedia = 6; // Miscellaneous and Complete are not shown
 constexpr std::uint8_t kSeaLaneTerrain = 26;
