@@ -144,12 +144,31 @@ Every colony, the computer's too, stores what it made:
   up and a free colonist appears on the colony's square. When the food runs
   out, the last colonist starves (a colony never starves to nothing).
 - Hammers add up towards the building under way. It is finished when there
-  are enough hammers and tools (`@BUILDING` lists both); those are used up.
+  are enough hammers and tools (`@BUILDING` lists both, the tools in tens).
+  The tools are used up and the hammers go back to 0: what is left over is
+  lost (measured: 600 hammers on a 40-hammer wagon train leave 0).
+- Byte 148 can also name a unit: 42 + n is `@UNIT` row 11 + n, so 42
+  artillery, 43 wagon train, 44 caravel, 45 merchantman, 46 galleon, 47
+  privateer. 48 (frigate) and higher never finish. A unit costs its `@UNIT`
+  cost column times 32 hammers (artillery 192, caravel 128), except the wagon
+  train, 40, and its tools column times 10 tools. The colony keeps building
+  the same unit afterwards. The new unit stands on the colony's square,
+  added at the end of the unit list. Measured on Curacao in `COLONY00.SAV`
+  (one turn per unit, and 1 hammer under and at the cost).
+- Building the warehouse expansion only raises byte 149 (1 warehouse, 2
+  expansion).
+- Messages, from the colonial advisor with "Continue turn." and "Zoom to
+  colony." (as the liberty reports): `@BUILT` ("Curacao colony produces
+  Wagon Train."), `@NEWCOLONIST` when the colony grows, and `@NEEDTOOLS` /
+  `@NEEDTOOLS0` while the hammers are there but the tools are not (tools
+  needed and tools there as the numbers).
 - The warehouse holds 100 of each good, 200 with a warehouse and 300 with
   the expansion; the rest is thrown away. Food is not limited this way.
 
-**Not yet done:** building ships and units, and the warnings before goods
-are lost.
+**Not yet done:** choosing what to build on the colony screen, and the
+other colony messages of `GAME.TXT` (`@CARGOREADY*`, `@SPOIL*`,
+`@FOODLOW`, `@FOOD1/2`, `@STARVE*`, `@LUMBER` and the other run-outs); the
+original showed `@FOODLOW` and `@CARGOREADY1` in the same test turns.
 
 ## Horses
 

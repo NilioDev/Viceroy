@@ -16,6 +16,7 @@
 
 #include <array>
 #include <optional>
+#include <string>
 #include <vector>
 
 namespace viceroy {
@@ -221,7 +222,24 @@ struct ColonyTurn {
     int libertyBefore = 0; // the production bonus before and after the turn
     int libertyAfter = 0;
     int horsesBred = 0;    // new horses, each fed with one food of the surplus
+    int builtUnit = -1;    // row of @UNIT finished this turn (wagon, artillery, ships)
+    int toolsNeeded = 0;   // the hammers are there but the tools are not: how many
 };
+
+// What the colony builds is a building (row of @BUILDING, 0-41) or, from
+// 42 on, a unit: 42 + n is @UNIT row 11 + n (artillery, wagon train,
+// caravel, merchantman, galleon, privateer). Measured: 48 (frigate) and
+// higher never finish.
+inline constexpr int kFirstUnitConstruction = 42;
+inline constexpr int kUnitConstructionRows = 6;
+// The unit a construction value stands for, or -1.
+int constructionUnit(int construction);
+// Hammers and tools a construction needs (measured for units: the @UNIT
+// cost column times 32, a wagon train 40; tools ten times the column).
+int constructionHammers(const Ruleset& rules, int construction);
+int constructionTools(const Ruleset& rules, int construction);
+// Its name, as the original's messages give it.
+std::string constructionName(const Ruleset& rules, int construction);
 
 // The food the colony's own square makes without the liberty bonus.
 int centreFoodYield(const Ruleset& rules, const MapSquare& square, int difficulty);
