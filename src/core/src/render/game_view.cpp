@@ -152,9 +152,10 @@ void blendGround(Screen& screen, const Art& art, const SaveMap& map, int x, int 
             continue;
         }
         const auto& n = map.at(nx, ny);
-        // Explored ground takes in other land only (the shore is drawn on
-        // the water square); the unexplored dark takes in water too.
-        if ((explored && !n.isLand()) || !n.seenBy(nation) || baseTile(n) == own) {
+        // Explored land takes in other land and water other water (ocean
+        // and sea lane); between land and water the shore is drawn on the
+        // water square instead. The unexplored dark takes in everything.
+        if ((explored && n.isLand() != sq.isLand()) || !n.seenBy(nation) || baseTile(n) == own) {
             continue;
         }
         const auto* mask = sprite(art.phys, kGroundBlend + side);
@@ -192,6 +193,7 @@ void drawTerrain(Screen& screen, const Art& art, const Game& game, int x, int y,
     }
     blitSprite(screen, art.terrain, baseTile(sq), px, py);
     if (!sq.isLand()) {
+        blendGround(screen, art, map, x, y, px, py, game.human());
         drawCoast(screen, art, map, x, y, px, py);
         return;
     }
@@ -199,12 +201,12 @@ void drawTerrain(Screen& screen, const Art& art, const Game& game, int x, int y,
     if (sq.flags & MapSquare::kPlowed) {
         blitSprite(screen, art.phys, kPlowed, px, py);
     }
+    if (forestShown(sq)) {
+        blitSprite(screen, art.phys, kForest + neighbourMask(map, x, y, forestShown), px, py);
+    }
     if (sq.river()) {
         const int mask = neighbourMask(map, x, y, [](const MapSquare& n) { return n.river() || n.isWater(); });
         blitSprite(screen, art.phys, (sq.majorRiver() ? kMajorRiver : kMinorRiver) + mask, px, py);
-    }
-    if (forestShown(sq)) {
-        blitSprite(screen, art.phys, kForest + neighbourMask(map, x, y, forestShown), px, py);
     }
     if (sq.hills()) {
         blitSprite(screen, art.phys, kHills + neighbourMask(map, x, y, [](const MapSquare& n) { return n.hills(); }),

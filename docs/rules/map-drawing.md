@@ -20,7 +20,8 @@ The dither is `PHYS0.SS` sprite 104 + side (north, east, south, west): each
 pixel 0 takes the neighbour's ground tile at the same spot. The sides are
 applied in that order, so west wins in the corners (seen in the original:
 west over north and south, south over east). Explored land only takes in
-other land; water gets its shore instead (below). An unexplored square takes
+other land and water only other water (ocean and sea lane take each other
+in); between land and water the shore is drawn instead (below). An unexplored square takes
 in the ground of every explored square next to it, water too, which gives
 the dotted edge of the unknown. Checked pixel by pixel against five captures
 of the original.
@@ -40,6 +41,9 @@ feature.
 | Minor river | 16 + mask   | guess    |
 | Road      | 81 + direction | guess   |
 | Plowed    | 149           | yes      |
+
+Order on a square: ground, plowed, forest, river, hills, mountains, road.
+Rivers run over the forest (checked against the view-mode captures).
 
 ## Coast
 
