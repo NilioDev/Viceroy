@@ -131,6 +131,8 @@ struct SaveUnit {
     int orders = 0;     // row of @ORDERS
     int profession = 0; // for colonists: their skill (row of the expert list)
     int holds = 0;      // cargo holds in use
+    int tools = 0;      // a pioneer's tools, used 20 at a time
+    int workTurns = 0;  // byte 22: turns at a pioneer's job, counted from 1
     int nextInTransport = -1;
     int prevInTransport = -1;
     std::array<std::uint8_t, 28> raw{};
@@ -140,6 +142,8 @@ struct SaveUnit {
     static constexpr int kSentry = 1;
     static constexpr int kFortify = 5;
     static constexpr int kFortified = 6;
+    static constexpr int kPlow = 8; // "Clear/Plow": plow, or clear a forest
+    static constexpr int kRoad = 9;
 };
 
 struct SaveSettlement {

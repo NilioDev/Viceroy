@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace viceroy {
@@ -47,6 +48,22 @@ enum class MoveResult {
     Blocked,     // the square cannot be entered (wrong terrain, no room)
     Occupied,    // a foreign unit, colony or settlement is there
     HighSeas,    // a ship moved onto the high seas: it may sail for Europe
+};
+
+enum class WorkResult {
+    Started,       // the pioneer is at work until the job is done
+    Finished,      // done at once (a hardy pioneer's quick job)
+    NotAPioneer,   // only pioneers with tools can do this
+    NotHere,       // not on land, or hills and mountains, which can't be plowed
+    AlreadyPlowed, // GAME.TXT @NOPLOW
+    AlreadyRoad,   // GAME.TXT @NOROAD
+};
+
+// Something the player is told in a message box: a GAME.TXT section and
+// the %STRINGs that go in it.
+struct GameNotice {
+    std::string section;
+    std::vector<std::string> strings;
 };
 
 enum class FoundResult {
@@ -100,6 +117,17 @@ public:
     void skipUnit(int index);
     void setOrders(int index, int orders);
 
+    // --- Pioneers ----------------------------------------------------------
+    // P and R: a pioneer plows the square or clears its forest
+    // (SaveUnit::kPlow), or builds a road (SaveUnit::kRoad). Each job uses
+    // 20 tools; a pioneer without tools is a colonist again. The timings
+    // are measured: docs/rules/pioneers.md.
+    WorkResult startWork(int index, int orders);
+    // The effort of a job on a square: the terrain's improvement value
+    // from NAMES.TXT, less 2 for a road.
+    int workEffort(int x, int y, int orders) const;
+    bool canPlow(int x, int y) const;
+
     // --- Colonies ----------------------------------------------------------
     FoundResult canFoundColony(int index) const;
     FoundResult foundColony(int index, const std::string& name);
@@ -112,6 +140,9 @@ public:
     void endTurn();
     // What happened in the human's colonies at the last end of turn.
     const std::vector<std::string>& lastTurnNews() const { return lastTurnNews_; }
+    // Message boxes for the player that came up since the last call: a
+    // pioneer out of tools, ...
+    std::vector<GameNotice> takeNotices() { return std::exchange(notices_, {}); }
     // A free colonist appears on the square (born in a colony).
     void addColonist(int x, int y, int nation);
 
@@ -141,6 +172,8 @@ public:
 
 private:
     void refreshUnitFlags();
+    bool workDone(int index) const;
+    void finishWork(int index);
     void sailOn(); // ships between Europe and the New World move on a stage
     void chainPassengers(int ship, const std::vector<int>& passengers);
     void removeUnit(int index);
@@ -150,6 +183,7 @@ private:
     SaveGame save_;
     Ruleset rules_;
     std::vector<std::string> lastTurnNews_;
+    std::vector<GameNotice> notices_;
     std::uint32_t random_ = 0;
 };
 

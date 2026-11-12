@@ -215,6 +215,7 @@ std::vector<SaveUnit> settlementBraves(const std::vector<SaveSettlement>& settle
         u.raw[6] = static_cast<std::uint8_t>(i); // its home settlement
         u.raw[7] = 0x58;
         u.raw[22] = 1;
+        u.workTurns = 1; // byte 22 again: what it means for braves is not known
         u.raw[23] = 0x1C;
         u.raw[24] = u.raw[25] = u.raw[26] = u.raw[27] = 0xFF;
         braves.push_back(u);
@@ -336,7 +337,7 @@ SaveGame newAmericaGame(std::span<const std::uint8_t> mapFile, const Ruleset& ru
         auto pioneer = europeanUnit(start[0], start[1], kPioneer, n, kPioneerProfession[i]);
         auto soldier = europeanUnit(start[0], start[1], kSoldier, n, kSoldierProfession[i]);
         pioneer.orders = soldier.orders = SaveUnit::kSentry;
-        pioneer.raw[21] = kStartTools;
+        pioneer.tools = kStartTools;
         pioneer.nextInTransport = first + 2;
         soldier.prevInTransport = first + 1;
         soldier.nextInTransport = first;

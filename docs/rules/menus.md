@@ -35,7 +35,7 @@ Where the group lines go is not in `MENU.TXT`; seen in the original:
 | --- | --- |
 | GAME | Colony Report Options, Pick Music, Load Game, DECLARE INDEPENDENCE |
 | VIEW | European Status, Find Colony, Zoom Out, Zoom Level 15 × 12 |
-| ORDERS | Join Colony, Pillage, Return to Europe, No Orders |
+| ORDERS | Sentry, Pillage, Return to Europe, No Orders |
 | REPORTS | F1, F5, F9 |
 | PEDIA | Terrain Types |
 
@@ -47,7 +47,14 @@ Seen in the original for a frigate at sea: Activate unit, Wait, Fortify,
 Sentry, Go to Port, Begin Trade Route, No Orders and Disband Unit can be
 used; Plow Fields, Build Road, Load and Unload Cargo, Return to Europe and
 Dump Cargo Overboard are grey; Build Colony, Join Colony, Clear Forest,
-Pillage, Go to Place and the second Fortify are not shown. For other units
+Pillage, Go to Place and the second Fortify are not shown.
+
+Seen for a pioneer on land: Activate unit, Wait, Fortify, Sentry, Build
+Colony, Plow Fields (Clear Forest on a forest, neither on hills or
+mountains), Build Road, Go to Place, No Orders and Disband Unit, all usable;
+Build Colony even on mountains and arctic, where picking it says why not.
+Load, Unload, Pillage, Go to Port, Trade Route, Return to Europe and Dump
+are not shown. For other units
 Viceroy follows the manual (pioneers clear, plow and build roads; land
 units build or join colonies; soldiers pillage; ships and wagon trains trade
 and carry cargo); these are still to be checked against the original. The

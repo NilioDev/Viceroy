@@ -109,8 +109,8 @@ Measured on the original (COLONY00, around Isabella; every unit in about
 - A colony picture (21 wide) is centred on its square, so it starts 2 pixels
   to the left. The owner's pennant (`ICONS.SS` 118 + nation) is drawn over
   the one in the picture, at the square's left + 3, top.
-- A unit's sprite starts 2 pixels into its square; a person 6 wide is
-  centred on the 8 pixels from there (so 3 pixels in). A black copy of its
+- A unit's sprite starts 2 pixels into its square; a person 6 or 7 wide
+  (a pioneer) starts 3 pixels in. A black copy of its
   shape lies 2 pixels to its left, as in the port.
 - Then the orders box (7 × 9), then the unit over it. Where the box goes, from
   the sprite's left `x`: a ship at (x + 7, top), a person at (x + width − 2,

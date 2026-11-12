@@ -49,7 +49,8 @@ enum class Command {
     Europe,   // E: the home port
     Left,     // menus and screens that list things side by side
     Right,
-    Recruit,  // R, P, T: the buttons in Europe
+    Recruit,  // R, P, T: the buttons in Europe; on the map R builds a road
+              // and P plows or clears the forest
     Purchase,
     Train,
     Menu, // F10: the menu bar
@@ -151,6 +152,10 @@ private:
     void openPurchase();
     void openTrain();
     void answer(const std::string& question, int unit, int choice);
+    void work(int orders); // P and R
+    // A message box with the frontiersman; waits its turn behind others.
+    void tell(GameNotice notice);
+    void showNotices(); // the next waiting message, when no box is up
 
     Game game_;
     ViewState view_;
@@ -165,6 +170,7 @@ private:
     std::string question_; // the GAME.TXT section the dialog asks
     int questionUnit_ = -1;
     std::vector<int> choices_; // what each choice of a list stands for
+    std::vector<GameNotice> notices_; // messages still to show, first first
     const Art* art_ = nullptr;
     int lastColony_ = -1;
     bool viewMode_ = false;

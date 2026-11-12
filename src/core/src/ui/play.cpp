@@ -63,7 +63,10 @@ PlayScreen::PlayScreen(Game game, std::filesystem::path savePath)
     } else {
         activate(game_.nextUnitNeedingOrders(-1));
     }
-    if (game_.activeUnit() < 0) {
+    if (game_.activeUnit() >= 0) {
+        // Seen after loading: the view is centred on the active unit.
+        centreOn(view_, game_, game_.unit(game_.activeUnit()).x, game_.unit(game_.activeUnit()).y);
+    } else {
         // Nothing to move: look at the first colony.
         for (const auto& c : game_.state().colonies) {
             if (c.nation == game_.human()) {
@@ -79,6 +82,7 @@ void PlayScreen::say(std::string text) {
 }
 
 void PlayScreen::activate(int index) {
+    const int last = game_.activeUnit();
     game_.setActiveUnit(index);
     view_.blinkOn = true;
     clock_ = 0;
@@ -90,8 +94,15 @@ void PlayScreen::activate(int index) {
         if (!inside) {
             centreOn(view_, game_, u.x, u.y);
         }
+        view_.endOfTurn = false;
     } else {
-        say("End of Turn. Press Enter.");
+        // Seen: the cursor stays on the square of the last unit moved, and
+        // the panel tells about it, "End of Turn" below.
+        if (last >= 0 && last < game_.unitCount() && game_.onMap(last)) {
+            view_.lookX = game_.unit(last).x;
+            view_.lookY = game_.unit(last).y;
+        }
+        view_.endOfTurn = true;
     }
 }
 
@@ -249,7 +260,50 @@ bool PlayScreen::handleDialog(Command command) {
     const int unit = questionUnit_;
     dialog_.reset();
     answer(question, unit, choice);
+    showNotices();
     return true;
+}
+
+void PlayScreen::tell(GameNotice notice) {
+    notices_.push_back(std::move(notice));
+    showNotices();
+}
+
+void PlayScreen::showNotices() {
+    if (dialog_ || notices_.empty() || art_ == nullptr) {
+        return;
+    }
+    const GameNotice notice = notices_.front();
+    notices_.erase(notices_.begin());
+    ask(notice.section, -1, notice.strings);
+    if (dialog_) {
+        placeFrontiersmanDialog(*dialog_);
+    }
+}
+
+void PlayScreen::work(int orders) {
+    const int active = game_.activeUnit();
+    if (active < 0) {
+        return;
+    }
+    switch (game_.startWork(active, orders)) {
+    case WorkResult::Started:
+    case WorkResult::Finished:
+        for (auto& notice : game_.takeNotices()) {
+            tell(std::move(notice));
+        }
+        advance();
+        break;
+    case WorkResult::AlreadyPlowed:
+        tell({"NOPLOW", {}});
+        break;
+    case WorkResult::AlreadyRoad:
+        tell({"NOROAD", {}});
+        break;
+    case WorkResult::NotAPioneer:
+    case WorkResult::NotHere:
+        break;
+    }
 }
 
 void PlayScreen::answer(const std::string& question, int unit, int choice) {
@@ -728,6 +782,9 @@ bool PlayScreen::handle(Command command) {
             say(news);
         }
         activate(game_.activeUnit());
+        for (auto& notice : game_.takeNotices()) {
+            tell(std::move(notice));
+        }
         break;
     case Command::Skip:
         if (active >= 0) {
@@ -800,6 +857,12 @@ bool PlayScreen::handle(Command command) {
         if (active >= 0) {
             centreOn(view_, game_, game_.unit(active).x, game_.unit(active).y);
         }
+        break;
+    case Command::Purchase: // P
+        work(SaveUnit::kPlow);
+        break;
+    case Command::Recruit: // R
+        work(SaveUnit::kRoad);
         break;
     case Command::Save:
         if (save()) {
@@ -892,9 +955,12 @@ void PlayScreen::drawScreen(Screen& screen, const Art& art) const {
         return;
     }
     drawGameScreen(screen, art, game_, view_);
-    if (viewMode_ && view_.blinkOn) {
-        const int px = kMapArea.x + (cursorX_ - view_.originX) * kSquare;
-        const int py = kMapArea.y + (cursorY_ - view_.originY) * kSquare;
+    const bool lookAtEnd = view_.endOfTurn && game_.activeUnit() < 0 && view_.lookX >= 0;
+    if ((viewMode_ || lookAtEnd) && view_.blinkOn) {
+        const int lx = viewMode_ ? cursorX_ : view_.lookX;
+        const int ly = viewMode_ ? cursorY_ : view_.lookY;
+        const int px = kMapArea.x + (lx - view_.originX) * kSquare;
+        const int py = kMapArea.y + (ly - view_.originY) * kSquare;
         screen.setClip(kMapArea);
         screen.frame({px, py, kSquare, kSquare}, 0x0F);
         screen.resetClip();
@@ -1086,15 +1152,23 @@ std::vector<EntryState> PlayScreen::menuStates(int index) const {
     } else {
         set(inColony ? kBuildColony : kJoinColony, EntryState::Hidden);
         const int row = inColony ? kJoinColony : kBuildColony;
-        set(row, game_.canFoundColony(active) == FoundResult::Founded || inColony ? EntryState::Enabled
-                                                                                 : EntryState::Disabled);
+        // Seen on mountains and arctic: Build Colony is offered all the
+        // same, and picking it says why not.
+        set(row, inColony || game_.canFoundColony(active) != FoundResult::NotAColonist ? EntryState::Enabled
+                                                                                       : EntryState::Disabled);
     }
+    // Seen for a pioneer: Clear Forest on a forest, Plow Fields elsewhere,
+    // neither on hills or mountains; both stay up on a plowed square or a
+    // road, and picking them then says so.
     set(square.isForest() ? kPlow : kClearForest, EntryState::Hidden);
-    set(square.isForest() ? kClearForest : kPlow, pioneer ? EntryState::Enabled : EntryState::Disabled);
+    const bool plowable = !ship && game_.canPlow(u.x, u.y);
+    set(square.isForest() ? kClearForest : kPlow,
+        pioneer && plowable ? EntryState::Enabled : pioneer ? EntryState::Hidden : EntryState::Disabled);
     set(kRoad, pioneer ? EntryState::Enabled : EntryState::Disabled);
     const bool cargo = (ship || wagon) && u.holds > 0;
-    set(kLoad, (ship || wagon) && inColony ? EntryState::Enabled : EntryState::Disabled);
-    set(kUnload, cargo && inColony ? EntryState::Enabled : EntryState::Disabled);
+    // Seen for a pioneer: no Load or Unload for those who carry nothing.
+    set(kLoad, !(ship || wagon) ? EntryState::Hidden : inColony ? EntryState::Enabled : EntryState::Disabled);
+    set(kUnload, !(ship || wagon) ? EntryState::Hidden : cargo && inColony ? EntryState::Enabled : EntryState::Disabled);
     set(kPillage, military && !ship ? EntryState::Enabled : EntryState::Hidden);
     set(kGoToPort, ship ? EntryState::Enabled : EntryState::Hidden);
     set(kGoToPlace, ship ? EntryState::Hidden : EntryState::Enabled);
@@ -1267,6 +1341,13 @@ bool PlayScreen::pickMenuEntry(int entry) {
         case kBuildColony:
         case kJoinColony:
             return handle(Command::BuildColony);
+        case kClearForest:
+        case kPlow:
+            work(SaveUnit::kPlow);
+            return true;
+        case kRoad:
+            work(SaveUnit::kRoad);
+            return true;
         case kNoOrders:
             return handle(Command::Skip);
         case kReturnToEurope: {

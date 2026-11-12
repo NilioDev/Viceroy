@@ -21,6 +21,9 @@ bool isNative(int nation) {
     return nation >= kEuropeanNations;
 }
 
+constexpr int kToolsPerJob = 20;
+constexpr int kHardyPioneer = 0x14;
+
 } // namespace
 
 Game::Game(SaveGame save, Ruleset rules) : save_(std::move(save)), rules_(std::move(rules)) {
@@ -109,20 +112,7 @@ int Game::moveCost(int index, int fromX, int fromY, int toX, int toY) const {
     if ((roadFrom && roadTo) || (from.river() && to.river())) {
         return 1;
     }
-    // Rows of the terrain tables: 0-7 open land, 8-15 forest, then arctic,
-    // ocean, sea lane, mountains, hills.
-    std::size_t row = 0;
-    if (to.mountains()) {
-        row = 19;
-    } else if (to.hills()) {
-        row = 20;
-    } else if (to.terrain == kTerrainArctic) {
-        row = 16;
-    } else if (to.isForest()) {
-        row = 8 + (to.terrain & 7u);
-    } else {
-        row = to.terrain & 7u;
-    }
+    const auto row = static_cast<std::size_t>(terrainRow(to));
     const int cost = row < rules_.terrain.size() ? rules_.terrain[row].movementCost : 1;
     return std::max(1, cost) * kThirds;
 }
@@ -267,6 +257,78 @@ void Game::setOrders(int index, int orders) {
     save_.units[static_cast<std::size_t>(index)].orders = orders;
 }
 
+// --- Pioneers ---------------------------------------------------------------
+
+bool Game::canPlow(int x, int y) const {
+    const auto& sq = save_.map.at(x, y);
+    return sq.isLand() && !sq.hills() && !sq.mountains();
+}
+
+int Game::workEffort(int x, int y, int orders) const {
+    const auto row = static_cast<std::size_t>(terrainRow(save_.map.at(x, y)));
+    const int value = row < rules_.terrain.size() ? rules_.terrain[row].improvementTurns : 0;
+    return std::max(0, orders == SaveUnit::kRoad ? value - 2 : value);
+}
+
+WorkResult Game::startWork(int index, int orders) {
+    auto& u = save_.units[static_cast<std::size_t>(index)];
+    if (u.type != unit_type::kPioneer || u.tools <= 0) {
+        return WorkResult::NotAPioneer;
+    }
+    if (!onMap(index) || isAboard(index)) {
+        return WorkResult::NotHere;
+    }
+    const auto& sq = save_.map.at(u.x, u.y);
+    if (orders == SaveUnit::kPlow) {
+        if (!canPlow(u.x, u.y)) {
+            return WorkResult::NotHere;
+        }
+        if (!sq.isForest() && (sq.flags & MapSquare::kPlowed) != 0) {
+            return WorkResult::AlreadyPlowed;
+        }
+    } else if ((sq.flags & (MapSquare::kRoad | MapSquare::kHasColony)) != 0) {
+        return WorkResult::AlreadyRoad;
+    }
+    u.orders = orders;
+    u.workTurns = 1;
+    u.movesUsed = movementAllowance(index);
+    if (workDone(index)) {
+        finishWork(index);
+        return WorkResult::Finished;
+    }
+    return WorkResult::Started;
+}
+
+bool Game::workDone(int index) const {
+    const auto& u = unit(index);
+    // Measured: a pioneer finishes after one turn more than the effort; a
+    // hardy pioneer after half the effort, so at once when that is 0.
+    const int turns = u.workTurns - 1;
+    const int effort = workEffort(u.x, u.y, u.orders);
+    return u.profession == kHardyPioneer ? turns >= effort / 2 : turns > effort;
+}
+
+void Game::finishWork(int index) {
+    auto& u = save_.units[static_cast<std::size_t>(index)];
+    auto& sq = save_.map.at(u.x, u.y);
+    if (u.orders == SaveUnit::kRoad) {
+        sq.flags = static_cast<std::uint8_t>(sq.flags | MapSquare::kRoad);
+    } else if (sq.isForest()) {
+        sq.terrain = static_cast<std::uint8_t>(sq.terrain - 8);
+    } else {
+        sq.flags = static_cast<std::uint8_t>(sq.flags | MapSquare::kPlowed);
+    }
+    u.orders = SaveUnit::kNoOrders;
+    u.workTurns = 0;
+    u.tools = std::max(0, u.tools - kToolsPerJob);
+    if (u.tools == 0) {
+        u.type = unit_type::kColonist;
+        if (u.nation == human()) {
+            notices_.push_back({"USEDUPTOOLS", {}});
+        }
+    }
+}
+
 // --- Colonies --------------------------------------------------------------
 
 FoundResult Game::canFoundColony(int index) const {
@@ -373,7 +435,16 @@ void Game::endTurn() {
     }
     sailOn();
     for (int i = 0; i < unitCount(); ++i) {
-        save_.units[static_cast<std::size_t>(i)].movesUsed = 0;
+        auto& u = save_.units[static_cast<std::size_t>(i)];
+        u.movesUsed = 0;
+        if ((u.orders == SaveUnit::kPlow || u.orders == SaveUnit::kRoad) && onMap(i)) {
+            ++u.workTurns;
+            if (workDone(i)) {
+                // The job takes the rest of this turn too.
+                finishWork(i);
+                u.movesUsed = movementAllowance(i);
+            }
+        }
     }
     ++save_.turn;
     if (save_.year < 1600) {

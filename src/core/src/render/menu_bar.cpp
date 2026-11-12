@@ -38,7 +38,7 @@ const std::array<Layout, 6>& layouts() {
     static const std::array<Layout, 6> kLayouts{{
         {"GAME", {1, 3, 5, 6}},
         {"VIEW", {2, 3, 5, 9}},
-        {"ORDERS", {6, 12, 16, 17}},
+        {"ORDERS", {4, 12, 16, 17}}, // seen for a frigate and a pioneer
         {"REPORTS", {0, 4, 8}},
         {"TRADE", {}},
         {"PEDIA", {2}},

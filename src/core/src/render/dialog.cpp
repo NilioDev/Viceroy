@@ -199,6 +199,15 @@ void placeEuropeDialog(Dialog& d, bool help) {
     d.portraitY = d.y - 78;
 }
 
+void placeFrontiersmanDialog(Dialog& d) {
+    d.portrait = kFrontiersman;
+    d.portraitBehind = false; // his rifle lies over the box
+    d.x = (Screen::kWidth - boxWidth(d)) / 2;
+    d.y = (288 - dialogHeight(d)) / 2;
+    d.portraitX = 86;
+    d.portraitY = d.y - 87;
+}
+
 void stepSelection(Dialog& d, int by) {
     const int n = static_cast<int>(d.options.size());
     for (int k = 1; k <= n; ++k) {
