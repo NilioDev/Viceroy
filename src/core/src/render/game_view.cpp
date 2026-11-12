@@ -80,6 +80,12 @@ int baseTile(const MapSquare& sq) {
     }
 }
 
+// The open ground of a square: forests (scrub too) stand on the land 8
+// lower. Used where a neighbour's ground shows through.
+int groundTile(const MapSquare& sq) {
+    return sq.terrain < 24 ? sq.terrain & 7 : baseTile(sq);
+}
+
 // Neighbour mask used by the joined-up overlays: 1 east, 2 west, 4 south,
 // 8 north. Squares off the map count as not matching.
 template <typename Pred>
@@ -92,17 +98,28 @@ int neighbourMask(const SaveMap& map, int x, int y, Pred pred) {
 // chosen by its three land neighbours: the side before it going clockwise,
 // the corner, and the side after it. Pixel 0 keeps the water, transparent
 // pixels show the neighbouring land's ground, everything else is drawn.
+// The quarters of a square (top left, top right, bottom right, bottom
+// left), each with the neighbours that decide its coast piece.
+struct Quarter {
+    int ox, oy;
+    Step first, corner, second;
+};
+constexpr Quarter kQuarters[4] = {
+    {0, 0, {-1, 0}, {-1, -1}, {0, -1}}, // top left: west, north-west, north
+    {8, 0, {0, -1}, {1, -1}, {1, 0}},   // top right: north, north-east, east
+    {8, 8, {1, 0}, {1, 1}, {0, 1}},     // bottom right: east, south-east, south
+    {0, 8, {0, 1}, {-1, 1}, {-1, 0}},   // bottom left: south, south-west, west
+};
+
+// The land whose ground shows through a quarter's open pixels: the first
+// side if it is land, else the second, else the corner.
+Step coastLandOf(const SaveMap& map, int x, int y, int q) {
+    const auto& quarter = kQuarters[q];
+    auto land = [&](Step s) { return map.inside(x + s.dx, y + s.dy) && map.at(x + s.dx, y + s.dy).isLand(); };
+    return land(quarter.first) ? quarter.first : land(quarter.second) ? quarter.second : quarter.corner;
+}
+
 void drawCoast(Screen& screen, const Art& art, const SaveMap& map, int x, int y, int px, int py) {
-    struct Quarter {
-        int ox, oy;
-        Step first, corner, second;
-    };
-    static constexpr Quarter kQuarters[4] = {
-        {0, 0, {-1, 0}, {-1, -1}, {0, -1}}, // top left: west, north-west, north
-        {8, 0, {0, -1}, {1, -1}, {1, 0}},   // top right: north, north-east, east
-        {8, 8, {1, 0}, {1, 1}, {0, 1}},     // bottom right: east, south-east, south
-        {0, 8, {0, 1}, {-1, 1}, {-1, 0}},   // bottom left: south, south-west, west
-    };
     auto land = [&](Step s) { return map.inside(x + s.dx, y + s.dy) && map.at(x + s.dx, y + s.dy).isLand(); };
     for (int q = 0; q < 4; ++q) {
         const auto& quarter = kQuarters[q];
@@ -111,9 +128,8 @@ void drawCoast(Screen& screen, const Art& art, const SaveMap& map, int x, int y,
             continue;
         }
         const auto* piece = sprite(art.phys, kCoast + 4 * group + q);
-        // The land whose ground shows through: a side first, then the corner.
-        const Step from = land(quarter.first) ? quarter.first : land(quarter.second) ? quarter.second : quarter.corner;
-        const auto* ground = sprite(art.terrain, baseTile(map.at(x + from.dx, y + from.dy)));
+        const Step from = coastLandOf(map, x, y, q);
+        const auto* ground = sprite(art.terrain, groundTile(map.at(x + from.dx, y + from.dy)));
         if (piece == nullptr) {
             continue;
         }
@@ -147,11 +163,31 @@ void drawBeachAndMouth(Screen& screen, const Art& art, const SaveMap& map, int x
         int dx, dy;
     };
     static constexpr Corner kCorners[4] = {{-1, -1}, {1, -1}, {-1, 1}, {1, 1}};
+    static constexpr int kBeachSide[4] = {1, 0, 0, 1};
     for (int c = 0; c < 4; ++c) {
         const int dx = kCorners[c].dx;
         const int dy = kCorners[c].dy;
         if (land(dx, 0) && land(0, dy) && land(dx, dy) && !land(-dx, 0) && !land(0, -dy) && !land(-dx, -dy)) {
-            blitSprite(screen, art.phys, kBeach + c, px, py);
+            const auto* piece = sprite(art.phys, kBeach + c);
+            if (piece == nullptr || piece->width != kSquare || piece->height != kSquare) {
+                continue;
+            }
+            for (int j = 0; j < kSquare; ++j) {
+                for (int i = 0; i < kSquare; ++i) {
+                    const auto at = static_cast<std::size_t>(j * kSquare + i);
+                    auto v = piece->pixels[at];
+                    if (v == kTransparent) {
+                        const int sx = kBeachSide[c] != 0 ? 0 : dx;
+                        const int sy = kBeachSide[c] != 0 ? dy : 0;
+                        const auto* ground = sprite(art.terrain, groundTile(map.at(x + sx, y + sy)));
+                        if (ground == nullptr || ground->width != kSquare || ground->height != kSquare) {
+                            continue;
+                        }
+                        v = ground->pixels[at];
+                    }
+                    screen.pixel(px + i, py + j, v);
+                }
+            }
         }
     }
     const auto& sq = map.at(x, y);
@@ -179,7 +215,7 @@ void blendGround(Screen& screen, const Art& art, const SaveMap& map, int x, int 
     static constexpr Step kSides[4] = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}};
     const auto& sq = map.at(x, y);
     const bool explored = sq.seenBy(nation);
-    const int own = explored ? baseTile(sq) : -1;
+    const int own = explored ? groundTile(sq) : -1;
     for (int side = 0; side < 4; ++side) {
         const int nx = x + kSides[side].dx;
         const int ny = y + kSides[side].dy;
@@ -190,11 +226,11 @@ void blendGround(Screen& screen, const Art& art, const SaveMap& map, int x, int 
         // Explored land takes in other land and water other water (ocean
         // and sea lane); between land and water the shore is drawn on the
         // water square instead. The unexplored dark takes in everything.
-        if ((explored && n.isLand() != sq.isLand()) || !n.seenBy(nation) || baseTile(n) == own) {
+        if ((explored && n.isLand() != sq.isLand()) || !n.seenBy(nation) || groundTile(n) == own) {
             continue;
         }
         const auto* mask = sprite(art.phys, kGroundBlend + side);
-        const auto* ground = sprite(art.terrain, baseTile(n));
+        const auto* ground = sprite(art.terrain, groundTile(n));
         if (mask == nullptr || ground == nullptr || ground->width != kSquare || ground->height != kSquare) {
             continue;
         }
@@ -241,7 +277,7 @@ void drawTerrain(Screen& screen, const Art& art, const Game& game, int x, int y,
         blitSprite(screen, art.phys, kForest + neighbourMask(map, x, y, forestShown), px, py);
     }
     if (sq.river()) {
-        const int mask = neighbourMask(map, x, y, [](const MapSquare& n) { return n.river() || n.isWater(); });
+        const int mask = neighbourMask(map, x, y, [](const MapSquare& n) { return n.river(); });
         blitSprite(screen, art.phys, (sq.majorRiver() ? kMajorRiver : kMinorRiver) + mask, px, py);
     }
     if (sq.hills()) {
@@ -473,7 +509,7 @@ Art loadArt(const std::filesystem::path& folder) {
 
 int minimapTop(const Game& game, const ViewState& view) {
     const auto& map = game.state().map;
-    return std::clamp(view.originY + kViewRows / 2 - 20, 0, std::max(0, map.height - 40));
+    return std::clamp(view.originY + kViewRows / 2 - 20, 0, std::max(0, map.height - 41));
 }
 
 std::optional<std::pair<int, int>> minimapSquare(const Game& game, const ViewState& view, int x, int y) {
@@ -491,8 +527,10 @@ std::optional<std::pair<int, int>> minimapSquare(const Game& game, const ViewSta
 
 void centreOn(ViewState& view, const Game& game, int x, int y) {
     const auto& map = game.state().map;
-    view.originX = std::clamp(x - kViewColumns / 2, 0, std::max(0, map.width - kViewColumns));
-    view.originY = std::clamp(y - kViewRows / 2, 0, std::max(0, map.height - kViewRows));
+    // The outermost row and column of the map are a border the view never
+    // shows (the original stops at row 1 and at the second-last row).
+    view.originX = std::clamp(x - kViewColumns / 2, 1, std::max(1, map.width - 1 - kViewColumns));
+    view.originY = std::clamp(y - kViewRows / 2, 1, std::max(1, map.height - 1 - kViewRows));
 }
 
 std::uint8_t nationColour(const Art& art, int nation) {
@@ -619,13 +657,26 @@ void drawMap(Screen& screen, const Art& art, const Game& game, const ViewState& 
     std::map<std::pair<int, int>, int> top;
     auto shown = [&](int i) {
         const auto& u = game.unit(i);
-        // Units inside a colony or a native settlement are not drawn.
-        return game.onMap(i) && !game.isAboard(i) && !game.colonyAt(u.x, u.y) && !settlementAt(save, u.x, u.y);
+        // Units inside a colony or a native settlement are not drawn, nor
+        // another nation's units the player cannot see: byte 3 of a unit has
+        // a bit per nation (4 + nation) for who sees it, as the "seen" map
+        // layer does.
+        const bool seen = u.nation == game.human() || ((u.raw[3] >> (4 + game.human())) & 1) != 0;
+        return seen && game.onMap(i) && !game.isAboard(i) && !game.colonyAt(u.x, u.y) && !settlementAt(save, u.x, u.y);
     };
     const int sliding = view.slideUnit >= 0 && view.slideUnit < game.unitCount() ? view.slideUnit : -1;
     for (int i = 0; i < game.unitCount(); ++i) {
         if (shown(i) && i != sliding) {
-            top.emplace(std::make_pair(game.unit(i).x, game.unit(i).y), i);
+            // Units on one square form a chain (bytes 24-25 point to the
+            // next one); the original shows the last of the chain, the unit
+            // with no next (checked on three stacks of COLONY00).
+            const auto& raw = game.unit(i).raw;
+            const bool last = raw[24] == 0xFF && raw[25] == 0xFF;
+            const auto key = std::make_pair(game.unit(i).x, game.unit(i).y);
+            const auto it = top.find(key);
+            if (it == top.end() || last) {
+                top[key] = i;
+            }
         }
     }
     const int active = game.activeUnit();

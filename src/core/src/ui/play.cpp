@@ -633,8 +633,8 @@ void PlayScreen::clickMinimap(int x, int y) {
 
 void PlayScreen::scrollView(int dx, int dy) {
     const auto& map = game_.state().map;
-    view_.originX = std::clamp(view_.originX + dx, 0, std::max(0, map.width - kViewColumns));
-    view_.originY = std::clamp(view_.originY + dy, 0, std::max(0, map.height - kViewRows));
+    view_.originX = std::clamp(view_.originX + dx, 1, std::max(1, map.width - 1 - kViewColumns));
+    view_.originY = std::clamp(view_.originY + dy, 1, std::max(1, map.height - 1 - kViewRows));
 }
 
 bool PlayScreen::handle(Command command) {

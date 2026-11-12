@@ -23,7 +23,9 @@ west over north and south, south over east). Explored land only takes in
 other land and water only other water (ocean and sea lane take each other
 in); between land and water the shore is drawn instead (below). An unexplored square takes
 in the ground of every explored square next to it, water too, which gives
-the dotted edge of the unknown. Checked pixel by pixel against five captures
+the dotted edge of the unknown. The ground a forest square lends is the open
+land under its trees, so scrub lends desert. Water squares are blended before
+the coast is drawn over them. Checked pixel by pixel against five captures
 of the original.
 
 ## Overlays (PHYS0.SS)
@@ -43,7 +45,10 @@ feature.
 | Plowed    | 149           | yes      |
 
 Order on a square: ground, plowed, forest, river, hills, mountains, road.
-Rivers run over the forest (checked against the view-mode captures).
+Rivers run over the forest (checked against the view-mode captures). A
+river's mask counts only neighbours that have a river themselves; a water
+square counts when the map marks a river on it (the mouth), not for being
+water.
 
 ## Coast
 
@@ -65,6 +70,20 @@ In those sprites pixel value 0 keeps the water underneath. A transparent pixel
 shows the land: the pixel at the same position of the land neighbour's base
 tile (the first side if it is land, else the second, else the corner).
 
+## Beaches and river mouths
+
+After the coast, a water square gets a beach (`PHYS0.SS` 150 to 153 for the
+north-west, north-east, south-west and south-east corners) when the two sides
+of that corner and the square between them are land and the two opposite
+sides and their corner are water. The beach's open pixels show land ground:
+from the west or east neighbour for the first three, from the square below
+for the south-east one (measured on 68 beaches; the leftover differences are
+a few pixels each).
+
+A water square on which the map marks a river draws a mouth for each side
+whose land neighbour has a river: sprite 140 + side for a major river, 144 +
+side for a minor one (sides north, east, south, west).
+
 ## Still unknown
 
 - Where fish and other resources appear. See "Resources" below.
@@ -76,6 +95,14 @@ tile (the first side if it is land, else the second, else the corner).
 Measured on the original (COLONY00, around Isabella; every unit in about
 250 captures of the map):
 
+- Only units the player may see are drawn: the player's own, and others whose byte 3
+  has the bit 4 + nation of the player set. Units in a colony or a native
+  settlement are not drawn on the map.
+- Units on one square are chained (bytes 24 and 25 point to the next one);
+  the unit drawn is the last of the chain, the one with no next (three
+  stacks checked). The active unit always shows on its square.
+- A native settlement with a mission has a black plate with a cross in the
+  missionary's nation colour (raw byte 5 of the settlement, low nibble).
 - First all colonies, in the order of the save, each with its name: a later
   colony covers the end of an earlier one's name. Then the units, which cover
   colonies and names.
@@ -103,7 +130,10 @@ or a unit shows its nation's colour (French 0x09, Spanish 0x0E, Dutch 0x0D;
 English 0x0C is a guess), a native settlement its tribe's colour (last
 column of `@TRIBES`), any other square the middle pixel (8, 8) of its ground
 tile, or of hills sprite 48 or mountains sprite 32. Forests show their
-ground. The view is a white frame of 15 × 12 squares. All but 4 of the
+ground. The view is a white frame of 15 × 12 squares. The frame's top row is
+clamped so the small map never goes past map height − 41. The map window never
+shows the outer row and column of the map: its corner stays between 1 and
+width − 1 − 15 (and height − 1 − 12). All but 4 of the
 small map's pixels matched; those are settlements the original leaves out
 (perhaps not yet visited) and one corner of the view frame.
 
