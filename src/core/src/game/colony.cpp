@@ -196,9 +196,6 @@ int squareYield(const Ruleset& rules, const MapSquare& square, int jobRow, int s
         break;
     case 5: // lumber
         amount *= 2;
-        if (road) {
-            amount += 2;
-        }
         break;
     case 6: // ore
     case 7: // silver
@@ -225,6 +222,17 @@ int squareYield(const Ruleset& rules, const MapSquare& square, int jobRow, int s
         // resource twice); the other experts make twice as much.
         const bool adds = jobRow == job::kFarmer || jobRow == job::kFisherman;
         amount = adds ? amount + 2 + added : amount * 2;
+    }
+    // Measured: for lumber a road adds after an expert doubles (San
+    // Salvador's expert lumberjack on a rain forest with a road: 2 x 2 x 2 +
+    // 2 = 10), for furs and ore before (Santo Domingo, New Amsterdam).
+    if (road && jobRow == 5) {
+        amount += 2;
+    }
+    // Indian converts make 1 more food, crops and furs (San Salvador: a
+    // convert farmer and a convert fisherman).
+    if (skill == skill::kConvert && (jobRow <= 4 || jobRow == job::kFisherman)) {
+        amount += 1;
     }
     // The tories' penalty comes off the end.
     return std::max(0, amount - modifier.penalty);
@@ -614,7 +622,7 @@ ColonyTurn runColonyTurn(SaveColony& colony, const SaveMap& map, const Ruleset& 
     colony.hammers += std::max(0, made[cargo::kHammers]);
     if (colony.construction >= 0 && static_cast<std::size_t>(colony.construction) < rules.buildings.size()) {
         const auto& b = rules.buildings[static_cast<std::size_t>(colony.construction)];
-        const int tools = b.tools * 10;
+        const int tools = b.tools;
         if (colony.hammers >= b.hammers && colony.stock[cargo::kTools] >= tools) {
             for (int k = 0; k < kBuildingKinds; ++k) {
                 const auto& f = kBuildingFields[static_cast<std::size_t>(k)];

@@ -17,7 +17,11 @@ be checked against more colonies.
 | Fisherman | yield + 1 where the water has land on 3 or more of its 8 sides, yield − 1 elsewhere |
 
 A river adds 1 to all of them. An expert farmer or fisherman makes 2 more;
-other experts make twice as much. The Sons of Liberty add to all of this or
+other experts make twice as much, the road included for furs and ore but
+not for lumber: an expert lumberjack on a rain forest (yield 2) with a road
+makes 2 × 2 × 2 + 2 = 10 (San Salvador, measured from its hammers over two
+turns). Indian converts make 1 more as farmers, fishermen, planters and fur
+trappers (San Salvador's convert farmer and fisherman), not as ore miners. The Sons of Liberty add to all of this or
 take from it (see [liberty.md](liberty.md)).
 
 Measured on test colonies: the ocean (yield 3) gives a colonist 2 food with

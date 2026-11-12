@@ -42,7 +42,7 @@ struct TerrainType {
 struct BuildingType {
     std::string name;
     int hammers = 0;
-    int tools = 0;        // stored in the file divided by 10
+    int tools = 0;        // the file lists tens of tools; this is the full number
     int slot = 0;         // the "size" column
     int minColonySize = 0;
     int upkeep = 0;

@@ -325,3 +325,27 @@ VCR_TEST("workshops: house, shop and factory (measured)") {
     VCR_CHECK(buildingYield(1, colonist, blacksmith, {0, 1}) == 2);
     VCR_CHECK(buildingYield(2, colonist, blacksmith, {1, 0}) == 7);
 }
+
+VCR_TEST("construction: finishes with the hammers and tools the ruleset lists") {
+    Ruleset r;
+    r.buildings.resize(3);
+    r.buildings[2].hammers = 320;
+    r.buildings[2].tools = 200; // NAMES.TXT says 20: tens of tools
+    SaveColony c;
+    c.construction = 2;
+    c.hammers = 319;
+    c.stock[cargo::kTools] = 200;
+    c.raw[149] = 1;
+    setBuildingLevel(c, BuildingKind::Fortification, 2);
+    SaveMap map;
+    // One hammer short: nothing yet (the colony's own hammers come from
+    // nobody here).
+    auto turn = runColonyTurn(c, map, r);
+    VCR_CHECK(turn.built == -1);
+    c.hammers = 320;
+    turn = runColonyTurn(c, map, r);
+    VCR_CHECK(turn.built == 2);
+    VCR_CHECK(c.hammers == 0);
+    VCR_CHECK(c.stock[cargo::kTools] == 0);
+    VCR_CHECK(buildingLevel(c, BuildingKind::Fortification) == 3);
+}
