@@ -17,7 +17,9 @@
 #include "viceroy/pack/library.hpp"
 #include "viceroy/render/game_view.hpp"
 #include "viceroy/render/screen.hpp"
+#include "viceroy/game/new_game.hpp"
 #include "viceroy/ui/debug_menu.hpp"
+#include "viceroy/ui/new_game_flow.hpp"
 #include "viceroy/ui/play.hpp"
 #include "viceroy/ui/title.hpp"
 #include "viceroy/version.hpp"
@@ -25,6 +27,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <ctime>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -42,7 +45,7 @@ constexpr int kScreenH = viceroy::Screen::kHeight;
 constexpr Uint64 kStickRepeatMs = 220;
 constexpr float kStickThreshold = 0.6f;
 
-enum class Mode { Welcome, Intro, Title, Load, Play };
+enum class Mode { Welcome, Intro, Title, Load, NewGame, Play };
 
 struct App {
     SDL_Window* window = nullptr;
@@ -61,6 +64,8 @@ struct App {
     // when it played to the end.
     std::unique_ptr<viceroy::Intro> intro;
     std::unique_ptr<viceroy::LoadMenu> load;
+    std::unique_ptr<viceroy::NewGameArt> newGameArt;
+    std::unique_ptr<viceroy::NewGameFlow> newGame;
     std::unique_ptr<viceroy::ColonyArt> colonyArt;
     std::unique_ptr<viceroy::PlayScreen> play;
     viceroy::DebugMenu debug;
@@ -174,11 +179,94 @@ void showTitle(App& app) {
     app.mode = Mode::Title;
 }
 
+void beginPlay(App& app, viceroy::Game game, const std::filesystem::path& path) {
+    app.play = std::make_unique<viceroy::PlayScreen>(std::move(game), path);
+    app.play->setAnimations(true);
+    app.play->setColonyNames(&app.art->colonyNames);
+    app.play->setColonyArt(app.colonyArt.get());
+    app.play->setArt(app.art.get());
+    app.mode = Mode::Play;
+}
+
+// Where a new game is saved: the first free slot, or else the one saved
+// longest ago.
+std::filesystem::path newGameSlot(const std::filesystem::path& folder) {
+    std::filesystem::path oldest;
+    std::filesystem::file_time_type oldestTime{};
+    for (int i = 0; i < 10; ++i) {
+        const std::string name = "COLONY0" + std::to_string(i) + ".SAV";
+        const auto found = viceroy::findFileNoCase(folder, name);
+        if (!found) {
+            return folder / name;
+        }
+        std::error_code ec;
+        const auto t = std::filesystem::last_write_time(*found, ec);
+        if (oldest.empty() || (!ec && t < oldestTime)) {
+            oldest = *found;
+            oldestTime = t;
+        }
+    }
+    return oldest;
+}
+
+void startNewGame(App& app) {
+    try {
+        const auto base = viceroy::pack::baseFolder(app.library);
+        const auto mapPath = viceroy::findFileNoCase(base, "AMER2.MP");
+        if (!mapPath) {
+            throw viceroy::FormatError("missing AMER2.MP");
+        }
+        auto setup = app.newGame->setup();
+        setup.seed = static_cast<std::uint32_t>(SDL_GetTicksNS() ^ static_cast<Uint64>(std::time(nullptr)));
+        auto save = viceroy::newAmericaGame(readAll(*mapPath), app.art->rules, setup);
+        const auto folder = viceroy::pack::savesFolder(app.library);
+        std::filesystem::create_directories(folder);
+        beginPlay(app, viceroy::Game(std::move(save), app.art->rules), newGameSlot(folder));
+    } catch (const std::exception& e) {
+        SDL_Log("No new game: %s", e.what());
+        showTitle(app);
+        if (app.mainMenu) {
+            app.mainMenu->say(std::string("Cannot start a game: ") + e.what());
+        }
+    }
+    app.newGame.reset();
+}
+
 void pickTitle(App& app, viceroy::TitleChoice choice) {
     if (choice == viceroy::TitleChoice::Load) {
         showLoadMenu(app);
+    } else if (choice == viceroy::TitleChoice::America) {
+        try {
+            if (!app.newGameArt) {
+                app.newGameArt = std::make_unique<viceroy::NewGameArt>(
+                    viceroy::loadNewGameArt(viceroy::pack::baseFolder(app.library)));
+            }
+            app.newGame = std::make_unique<viceroy::NewGameFlow>(*app.art);
+            app.mode = Mode::NewGame;
+        } catch (const std::exception& e) {
+            app.mainMenu->say(std::string("Cannot start a game: ") + e.what());
+        }
     } else {
         app.mainMenu->say("Not in Viceroy yet.");
+    }
+}
+
+// After a key or click in the new game screens.
+void afterNewGameStep(App& app) {
+    if (!app.newGame) {
+        return;
+    }
+    using Step = viceroy::NewGameFlow::Step;
+    if (app.newGame->typing()) {
+        SDL_StartTextInput(app.window);
+    } else {
+        SDL_StopTextInput(app.window);
+    }
+    if (app.newGame->step() == Step::Cancelled) {
+        app.newGame.reset();
+        showTitle(app);
+    } else if (app.newGame->step() == Step::Done) {
+        startNewGame(app);
     }
 }
 
@@ -211,13 +299,7 @@ void openLibrary(App& app) {
 
 void startGame(App& app, const viceroy::SaveSlot& slot) {
     try {
-        viceroy::Game game(viceroy::readSaveGame(readAll(slot.path)), app.art->rules);
-        app.play = std::make_unique<viceroy::PlayScreen>(std::move(game), slot.path);
-        app.play->setAnimations(true);
-        app.play->setColonyNames(&app.art->colonyNames);
-        app.play->setColonyArt(app.colonyArt.get());
-        app.play->setArt(app.art.get());
-        app.mode = Mode::Play;
+        beginPlay(app, viceroy::Game(viceroy::readSaveGame(readAll(slot.path)), app.art->rules), slot.path);
     } catch (const viceroy::FormatError& e) {
         app.status = std::string("Cannot read this savegame: ") + e.what();
     }
@@ -450,6 +532,10 @@ void send(App& app, Command command) {
             startGame(app, *slot);
         }
         break;
+    case Mode::NewGame:
+        app.newGame->handle(command);
+        afterNewGameStep(app);
+        break;
     case Mode::Play:
         if (app.debug.open()) {
             const std::string result = app.debug.handle(command, *app.play);
@@ -486,6 +572,11 @@ void click(App& app, float wx, float wy) {
         if (auto slot = app.load->click(static_cast<int>(x), static_cast<int>(y))) {
             startGame(app, *slot);
         }
+        return;
+    }
+    if (app.mode == Mode::NewGame) {
+        app.newGame->click(static_cast<int>(x), static_cast<int>(y));
+        afterNewGameStep(app);
         return;
     }
     if (app.mode != Mode::Play) {
@@ -551,6 +642,8 @@ void present(App& app) {
         app.intro->draw(app.screen, *app.title);
     } else if (app.mode == Mode::Title) {
         app.mainMenu->draw(app.screen, *app.art, *app.title, app.intro.get());
+    } else if (app.mode == Mode::NewGame) {
+        app.newGame->draw(app.screen, *app.art, *app.newGameArt);
     } else if (app.mode == Mode::Load) {
         app.load->draw(app.screen, *app.art);
         if (!app.status.empty()) {
@@ -642,8 +735,16 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
             showTitle(*app);
             break;
         }
+        if (app->mode == Mode::NewGame && app->newGame->typing() && event->key.key == SDLK_BACKSPACE) {
+            app->newGame->backspace();
+            break;
+        }
+        if (app->mode == Mode::NewGame && app->newGame->typing() && event->key.key != SDLK_RETURN &&
+            event->key.key != SDLK_KP_ENTER && event->key.key != SDLK_ESCAPE) {
+            break; // the letters come as text
+        }
         if (event->key.key == SDLK_ESCAPE) {
-            if (app->mode == Mode::Play || (app->mode == Mode::Load && app->title)) {
+            if (app->mode == Mode::Play || app->mode == Mode::NewGame || (app->mode == Mode::Load && app->title)) {
                 send(*app, Command::Cancel);
                 break;
             }
@@ -687,6 +788,13 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
             }
         }
         break;
+    case SDL_EVENT_TEXT_INPUT:
+        if (app->mode == Mode::NewGame && event->text.text != nullptr) {
+            for (const char* c = event->text.text; *c != '\0'; ++c) {
+                app->newGame->type(*c);
+            }
+        }
+        break;
     case SDL_EVENT_MOUSE_MOTION:
         app->pointerShown = true;
         SDL_RenderCoordinatesFromWindow(app->renderer, event->motion.x, event->motion.y, &app->pointerX,
@@ -717,11 +825,12 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
             }
             break;
         }
-        if ((app->mode == Mode::Load || app->mode == Mode::Title) && event->gbutton.button == SDL_GAMEPAD_BUTTON_SOUTH) {
+        if ((app->mode == Mode::Load || app->mode == Mode::Title || app->mode == Mode::NewGame) &&
+            event->gbutton.button == SDL_GAMEPAD_BUTTON_SOUTH) {
             send(*app, Command::Confirm);
             break;
         }
-        if (app->mode == Mode::Load && event->gbutton.button == SDL_GAMEPAD_BUTTON_EAST) {
+        if ((app->mode == Mode::Load || app->mode == Mode::NewGame) && event->gbutton.button == SDL_GAMEPAD_BUTTON_EAST) {
             send(*app, Command::Cancel);
             break;
         }
@@ -804,6 +913,10 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
     app->lastTicks = now;
     if (app->mode == Mode::Play) {
         app->play->tick(elapsed);
+    }
+    if (app->mode == Mode::NewGame) {
+        app->newGame->tick(elapsed);
+        afterNewGameStep(*app);
     }
     if (app->mode == Mode::Intro) {
         app->intro->tick(elapsed);

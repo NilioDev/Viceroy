@@ -10,7 +10,9 @@ savegames, scaled sharply to any screen and with gamepad, mouse, keyboard and
 touch controls.
 
 > [!NOTE]
-> **Status: first playable steps.** Load one of your savegames, move your
+> **Status: first playable steps.** Start a new game on the map of America
+> (difficulty, nation and name, the king's audience and the departure, as
+> in the original) or load one of your savegames, move your
 > units over the original map, board ships and make landfall, found
 > colonies, look inside your colonies, end turns and save. The colony screen
 > shows its buildings, people, what they produce and the warehouse; give
@@ -52,14 +54,17 @@ and download one at the bottom of the page.
 ## Controls
 
 When the game files are in place, Viceroy plays the original's opening and
-then shows its main menu. For now only **LOAD Game** works there; starting a
-new game comes later.
+then shows its main menu. **Start a Game in AMERICA** and **LOAD Game** work
+there; the New World maps and the customizing come later. A new game is
+saved in the first free slot, or over the savegame saved longest ago.
 
 | Action | Keyboard | Gamepad |
 | --- | --- | --- |
 | Skip the opening | Any key, or click | Any button |
 | Pick in the main menu or the load menu | Up / Down and Enter, or click | D-pad and A |
 | Back from the load menu to the main menu | Esc | B |
+| New game: pick the difficulty and the nation | Arrow keys and Enter, or click and then *Click Here When Finished* | D-pad and A |
+| New game: type your name | Letters, Backspace, Enter | A keeps the leader's name |
 | Move the active unit | Numeric keypad 1-9, arrow keys, Home / PgUp / End / PgDn for diagonals, or click a square next to it | Left stick or D-pad |
 | Move the map | Click any other square to bring it to the middle, or click the small map | Right stick |
 | No orders this turn | Space | A |

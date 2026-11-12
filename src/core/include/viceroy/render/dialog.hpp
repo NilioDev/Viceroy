@@ -60,4 +60,12 @@ int dialogOptionAt(const Dialog& dialog, int x, int y);
 
 void drawDialog(Screen& screen, const Art& art, const Dialog& dialog);
 
+// The pieces boxes are made of, for screens that lay out GAME.TXT text
+// themselves: the width of text without its {braces}, wrapping (a line
+// breaks when the next word would make it wider than `limit`), and drawing
+// in the box colours, gold between braces (`gold` carries over lines).
+int markedWidth(const Font& font, const std::string& text);
+std::vector<std::string> wrapMarkedText(const Font& font, const std::string& text, int limit);
+void drawMarkedText(Screen& screen, const Font& font, int x, int y, const std::string& line, bool& gold);
+
 } // namespace viceroy

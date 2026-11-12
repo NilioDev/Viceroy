@@ -24,6 +24,7 @@ add_library(vcr_core STATIC
     src/render/menu_bar.cpp
     src/ui/play.cpp
     src/ui/title.cpp
+    src/ui/new_game_flow.cpp
     src/ui/debug_menu.cpp
 )
 add_library(viceroy::core ALIAS vcr_core)

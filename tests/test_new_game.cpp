@@ -140,3 +140,69 @@ VCR_TEST("original files: a new game on America starts as the original's") {
     VCR_CHECK(game.isAboard(10) && game.isAboard(11));
     VCR_CHECK(!game.isAboard(9));
 }
+
+#include "viceroy/ui/new_game_flow.hpp"
+
+VCR_TEST("original files: the screens of a new game, from the map to the departure") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    const NewGameArt pictures = loadNewGameArt(dir);
+    NewGameFlow flow(art);
+    using Step = NewGameFlow::Step;
+    Screen screen;
+    flow.draw(screen, art, pictures);
+    flow.handle(Command::Confirm); // the original map
+    VCR_CHECK(flow.step() == Step::Difficulty);
+    flow.handle(Command::Right);
+    flow.handle(Command::Right);
+    VCR_CHECK(flow.difficulty() == 2);
+    flow.draw(screen, art, pictures);
+    VCR_CHECK(screen.at(23, 103) == 14); // the conquistador's yellow frame
+    flow.handle(Command::Confirm);
+    VCR_CHECK(flow.step() == Step::Nation);
+    flow.handle(Command::Down); // England to Spain: the flags lie in a square
+    VCR_CHECK(flow.nation() == 2);
+    flow.handle(Command::Right);
+    VCR_CHECK(flow.nation() == 3);
+    flow.handle(Command::Confirm);
+    VCR_CHECK(flow.step() == Step::Name && flow.typing());
+    VCR_CHECK(flow.name() == "Michiel De Ruyter");
+    for (int i = 0; i < 30; ++i) {
+        flow.backspace();
+    }
+    for (const char c : std::string("Piet Hein")) {
+        flow.type(c);
+    }
+    flow.draw(screen, art, pictures);
+    flow.handle(Command::Confirm);
+    VCR_CHECK(flow.step() == Step::NationPage1);
+    flow.draw(screen, art, pictures);
+    flow.handle(Command::Confirm);
+    flow.handle(Command::Confirm);
+    VCR_CHECK(flow.step() == Step::Audience);
+    flow.draw(screen, art, pictures);
+    flow.handle(Command::Confirm);
+    VCR_CHECK(flow.step() == Step::Departure);
+    flow.tick(20000);
+    flow.draw(screen, art, pictures);
+    flow.tick(100000);
+    VCR_CHECK(flow.step() == Step::Done);
+    const auto setup = flow.setup();
+    VCR_CHECK(setup.humanNation == 3 && setup.difficulty == 2);
+    VCR_CHECK(setup.leaders[3] == "Piet Hein" && setup.leaders[0] == "Walter Raleigh");
+}
+
+VCR_TEST("original files: Escape leaves the new game screens") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    NewGameFlow flow(art);
+    flow.handle(Command::Confirm);
+    flow.handle(Command::Cancel);
+    VCR_CHECK(flow.step() == NewGameFlow::Step::Cancelled);
+}

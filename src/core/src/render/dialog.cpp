@@ -108,6 +108,18 @@ int boxWidth(const Dialog& d) {
 
 } // namespace
 
+int markedWidth(const Font& font, const std::string& text) {
+    return plainWidth(font, text);
+}
+
+std::vector<std::string> wrapMarkedText(const Font& font, const std::string& text, int limit) {
+    return wrap(font, text, limit);
+}
+
+void drawMarkedText(Screen& screen, const Font& font, int x, int y, const std::string& line, bool& gold) {
+    drawMarkedLine(screen, font, x, y, line, gold);
+}
+
 Dialog makeDialog(const Art& art, std::string_view section, const std::vector<std::string>& strings,
                   const std::vector<int>& numbers) {
     Dialog d;
