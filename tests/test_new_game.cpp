@@ -3,7 +3,15 @@
 
 #include "viceroy/data/reader.hpp"
 #include "viceroy/game/new_game.hpp"
+#include "viceroy/game/game.hpp"
 #include "viceroy/game/resource.hpp"
+#include "viceroy/game_files.hpp"
+#include "viceroy/render/game_view.hpp"
+
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
 
 using namespace viceroy;
 
@@ -65,4 +73,70 @@ VCR_TEST("new game: open sea far from land has no fish") {
             VCR_CHECK(((map.at(x, y).flags & 4) != 0) == !nearLand);
         }
     }
+}
+
+VCR_TEST("new game: settlements are placed near their sites, apart, with braves") {
+    auto file = mapFile(58, 72, 3); // grassland everywhere
+    auto map = readMapFile(file);
+    prepareStartingMap(map);
+    std::vector<Tribe> tribes(8);
+    tribes[0].level = 3;
+    NewGameRandom random(12345);
+    const auto settlements = placeAmericaSettlements(map, tribes, random);
+    VCR_CHECK(settlements.size() == 56);
+    int capitals = 0;
+    for (std::size_t i = 0; i < settlements.size(); ++i) {
+        const auto& s = settlements[i];
+        VCR_CHECK(map.at(s.x, s.y).isLand());
+        capitals += s.raw[3] == 4 ? 1 : 0;
+        for (std::size_t j = 0; j < i; ++j) {
+            const auto& o = settlements[j];
+            VCR_CHECK(std::abs(o.x - s.x) > 1 || std::abs(o.y - s.y) > 1);
+        }
+    }
+    VCR_CHECK(capitals == 8);
+    VCR_CHECK(settlements.front().nation == 4 && settlements.front().population == 9);
+    VCR_CHECK(settlements.back().nation == 11 && settlements.back().population == 3);
+    const auto braves = settlementBraves(settlements);
+    VCR_CHECK(braves.size() == 56 && braves[5].x == settlements[5].x && braves[5].raw[6] == 5);
+}
+
+VCR_TEST("new game: no settlement on water") {
+    auto map = readMapFile(mapFile(58, 72, 25));
+    NewGameRandom random(1);
+    VCR_CHECK(placeAmericaSettlements(map, {}, random).empty());
+}
+
+VCR_TEST("original files: a new game on America starts as the original's") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    std::ifstream in(*findFileNoCase(dir, "AMER2.MP"), std::ios::binary);
+    const Bytes file(std::istreambuf_iterator<char>(in), {});
+    NewGameSetup setup;
+    setup.humanNation = 3;
+    setup.seed = 99;
+    for (int n = 0; n < 4; ++n) {
+        setup.leaders[static_cast<std::size_t>(n)] = textLine(art.names, "LEADERNAME", n, "");
+        setup.countries[static_cast<std::size_t>(n)] = textLine(art.names, "COLONYNAME", n, "");
+    }
+    const auto save = newAmericaGame(file, art.rules, setup);
+    VCR_CHECK(save.map.width == 58 && save.map.height == 72);
+    VCR_CHECK(save.units.size() == 12 + save.settlements.size());
+    VCR_CHECK(save.settlements.size() >= 54);
+    VCR_CHECK(save.players[3].name == "Michiel De Ruyter" && save.players[0].country == "New England");
+    VCR_CHECK(save.nations[3].gold == 1000 && save.nations[0].gold == 0);
+    VCR_CHECK(save.units[9].type == 14 && save.activeUnit == 9);
+    for (const auto& s : save.settlements) {
+        VCR_CHECK(save.map.at(s.x, s.y).isLand() && !save.map.at(s.x, s.y).mountains());
+    }
+    // It saves and loads back, and a game can be played from it.
+    const auto again = readSaveGame(writeSaveGame(save));
+    VCR_CHECK(again.units.size() == save.units.size() && again.map.resourceSeed == save.map.resourceSeed);
+    VCR_CHECK(again.humanNation == 3 && again.year == 1492);
+    Game game(again, art.rules);
+    VCR_CHECK(game.isAboard(10) && game.isAboard(11));
+    VCR_CHECK(!game.isAboard(9));
 }

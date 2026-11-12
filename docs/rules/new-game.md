@@ -47,9 +47,38 @@ Dutch. The colonists' professions were the same in both games:
 | Spanish | veteran soldier | free colonist |
 | Dutch | veteran soldier | free colonist |
 
-The natives start with 56 settlements, in the same order and tribes in both
-games but at places that differ by a square or so, and one brave (type 19)
-for each settlement.
+## The natives at the start
+
+Compared over eight new games. The natives have 56 sites, always in the
+same order and for the same tribes: 5 Inca, 3 Aztec, 5 Arawak, 11
+Iroquois, 4 Cherokee, 7 Apache, 7 Sioux and 14 Tupi. The first site of each
+tribe is its capital (byte 3 is 4). Each site lands within two squares of
+its own middle square, on land without hills or mountains (rivers are
+fine), never next to another settlement. Viceroy keeps the middle squares
+it measured and draws the offset at random, trying again when the square
+does not fit; a site that finds no square is left out. *Not yet known:* in
+three of the eight games the 55th site, (41, 40), was missing, which
+Viceroy's rule leaves out only in about one game in fifteen.
+
+A settlement's size (byte 4) is 3 + 2 × the tribe's level from `@TRIBES`
+(9 for the Inca down to 3 for the nomads); the capital repeats it in byte
+6. Byte 5 (the mission) and bytes 7 to 9 are 0xFF.
+
+Each settlement has one brave (unit type 19) on its square, with its home
+settlement's index in byte 6. In the saves the braves had already taken
+their first walk; Viceroy starts them at home.
+
+The units come in the order ship, pioneer, soldier for each nation, then
+the braves. The pioneer carries 100 tools, and pioneer and soldier are on
+sentry aboard the ship. The human player's ship is the active unit, and
+the squares around it are explored.
+
+## What Viceroy leaves empty
+
+The low nibble of the "seen" layer (set on most land in a new game), mask
+bit 0x20, the block of tribe data after the settlements, most of the
+header and the block after the map are not understood yet and start at
+zero, apart from the seed of the resource pattern.
 
 ## The nations at the start
 
@@ -71,4 +100,6 @@ Compared over four new games (bytes of the nation record, see
   values (51, 56), (37, 14), (56, 42) and (47, 28), dealt out to the nations
   at random.
 - The three recruits waiting on the docks are random for the computer
-  nations. For the Dutch human player they were the same in all four games.
+  nations, though the first was always the same for each nation (25, 25,
+  24 and 13). For the Dutch human player all three were the same in all
+  four games (13, 0, 22). Viceroy draws the other two at random.
