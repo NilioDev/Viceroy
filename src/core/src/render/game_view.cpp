@@ -361,6 +361,8 @@ Art loadArt(const std::filesystem::path& folder) {
     art.colonyNames = parseTextFile(readFile(folder, "COLONY.TXT"));
     art.labelText = parseTextFile(readFile(folder, "LABELS.TXT"));
     art.gameText = parseTextFile(readFile(folder, "GAME.TXT"));
+    art.menus = readMenus(parseTextFile(readFile(folder, "MENU.TXT")));
+    placeMenus(art, art.menus);
     art.portraits.push_back(readSpriteSheet(readFile(folder, "MSS0.SS")));
     art.portraits.push_back(readSpriteSheet(readFile(folder, "MSS2.SS")));
     art.rules = readRuleset(art.names);
@@ -496,19 +498,7 @@ void drawMap(Screen& screen, const Art& art, const Game& game, const ViewState& 
 }
 
 void drawMenuBar(Screen& screen, const Art& art) {
-    screen.tile(art.wood, {0, 0, Screen::kWidth, 7});
-    screen.fill({0, 7, Screen::kWidth, 1}, kBlack);
-    struct Item {
-        const char* text;
-        int x;
-    };
-    static constexpr Item kItems[] = {{"GAME", 13},   {"VIEW", 45},  {"ORDERS", 77},
-                                      {"REPORTS", 115}, {"TRADE", 157}, {"COLONIZOPEDIA", 255}};
-    for (const auto& item : kItems) {
-        const std::string text = item.text;
-        const int x = screen.text(art.tiny, item.x, 1, text.substr(0, 1), {kGold, kNoColour, kNoColour});
-        screen.text(art.tiny, x, 1, text.substr(1), {kGreen, kNoColour, kNoColour});
-    }
+    drawMenuBar(screen, art, art.menus, nullptr);
 }
 
 void drawPanel(Screen& screen, const Art& art, const Game& game, const ViewState& view) {

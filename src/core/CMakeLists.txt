@@ -19,6 +19,7 @@ add_library(vcr_core STATIC
     src/render/colony_view.cpp
     src/render/europe_view.cpp
     src/render/dialog.cpp
+    src/render/menu_bar.cpp
     src/ui/play.cpp
     src/ui/debug_menu.cpp
 )

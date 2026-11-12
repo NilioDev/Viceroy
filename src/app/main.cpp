@@ -22,6 +22,7 @@
 #include "viceroy/version.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
@@ -284,6 +285,8 @@ std::optional<Command> keyCommand(const SDL_KeyboardEvent& key) {
         return Command::Train;
     case SDLK_TAB:
         return (key.mod & SDL_KMOD_SHIFT) ? Command::PreviousUnit : Command::NextUnit;
+    case SDLK_F10:
+        return Command::Menu;
     default:
         return std::nullopt;
     }
@@ -320,7 +323,7 @@ std::optional<Command> buttonCommand(Uint8 button, bool waitingForEndOfTurn, boo
     case SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER:
         return Command::NextUnit;
     case SDL_GAMEPAD_BUTTON_START:
-        return Command::Save;
+        return Command::Menu;
     case SDL_GAMEPAD_BUTTON_BACK:
         return Command::ViewMode;
     case SDL_GAMEPAD_BUTTON_LEFT_STICK:
@@ -403,6 +406,12 @@ void click(App& app, float wx, float wy) {
                     send(app, kButtons[i]);
                 }
             }
+        }
+        return;
+    }
+    if (!app.debug.open() && app.play->clickMenu(static_cast<int>(x), static_cast<int>(y))) {
+        if (app.play->loadRequested()) {
+            showLoadMenu(app);
         }
         return;
     }
@@ -532,13 +541,46 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
             chooseZip(*app);
             break;
         }
+        if (app->mode == Mode::Play && !app->debug.open()) {
+            // Alt and a title's gold letter open that menu; with a menu
+            // open, a letter picks its entry.
+            const SDL_Keycode k = event->key.key;
+            const bool letter = k >= SDLK_A && k <= SDLK_Z;
+            if (letter && (event->key.mod & SDL_KMOD_ALT) && app->art) {
+                for (std::size_t i = 0; i < app->art->menus.size(); ++i) {
+                    const auto& title = app->art->menus[i].title;
+                    const auto mark = title.find('~');
+                    if (mark != std::string::npos && mark + 1 < title.size() &&
+                        std::toupper(static_cast<unsigned char>(title[mark + 1])) == static_cast<int>('A' + (k - SDLK_A))) {
+                        app->play->openMenu(static_cast<int>(i), true);
+                        break;
+                    }
+                }
+                break;
+            }
+            if (letter && app->play->menu()) {
+                app->play->menuLetter(static_cast<char>('A' + (k - SDLK_A)));
+                if (app->play->loadRequested()) {
+                    showLoadMenu(*app);
+                } else if (app->play->quitRequested()) {
+                    return SDL_APP_SUCCESS;
+                }
+                break;
+            }
+        }
         if (auto command = keyCommand(event->key)) {
             send(*app, *command);
+            if (app->mode == Mode::Play && app->play->quitRequested()) {
+                return SDL_APP_SUCCESS;
+            }
         }
         break;
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
         if (event->button.button == SDL_BUTTON_LEFT) {
             click(*app, event->button.x, event->button.y);
+            if (app->mode == Mode::Play && app->play->quitRequested()) {
+                return SDL_APP_SUCCESS;
+            }
         }
         break;
     case SDL_EVENT_GAMEPAD_BUTTON_DOWN: {
@@ -563,6 +605,7 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
         if (playing && event->gbutton.button == SDL_GAMEPAD_BUTTON_START) {
             SDL_Gamepad* pad = SDL_GetGamepadFromID(event->gbutton.which);
             if (pad != nullptr && SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_BACK)) {
+                app->play->closeMenu();
                 app->debug.toggle(*app->play);
                 break;
             }
@@ -581,9 +624,12 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
         }
         const bool pointing =
             playing && (app->play->colonyScreen() || app->play->europeScreen() || app->play->dialog() ||
-                        app->play->viewMode());
+                        app->play->viewMode() || app->play->menu());
         if (auto command = buttonCommand(event->gbutton.button, playing && app->play->waitingForEndOfTurn(), pointing)) {
             send(*app, *command);
+            if (app->mode == Mode::Play && app->play->quitRequested()) {
+                return SDL_APP_SUCCESS;
+            }
         }
         break;
     }

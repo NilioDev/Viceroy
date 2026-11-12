@@ -10,6 +10,7 @@
 #include "viceroy/render/dialog.hpp"
 #include "viceroy/render/europe_view.hpp"
 #include "viceroy/render/game_view.hpp"
+#include "viceroy/render/menu_bar.hpp"
 
 #include <cstdint>
 #include <filesystem>
@@ -51,6 +52,7 @@ enum class Command {
     Recruit,  // R, P, T: the buttons in Europe
     Purchase,
     Train,
+    Menu, // F10: the menu bar
 };
 
 // The main map screen while playing.
@@ -105,6 +107,22 @@ public:
     void setAnimations(bool on) { animations_ = on; }
     bool animating() const { return slide_.has_value(); }
 
+    // The menu bar. Needs setArt. A menu opened from the keyboard or a
+    // gamepad starts with its first entry highlighted.
+    void openMenu(int index, bool keyboard);
+    void closeMenu() { menu_.reset(); }
+    const std::optional<OpenMenu>& menu() const { return menu_; }
+    // A click while playing on the main screen: the menu bar, an open
+    // menu, or neither (false: the click is for the map).
+    bool clickMenu(int x, int y);
+    // A letter typed while a menu is open picks the entry with that gold
+    // letter.
+    void menuLetter(char letter);
+    // Exit to DOS was picked.
+    bool quitRequested() const { return quit_; }
+    // Load Game was picked with the mouse: back to the load menu.
+    bool loadRequested() const { return quitToLoad_; }
+
 private:
     struct Slide {
         int unit = -1;
@@ -114,6 +132,11 @@ private:
         bool advanceAfter = false; // the unit's moves are used up
     };
     void finishSlide();
+    std::vector<EntryState> menuStates(int index) const;
+    bool handleMenu(Command command);
+    bool pickMenuEntry(int entry); // false: back to the load menu
+    void stepMenu(int delta);
+    void notYet();
     void moveActive(Step step);
     void activate(int index);
     void advance(); // to the next unit that needs orders
@@ -149,6 +172,9 @@ private:
     int cursorY_ = 0;
     bool animations_ = false;
     std::optional<Slide> slide_;
+    std::optional<OpenMenu> menu_;
+    bool quit_ = false;
+    bool quitToLoad_ = false;
 };
 
 // One line of the load menu.

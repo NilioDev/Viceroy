@@ -77,7 +77,8 @@ and download one at the bottom of the page.
 | In Europe: Recruit, Purchase, Train | R, P, T, or click the button | D-pad up to the buttons, then A |
 | Close the Europe screen | Esc, or click Exit | B |
 | Answer a question | Up / Down and Enter | D-pad and A |
-| Save the game | Ctrl+S | Start |
+| Open the menu bar (Game, View, Orders, Reports, Trade, Colonizopedia) | Click a title, F10, or Alt and the title's gold letter; then the arrow keys and Enter, or a gold letter | Start, then the D-pad and A |
+| Save the game | Ctrl+S, or Game, Save Game | Start, then Save Game |
 | Back to the load menu | Esc | Guide |
 
 **Debug menu.** F12, or Back and Start together on a gamepad, opens a menu

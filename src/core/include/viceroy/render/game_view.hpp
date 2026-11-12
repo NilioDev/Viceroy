@@ -9,6 +9,7 @@
 #include "viceroy/data/image.hpp"
 #include "viceroy/data/text_table.hpp"
 #include "viceroy/game/game.hpp"
+#include "viceroy/render/menu_bar.hpp"
 #include "viceroy/render/screen.hpp"
 
 #include <filesystem>
@@ -32,6 +33,7 @@ struct Art {
     TextFile colonyNames; // COLONY.TXT
     TextFile labelText;   // LABELS.TXT: words on the screens
     TextFile gameText;    // GAME.TXT: the messages
+    std::vector<MenuDef> menus; // MENU.TXT: the menu bar
     std::vector<SpriteSheet> portraits; // advisors: MSS0.SS, ...
     Ruleset rules;
 };

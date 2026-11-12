@@ -7,6 +7,7 @@
 #include "viceroy/game_files.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <fstream>
 #include <iterator>
 
@@ -644,6 +645,9 @@ bool PlayScreen::handle(Command command) {
     if (dialog_) {
         return handleDialog(command);
     }
+    if (menu_) {
+        return handleMenu(command);
+    }
     if (europeScreen_) {
         return handleEuropeScreen(command);
     }
@@ -652,6 +656,10 @@ bool PlayScreen::handle(Command command) {
     }
     if (command == Command::Europe) {
         openEurope();
+        return true;
+    }
+    if (command == Command::Menu) {
+        openMenu(0, true);
         return true;
     }
     if (viewMode_) {
@@ -861,6 +869,9 @@ void PlayScreen::finishSlide() {
 
 void PlayScreen::draw(Screen& screen, const Art& art) const {
     drawScreen(screen, art);
+    if (menu_ && !colonyScreen_ && !europeScreen_) {
+        drawMenuBar(screen, art, art.menus, &*menu_);
+    }
     if (dialog_) {
         drawDialog(screen, art, *dialog_);
     }
@@ -965,6 +976,301 @@ void LoadMenu::draw(Screen& screen, const Art& art) const {
         screen.text(art.tiny, box.x + 8, y, slots_[i].label,
                     {selected ? kBlack : kGreen, kNoColour, kNoColour});
     }
+}
+
+} // namespace viceroy
+
+// --- The menu bar -------------------------------------------------------------
+
+namespace viceroy {
+namespace {
+
+// Rows of the menus in MENU.TXT that Viceroy acts on.
+namespace game_menu {
+constexpr int kSave = 4;
+constexpr int kLoad = 5;
+constexpr int kExit = 8;
+} // namespace game_menu
+namespace view_menu {
+constexpr int kMovePieces = 0;
+constexpr int kViewPieces = 1;
+constexpr int kCentre = 11;
+} // namespace view_menu
+namespace orders_menu {
+constexpr int kActivate = 0;
+constexpr int kWait = 1;
+constexpr int kFortify = 2;
+constexpr int kUnfortify = 3; // a second "Fortify" row, not seen yet
+constexpr int kSentry = 4;
+constexpr int kBuildColony = 5;
+constexpr int kJoinColony = 6;
+constexpr int kClearForest = 7;
+constexpr int kPlow = 8;
+constexpr int kRoad = 9;
+constexpr int kLoad = 10;
+constexpr int kUnload = 11;
+constexpr int kPillage = 12;
+constexpr int kGoToPort = 13;
+constexpr int kGoToPlace = 14;
+constexpr int kTradeRoute = 15;
+constexpr int kReturnToEurope = 16;
+constexpr int kNoOrders = 17;
+constexpr int kDump = 18;
+constexpr int kDisband = 19;
+} // namespace orders_menu
+constexpr int kHiddenPedia = 6; // Miscellaneous and Complete are not shown
+constexpr std::uint8_t kSeaLaneTerrain = 26;
+
+} // namespace
+
+std::vector<EntryState> PlayScreen::menuStates(int index) const {
+    std::vector<EntryState> states;
+    if (art_ == nullptr || index < 0 || index >= static_cast<int>(art_->menus.size())) {
+        return states;
+    }
+    const auto& def = art_->menus[static_cast<std::size_t>(index)];
+    states.assign(def.entries.size(), EntryState::Enabled);
+    if (def.section == "PEDIA") {
+        for (std::size_t i = kHiddenPedia; i < states.size(); ++i) {
+            states[i] = EntryState::Hidden;
+        }
+    }
+    if (def.section != "ORDERS") {
+        return states;
+    }
+    // The orders depend on the active unit. Seen in the original for a
+    // frigate at sea; the rest follows the manual and is not yet checked.
+    using namespace orders_menu;
+    auto set = [&](int row, EntryState state) {
+        if (row < static_cast<int>(states.size())) {
+            states[static_cast<std::size_t>(row)] = state;
+        }
+    };
+    const int active = game_.activeUnit();
+    set(kUnfortify, EntryState::Hidden);
+    if (active < 0 || !game_.onMap(active)) {
+        for (auto& s : states) {
+            s = s == EntryState::Hidden ? s : EntryState::Disabled;
+        }
+        set(kBuildColony, EntryState::Hidden);
+        set(kJoinColony, EntryState::Hidden);
+        set(kClearForest, EntryState::Hidden);
+        set(kPillage, EntryState::Hidden);
+        set(kGoToPlace, EntryState::Hidden);
+        return states;
+    }
+    const auto& u = game_.unit(active);
+    const bool ship = game_.isShip(active);
+    const bool wagon = u.type == unit_type::kWagonTrain;
+    const bool pioneer = u.type == unit_type::kPioneer;
+    const bool military = game_.rules().units[static_cast<std::size_t>(u.type)].attack > 0;
+    const auto& square = game_.state().map.at(u.x, u.y);
+    const bool inColony = game_.colonyAt(u.x, u.y).has_value();
+
+    if (ship) {
+        set(kBuildColony, EntryState::Hidden);
+        set(kJoinColony, EntryState::Hidden);
+    } else {
+        set(inColony ? kBuildColony : kJoinColony, EntryState::Hidden);
+        const int row = inColony ? kJoinColony : kBuildColony;
+        set(row, game_.canFoundColony(active) == FoundResult::Founded || inColony ? EntryState::Enabled
+                                                                                 : EntryState::Disabled);
+    }
+    set(square.isForest() ? kPlow : kClearForest, EntryState::Hidden);
+    set(square.isForest() ? kClearForest : kPlow, pioneer ? EntryState::Enabled : EntryState::Disabled);
+    set(kRoad, pioneer ? EntryState::Enabled : EntryState::Disabled);
+    const bool cargo = (ship || wagon) && u.holds > 0;
+    set(kLoad, (ship || wagon) && inColony ? EntryState::Enabled : EntryState::Disabled);
+    set(kUnload, cargo && inColony ? EntryState::Enabled : EntryState::Disabled);
+    set(kPillage, military && !ship ? EntryState::Enabled : EntryState::Hidden);
+    set(kGoToPort, ship ? EntryState::Enabled : EntryState::Hidden);
+    set(kGoToPlace, ship ? EntryState::Hidden : EntryState::Enabled);
+    set(kTradeRoute, ship || wagon ? EntryState::Enabled : EntryState::Hidden);
+    set(kReturnToEurope, !ship ? EntryState::Hidden
+                         : square.terrain == kSeaLaneTerrain ? EntryState::Enabled
+                                                             : EntryState::Disabled);
+    set(kDump, !(ship || wagon) ? EntryState::Hidden : cargo ? EntryState::Enabled : EntryState::Disabled);
+    return states;
+}
+
+void PlayScreen::openMenu(int index, bool keyboard) {
+    if (art_ == nullptr || index < 0 || index >= static_cast<int>(art_->menus.size()) || slide_ || dialog_ ||
+        colonyScreen_ || europeScreen_) {
+        return;
+    }
+    OpenMenu open;
+    open.menu = index;
+    open.states = menuStates(index);
+    menu_ = std::move(open);
+    if (keyboard) {
+        stepMenu(1);
+    }
+}
+
+void PlayScreen::stepMenu(int delta) {
+    if (!menu_) {
+        return;
+    }
+    const int n = static_cast<int>(menu_->states.size());
+    int i = menu_->selected;
+    for (int tries = 0; tries < n; ++tries) {
+        i = i < 0 ? (delta > 0 ? 0 : n - 1) : (i + delta + n) % n;
+        if (menu_->states[static_cast<std::size_t>(i)] == EntryState::Enabled) {
+            menu_->selected = i;
+            return;
+        }
+    }
+}
+
+bool PlayScreen::handleMenu(Command command) {
+    const int count = static_cast<int>(art_->menus.size());
+    switch (command) {
+    case Command::MoveN:
+    case Command::Up:
+        stepMenu(-1);
+        return true;
+    case Command::MoveS:
+    case Command::Down:
+        stepMenu(1);
+        return true;
+    case Command::MoveW:
+    case Command::Left:
+        openMenu((menu_->menu + count - 1) % count, true);
+        return true;
+    case Command::MoveE:
+    case Command::Right:
+        openMenu((menu_->menu + 1) % count, true);
+        return true;
+    case Command::Confirm:
+        return pickMenuEntry(menu_->selected);
+    case Command::Cancel:
+    case Command::Menu:
+        menu_.reset();
+        return true;
+    default:
+        return true;
+    }
+}
+
+bool PlayScreen::clickMenu(int x, int y) {
+    if (art_ == nullptr || slide_ || dialog_ || colonyScreen_ || europeScreen_) {
+        return false;
+    }
+    const int title = menuTitleAt(*art_, art_->menus, x, y);
+    if (title >= 0) {
+        if (menu_ && menu_->menu == title) {
+            menu_.reset();
+        } else {
+            openMenu(title, false);
+        }
+        return true;
+    }
+    if (!menu_) {
+        return false;
+    }
+    const auto& def = art_->menus[static_cast<std::size_t>(menu_->menu)];
+    const int entry = menuEntryAt(*art_, def, *menu_, x, y);
+    const Rect box = menuBox(*art_, def, *menu_);
+    if (entry >= 0) {
+        if (!pickMenuEntry(entry)) {
+            quitToLoad_ = true;
+        }
+    } else if (x < box.x || x >= box.x + box.w || y < box.y || y >= box.y + box.h) {
+        menu_.reset(); // a click outside closes the menu
+    }
+    return true;
+}
+
+void PlayScreen::menuLetter(char letter) {
+    if (!menu_ || art_ == nullptr) {
+        return;
+    }
+    const auto& def = art_->menus[static_cast<std::size_t>(menu_->menu)];
+    const char upper = static_cast<char>(std::toupper(static_cast<unsigned char>(letter)));
+    for (int i = 0; i < static_cast<int>(def.entries.size()); ++i) {
+        if (def.entries[static_cast<std::size_t>(i)].hotkey == upper &&
+            menu_->states[static_cast<std::size_t>(i)] == EntryState::Enabled) {
+            menu_->selected = i;
+            if (!pickMenuEntry(i)) {
+                quitToLoad_ = true;
+            }
+            return;
+        }
+    }
+}
+
+void PlayScreen::notYet() {
+    say("Not in Viceroy yet.");
+}
+
+bool PlayScreen::pickMenuEntry(int entry) {
+    if (!menu_ || entry < 0 || entry >= static_cast<int>(menu_->states.size()) ||
+        menu_->states[static_cast<std::size_t>(entry)] != EntryState::Enabled) {
+        return true;
+    }
+    const std::string section = art_->menus[static_cast<std::size_t>(menu_->menu)].section;
+    menu_.reset();
+    if (section == "GAME") {
+        switch (entry) {
+        case game_menu::kSave:
+            if (save()) {
+                say("Game saved.");
+            }
+            return true;
+        case game_menu::kLoad:
+            return false;
+        case game_menu::kExit:
+            quit_ = true;
+            return true;
+        default:
+            notYet();
+            return true;
+        }
+    }
+    if (section == "VIEW") {
+        switch (entry) {
+        case view_menu::kMovePieces:
+            return handle(Command::MoveMode);
+        case view_menu::kViewPieces:
+            return handle(Command::ViewMode);
+        case view_menu::kCentre:
+            return handle(Command::Centre);
+        default:
+            notYet();
+            return true;
+        }
+    }
+    if (section == "ORDERS") {
+        using namespace orders_menu;
+        switch (entry) {
+        case kActivate:
+            return handle(Command::MoveMode);
+        case kWait:
+            return handle(Command::Wait);
+        case kFortify:
+            return handle(Command::Fortify);
+        case kSentry:
+            return handle(Command::Sentry);
+        case kBuildColony:
+        case kJoinColony:
+            return handle(Command::BuildColony);
+        case kNoOrders:
+            return handle(Command::Skip);
+        case kReturnToEurope: {
+            const int active = game_.activeUnit();
+            if (active >= 0 && game_.sailToEurope(active)) {
+                say("Sailing to Europe.");
+                advance();
+            }
+            return true;
+        }
+        default:
+            notYet();
+            return true;
+        }
+    }
+    notYet();
+    return true;
 }
 
 } // namespace viceroy
