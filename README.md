@@ -16,10 +16,10 @@ touch controls.
 > units over the original map, board ships and make landfall, plow fields,
 > clear forests and build roads with your pioneers, found colonies, look inside your colonies, end turns and save. The colony screen
 > shows its buildings, people, what they produce and the warehouse; give
-> colonists other jobs with the jobs menu. At the end of the turn colonies
+> colonists other jobs with the jobs menu, and choose what the colony builds
+> on its Make panel. At the end of the turn colonies
 > store what they make, breed horses from spare food, grow and finish
-> the buildings, wagon trains, artillery and ships under way (choosing what
-> to build comes later). Ships sail to Europe from
+> the buildings, wagon trains, artillery and ships under way. Ships sail to Europe from
 > the high seas, sell and buy goods there (prices move as you trade), take colonists from the docks and
 > sail back. In Europe you can recruit colonists, buy artillery and ships,
 > and have specialists trained. Crosses made in your colonies and churches
@@ -87,6 +87,8 @@ saved in the first free slot, or over the savegame saved longest ago.
 | Open your colony | Click it, or Enter on it in view mode | A on it in view mode |
 | Pick a colonist on the colony screen | Arrow keys, Tab | D-pad, LB / RB |
 | Give the colonist another job (jobs menu) | Enter, then the arrow keys and Enter | A, then the D-pad and A |
+| Choose what the colony builds | B, then the arrow keys and Enter; or click the hammer button, then CHANGE and a line | X, then the D-pad and A |
+| Show what the colony produces again | Click the house button | |
 | Close the colony screen | Esc, or Enter with nobody picked, or click Exit | B |
 | Open the home port in Europe | E | Share / Capture button |
 | In Europe: move between the market, the ships, the docks and the buttons | Up / Down | D-pad up / down |

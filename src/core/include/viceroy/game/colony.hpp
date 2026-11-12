@@ -228,10 +228,11 @@ struct ColonyTurn {
 
 // What the colony builds is a building (row of @BUILDING, 0-41) or, from
 // 42 on, a unit: 42 + n is @UNIT row 11 + n (artillery, wagon train,
-// caravel, merchantman, galleon, privateer). Measured: 48 (frigate) and
-// higher never finish.
+// caravel, merchantman, galleon, privateer, frigate). Measured: the frigate
+// is offered with a shipyard but never finishes, and nothing higher exists.
 inline constexpr int kFirstUnitConstruction = 42;
-inline constexpr int kUnitConstructionRows = 6;
+inline constexpr int kUnitConstructionRows = 7;
+inline constexpr int kFrigateConstruction = 48;
 // The unit a construction value stands for, or -1.
 int constructionUnit(int construction);
 // Hammers and tools a construction needs (measured for units: the @UNIT
@@ -240,6 +241,15 @@ int constructionHammers(const Ruleset& rules, int construction);
 int constructionTools(const Ruleset& rules, int construction);
 // Its name, as the original's messages give it.
 std::string constructionName(const Ruleset& rules, int construction);
+
+// A line of the "Select An Item To Build" list.
+struct BuildOption {
+    int construction = -1; // byte 148 value
+    bool complete = false; // the colony is building it but already has it
+};
+// What the colony may build, in the original's order (buildings by row,
+// then units), measured on its colony screen; see docs/rules/colony-screen.md.
+std::vector<BuildOption> buildOptions(const SaveColony& colony, const SaveMap& map, const Ruleset& rules);
 
 // The food the colony's own square makes without the liberty bonus.
 int centreFoodYield(const Ruleset& rules, const MapSquare& square, int difficulty);

@@ -85,6 +85,9 @@ public:
     // The colony screen, when one is open.
     const std::optional<ColonyViewState>& colonyScreen() const { return colonyScreen_; }
     void openColony(int index);
+    // A click on the colony screen: the panel buttons, CHANGE, and the list
+    // of things to build. Returns true when it was used.
+    bool clickColonyScreen(int x, int y);
     // The home port in Europe, when it is shown.
     const std::optional<EuropeViewState>& europeScreen() const { return europeScreen_; }
     void openEurope();
@@ -143,6 +146,8 @@ private:
     void advance(); // to the next unit that needs orders
     void say(std::string text);
     bool handleColonyScreen(Command command);
+    bool handleBuildList(Command command);
+    void openBuildList();
     bool handleEuropeScreen(Command command);
     bool handleDialog(Command command);
     void drawScreen(Screen& screen, const Art& art) const;

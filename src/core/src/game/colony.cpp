@@ -608,6 +608,77 @@ std::string constructionName(const Ruleset& rules, int construction) {
     return rules.buildings[static_cast<std::size_t>(construction)].name;
 }
 
+std::vector<BuildOption> buildOptions(const SaveColony& colony, const SaveMap& map, const Ruleset& rules) {
+    std::vector<BuildOption> options;
+    const int population = colony.population;
+    auto bigEnough = [&](int row) {
+        return static_cast<std::size_t>(row) < rules.buildings.size() &&
+               rules.buildings[static_cast<std::size_t>(row)].minColonySize <= population;
+    };
+    bool byWater = false;
+    for (int dy = -1; dy <= 1; ++dy) {
+        for (int dx = -1; dx <= 1; ++dx) {
+            if ((dx != 0 || dy != 0) && map.inside(colony.x + dx, colony.y + dy) &&
+                map.at(colony.x + dx, colony.y + dy).isWater()) {
+                byWater = true;
+            }
+        }
+    }
+    // Measured: the next level of each kind of building. Never the town
+    // hall's upper levels or the capitol; the factory level of the craft
+    // shops and the arsenal need Adam Smith in the original, so not yet.
+    constexpr int kArsenal = 5;
+    constexpr int kWarehouseRow = 15;
+    auto offered = [&](int row) {
+        switch (row) {
+        case kArsenal:
+        case 23: // textile mill
+        case 26: // cigar factory
+        case 29: // rum factory
+        case 34: // fur factory
+        case 41: // iron works
+        case 10:
+        case 11: // town hall upper levels
+        case 30:
+        case 31: // capitol
+            return false;
+        case 6: // docks
+            return byWater;
+        default:
+            return true;
+        }
+    };
+    for (int row = 0; row < 42; ++row) {
+        bool next = false;
+        if (row == kWarehouseRow || row == kWarehouseRow + 1) {
+            next = colony.raw[149] == row - kWarehouseRow;
+        } else {
+            for (int k = 0; k < kBuildingKinds; ++k) {
+                const auto& f = kBuildingFields[static_cast<std::size_t>(k)];
+                if (f.firstRow >= 0 && row >= f.firstRow && row < f.firstRow + f.bits) {
+                    next = buildingLevel(colony, static_cast<BuildingKind>(k)) == row - f.firstRow;
+                }
+            }
+        }
+        if (row == colony.construction && !next) {
+            options.push_back({row, true});
+        } else if (next && offered(row) && bigEnough(row)) {
+            options.push_back({row, false});
+        }
+    }
+    // Units: artillery with an armory, a wagon train anywhere, ships with a
+    // shipyard (the frigate too, though it never gets built).
+    const bool armory = buildingLevel(colony, BuildingKind::Armory) > 0;
+    const bool shipyard = buildingLevel(colony, BuildingKind::Docks) >= 3;
+    for (int value = kFirstUnitConstruction; value < kFirstUnitConstruction + kUnitConstructionRows; ++value) {
+        const int unit = constructionUnit(value);
+        if ((unit == 11 && armory) || unit == 12 || (unit >= 13 && shipyard)) {
+            options.push_back({value, false});
+        }
+    }
+    return options;
+}
+
 ColonyTurn runColonyTurn(SaveColony& colony, const SaveMap& map, const Ruleset& rules, int difficulty) {
     ColonyTurn turn;
     const auto p = colonyProduction(colony, map, rules, difficulty);
@@ -665,7 +736,7 @@ ColonyTurn runColonyTurn(SaveColony& colony, const SaveMap& map, const Ruleset& 
     // something is finished.
     colony.hammers += std::max(0, made[cargo::kHammers]);
     const int needHammers = constructionHammers(rules, colony.construction);
-    if (needHammers > 0 && colony.hammers >= needHammers) {
+    if (needHammers > 0 && colony.hammers >= needHammers && colony.construction != kFrigateConstruction) {
         const int tools = constructionTools(rules, colony.construction);
         if (colony.stock[cargo::kTools] < tools) {
             turn.toolsNeeded = tools;

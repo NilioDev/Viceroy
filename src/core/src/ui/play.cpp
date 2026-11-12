@@ -619,11 +619,105 @@ bool PlayScreen::handleEuropeScreen(Command command) {
     }
 }
 
+// "Select An Item To Build" opens on what the colony is building now.
+void PlayScreen::openBuildList() {
+    auto& state = *colonyScreen_;
+    const auto& save = game_.state();
+    const auto& colony = save.colonies[static_cast<std::size_t>(state.colony)];
+    const auto options = buildOptions(colony, save.map, game_.rules());
+    state.panel = ColonyPanel::Make;
+    state.buildList = 0;
+    for (std::size_t i = 0; i < options.size(); ++i) {
+        if (options[i].construction == colony.construction) {
+            state.buildList = static_cast<int>(i) + 1;
+        }
+    }
+}
+
+bool PlayScreen::handleBuildList(Command command) {
+    auto& state = *colonyScreen_;
+    auto& save = game_.state();
+    auto& colony = save.colonies[static_cast<std::size_t>(state.colony)];
+    const auto options = buildOptions(colony, save.map, game_.rules());
+    const int lines = static_cast<int>(options.size()) + 1; // the first line is "(No Production)"
+    switch (command) {
+    case Command::MoveN:
+    case Command::Up:
+        state.buildList = (state.buildList + lines - 1) % lines;
+        break;
+    case Command::MoveS:
+    case Command::Down:
+        state.buildList = (state.buildList + 1) % lines;
+        break;
+    case Command::Confirm:
+    case Command::Skip:
+        if (state.buildList == 0) {
+            colony.construction = -1;
+        } else if (state.buildList <= static_cast<int>(options.size())) {
+            const auto& o = options[static_cast<std::size_t>(state.buildList - 1)];
+            if (!o.complete) {
+                colony.construction = o.construction;
+            }
+        }
+        state.buildList = -1;
+        break;
+    case Command::Cancel:
+        state.buildList = -1;
+        break;
+    default:
+        break;
+    }
+    return true;
+}
+
+bool PlayScreen::clickColonyScreen(int x, int y) {
+    if (!colonyScreen_ || dialog_) {
+        return false;
+    }
+    auto& state = *colonyScreen_;
+    auto inside = [&](const auto& r) { return x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h; };
+    if (state.buildList >= 0) {
+        const auto& save = game_.state();
+        const auto& colony = save.colonies[static_cast<std::size_t>(state.colony)];
+        const int items = static_cast<int>(buildOptions(colony, save.map, game_.rules()).size());
+        const auto box = buildListBox(items);
+        if (!inside(box)) {
+            state.buildList = -1;
+            return true;
+        }
+        const int line = (y - (box.firstLine - 1)) / 8;
+        if (y >= box.firstLine - 1 && line <= items) {
+            state.buildList = line;
+            handleBuildList(Command::Confirm);
+        }
+        return true;
+    }
+    if (state.jobsMenu >= 0) {
+        return false;
+    }
+    if (inside(kPanelButtons[0])) {
+        state.panel = ColonyPanel::Production;
+        return true;
+    }
+    if (inside(kPanelButtons[2])) {
+        state.panel = ColonyPanel::Make;
+        return true;
+    }
+    if (state.panel == ColonyPanel::Make && inside(kChangeButton)) {
+        openBuildList();
+        return true;
+    }
+    return false;
+}
+
 bool PlayScreen::handleColonyScreen(Command command) {
     auto& state = *colonyScreen_;
     auto& save = game_.state();
     auto& colony = save.colonies[static_cast<std::size_t>(state.colony)];
     const int people = colony.population;
+    if (state.buildList >= 0) {
+        return handleBuildList(command);
+    }
     if (state.jobsMenu >= 0) {
         const auto choices = jobChoices(colony, save.map, game_.rules(), save.colonies, state.selectedColonist, save.difficulty);
         const int lines = static_cast<int>(choices.size()) + 1; // the last line is "(More)"
@@ -655,6 +749,9 @@ bool PlayScreen::handleColonyScreen(Command command) {
     switch (command) {
     case Command::Cancel:
         colonyScreen_.reset();
+        break;
+    case Command::BuildColony: // B, or X on a gamepad: choose what to build
+        openBuildList();
         break;
     case Command::Confirm:
     case Command::Skip:
