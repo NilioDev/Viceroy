@@ -213,7 +213,10 @@ public:
     // Fights it out: the loser is demoted, damaged or captured, and the
     // attacker's turn is over. Notices tell what happened.
     CombatOutcome attack(int attacker, int defender);
-    // The odds the attacker wins, from the two strengths.
+    // The numbers the fight is rolled on (see docs/rules/combat.md).
+    CombatStrengths combatStrengths(int attacker, int defender) const;
+    // The attacker wins with a roll of 1 to attack + defense at or below
+    // attack.
     static bool attackerWins(int attack, int defense, int roll);
 
     // --- Map -----------------------------------------------------------------

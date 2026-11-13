@@ -142,3 +142,50 @@ VCR_TEST("combat: breaking a treaty ends the peace on both sides (measured)") {
     VCR_CHECK(!g.atPeace(kDutch, kFrench));
     VCR_CHECK(!g.atPeace(kFrench, kDutch));
 }
+
+VCR_TEST("combat: the numbers a veteran soldier and a dragoon in forest roll on (observed)") {
+    // Observed in the original on Discoverer: 80 against 36.
+    Game g = battle(unit_type::kSoldier, unit_type::kDragoon);
+    g.state().units[0].profession = 0x15;
+    g.state().turn = 120;
+    const auto s = g.combatStrengths(0, 1);
+    VCR_CHECK(s.attack == 80);
+    VCR_CHECK(s.defense == 36);
+    // On Conquistador the human attacker gets nothing extra.
+    g.state().difficulty = 4;
+    VCR_CHECK(g.combatStrengths(0, 1).attack == 36);
+    // Two thirds of a move left: two thirds of the attack.
+    g.state().units[0].movesUsed = 1;
+    VCR_CHECK(g.combatStrengths(0, 1).attack == 24);
+}
+
+VCR_TEST("combat: early on the easy levels a human defender is attacked at half strength") {
+    Game g = battle(unit_type::kSoldier, unit_type::kDragoon);
+    g.state().units[0].nation = kFrench;
+    g.state().units[1].nation = kDutch;
+    g.state().difficulty = 1;
+    g.state().turn = 10;
+    auto s = g.combatStrengths(0, 1);
+    VCR_CHECK(s.attack == 12);  // 16 x 3/2, halved
+    VCR_CHECK(s.defense == 39); // 24 x 6/4 + 4 - 1
+    g.state().turn = 80;
+    VCR_CHECK(g.combatStrengths(0, 1).attack == 24);
+}
+
+VCR_TEST("combat: artillery in the open fights at a quarter unless the defender is dug in") {
+    Game g = battle(11, unit_type::kDragoon);
+    g.state().difficulty = 2;
+    g.state().turn = 120;
+    VCR_CHECK(g.combatStrengths(0, 1).attack == 21); // (56 x 3/2 + 2) / 4
+    g.state().units[1].orders = SaveUnit::kFortify;
+    VCR_CHECK(g.combatStrengths(0, 1).attack == 86);
+    VCR_CHECK(g.combatStrengths(0, 1).defense == 36); // fortifying is not fortified yet
+    g.state().units[1].orders = SaveUnit::kFortified;
+    VCR_CHECK(g.combatStrengths(0, 1).defense == 48);
+}
+
+VCR_TEST("combat: the roll wins at or below the attack") {
+    VCR_CHECK(Game::attackerWins(80, 36, 80));
+    VCR_CHECK(!Game::attackerWins(80, 36, 81));
+    VCR_CHECK(!Game::attackerWins(0, 36, 1));
+}
