@@ -38,9 +38,13 @@ int missionOf(const SaveSettlement& settlement);
 inline constexpr std::uint8_t kExpertMission = 0x10;
 
 // The nation's colony nearest to (x, y), measured the original's way (the
-// longer side plus half the shorter); a later colony wins a tie. -1 if
-// the nation has none.
-int nearestColony(const SaveGame& save, int x, int y, int nation);
+// longer side plus half the shorter); a later colony wins a tie. With a
+// region, only colonies on land of that region count. -1 if there is none.
+int nearestColony(const SaveGame& save, int x, int y, int nation, int region = -1);
+
+// The land region of a square (the low four bits of the path layer), or
+// -1 for water and the map's border.
+int landRegion(const SaveMap& map, int x, int y);
 
 // Whether the nation has met the tribe (bit 0x40 of its attitude byte).
 bool metTribe(const SaveGame& save, int nation, int tribe);
@@ -81,6 +85,8 @@ std::array<int, 3> villageWants(const SaveGame& save, int settlement);
 
 // Settlement flag: a scout has spoken with the chief.
 inline constexpr std::uint8_t kSettlementVisited = 0x08;
+// Settlement flag: it has paid tribute.
+inline constexpr std::uint8_t kSettlementTribute = 0x10;
 
 // The random numbers of the original's C library: the same seed gives the
 // same numbers.

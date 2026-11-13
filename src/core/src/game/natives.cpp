@@ -136,12 +136,19 @@ int missionOf(const SaveSettlement& settlement) {
     return byte < 0 ? -1 : byte & 0x0F;
 }
 
-int nearestColony(const SaveGame& save, int x, int y, int nation) {
+int landRegion(const SaveMap& map, int x, int y) {
+    if (x < 1 || y < 1 || x >= map.width - 1 || y >= map.height - 1 || map.at(x, y).isWater()) {
+        return -1;
+    }
+    return map.at(x, y).region & 0x0F;
+}
+
+int nearestColony(const SaveGame& save, int x, int y, int nation, int region) {
     int best = -1;
     int bestDistance = 9999;
     for (std::size_t i = 0; i < save.colonies.size(); ++i) {
         const auto& c = save.colonies[i];
-        if (c.nation != nation) {
+        if (c.nation != nation || (region >= 0 && landRegion(save.map, c.x, c.y) != region)) {
             continue;
         }
         const int dx = std::abs(c.x - x);

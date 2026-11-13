@@ -28,14 +28,21 @@ second the tribe's name ("Sioux").
 The options come from `@ACTIONS`. A colonist or pioneer of a nation that
 has met the tribe is offered **Live Among The Natives**; everyone is
 offered **Cancel Action**, which leaves the unit where it was. A scout of
-a nation that has met the tribe is offered **Ask to Speak With Chief**;
-the original also offers it Demand Tribute and Attack Village, which
-Viceroy does not have yet. Without contact with the tribe only Cancel
-Action is there. A missionary is offered **Establish Mission** at a
-settlement without a mission (the original also offers Incite Indians,
-and Denounce Heresy at another nation's mission, which Viceroy does not
-have yet). Soldiers get other options, which Viceroy does not have yet
-either.
+a nation that has met the tribe is offered **Ask to Speak With Chief**.
+Any land unit with an attack above 0, except a missionary, is offered
+**Demand Tribute** when its nation has met the tribe. The original also
+offers **Attack Village**: first, to units with an attack above 1, and
+after Demand Tribute to the others (a scout sees Speak, Demand Tribute,
+Attack Village, Cancel Action); Viceroy does not have it yet. Without
+contact with the tribe only Cancel Action is there. A missionary is
+offered **Establish Mission** at a settlement without a mission (the
+original also offers Incite Indians, and Denounce Heresy at another
+nation's mission, which Viceroy does not have yet).
+
+Every native answer is told by a figure of the tribe (`IND<tribe>A<mood>.SS`)
+whose mood is the step of the tribe's tension toward the player: 0 below
+25, 1 below 50, 2 below 75, 3 above. The Iroquois chief at tension 80
+was seen in his furious pose.
 
 ## Learning a skill
 
@@ -121,6 +128,65 @@ nation's nearest colony ("Church of Curaçao mission founded in Autumn,
 1653. Apache are offended."), measured as the longer side plus half the
 shorter, a later colony winning a tie. The religious advisor shows it.
 Measured once: the Apache, at tension 51, went to 41 and were offended.
+
+## Demanding tribute
+
+Demanding tribute uses up the unit's moves. The answer weighs two counts
+of forces that the original keeps by land region (see *Counting forces*
+below), for the region of the square the unit stands on:
+
+- the nation's *might*: its attack outside colonies in the region, plus
+  half its attack in all; half again for Spain, and half again with Hernan
+  Cortes;
+- the tribe's *defence*: twice (its defence in the region plus half its
+  defence in all), plus half the tension.
+
+A roll of 0 to the might against a roll of 0 to the defence: the village
+is *cowed* when the defence roll is below the might roll, and only when
+the nation has a colony on land of the same region (the nearest, measured
+as for missions). Then, in this order:
+
+1. Not cowed with a might no greater than the defence, or a tension of 75
+   or more: `@EXTORTLAUGH` ("... {Iroquois} warriors are known for their
+   ferocity ..."). The tension rises by difficulty + 1.
+2. Not cowed with a tension of 50 or more: `@EXTORTNO`, naming the
+   player by the difficulty's title and the leader's name. The tension
+   rises by difficulty + 1.
+3. Not cowed, or the village has paid tribute before (byte 3, bit 0x10):
+   `@EXTORTPOOR`. The tension does not move.
+4. Otherwise the village pays: it marks itself as having paid, and
+   delivers the good it makes most of (its economy as in the skill pick,
+   sorted the original's way) to the nearest colony: as much as the
+   warehouse has room for, at most three times what the village makes of
+   it plus 10 and at most 100, but at least 10 (`@EXTORTSTUFF`, "Great
+   Discoverer, ... the humble and peaceloving Iroquois shall gladly
+   deliver 30 Food to Roanoke ..."). The tension rises by twice
+   (difficulty + 1).
+
+For a computer nation the tension moves by 1 (2 when paid) instead.
+Measured: with the Dutch strong in the region and no Iroquois braves
+counted, a scout at an Iroquois village got 30 Food delivered to
+Roanoke; with the tension at 80 the chief laughed.
+
+### Counting forces
+
+When the player's turn ends the original counts every nation's units,
+leaving out ships. A unit's attack (or defence) is its column of `@UNIT`,
+2 less for damaged artillery, times 8, and half again for a veteran
+soldier or dragoon. Its region is the low four bits of the path layer
+under it, for land inside the map's border (none for units in Europe or
+at sea).
+
+- A European nation adds each unit's attack to its total (16 bits), and,
+  when the unit has a region, to that region (a byte that stops at 255).
+  Units standing in a colony are left out of the region for the human
+  player, and for a computer player when the unit's byte 7 holds `A` or
+  `G`.
+- A tribe adds each brave's defence to its total and to its region (bytes
+  that stop at 255). The counts in `COLONY00.SAV` match its braves: 8 for
+  a brave, 16 for an armed one.
+
+The counts are kept in the save; see [the savegame format](../formats/savegame.md).
 
 ## Trade
 

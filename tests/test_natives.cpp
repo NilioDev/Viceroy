@@ -147,7 +147,7 @@ VCR_TEST("original files: a colonist lives among the natives and learns their sk
     dump("_greeting");
     play.handle(Command::Confirm);
     VCR_CHECK(play.dialog().has_value());
-    VCR_CHECK(play.dialog()->portrait == kNativePortraits + kIroquois);
+    VCR_CHECK(play.dialog()->portrait == kNativePortraits + 4 * kIroquois);
     VCR_CHECK(play.dialog()->options.size() == 2); // the offer
     dump("_offer");
     play.handle(Command::Confirm);
@@ -240,10 +240,10 @@ VCR_TEST("original files: a scout speaks with the chief") {
     play.game().setActiveUnit(scout);
     play.handle(Command::MoveE);
     VCR_CHECK(play.dialog().has_value());
-    VCR_CHECK(play.dialog()->options.size() == 2); // Ask to Speak With Chief, Cancel Action
+    VCR_CHECK(play.dialog()->options.size() == 3); // Ask to Speak With Chief, Demand Tribute, Cancel Action
     play.handle(Command::Confirm);
     VCR_CHECK(play.dialog().has_value()); // the chief's greeting
-    VCR_CHECK(play.dialog()->portrait == kNativePortraits + kIroquois);
+    VCR_CHECK(play.dialog()->portrait == kNativePortraits + 4 * kIroquois);
     play.handle(Command::Confirm);
     VCR_CHECK(play.dialog().has_value()); // what he says next
     play.handle(Command::Confirm);
@@ -391,4 +391,109 @@ VCR_TEST("original files: trading with a village (measured)") {
     VCR_CHECK(!play.dialog().has_value());
     const auto& w = play.game().unit(wagon);
     VCR_CHECK(w.holds == 1 && holdGood(w, 0) == kCotton && holdAmount(w, 0) == 60);
+}
+
+VCR_TEST("original files: demanding tribute (measured)") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
+    SaveGame save = readSaveGame(Bytes(std::istreambuf_iterator<char>(in), {}));
+    constexpr int kDutch = 3, kIroquois = 3, kVillage = 4, kFood = 0;
+    constexpr std::size_t kExtra = 8 * 78;
+
+    {
+        // The tribes' count in the save matches its braves: 8 for a brave,
+        // 16 for an armed one, by region.
+        Game game(save, art.rules);
+        game.countForces();
+        const auto& block = game.state().tribesAndMore;
+        for (std::size_t at = kExtra + 565; at < kExtra + 589 + 128; ++at) {
+            if (at < kExtra + 573 || at >= kExtra + 589) {
+                VCR_CHECK(block[at] == save.tribesAndMore[at]);
+            }
+        }
+    }
+
+    // As measured: the Dutch strong in the region, the Iroquois with no
+    // braves counted.
+    save.nations[kDutch].raw[52 + 4 + kIroquois] = 0x60;
+    save.tribesAndMore[kExtra + 300 + 16 * kDutch + 1] = 200;
+    save.tribesAndMore[kExtra + 44 + 2 * kDutch] = 0;
+    save.tribesAndMore[kExtra + 44 + 2 * kDutch + 1] = 0;
+    save.tribesAndMore[kExtra + 565 + kIroquois] = 0;
+    save.tribesAndMore[kExtra + 589 + 16 * kIroquois + 1] = 0;
+    const auto& village = save.settlements[kVillage];
+    int scout = -1;
+    for (std::size_t i = 0; i < save.units.size(); ++i) {
+        if (save.units[i].nation == kDutch && save.units[i].type == 0) {
+            scout = static_cast<int>(i);
+            break;
+        }
+    }
+    auto& u = save.units[static_cast<std::size_t>(scout)];
+    u.type = 5;
+    u.profession = 0x1C;
+    u.movesUsed = 0;
+    u.orders = SaveUnit::kNoOrders;
+    u.x = village.x - 1;
+    u.y = village.y;
+
+    PlayScreen play(Game(save, art.rules), {});
+    play.setArt(&art);
+    play.game().setActiveUnit(scout);
+    play.handle(Command::MoveE);
+    // Ask to Speak With Chief, Demand Tribute, Cancel Action.
+    VCR_CHECK(play.dialog().has_value() && play.dialog()->options.size() == 3);
+    play.handle(Command::Down);
+    play.handle(Command::Confirm);
+    // Seen: "Great Discoverer, ... the humble and peaceloving Iroquois shall
+    // gladly deliver 30 Food to Roanoke ..."
+    VCR_CHECK(play.dialog().has_value());
+    std::string text;
+    for (const auto& line : play.dialog()->lines) {
+        text += line + " ";
+    }
+    VCR_CHECK(text.find("Great Discoverer") != std::string::npos);
+    VCR_CHECK(play.dialog()->portrait == kNativePortraits + 4 * kIroquois); // calm
+    VCR_CHECK(text.find("{30 Food} to {Roanoke}") != std::string::npos);
+    const auto& after = play.game().state();
+    int roanoke = -1;
+    for (std::size_t c = 0; c < after.colonies.size(); ++c) {
+        if (after.colonies[c].name == "Roanoke") {
+            roanoke = static_cast<int>(c);
+        }
+    }
+    VCR_CHECK(roanoke >= 0);
+    VCR_CHECK(after.colonies[static_cast<std::size_t>(roanoke)].stock[kFood] ==
+              save.colonies[static_cast<std::size_t>(roanoke)].stock[kFood] + 30);
+    VCR_CHECK((after.settlements[kVillage].raw[3] & kSettlementTribute) != 0);
+    VCR_CHECK(tribeTension(after, kIroquois, kDutch) == tribeTension(save, kIroquois, kDutch) + 2 * (save.difficulty + 1));
+    VCR_CHECK(play.game().movesLeft(scout) <= 0);
+    play.handle(Command::Confirm);
+    VCR_CHECK(!play.dialog().has_value());
+
+    // A second demand finds the village poor.
+    Game again(after, art.rules);
+    again.state().units[static_cast<std::size_t>(scout)].movesUsed = 0;
+    VCR_CHECK(again.demandTribute(scout, kVillage).reply == Game::Tribute::Reply::Poor);
+
+    // Seen with the tension at 80: "We laugh at your puny threats ...
+    // Iroquois warriors ...", told by the furious chief.
+    setTribeTension(save, kIroquois, kDutch, 80);
+    PlayScreen angry(Game(save, art.rules), {});
+    angry.setArt(&art);
+    angry.game().setActiveUnit(scout);
+    angry.handle(Command::MoveE);
+    angry.handle(Command::Down);
+    angry.handle(Command::Confirm);
+    VCR_CHECK(angry.dialog().has_value() && angry.dialog()->portrait == kNativePortraits + 4 * kIroquois + 3);
+    text.clear();
+    for (const auto& line : angry.dialog()->lines) {
+        text += line + " ";
+    }
+    VCR_CHECK(text.find("We laugh at your puny threats") != std::string::npos);
+    VCR_CHECK(tribeTension(angry.game().state(), kIroquois, kDutch) == 80 + save.difficulty + 1);
 }
