@@ -209,6 +209,7 @@ MoveResult Game::move(int index, Step step) {
     }
     reveal(toX, toY, sightRadius(index), u.nation);
     refreshUnitFlags();
+    meetNeighbours(index);
     if (ship && target.terrain == kSeaLane && !isNative(u.nation)) {
         return MoveResult::HighSeas;
     }

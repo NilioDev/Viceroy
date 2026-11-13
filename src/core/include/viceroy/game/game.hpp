@@ -70,6 +70,7 @@ struct GameNotice {
     int value = -1; // what the screen needs to fill in the rest: a profession, ...
     std::vector<int> numbers{}; // the %NUMBERs
     int colony = -1;          // the colony it is about, for "Zoom to colony."
+    int unit = -1;            // the unit it is about, for the map to show
     // %STRINGs that are a nation's adjective ("French"): which string, and
     // the nation, for the screen to fill in.
     std::vector<std::pair<int, int>> adjectives{};
@@ -337,6 +338,20 @@ public:
     // missionary back, converts for the mission's nation. The attacker's
     // turn is over; notices tell what happened.
     CombatOutcome attackVillage(int attacker, int settlement);
+
+    // First contact: a unit standing on land next to land with a unit or
+    // settlement of a tribe its nation has not met yet meets that tribe
+    // (and a native unit meets a European nation the same way). The tribe
+    // offers peace: a computer nation takes it at once; the player is asked
+    // with an INDIANWELCOME notice. Returns whether the player is asked.
+    bool meetNeighbours(int unit);
+    // The tribe's (or nation's) first meeting: both sides have met, and the
+    // tribe's tension is at most 20.
+    void meetTribe(int nation, int tribe);
+    // The player's answer to a tribe's welcome. Yes makes peace (notices
+    // INDIANPEACE and INDIANCOME); no leaves the tribe 100 tense (notice
+    // INDIANSHUN).
+    void answerWelcome(int tribe, bool accept);
 
     // A ship that lost a fight and is being repaired (bit 0x80 of byte 4).
     bool isDamagedShip(int index) const;

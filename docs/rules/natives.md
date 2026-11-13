@@ -45,6 +45,37 @@ whose mood is the step of the tribe's tension toward the player: 0 below
 25, 1 below 50, 2 below 75, 3 above. The Iroquois chief at tension 80
 was seen in his furious pose.
 
+## First contact
+
+A nation meets a tribe when one of its units stands on land and one of the
+eight squares around it, also land, holds a unit, colony or settlement of
+the tribe (the same check runs for a native unit beside a European one).
+Ships at sea meet no one. The original makes the check after each move:
+
+- Both sides get the "met" bit 0x20 in their relation bytes, the tribe's
+  tension toward the nation drops to at most 20, and the tribe's 16-bit
+  word at 46 + 2 × nation becomes 2 (its use is not read yet).
+- A computer nation always accepts the treaty: bit 0x40 on both sides.
+- The player sees the map centre on the unit and the tribe's chief ask
+  `INDIANWELCOME`: "The Iroquois tribe welcomes you. We are a glorious
+  nation of 11 Villages", with the tribe's adjective, its number of
+  settlements and the plural of its level from the third column of
+  `@LEVELS`.
+  - **Yes**: the treaty bit 0x40 on both sides, then `INDIANPEACE` ("The
+    Iroquois welcome peace with our brothers the Dutch") and, when the
+    tribe's tension is below 25 (always, just after the meeting),
+    `INDIANCOME`, the invitation to visit and trade.
+  - **No**: no treaty, the tribe's tension becomes 100 (measured from 2),
+    and the chief, now angry, answers `INDIANSHUN`: "Prepare for WAR!".
+    No war is declared yet.
+
+The answers were measured in DOSBox: Yes and No on the Iroquois, after
+clearing the Dutch contact bytes in a save. Two things are not done yet:
+the original also has `INDIANTREATY` and `INDIANHELLO1`/`2` in GAME.TXT,
+which its code never asks for, and the welcome's map shows the unit still
+on its old square, where we draw it on the new one. Without the treaty
+bit a settlement offers only Cancel Action.
+
 ## Learning a skill
 
 Living among the natives uses up the unit's moves for the turn, whatever

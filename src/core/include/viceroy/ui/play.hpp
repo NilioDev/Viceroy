@@ -201,6 +201,7 @@ private:
     };
     std::vector<int> villageOptions_;
     int village_ = -1;
+    int welcomeTribe_ = -1; // the tribe whose welcome is up
     void enterVillage(int unit, int settlement);
     void showLesson(int unit, const std::string& section, const std::vector<std::string>& strings);
     // What the chief answers a scout, shown after his greeting.

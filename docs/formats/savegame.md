@@ -137,8 +137,11 @@ a save and reading the prices the original then asks.
 
 The nation's bytes 52 to 63 hold its relation to each of the twelve
 nations (the four European ones, then the eight tribes in `@TRIBES`
-order); bit 0x40 on a tribe means the nation has met it. Without it the
-original offers only Cancel Action at the tribe's settlements.
+order); on a tribe, bit 0x20 means the nation has met it and bit 0x40
+that they have a peace treaty. Without the treaty the original offers only
+Cancel Action at the tribe's settlements. A tribe's 16-bit word at
+46 + 2 × nation is 2 after their first meeting (see
+[natives](../rules/natives.md)).
 
 **Native settlement** (18 bytes): x, y, tribe (4 to 11, in `@TRIBES`
 order from the Inca), flags at 3 (0x02 has taught its skill, 0x04 the
