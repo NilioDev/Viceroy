@@ -231,7 +231,13 @@ struct ColonyTurn {
     std::array<bool, kGoodsKinds> ranOut{};
     bool foodRanOut = false; // the colony ate more food than it had
     int foodShort = 0;       // how much more food it eats than it makes
+    int foodMissing = 0;     // how far below nothing the store would have gone
+    int foodBefore = 0;      // the food in store when the turn began
 };
+
+// A colonist leaves the colony (starved): the ones after it move up, and
+// the squares it worked are free.
+void removeColonist(SaveColony& colony, int colonist);
 
 // What the colony builds is a building (row of @BUILDING, 0-41) or, from
 // 42 on, a unit: 42 + n is @UNIT row 11 + n (artillery, wagon train,

@@ -127,7 +127,8 @@ VCR_TEST("colony reports: food runs low, then out (measured)") {
         VCR_CHECK(find(afterTurn(g), "FOODLOW") == nullptr);
     }
     // Out of food: before 1600 and after an autumn turn plainly, and with
-    // winter coming after a spring turn from 1600. Nobody starves.
+    // winter coming after a spring turn from 1600. Nobody starves in the
+    // turn the food runs out.
     {
         Game g = reportGame(4, 1494, 0, [](SaveColony& c) { c.stock[cargo::kFood] = 3; });
         VCR_CHECK(find(afterTurn(g), "FOOD1") != nullptr);
@@ -185,4 +186,92 @@ VCR_TEST("colony reports: the cargo tutorial hint, once a game and only with hin
     n = afterTurn(g);
     VCR_CHECK(find(n, "CARGOREADY0") != nullptr);
     VCR_CHECK(find(n, "TUTORIAL6") == nullptr);
+}
+
+namespace {
+
+int countSection(const std::vector<GameNotice>& notices, const std::string& section) {
+    return static_cast<int>(
+        std::count_if(notices.begin(), notices.end(), [&](const GameNotice& n) { return n.section == section; }));
+}
+
+} // namespace
+
+VCR_TEST("colony reports: a colonist starves when the store was empty already (seen in the original)") {
+    Game g = reportGame(3, 1494, 0, [](SaveColony& c) {
+        c.stock[cargo::kFood] = 0;
+        c.squares = {0, 1, 2, -1, -1, -1, -1, -1};
+    });
+    g.state().difficulty = 2;
+    auto n = afterTurn(g);
+    VCR_CHECK(find(n, "STARVE1") != nullptr);
+    VCR_CHECK(find(n, "FOOD1") == nullptr);
+    const auto& c = g.state().colonies[0];
+    VCR_CHECK(c.population == 2);
+    // One of the three squares is free now, the other two are worked by
+    // colonists 0 and 1.
+    VCR_CHECK(std::count(c.squares.begin(), c.squares.end(), -1) == 6);
+    VCR_CHECK(std::count(c.squares.begin(), c.squares.end(), 0) == 1);
+    VCR_CHECK(std::count(c.squares.begin(), c.squares.end(), 1) == 1);
+}
+
+VCR_TEST("colony reports: food running out this turn only warns (seen in the original)") {
+    Game g = reportGame(3, 1494, 0, [](SaveColony& c) { c.stock[cargo::kFood] = 3; });
+    g.state().difficulty = 4;
+    auto n = afterTurn(g);
+    VCR_CHECK(find(n, "FOOD1") != nullptr);
+    VCR_CHECK(g.state().colonies[0].population == 3);
+    // The next turn begins with an empty store.
+    n = afterTurn(g);
+    VCR_CHECK(find(n, "STARVE1") != nullptr);
+    VCR_CHECK(g.state().colonies[0].population == 2);
+}
+
+VCR_TEST("colony reports: nobody starves on Discoverer before 1520, some do after (measured)") {
+    Game g = reportGame(8, 1494, 0, [](SaveColony& c) { c.stock[cargo::kFood] = 0; });
+    for (int turn = 0; turn < 20; ++turn) {
+        const auto n = afterTurn(g);
+        VCR_CHECK(countSection(n, "STARVE1") == 0);
+    }
+    VCR_CHECK(g.state().colonies[0].population == 8);
+
+    Game late = reportGame(30, 1601, 0, [](SaveColony& c) { c.stock[cargo::kFood] = 0; });
+    int starved = 0;
+    int spared = 0;
+    for (int turn = 0; turn < 24; ++turn) {
+        const auto n = afterTurn(late);
+        starved += countSection(n, "STARVE1") + countSection(n, "STARVE2");
+        spared += countSection(n, "FOOD1") + countSection(n, "FOOD2");
+    }
+    VCR_CHECK(starved > 0 && spared > 0);
+    VCR_CHECK(late.state().colonies[0].population == 30 - starved);
+}
+
+VCR_TEST("colony reports: the last colonist starving ends the colony (seen in the original)") {
+    Game g = reportGame(1, 1494, 0, [](SaveColony& c) { c.stock[cargo::kFood] = 0; });
+    g.state().difficulty = 2;
+    g.state().map.at(1, 1).flags |= MapSquare::kHasColony;
+    const auto n = afterTurn(g);
+    VCR_CHECK(find(n, "VANISH") != nullptr);
+    VCR_CHECK(find(n, "VANISH")->strings == std::vector<std::string>{"New Amsterdam"});
+    VCR_CHECK(g.state().colonies.empty());
+    VCR_CHECK((g.state().map.at(1, 1).flags & MapSquare::kHasColony) == 0);
+}
+
+VCR_TEST("colony reports: another nation's colony starves only when 3 or more short (seen in the original)") {
+    Game g = reportGame(1, 1494, 0, [](SaveColony& c) {
+        c.stock[cargo::kFood] = 0;
+        c.nation = 1;
+    });
+    g.state().difficulty = 2;
+    afterTurn(g);
+    VCR_CHECK(g.state().colonies.size() == 1);
+    Game two = reportGame(2, 1494, 0, [](SaveColony& c) {
+        c.stock[cargo::kFood] = 0;
+        c.nation = 1;
+    });
+    two.state().difficulty = 2;
+    const auto n = afterTurn(two);
+    VCR_CHECK(two.state().colonies[0].population == 1);
+    VCR_CHECK(n.empty() || find(n, "STARVE1") == nullptr);
 }

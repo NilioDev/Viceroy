@@ -238,6 +238,10 @@ private:
     // The messages about a colony's warehouse after its turn.
     void storageNotices(const ColonyTurn& turn, int colony);
     void foodNotices(const ColonyTurn& turn, int colony);
+    // A colony out of food may lose a colonist; returns true when it had
+    // only one and is gone.
+    bool starve(const ColonyTurn& turn, int colony);
+    void removeColony(int colony);
     void runOutNotices(const ColonyTurn& turn, int colony);
     std::uint32_t random_ = 0;
     int nextRandom(int range); // 0 .. range - 1
