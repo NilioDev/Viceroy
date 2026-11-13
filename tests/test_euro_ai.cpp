@@ -3,6 +3,7 @@
 
 #include "viceroy/data/savegame.hpp"
 #include "viceroy/data/text_table.hpp"
+#include "viceroy/game/colony.hpp"
 #include "viceroy/game/europe.hpp"
 #include "viceroy/game/game.hpp"
 #include "viceroy/game/natives.hpp"
@@ -390,4 +391,104 @@ VCR_TEST("european ai: an attack waits for a full move") {
     VCR_CHECK(d.type == unit_type::kDragoon && d.x == 6 && d.y == 4);
     VCR_CHECK(d.raw[7] == '9');
     VCR_CHECK(g.state().units[1].nation == 2);
+}
+
+namespace {
+
+// A French colony of free colonists at (8, 4), with the Spanish at war in
+// the same land but sitting their turn out.
+SaveGame colonySave(int population) {
+    SaveGame s = attackSave(0x20);
+    s.units.clear();
+    s.colonies.clear();
+    SaveColony c;
+    c.x = 8;
+    c.y = 4;
+    c.nation = 1;
+    c.population = population;
+    for (int k = 0; k < population; ++k) {
+        c.skills[static_cast<std::size_t>(k)] = 0x1C;
+    }
+    s.colonies.push_back(c);
+    return s;
+}
+
+int frenchOfType(const Game& g, int type) {
+    int count = 0;
+    for (const auto& u : g.state().units) {
+        count += u.nation == 1 && u.type == type ? 1 : 0;
+    }
+    return count;
+}
+
+} // namespace
+
+VCR_TEST("european ai: a colony under threat sends a colonist out as a soldier") {
+    SaveGame s = colonySave(3);
+    s.colonies[0].stock[cargo::kMuskets] = 100;
+    s.units.push_back(unitAt(9, 4, unit_type::kDragoon, 2)); // next to it
+    Game g(s, aiRules());
+    g.europeanTurn(1);
+    const auto& c = g.state().colonies[0];
+    VCR_CHECK((c.raw[0x1B] & 0x40) != 0); // marked as wanting guards
+    VCR_CHECK(c.population == 2);
+    VCR_CHECK(c.stock[cargo::kMuskets] == 50);
+    VCR_CHECK(frenchOfType(g, unit_type::kSoldier) + frenchOfType(g, unit_type::kColonist) == 1);
+}
+
+VCR_TEST("european ai: a quiet colony sends nobody out") {
+    SaveGame s = colonySave(1);
+    s.colonies[0].stock[cargo::kMuskets] = 100;
+    Game g(s, aiRules());
+    g.europeanTurn(1);
+    const auto& c = g.state().colonies[0];
+    VCR_CHECK((c.raw[0x1B] & 0x40) == 0);
+    VCR_CHECK(c.population == 1);
+    VCR_CHECK(frenchOfType(g, unit_type::kSoldier) + frenchOfType(g, unit_type::kColonist) == 0);
+}
+
+VCR_TEST("european ai: a colony with muskets but no horses asks for horses") {
+    SaveGame s = colonySave(1);
+    s.colonies[0].stock[cargo::kMuskets] = 100;
+    Game g(s, aiRules());
+    g.europeanTurn(1);
+    VCR_CHECK(g.state().colonies[0].raw[0x8D] == cargo::kHorses);
+}
+
+VCR_TEST("european ai: spare muskets go back to Europe") {
+    SaveGame s = colonySave(1);
+    s.colonies[0].stock[cargo::kMuskets] = 250;
+    s.colonies[0].stock[cargo::kHorses] = 60;
+    Game g(s, aiRules());
+    g.europeanTurn(1);
+    VCR_CHECK(g.state().colonies[0].stock[cargo::kMuskets] == 200);
+    VCR_CHECK(g.state().nations[1].raw[73] == 1);
+}
+
+VCR_TEST("european ai: every tenth turn a colony without tools buys twenty") {
+    SaveGame s = colonySave(1);
+    s.nations[1].gold = 1000;
+    Game g(s, aiRules());
+    g.europeanTurn(1);
+    VCR_CHECK(g.state().colonies[0].stock[cargo::kTools] == 20);
+    s.turn = 11;
+    Game h(s, aiRules());
+    h.europeanTurn(1);
+    VCR_CHECK(h.state().colonies[0].stock[cargo::kTools] == 0);
+}
+
+VCR_TEST("european ai: a soldier on the square of a colony with too many guards joins it") {
+    SaveGame s = colonySave(1);
+    s.colonies[0].raw[0x1B] = 0x10; // marked for recruits
+    s.units.push_back(unitAt(8, 4, unit_type::kSoldier, 1));
+    s.units.push_back(unitAt(8, 4, unit_type::kSoldier, 1));
+    s.units[0].raw[6] = 0;
+    s.units[1].raw[6] = 0;
+    s.units[0].profession = 0x1C;
+    s.units[1].profession = 0x1C;
+    Game g(s, aiRules());
+    g.europeanTurn(1);
+    const auto& c = g.state().colonies[0];
+    VCR_CHECK(c.population == 2);
+    VCR_CHECK(c.stock[cargo::kMuskets] == 50);
 }

@@ -68,7 +68,9 @@ touch controls.
 > roads, explore, visit villages, and their ships carry people and goods
 > between Europe and their colonies. When the odds are good they attack
 > the units and colonies of nations they have no peace with, and the
-> villages of tribes they are at war with. Wagon trains and ships can trade with the
+> villages of tribes they are at war with. Their colonies watch for
+> threats, call for guards, arm colonists as soldiers, take in newcomers
+> and ask for the goods they lack. Wagon trains and ships can trade with the
 > natives: sell, haggle, give and buy at the original's prices. Soldiers,
 > scouts and other armed units can demand tribute, which a village pays
 > in goods for your nearest colony when your forces nearby impress it, and

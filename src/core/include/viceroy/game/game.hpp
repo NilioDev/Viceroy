@@ -614,6 +614,9 @@ private:
     int aiRelation(int nation, int other) const;
     int aiAttackOdds(int unit, int x, int y);
     void aiAttack(int unit, int x, int y);
+    void aiColonyPlan(int colony);
+    void aiTakeIntoColony(int unit, int colony);
+    void aiSendOut(int colony, int colonist, int role);
     void aiGoTo(int unit, char goal, int x, int y);
     void aiToEurope(int unit);
     void aiEndMoves(int unit);

@@ -9,8 +9,10 @@ description of that behaviour. Viceroy follows it in
 What is done so far: the order of the turns, the count of each nation's
 forces and people, the tallies the plans start from, the cooling of old
 grudges, everything the computer buys in Europe, the plan each nation
-makes for its units, and what each unit then does on the map, but for
-attacks. Attacks, the colonies' own plans and diplomacy are still to come.
+makes for its units, what each unit then does on the map, its attacks,
+and the first part of each colony's own plans (its guards, what it is
+short of, the units it takes in or sends out, and the goods it asks for).
+The colony's jobs, buildings and teaching and diplomacy are still to come.
 
 ## The round
 
@@ -78,8 +80,8 @@ player's turn).
 
 ## Before the purchases
 
-Each colony of the nation is first looked after by its own plans (still to
-come). Then the turn tallies what the colonies ask for, by good: the good
+Each colony of the nation is first looked after by its own plans (see
+"Colony plans" below). Then the turn tallies what the colonies ask for, by good: the good
 a colony asks for (byte 141 of the colony), muskets twice over when that is
 muskets, and one more for each colony out of muskets, horses or tools.
 Goods already in the nation's ships come off the tally, and each pioneer
@@ -320,6 +322,83 @@ weighed an attack but chose none, and stands next to someone else's
 colony, waits there (goal `F`). The original checks there that the unit
 heads its square's stack; Viceroy only checks that it stands on land.
 
+## Colony plans
+
+Before the tallies, each of the nation's colonies makes its own plans, in
+this order. Viceroy follows it in `src/core/src/game/euro_ai_colony.cpp`.
+
+1. **Housekeeping.** Bytes 138 and 139 are cleared, and the counters at 140
+   (turns of tools for its own land work) and 143 (the pickup bonus) go up
+   by one, to at most 127.
+2. **The threat.** Every armed land unit of another nation within five
+   squares counts with its attack force, scaled by nearness: force ×
+   (8 − distance) / 8, where distance is the longer side plus half the
+   shorter one. A unit on a colony or village square counts half. A unit of
+   another European nation counts only with a force above 1, and half as
+   much again when it is the player's; one standing right next to the
+   colony is noted as adjacent. A brave counts only when its tribe's
+   tension with the nation is at least 25 and its home village's alarm is
+   at least 128. The threat divided by one more than the fortification
+   level, but at least the threat itself up to 16, gives the threat level;
+   byte 30 keeps it in eighths.
+3. **Guards wanted.** An eighth of the threat level, but at most half of
+   its colonists and people on the square, is the number of guards it
+   wants; one more after independence, and at least one when an enemy is
+   adjacent and it has more than one person. Byte 142 keeps it. Each armed
+   unit already on the square takes one off; units there without a home
+   colony take this one as their home.
+4. **The land.** Of the squares it can work (8, or 12 and 20 with a larger
+   town hall), it counts water and off-map squares, forests (and those with
+   good food under the trees), good farmland (food 3 or more) and poor
+   land (food under 2), and of the squares worked, those without a road
+   and the open land not yet plowed. Docks make the water count as land.
+5. **What it is short of** (byte 27). The low three bits stay. It wants
+   people when it was marked for recruits, or when it is below its size
+   for its town hall (8, 12 or 32 colonists, with room for twice the
+   nation's colony need) and has free land. It wants guards (bit 64)
+   whenever it wants any. A guard ratio comes from its size, the nation's
+   first trait and the turn, with two more when the region is quiet and
+   one more when it is contested; when the region is fortified against the
+   nation's attack (not Spain), at most one. Bit 8 is set when the ratio is
+   above the armed units that call it home, bit 4 when they are more than
+   the ratio needs. Mostly water or forest around, or too little good
+   farmland, sets bits 32 and 128 (forest to clear); land without roads or
+   plowing sets bit 128 (a pioneer wanted).
+6. **War on a tribe.** When the nation is set on attacking in the region
+   (its attack count there at least 2), the nearest tribe in the same land
+   is marked for war when its strength in the natives' count is
+   at most twice the nation's attack, its defence in the region is under
+   four times the nation's attack out there (both doubled for Spain), and
+   it is tense with the nation (above 25; Spain does not wait for that). Both relation bytes get bit 2.
+7. **Units join.** While it wants people, people on its square join it,
+   one at a time: a soldier or dragoon when it has too many guards (and
+   it then wants one more), a pioneer when it needs one but has no tools
+   or the region is quiet, a scout when the region is quiet or it has
+   under 52 horses, and every free colonist. Their muskets, horses and
+   tools go into the store.
+8. **One goes out.** With more than one colonist, it may send one out: a
+   scout when it has 102 horses or more and is full; a pioneer when the
+   region is quiet, it has more than 10 colonists, a 1 in 4 chance comes up,
+   the nation has no pioneer and wants colonies, and there are 20 tools;
+   and a soldier (a dragoon with 52 horses) when it wants guards, or in that
+   crowded case, and has 50 muskets. The colonist chosen is one who already
+   has the role's skill, then one without a skill, never an expert for a
+   soldier unless guards are wanted; indentured servants and criminals are
+   picked first, and converts never. It takes its gear from the store: 50
+   muskets, 50 horses, or the tools in twenties up to 100.
+9. **The good it asks for** (byte 141, -1 for none). In order, each later
+   one winning: muskets when it has fewer than 50 × (first trait + 2);
+   trade goods when it has under 100, they are cheap and it is marked for
+   them; horses under 50; tools when it needs a pioneer and has none; and
+   muskets again when it is short of 50 and wants guards. A good it
+   already makes, or has a full store of, is never asked for. With no
+   guards wanted and 200 muskets or more, 50 go back to the nation's store
+   in Europe (up to 20 lots).
+10. **Tools.** When it needs a pioneer, or every tenth turn, and has under 20
+    tools, it buys 20 in Europe if the nation has the gold.
+11. **Horses.** From turn 40, a colony with under 2 horses and a ship or
+    wagon train on its square buys 2 for 10 gold.
+
 ## Not done yet
 
 - What the original's units do on reaching a village they were sent to,
@@ -331,9 +410,9 @@ heads its square's stack; Viceroy only checks that it stands on land.
   original weighs those against the player, by a ranking of the nations
   not read yet).
 
-- The colonies' own plans (which also set the good each colony asks for,
-  the guards it wants and the colonies marked for recruits), and which
-  job a colonist takes on joining a colony.
+- The rest of the colonies' own plans: the jobs of its colonists (a
+  colonist that joins takes the statesman's job for now), what it builds,
+  its own work on the land, teaching and buying training.
 - Diplomacy beyond the cooling of grudges.
 - Which units on the docks the original's ships take (Viceroy takes them
   in the order of the units), and what the original stores in a sailing

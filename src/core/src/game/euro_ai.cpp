@@ -332,11 +332,13 @@ void Game::aiTallies(int n) {
             }
         }
     }
-    for (auto& colony : save_.colonies) {
-        if (colony.nation != n) {
+    for (std::size_t c = 0; c < save_.colonies.size(); ++c) {
+        if (save_.colonies[c].nation != n) {
             continue;
         }
-        // (The colony's own plans come first; see docs/rules/european-ai.md.)
+        // The colony's own plans come first; see docs/rules/european-ai.md.
+        aiColonyPlan(static_cast<int>(c));
+        auto& colony = save_.colonies[c];
         const int asks = signedByte(colony.raw[kColonyWant]);
         if (asks >= 0 && asks < kGoodsKinds) {
             ++want[static_cast<std::size_t>(asks)];

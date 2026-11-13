@@ -4,8 +4,7 @@
 // the start of its turn (the places worth going to and what each region is
 // to it), then what each of its units does. Read from the original with a
 // debugger and a disassembler (observed only); the rules are in our own
-// words in docs/rules/european-ai.md. Attacks are still to come: a square
-// held by another nation or tribe is left alone.
+// words in docs/rules/european-ai.md.
 #include "viceroy/game/colony.hpp"
 #include "viceroy/game/europe.hpp"
 #include "viceroy/game/game.hpp"
@@ -71,10 +70,10 @@ constexpr std::size_t kTrading = 20;  // a wagon train off to trade
 constexpr std::uint8_t kDamaged = 0x80;
 
 // Colony record.
-constexpr std::size_t kThreat = 0x1B;
+constexpr std::size_t kNeeds = 0x1B; // what the colony is short of (its own plans set it)
 constexpr std::size_t kMarks = 0x1C;
 constexpr std::uint8_t kCoastal = 0x40;
-constexpr std::size_t kGarrisonCount = 0x1E;
+constexpr std::size_t kThreatLevel = 0x1E; // the threat around it, in guards
 constexpr std::size_t kWantedGood = 0x8D;
 constexpr std::size_t kGarrison = 0x8E;
 constexpr std::size_t kPickupBonus = 0x8F;
@@ -867,8 +866,8 @@ void Game::aiPlan(int n) {
         if ((colony.raw[kMarks] & kCoastal) == 0) {
             continue;
         }
-        if ((colony.raw[kThreat] & 0x03) != 0) {
-            aiAddTarget(n, colony.x, colony.y, 0, (colony.raw[kThreat] & 0x02) != 0 ? 8 : 5);
+        if ((colony.raw[kNeeds] & 0x03) != 0) {
+            aiAddTarget(n, colony.x, colony.y, 0, (colony.raw[kNeeds] & 0x02) != 0 ? 8 : 5);
         }
         // What a ship could fetch here.
         int value = 0;
@@ -879,7 +878,7 @@ void Game::aiPlan(int n) {
         for (const int i : here) {
             const auto& u = unit(i);
             const auto& t = units[static_cast<std::size_t>(u.type)];
-            if (u.type == unit_type::kPioneer && (colony.raw[kThreat] & 0x80) == 0) {
+            if (u.type == unit_type::kPioneer && (colony.raw[kNeeds] & 0x80) == 0) {
                 value += 800;
                 ++loads;
                 worth = true;
@@ -957,8 +956,8 @@ void Game::aiPlan(int n) {
                     }
                     u.raw[kGoal] = 'A';
                     --colony.raw[kGarrison];
-                    if (colony.raw[kGarrisonCount] > 0) {
-                        --colony.raw[kGarrisonCount];
+                    if (colony.raw[kThreatLevel] > 0) {
+                        --colony.raw[kThreatLevel];
                     }
                 }
             }
@@ -1501,7 +1500,7 @@ int Game::aiDecide(int n, int i) {
     }
     wantFound = wantFound && foundSc != 0;
     if (type == unit_type::kColonist && inOwnColony &&
-        (save_.colonies[static_cast<std::size_t>(ncOwn.index)].raw[kThreat] & 0x10) != 0) {
+        (save_.colonies[static_cast<std::size_t>(ncOwn.index)].raw[kNeeds] & 0x10) != 0) {
         wantFound = false;
     }
     if (wantFound && REG >= 0) {
@@ -1757,7 +1756,7 @@ int Game::aiDecide(int n, int i) {
             if (colony.nation != n || landRegion(map, colony.x, colony.y) != REG) {
                 continue;
             }
-            if ((colony.raw[kThreat] & 0x10) == 0 && U().profession != kConvert) {
+            if ((colony.raw[kNeeds] & 0x10) == 0 && U().profession != kConvert) {
                 continue;
             }
             const int need = std::min(16, colonyTarget(colony));
@@ -1829,7 +1828,7 @@ int Game::aiDecide(int n, int i) {
         if (type == unit_type::kWagonTrain) {
             free = std::min(free, 1);
         }
-        if (ship && (colony.raw[kThreat] & 0x02) != 0 && type < kGalleon) {
+        if (ship && (colony.raw[kNeeds] & 0x02) != 0 && type < kGalleon) {
             ++U().workTurns;
             if (10 - capacity > U().workTurns) {
                 U().raw[kGoal] = 'C';
@@ -2107,7 +2106,7 @@ int Game::aiDecide(int n, int i) {
                     if (mil == 0) {
                         const int pop = std::min(C.population, 16);
                         s = aiRandom(0, 8) + 4 * ((17 - pop) * (17 - pop) + 2) + 2 * (need - C.population) +
-                            (humanThere ? 20 : 0) + ((C.raw[kThreat] & 0x10) != 0 ? 25 : -25);
+                            (humanThere ? 20 : 0) + ((C.raw[kNeeds] & 0x10) != 0 ? 25 : -25);
                     } else {
                         if (st == 0) {
                             continue;
@@ -2122,22 +2121,22 @@ int Game::aiDecide(int n, int i) {
                         if (humanThere) {
                             s += 50;
                         }
-                        if ((C.raw[kThreat] & 0x40) != 0) {
+                        if ((C.raw[kNeeds] & 0x40) != 0) {
                             s += 60;
                         } else if (ai_.openRegions > 1 && ai_.pickupCalls[un] < 20) {
                             s -= 45;
-                        } else if ((C.raw[kThreat] & 0x08) != 0) {
+                        } else if ((C.raw[kNeeds] & 0x08) != 0) {
                             s += 45;
                         } else {
                             s -= 15;
                         }
                     }
                     s += C.raw[kPickupBonus];
-                    if ((C.raw[kThreat] & 0x02) != 0) {
+                    if ((C.raw[kNeeds] & 0x02) != 0) {
                         if (type != kFrigate) {
                             s -= 50;
                         }
-                    } else if ((C.raw[kThreat] & 0x01) != 0 && type < kFrigate) {
+                    } else if ((C.raw[kNeeds] & 0x01) != 0 && type < kFrigate) {
                         s += 2 * (ut.combat - 10);
                     }
                     int cx = C.x;
@@ -2238,9 +2237,9 @@ int Game::aiDecide(int n, int i) {
                                  : 24;
                     }
                 }
-                if ((C.raw[kThreat] & 0x02) != 0 && type < kPrivateer) {
+                if ((C.raw[kNeeds] & 0x02) != 0 && type < kPrivateer) {
                     s += 8 * (ut.combat - 10);
-                } else if ((C.raw[kThreat] & 0x01) != 0 && type < kPrivateer) {
+                } else if ((C.raw[kNeeds] & 0x01) != 0 && type < kPrivateer) {
                     s += 2 * (ut.combat - 10);
                 }
                 s /= distanceBetween(X, Y, C.x, C.y) / 4 + 1;
@@ -2277,7 +2276,7 @@ int Game::aiDecide(int n, int i) {
                     continue;
                 }
                 const auto& C = save_.colonies[static_cast<std::size_t>(p.colony)];
-                if ((C.raw[kThreat] & 0x02) != 0 && type < kPrivateer) {
+                if ((C.raw[kNeeds] & 0x02) != 0 && type < kPrivateer) {
                     continue;
                 }
                 const int s = p.value / (distanceBetween(X, Y, C.x, C.y) / 4 + 1);
@@ -2479,11 +2478,11 @@ int Game::aiDecide(int n, int i) {
         if (attack > 0 && signedByte(U().raw[kHome]) >= 0 &&
             static_cast<std::size_t>(U().raw[kHome]) < save_.colonies.size()) {
             auto& C = save_.colonies[U().raw[kHome]];
-            if (C.nation == n && (C.raw[kThreat] & 0x04) != 0 &&
-                (C.raw[kGarrisonCount] != 0 || type != unit_type::kDragoon) && landRegion(map, C.x, C.y) == REG) {
-                C.raw[kThreat] &= static_cast<std::uint8_t>(~0x04);
-                if (C.raw[kGarrisonCount] > 0) {
-                    --C.raw[kGarrisonCount];
+            if (C.nation == n && (C.raw[kNeeds] & 0x04) != 0 &&
+                (C.raw[kThreatLevel] != 0 || type != unit_type::kDragoon) && landRegion(map, C.x, C.y) == REG) {
+                C.raw[kNeeds] &= static_cast<std::uint8_t>(~0x04);
+                if (C.raw[kThreatLevel] > 0) {
+                    --C.raw[kThreatLevel];
                 }
                 return goTo('W', C.x, C.y);
             }
@@ -2610,11 +2609,11 @@ int Game::aiDecide(int n, int i) {
             const auto& C = save_.colonies[static_cast<std::size_t>(*colony)];
             if (C.nation != n) {
                 s += 16;
-            } else if ((C.raw[kThreat] & 0x40) != 0) {
+            } else if ((C.raw[kNeeds] & 0x40) != 0) {
                 s += 10;
-            } else if ((C.raw[kThreat] & 0x04) != 0) {
+            } else if ((C.raw[kNeeds] & 0x04) != 0) {
                 s += 6;
-            } else if ((C.raw[kThreat] & 0x10) != 0) {
+            } else if ((C.raw[kNeeds] & 0x10) != 0) {
                 s += 3;
             }
         }
