@@ -146,7 +146,8 @@ tribe's capital, 0x08 a scout has spoken with the chief, 0x10 has paid
 tribute), population at 4, the nation whose mission is there at 5
 (0xFF none; bit 0x10 an expert mission), at 7 the good it refuses after
 haggling (0xFE: it sells nothing more), at 8 the good last sold to it, at
-9 the good last bought from it, and from 10 one 16-bit alarm per European nation. See
+9 the good last bought from it, and from 10 one 16-bit alarm per European
+nation (an attack adds one to its high byte). See
 [natives](../rules/natives.md).
 
 **Tribe** (78 bytes, eight of them at the start of the block after the
@@ -154,14 +155,21 @@ settlements, in `@TRIBES` order): the tribe's level at 2 (0 semi-nomadic
 to 3 civilized), two numbers at 7 and 8 that its economy reads for
 muskets and horses, its horses at 10 and silver at 12 (16 bits), what it
 holds of each of the 16 goods from 14 (16 bits each), and its tension
-toward each European nation from 70 (16 bits each).
+toward each European nation from 70 (16 bits each), and its relation to
+each European nation from 58 (bit 0x04 war, as in the nation's own
+relation bytes). Bit 0x40 of byte 3 is set once the player has burned one
+of its settlements.
+
+A nation's byte 24 counts the native settlements it has burned. A native
+unit's byte 6 is the settlement it lives in.
 
 The 727 bytes after the tribe records hold, among what is not read yet,
 the count of forces that a demand for tribute weighs (see
 [natives](../rules/natives.md)): at 44 each European nation's attack in
 all (16 bits each), at 300 its attack outside colonies in each of 16 land
 regions (16 bytes per nation), at 565 each tribe's defence in all (a byte
-each) and at 589 its defence in each region (16 bytes per tribe).
+each) and at 589 its defence in each region (16 bytes per tribe). At
+581 each tribe has its number of settlements (a byte each).
 
 In the block after the map, bytes 608 to 611 hold the game's own random
 seed (the skill each settlement teaches is drawn from it).

@@ -319,6 +319,24 @@ public:
     void countForces();
     // A unit's attack (or defence) in eighths, as the count weighs it.
     int unitForce(const SaveUnit& u, bool attacking) const;
+    // Any land unit with an attack value may attack a village, met or not.
+    bool canAttackVillage(int unit) const;
+    // Attacking makes war on the tribe: the war bit on both sides, the
+    // tribe 10 and twice the difficulty level more tense, and the
+    // village's alarm up.
+    void attackVillageWar(int unit, int settlement);
+    // Who defends the village: a native unit on its square, or else -1 and
+    // one of its people stands up as a brave (armed when the tribe has
+    // muskets, mounted when it has 25 horses).
+    int villageDefenderUnit(int settlement, int attacker) const;
+    SaveUnit villageBrave(int settlement) const;
+    CombatAnalysis analyseVillageAttack(int attacker, int settlement) const;
+    CombatStrengths villageStrengths(int attacker, int settlement) const;
+    // Fights it out. A won fight against the village's own people costs it
+    // a person, and the last one burns it: treasure, the mission's
+    // missionary back, converts for the mission's nation. The attacker's
+    // turn is over; notices tell what happened.
+    CombatOutcome attackVillage(int attacker, int settlement);
 
     // A ship that lost a fight and is being repaired (bit 0x80 of byte 4).
     bool isDamagedShip(int index) const;
@@ -367,7 +385,8 @@ private:
     void runOutNotices(const ColonyTurn& turn, int colony);
     std::uint32_t random_ = 0;
     int nextRandom(int range); // 0 .. range - 1
-    void loseBattle(int loser, int winner);
+    // True when the loser is gone (unit numbers after it move down).
+    bool loseBattle(int loser, int winner);
     CombatStrengths strengthsAgainst(int attacker, const SaveUnit& defender, bool defenderShip, bool defenderDamaged,
                                      int defenderExtra) const;
     SaveUnit colonistAsUnit(int colony, int colonist) const;
@@ -375,6 +394,11 @@ private:
     void loseShip(int loser, int winner);
     void repairShips();
     int addColonyBonus(CombatSide& side, int colony) const; // its quarters
+    int settlementQuarters(int settlement) const;
+    void loseNative(int loser);
+    void winAgainstVillage(int attacker, int settlement);
+    void burnSettlement(int settlement);
+    int villageTreasure(int nation, int tribe, bool capital);
 };
 
 } // namespace viceroy

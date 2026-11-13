@@ -460,6 +460,63 @@ void drawColonyDefender(Screen& screen, const Art& art, const Game& game, int co
     screen.blit(*image, px + x, py);
 }
 
+void drawSettlementPicture(Screen& screen, const Art& art, const SaveSettlement& s, int px, int py) {
+    const auto tribe = static_cast<std::size_t>(s.nation - kEuropeanNations);
+    const int level = tribe < art.rules.tribes.size() ? art.rules.tribes[tribe].level : 0;
+    // Centred on the square like a colony.
+    if (const auto* image = sprite(art.icons, kSettlementBase + std::clamp(level, 0, 3))) {
+        screen.blit(*image, px + (kSquare - image->width) / 2, py);
+    }
+    // A mission: a cross in the colour of the nation that sent it on
+    // a black plate (byte 5: 0xFF none, else the nation in the low
+    // four bits). Seen on the original for a French mission.
+    const int mission = s.raw[5];
+    if (mission != 0xFF && (mission & 15) < kEuropeanNations) {
+        const std::uint8_t colour = nationColour(art, mission & 15);
+        // The plate's rim, colours 0x88 and 0x93, as seen.
+        screen.pixel(px + 8, py + 4, 0x88);
+        for (int j = 6; j <= 10; ++j) {
+            const std::uint8_t rim = j == 8 ? 0x93 : 0x88;
+            screen.pixel(px + 5, py + j, rim);
+            screen.pixel(px + 11, py + j, rim);
+        }
+        for (int i = 6; i <= 10; ++i) {
+            screen.pixel(px + i, py + 11, i == 8 ? 0x93 : 0x88);
+        }
+        screen.fill({px + 6, py + 5, 5, 6}, kBlack);
+        screen.fill({px + 8, py + 6, 1, 4}, colour);
+        screen.fill({px + 7, py + 7, 3, 1}, colour);
+    }
+}
+
+void drawBraveDefender(Screen& screen, const Art& art, const Game& game, int type, int nation, int px, int py) {
+    // Seen: the village's brave with a "-" box in the tribe's colour.
+    const auto& types = game.rules().units;
+    if (type < 0 || type >= static_cast<int>(types.size())) {
+        return;
+    }
+    const auto* image = sprite(art.icons, types[static_cast<std::size_t>(type)].icon - 1);
+    if (image == nullptr || image->width <= 0) {
+        return;
+    }
+    constexpr int kMountedBrave = 21;
+    const bool mounted = type >= kMountedBrave;
+    const int x = mounted ? 2 : image->width <= 7 ? 3 : 2;
+    for (int j = 0; j < image->height; ++j) {
+        for (int i = 0; i < image->width; ++i) {
+            if (image->pixels[static_cast<std::size_t>(j * image->width + i)] != kTransparent) {
+                screen.pixel(px + x - 2 + i, py + j, kBlack);
+            }
+        }
+    }
+    const Rect box = mounted ? Rect{px, py, 7, 9} : Rect{px + x + image->width - 2, py + 7, 7, 9};
+    screen.fill(box, nationColour(art, nation));
+    screen.frame(box, kBlack);
+    const int w = Screen::textWidth(art.tiny, "-");
+    screen.text(art.tiny, box.x + (box.w - w) / 2 + 1, box.y + 2, "-", {kBlack, kNoColour, kNoColour});
+    screen.blit(*image, px + x, py);
+}
+
 void drawColonyPicture(Screen& screen, const Art& art, const SaveColony& c, int px, int py) {
     const int fortification = c.raw[132] & 7;
     const int icon = fortification == 0 ? kColonyOpen : fortification == 1 ? 0 : fortification == 3 ? 1 : 2;
@@ -758,34 +815,7 @@ void drawMap(Screen& screen, const Art& art, const Game& game, const ViewState& 
 
     for (const auto& s : save.settlements) {
         if (visible(s.x, s.y)) {
-            const auto tribe = static_cast<std::size_t>(s.nation - kEuropeanNations);
-            const int level = tribe < art.rules.tribes.size() ? art.rules.tribes[tribe].level : 0;
-            // Centred on the square like a colony.
-            const int px = screenX(s.x);
-            const int py = screenY(s.y);
-            if (const auto* image = sprite(art.icons, kSettlementBase + std::clamp(level, 0, 3))) {
-                screen.blit(*image, px + (kSquare - image->width) / 2, py);
-            }
-            // A mission: a cross in the colour of the nation that sent it on
-            // a black plate (byte 5: 0xFF none, else the nation in the low
-            // four bits). Seen on the original for a French mission.
-            const int mission = s.raw[5];
-            if (mission != 0xFF && (mission & 15) < kEuropeanNations) {
-                const std::uint8_t colour = nationColour(art, mission & 15);
-                // The plate's rim, colours 0x88 and 0x93, as seen.
-                screen.pixel(px + 8, py + 4, 0x88);
-                for (int j = 6; j <= 10; ++j) {
-                    const std::uint8_t rim = j == 8 ? 0x93 : 0x88;
-                    screen.pixel(px + 5, py + j, rim);
-                    screen.pixel(px + 11, py + j, rim);
-                }
-                for (int i = 6; i <= 10; ++i) {
-                    screen.pixel(px + i, py + 11, i == 8 ? 0x93 : 0x88);
-                }
-                screen.fill({px + 6, py + 5, 5, 6}, kBlack);
-                screen.fill({px + 8, py + 6, 1, 4}, colour);
-                screen.fill({px + 7, py + 7, 3, 1}, colour);
-            }
+            drawSettlementPicture(screen, art, s, screenX(s.x), screenY(s.y));
         }
     }
 

@@ -47,19 +47,24 @@ bool armed(int type) {
 }
 
 // Measured: a soldier routed becomes a colonist, a dragoon a soldier. The
-// rest follow the same rule (they lose their horses first, then their
-// muskets) and are not measured.
+// rest, read from the original's list: cavalry become regulars,
+// continental cavalry continental army, which becomes colonists. Scouts
+// and regulars are not on it: they die.
 int demotedType(int type) {
     switch (type) {
     case unit_type::kDragoon: return unit_type::kSoldier;
     case kCavalry: return kRegulars;
     case kContinentalCavalry: return kContinentalArmy;
     case unit_type::kSoldier:
-    case unit_type::kScout:
-    case kRegulars:
     case kContinentalArmy: return unit_type::kColonist;
     default: return -1;
     }
+}
+
+// Only colonists, wagon trains and treasure are taken; anyone else who
+// loses and is not demoted dies.
+bool capturable(int type) {
+    return type == unit_type::kColonist || type == unit_type::kWagonTrain || type == unit_type::kTreasure;
 }
 
 } // namespace
@@ -227,12 +232,15 @@ CombatStrengths Game::strengthsAgainst(int attacker, const SaveUnit& du, bool de
     const bool defenderHuman = du.nation == human();
     const int difficulty = save_.difficulty;
     const auto colony = colonyAt(du.x, du.y);
+    const auto settlement = colony ? std::nullopt : settlementAt(du.x, du.y);
 
     // The defender's bonus, in quarters.
     int m = 0;
     if (colony) {
         m = 2 * (buildingLevel(save_.colonies[static_cast<std::size_t>(*colony)], BuildingKind::Fortification) + 1);
-    } else if (attackerEuropean && defenderEuropean) {
+    } else if (settlement) {
+        m = settlementQuarters(*settlement);
+    } else if (!defenderEuropean || attackerEuropean) {
         const int row = terrainRow(save_.map.at(du.x, du.y));
         if (row >= 0 && row < static_cast<int>(rules_.terrain.size())) {
             m = rules_.terrain[static_cast<std::size_t>(row)].defenseBonus;
@@ -260,13 +268,18 @@ CombatStrengths Game::strengthsAgainst(int attacker, const SaveUnit& du, bool de
         d >>= 1; // someone who cannot fight
     }
     const bool dugIn = (du.orders == SaveUnit::kFortify || du.orders == SaveUnit::kFortified) && defenderEuropean;
-    if (!colony && !dugIn) {
+    if (!colony && !settlement && !dugIn) {
         if (au.type == kArtillery) {
             a >>= 2;
         }
         if (du.type == kArtillery) {
             d >>= 2;
         }
+    }
+    // Spain's bonus against the natives in their villages.
+    constexpr int kSpain = 2;
+    if (settlement && au.nation == kSpain && !defenderEuropean) {
+        a += a >> 1;
     }
     if (difficulty <= 1) {
         constexpr int kEarlyTurns = 80;
@@ -595,11 +608,11 @@ CombatOutcome Game::attack(int attacker, int defender) {
         return won ? CombatOutcome::AttackerWon : CombatOutcome::DefenderWon;
     }
     if (won) {
-        loseBattle(defender, attacker);
-        promote(attacker, s.attack, s.defense);
+        const bool gone = loseBattle(defender, attacker);
+        promote(gone && defender < attacker ? attacker - 1 : attacker, s.attack, s.defense);
     } else {
-        loseBattle(attacker, defender);
-        promote(defender, s.defense, s.attack);
+        const bool gone = loseBattle(attacker, defender);
+        promote(gone && attacker < defender ? defender - 1 : defender, s.defense, s.attack);
     }
     refreshUnitFlags();
     return won ? CombatOutcome::AttackerWon : CombatOutcome::DefenderWon;
@@ -668,20 +681,29 @@ void Game::promote(int index, int own, int opponent) {
     notices_.push_back({"VALOR", {typeName, expertName(from), expertName(to)}});
 }
 
-void Game::loseBattle(int loser, int winner) {
+bool Game::loseBattle(int loser, int winner) {
     auto& l = save_.units[static_cast<std::size_t>(loser)];
     const auto name = [&](int type) {
         return type >= 0 && type < static_cast<int>(rules_.units.size()) ? rules_.units[static_cast<std::size_t>(type)].name
                                                                          : std::string();
     };
-    if (const int to = demotedType(l.type); to >= 0) {
+    if (l.nation >= kEuropeanNations) {
+        loseNative(loser);
+        return true;
+    }
+    if (int to = demotedType(l.type); to >= 0) {
+        // A Jesuit missionary who took up arms goes back to preaching.
+        constexpr int kJesuit = 0x18;
+        if (to == unit_type::kColonist && l.profession == kJesuit) {
+            to = unit_type::kMissionary;
+        }
         // "French Dragoons routed! Unit demoted to Soldiers status."
         GameNotice notice{"DEMOTE", {"", name(l.type), name(to)}};
         notice.adjectives = {{0, l.nation}};
         notices_.push_back(std::move(notice));
         // Measured: a fortified unit stays fortified.
         l.type = to;
-        return;
+        return false;
     }
     if (l.type == kArtillery) {
         // Measured: the first defeat sets the damage flag, and the unit
@@ -695,10 +717,13 @@ void Game::loseBattle(int loser, int winner) {
         } else {
             l.raw[4] = static_cast<std::uint8_t>(l.raw[4] | SaveUnit::kDamaged);
         }
-        return;
+        return destroyed;
     }
-    if (winner < 0) {
-        return; // only fighters attack a colony
+    // Measured: a scout beaten by a village's brave is gone, without a
+    // word. Natives take no one.
+    if (!capturable(l.type) || winner < 0 || unit(winner).nation >= kEuropeanNations) {
+        removeUnit(loser);
+        return true;
     }
     const auto& w = unit(winner);
     // Someone who cannot fight is taken by the winner (measured for
@@ -721,6 +746,7 @@ void Game::loseBattle(int loser, int winner) {
     if (veteran) {
         l.profession = kFreeColonist;
     }
+    return false;
 }
 
 } // namespace viceroy

@@ -109,6 +109,10 @@ void drawColonyDefender(Screen& screen, const Art& art, const Game& game, int co
                         int px, int py);
 // A colony's map picture (with its stockade) and pennant at (px, py).
 void drawColonyPicture(Screen& screen, const Art& art, const SaveColony& colony, int px, int py);
+// A native settlement as on the map, with its mission's cross.
+void drawSettlementPicture(Screen& screen, const Art& art, const SaveSettlement& settlement, int px, int py);
+// A village's own brave in the combat analysis.
+void drawBraveDefender(Screen& screen, const Art& art, const Game& game, int type, int nation, int px, int py);
 // The same in the colony's list of units present: a unit without orders
 // shows as on sentry, and artillery has a smaller picture.
 void drawUnitInColonyList(Screen& screen, const Art& art, const Game& game, int index, int px, int py);
