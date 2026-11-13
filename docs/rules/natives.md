@@ -150,6 +150,51 @@ The original weighs how hard the Europeans press on a native settlement
   mission of another nation adds half (an expert mission doubles it); the
   nation's own mission takes a quarter off (an expert mission half).
 
+## The natives' turn
+
+Read from the original's code and checked by ending turns in it. At the
+end of the turn every tribe that is left (bit 0x80 of its byte 3 clear)
+has its turn, in `@TRIBES` order, after the word per nation at 46 of every
+tribe record has been cleared:
+
+1. Its musket count (byte 7) is raised to 0 if it went below.
+2. Each of its settlements, in list order:
+   - Growth. A settlement holds up to twice the tribe's level plus three
+     people (three times the level plus four for the capital). Below that,
+     or when its brave is gone (bit 0x01 of byte 3, set when a native unit
+     is removed), byte 6 gains the population. At 20 or more it goes back
+     to 0 and the settlement gains a person, or, if its brave was gone,
+     raises a new one: a brave, armed if the tribe has muskets (each new
+     armed brave uses one with a chance of 1 in the difficulty level plus
+     1), mounted if the tribe has 50 horses (which it uses). The brave's
+     home is the settlement (its byte 6).
+   - The tribe calms toward every nation it has met: with the tension's
+     step s (0 to 3, at 25, 50 and 75), s² + 1 rolls of 1 in 13 − s² each
+     add one to the tribe's mood counter for that nation (a signed byte
+     at 54 + nation).
+   - A mission adds 1 to the counter of its nation (4 for an expert
+     mission), twice that at the capital, twice again with father 24 and
+     half with father 23, and takes three times that off the settlement's
+     alarm toward the nation (not below 0).
+   - The nation pressing hardest on the settlement (see below) loses its
+     pressure (twice at the capital) from its counter, and the
+     settlement's alarm toward it rises by that amount (halved if it also
+     runs the mission there) plus a fifth of the tribe's tension.
+   - Each 8 on a counter takes one off the tribe's tension toward the
+     nation, and each −8 adds one (through the tension rule above).
+3. Its goods wear away: each holding (16 bits from byte 14) moves toward 0
+   by the tribe's level plus one.
+4. It counts itself: its settlements, its people, and its units' attack
+   (8 per point, at most 255) in all and per land region (the fields at
+   565, 573, 581 and 589 of the block after the tribe records).
+5. Horses breed by byte 8, up to twice its people plus 25. The original
+   reads the tribe of the last settlement in its list here, so it is
+   always that tribe's horses that breed, by its own byte 8, once for
+   every tribe's turn (measured: 3 in the Cherokee byte 8 gave 15 more
+   horses with five tribes left, and 5 in the Apache byte 8 gave none).
+6. Its units move. Not done yet, nor the war of independence, when a
+   tribe may take the Crown's side (`@INDIANGRUDGE`).
+
 ## Denouncing heresy
 
 A missionary at another nation's mission weighs the two sides:

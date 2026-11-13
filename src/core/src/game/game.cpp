@@ -612,6 +612,7 @@ void Game::endTurn() {
             }
         }
     }
+    nativesTurn();
     ++save_.turn;
     if (save_.year < 1600) {
         ++save_.year;
@@ -1079,6 +1080,13 @@ int Game::moveToFront(int index) {
 }
 
 void Game::removeUnit(int index) {
+    // A settlement whose brave is gone raises a new one (seen in the
+    // original's code: bit 0x01 of the home settlement's byte 3).
+    const auto& gone = save_.units[static_cast<std::size_t>(index)];
+    if (gone.nation >= kEuropeanNations && gone.raw[6] < save_.settlements.size()) {
+        auto& home = save_.settlements[gone.raw[6]];
+        home.raw[3] = static_cast<std::uint8_t>(home.raw[3] | 0x01);
+    }
     save_.units.erase(save_.units.begin() + index);
     auto fix = [index](int& ref) {
         if (ref == index) {
