@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "viceroy/render/dialog.hpp"
 
+#include "viceroy/data/text_table.hpp"
 #include "viceroy/game/europe.hpp"
+#include "viceroy/game/natives.hpp"
 #include "viceroy/render/game_view.hpp"
 #include <algorithm>
 #include <optional>
@@ -439,6 +441,14 @@ void drawCombatAnalysis(Screen& screen, const Art& art, const Game& game, const 
             const int job = professionJob(c.skills[static_cast<std::size_t>(std::clamp(s.colonist, 0, kMaxColonists - 1))]);
             const auto& jobs = game.rules().jobs;
             name = job >= 0 && job < static_cast<int>(jobs.size()) ? jobs[static_cast<std::size_t>(job)].name : "";
+        } else if (s.settlement >= 0 && s.settlement < static_cast<int>(game.state().settlements.size())) {
+            // Seen: the village's own "Braves".
+            const int nation = game.state().settlements[static_cast<std::size_t>(s.settlement)].nation;
+            drawBraveDefender(screen, art, game, s.braveType, nation, left, y - 1);
+            const auto& types = game.rules().units;
+            name = s.braveType >= 0 && s.braveType < static_cast<int>(types.size())
+                       ? types[static_cast<std::size_t>(s.braveType)].name
+                       : "";
         }
         screen.text(font, left + 17, y + 5, name, kBasic);
         const std::string base = std::to_string(s.base);
@@ -449,7 +459,23 @@ void drawCombatAnalysis(Screen& screen, const Art& art, const Game& game, const 
                 const auto& u = game.unit(s.unit);
                 drawTerrain(screen, art, game, u.x, u.y, left, y - 1);
             }
-            const bool picture = b.terrainPicture || b.colonyPicture;
+            std::string text = b.text;
+            const auto& settlements = game.state().settlements;
+            if (b.settlementPicture >= 0 && b.settlementPicture < static_cast<int>(settlements.size())) {
+                // Seen: "Camp" beside the camp: the second column of @LEVELS.
+                const auto& settlement = settlements[static_cast<std::size_t>(b.settlementPicture)];
+                drawSettlementPicture(screen, art, settlement, left, y - 1);
+                if (text.empty()) {
+                    if (const auto* levels = art.names.find("LEVELS")) {
+                        const bool capital = (settlement.raw[3] & kSettlementCapital) != 0;
+                        const auto row = static_cast<std::size_t>(capital ? 4 : tribeLevel(game.state(), tribeOf(settlement)));
+                        const auto fields =
+                            row < levels->lines.size() ? splitFields(levels->lines[row]) : std::vector<std::string>{};
+                        text = fields.size() > 1 ? fields[1] : "";
+                    }
+                }
+            }
+            const bool picture = b.terrainPicture || b.colonyPicture || b.settlementPicture >= 0;
             if (b.colonyPicture) {
                 const int x = s.unit >= 0 ? game.unit(s.unit).x : -1;
                 const int yy = s.unit >= 0 ? game.unit(s.unit).y : -1;
@@ -458,7 +484,7 @@ void drawCombatAnalysis(Screen& screen, const Art& art, const Game& game, const 
                     drawColonyPicture(screen, art, game.state().colonies[static_cast<std::size_t>(*colony)], left, y - 1);
                 }
             }
-            screen.text(font, picture ? left + 17 : left, y + 5, b.text.empty() ? label(b.label) : b.text, kBasic);
+            screen.text(font, picture ? left + 17 : left, y + 5, text.empty() ? label(b.label) : text, kBasic);
             const std::string value = b.points != 0 ? (b.points > 0 ? "+" : "") + std::to_string(b.points)
                                                     : (b.percent > 0 ? "+" : "") + std::to_string(b.percent) + "%";
             screen.text(font, left + 80 - Screen::textWidth(font, value), y + 5, value, kHilite);

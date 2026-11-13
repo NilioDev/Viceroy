@@ -48,7 +48,8 @@ touch controls.
 > natives: sell, haggle, give and buy at the original's prices. Soldiers,
 > scouts and other armed units can demand tribute, which a village pays
 > in goods for your nearest colony when your forces nearby impress it, and
-> the chief's face shows how angry the tribe is. Fish,
+> the chief's face shows how angry the tribe is. They can also attack a
+> village and burn it, for treasure, converts and the tribe's anger. Fish,
 > ore and the other resources show on the map where the original puts them
 > and add to what your colonists make there;
 > lost city rumours are not drawn yet.

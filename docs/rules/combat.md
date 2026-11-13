@@ -119,10 +119,16 @@ counts in the save.
 All told by the colonial advisor, box at x 54 centred on row 139:
 
 - A dragoon is demoted to soldier, a soldier to colonist (`@DEMOTE`). A
-  fortified unit stays fortified.
+  fortified unit stays fortified. Read from the original's list: cavalry
+  become regulars, continental cavalry continental army, continental army
+  colonists, and a Jesuit soldier a missionary again. Scouts and regulars
+  are not on the list: they die, without a message (measured for a
+  scout).
 - Artillery is damaged the first time (`@ARTILLERY`) and destroyed the
   second (`@ARTILLERY2`). The damaged unit stays on its square.
-- A colonist, wagon train or treasure is captured: it changes nation,
+- A beaten native unit dies; see [natives](natives.md).
+- A colonist, wagon train or treasure is captured (natives take no one;
+  anyone else who cannot fight dies): it changes nation,
   moves onto the winner's square and waits for orders (`@COLONISTCAPTURE`,
   `@COLONISTCAPTURE2` for a veteran, `@WAGONCAPTURE`, `@LOOTCAPTURE`).
 - The attacker's turn is over, win or lose.

@@ -240,7 +240,8 @@ VCR_TEST("original files: a scout speaks with the chief") {
     play.game().setActiveUnit(scout);
     play.handle(Command::MoveE);
     VCR_CHECK(play.dialog().has_value());
-    VCR_CHECK(play.dialog()->options.size() == 3); // Ask to Speak With Chief, Demand Tribute, Cancel Action
+    // Seen: Ask to Speak With Chief, Demand Tribute, Attack Village, Cancel Action.
+    VCR_CHECK(play.dialog()->options.size() == 4);
     play.handle(Command::Confirm);
     VCR_CHECK(play.dialog().has_value()); // the chief's greeting
     VCR_CHECK(play.dialog()->portrait == kNativePortraits + 4 * kIroquois);
@@ -445,8 +446,8 @@ VCR_TEST("original files: demanding tribute (measured)") {
     play.setArt(&art);
     play.game().setActiveUnit(scout);
     play.handle(Command::MoveE);
-    // Ask to Speak With Chief, Demand Tribute, Cancel Action.
-    VCR_CHECK(play.dialog().has_value() && play.dialog()->options.size() == 3);
+    // Ask to Speak With Chief, Demand Tribute, Attack Village, Cancel Action.
+    VCR_CHECK(play.dialog().has_value() && play.dialog()->options.size() == 4);
     play.handle(Command::Down);
     play.handle(Command::Confirm);
     // Seen: "Great Discoverer, ... the humble and peaceloving Iroquois shall
@@ -496,4 +497,124 @@ VCR_TEST("original files: demanding tribute (measured)") {
     }
     VCR_CHECK(text.find("We laugh at your puny threats") != std::string::npos);
     VCR_CHECK(tribeTension(angry.game().state(), kIroquois, kDutch) == 80 + save.difficulty + 1);
+}
+
+VCR_TEST("original files: attacking a village (measured)") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
+    const SaveGame original = readSaveGame(Bytes(std::istreambuf_iterator<char>(in), {}));
+    // As measured: the Dutch unit 47 beside the Apache camp at (4, 18),
+    // which has no brave on its square; brave 13 lives there.
+    constexpr int kDutch = 3, kApache = 5, kCamp = 15, kUnit = 47;
+    constexpr int kArtilleryType = 11, kScoutType = 5;
+    const auto scenario = [&](int type, int population, int mission, int turn) {
+        SaveGame save = original;
+        save.turn = turn;
+        auto& u = save.units[kUnit];
+        u.type = type;
+        u.profession = 0x1C;
+        u.x = 3;
+        u.y = 18;
+        u.movesUsed = 0;
+        u.orders = SaveUnit::kNoOrders;
+        save.nations[kDutch].raw[52 + 4 + kApache] = 0x60;
+        save.settlements[kCamp].population = population;
+        save.settlements[kCamp].raw[4] = static_cast<std::uint8_t>(population);
+        save.settlements[kCamp].raw[5] = static_cast<std::uint8_t>(mission);
+        return save;
+    };
+
+    {
+        // Seen: Attack Village first for artillery; Combat Analysis with
+        // "Artillery 7, Attack Bonus +50%" against "Braves 1, Camp +50%".
+        PlayScreen play(Game(scenario(kArtilleryType, 1, 3, 0), art.rules), {});
+        play.setArt(&art);
+        play.game().setActiveUnit(kUnit);
+        play.handle(Command::MoveE);
+        VCR_CHECK(play.dialog().has_value() && play.dialog()->options.size() == 3);
+        const auto a = play.game().analyseVillageAttack(kUnit, kCamp);
+        VCR_CHECK(a.attacker.base == 7 && a.attacker.bonuses.size() == 1 && a.attacker.bonuses[0].percent == 50);
+        VCR_CHECK(a.defender.unit == -1 && a.defender.braveType == 19 && a.defender.base == 1);
+        VCR_CHECK(a.defender.bonuses.size() == 1 && a.defender.bonuses[0].percent == 50 &&
+                  a.defender.bonuses[0].settlementPicture == kCamp);
+        // On the easiest level: (7 x 8 x 1.5 + 4) x 2 against 1 x 8 x 1.5,
+        // halved for a brave against a soldier's weapons.
+        const auto s = play.game().villageStrengths(kUnit, kCamp);
+        VCR_CHECK(s.attack == 176 && s.defense == 6);
+    }
+
+    bool sawWin = false, sawBurn = false, sawLoss = false;
+    for (int turn = 0; turn < 40 && !(sawWin && sawBurn && sawLoss); ++turn) {
+        {
+            // A camp of three with an expert Dutch mission: war, tension 10
+            // up on the easiest level, the alarm's high byte one up; a win costs it a person and
+            // may bring converts to the attacker's square.
+            Game game(scenario(kArtilleryType, 3, 0x13, turn), art.rules);
+            const int tensionBefore = tribeTension(game.state(), kApache, kDutch);
+            game.attackVillageWar(kUnit, kCamp);
+            VCR_CHECK((game.state().nations[kDutch].raw[52 + 4 + kApache] & 0x04) != 0);
+            VCR_CHECK((game.state().tribesAndMore[kApache * 78 + 58 + kDutch] & 0x04) != 0);
+            VCR_CHECK(tribeTension(game.state(), kApache, kDutch) == tensionBefore + 10);
+            VCR_CHECK(game.state().settlements[kCamp].raw[17] == 1);
+            const int units = game.unitCount();
+            if (game.attackVillage(kUnit, kCamp) == CombatOutcome::AttackerWon && !sawWin) {
+                sawWin = true;
+                VCR_CHECK(game.state().settlements[kCamp].population == 2);
+                VCR_CHECK(game.unit(kUnit).movesUsed == game.movementAllowance(kUnit));
+                const auto notices = game.takeNotices();
+                if (game.unitCount() == units + 1) {
+                    const auto& convert = game.unit(units);
+                    VCR_CHECK(convert.profession == 0x1B && convert.x == 3 && convert.y == 18 && convert.nation == kDutch);
+                    VCR_CHECK(!notices.empty() && notices.front().section == "INDIANSLAVES");
+                }
+            }
+        }
+        {
+            // The last of a camp: it burns, its brave with it; the Dutch
+            // missionary and the treasure stand where it was. With Cortes
+            // the camp always has some: 200 to 400, half as much again (the
+            // original found 300).
+            Game game(scenario(kArtilleryType, 1, 3, turn), art.rules);
+            const auto count = game.state().settlements.size();
+            const int burned = game.state().nations[kDutch].raw[24];
+            if (game.attackVillage(kUnit, kCamp) == CombatOutcome::AttackerWon && !sawBurn) {
+                sawBurn = true;
+                const auto& st = game.state();
+                VCR_CHECK(st.settlements.size() == count - 1);
+                VCR_CHECK(!game.settlementAt(4, 18).has_value());
+                VCR_CHECK(st.nations[kDutch].raw[24] == burned + 1);
+                VCR_CHECK(st.tribesAndMore[8 * 78 + 581 + kApache] == original.tribesAndMore[8 * 78 + 581 + kApache] - 1);
+                bool brave = false, missionary = false;
+                int treasure = 0;
+                for (const auto& u : st.units) {
+                    brave |= u.nation == 4 + kApache && u.x == 3 && u.y == 18 && u.type == 19;
+                    missionary |= u.type == 3 && u.x == 4 && u.y == 18 && u.nation == kDutch && u.profession == 0x1C;
+                    if (u.type == 10 && u.x == 4 && u.y == 18) {
+                        treasure = u.profession * 100;
+                    }
+                }
+                VCR_CHECK(!brave && missionary);
+                const auto notices = game.takeNotices();
+                VCR_CHECK(!notices.empty());
+                VCR_CHECK(treasure == 300 || treasure == 400 || treasure == 600);
+                VCR_CHECK(notices.back().section == "LOOT" && notices.back().numbers.front() == treasure);
+                VCR_CHECK(notices.back().value == 0); // "Camp"
+            }
+        }
+        {
+            // Measured: a scout beaten by the camp is gone without a word.
+            Game game(scenario(kScoutType, 3, 0xFF, turn), art.rules);
+            const int units = game.unitCount();
+            if (game.attackVillage(kUnit, kCamp) == CombatOutcome::DefenderWon && !sawLoss) {
+                sawLoss = true;
+                VCR_CHECK(game.unitCount() == units - 1);
+                VCR_CHECK(game.takeNotices().empty());
+            }
+        }
+    }
+    VCR_CHECK(sawWin && sawBurn && sawLoss);
 }

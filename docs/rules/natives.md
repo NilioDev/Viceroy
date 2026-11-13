@@ -30,11 +30,12 @@ has met the tribe is offered **Live Among The Natives**; everyone is
 offered **Cancel Action**, which leaves the unit where it was. A scout of
 a nation that has met the tribe is offered **Ask to Speak With Chief**.
 Any land unit with an attack above 0, except a missionary, is offered
-**Demand Tribute** when its nation has met the tribe. The original also
-offers **Attack Village**: first, to units with an attack above 1, and
-after Demand Tribute to the others (a scout sees Speak, Demand Tribute,
-Attack Village, Cancel Action); Viceroy does not have it yet. Without
-contact with the tribe only Cancel Action is there. A missionary is
+**Demand Tribute** when its nation has met the tribe. Any land unit with
+an attack above 0 is offered **Attack Village**, met or not: first (after
+Speak) to units with an attack above 1, and after Demand Tribute to the
+others (seen: artillery gets Attack Village, Demand Tribute, Cancel
+Action; a scout Speak, Demand Tribute, Attack Village, Cancel Action).
+Without contact with the tribe the others are not there. A missionary is
 offered **Establish Mission** at a settlement without a mission (the
 original also offers Incite Indians, and Denounce Heresy at another
 nation's mission, which Viceroy does not have yet).
@@ -187,6 +188,63 @@ at sea).
   a brave, 16 for an armed one.
 
 The counts are kept in the save; see [the savegame format](../formats/savegame.md).
+
+## Attacking a village
+
+Read from the original with a debugger, then measured on the Apache camp
+at (4, 18) in `COLONY00.SAV` (easiest level):
+
+- Choosing **Attack Village** makes war at once, whatever the fight's
+  outcome: the war bit 0x04 is set in the nation's relation to the tribe
+  and in the tribe's relation to the nation; the tribe's tension toward
+  the nation goes up by 10 and twice the difficulty level (measured 10,
+  14 and 18 on levels 0, 2 and 4, from 0 and from 40 alike); the high byte
+  of the village's alarm toward the nation goes up by one.
+- A native unit standing on the settlement defends it. When there is
+  none, one of the village's people stands up: a **brave**, armed when
+  the tribe has muskets (its byte 7 is not 0), mounted when it has 25
+  horses or more.
+- The fight is the land fight of [combat](combat.md) with the settlement
+  in place of the colony: +50% for a camp or village, +100% for a city of
+  an advanced or civilized tribe, twice that for a capital; fortified
+  adds +50% only below +125%; no artillery penalty in a settlement; Spain
+  attacks natives in their settlements with half again. A brave cannot
+  stand up to firearms: against an attack above 1 its defence is halved,
+  as for anyone with a combat value below 2. The Combat Analysis box shows
+  the brave ("Braves 1") and the settlement by its word in `@LEVELS`
+  ("Camp +50%") with its picture.
+- A beaten brave is gone, without a message; half the time the tribe gets
+  back its muskets (byte 7 one up) and its horses (25 more).
+- A won fight against the village's own people costs it a person. When
+  the last one falls it burns: the settlement and the braves who live
+  there (unit byte 6 is their home) are gone, the other natives' home
+  numbers above it move down, the tribe's settlement count (byte 581 +
+  tribe of the block after the tribe records) drops by one, and the
+  nation's count of burned villages (its byte 24) goes up. A human
+  player's burning sets bit 0x40 of the tribe's byte 3. The attacker's
+  own mission sends its missionary out onto the settlement's square (a
+  Jesuit for an expert mission).
+- Each such win where the attacker runs the mission may bring converts:
+  the chance is 4 in 13 (8 for an expert mission), 4 more for Spain and
+  with Juan de Sepulveda, 4 less with Bartolome de las Casas. A convert
+  appears on the attacker's square: "Frightened Apache flock to Dutch
+  mission as converts." (`@INDIANSLAVES`).
+- The ruins may hold treasure, in hundreds: a camp 2 to 4 (only one time
+  in 7, one in 4 for Spain), a village 3 to 8 (one time in 3); doubled
+  for a capital, half again with Hernan Cortes, and a capital or Cortes
+  always finds some. A city of an advanced tribe has 20 to 60 (40 to 100
+  for a capital), 60 more with Cortes and 30 more for Spain; a civilized
+  tribe's city 2 to 6 times 16 (25 for a capital, 10 more with Cortes,
+  5 more for Spain). The treasure stands on the settlement's square (unit
+  byte 23 holds the hundreds): "Dutch loot and burn Apache Camp! Natives
+  flee in panic! 300 worth of treasure recovered from ruins!" (`@LOOT`,
+  measured with Cortes), or `@LOOT2` without treasure.
+- A burned capital calms the tribe down to 15 and clears every one of its
+  villages' alarm toward the nation; the chief tells a human player that
+  the tribe bows (`@INDIANBOW`).
+- A lost fight is lost as anywhere: a soldier becomes a colonist, a
+  dragoon a soldier; a scout dies, without a message (measured).
+- The attacker's turn is over, win or lose.
 
 ## Trade
 

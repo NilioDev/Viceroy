@@ -167,6 +167,7 @@ private:
     // A fight, step by step: the treaty question, the tired men, the
     // Combat Analysis box, then the result.
     void startAttack(int attacker, int defender, int colony = -1);
+    void attackVillage(int unit);
     void continueAttack();
     void resolveAttack();
     std::string adjective(int nation) const; // "French"
@@ -189,7 +190,15 @@ private:
     std::vector<int> unitOptions_;
     void openUnitOptions(int unit, bool first);
     // A unit at a native settlement: what each option of the greeting does.
-    enum VillageOption { kVillageTrade, kVillageLive, kVillageMission, kVillageSpeak, kVillageTribute, kVillageCancel };
+    enum VillageOption {
+        kVillageTrade,
+        kVillageLive,
+        kVillageMission,
+        kVillageSpeak,
+        kVillageTribute,
+        kVillageAttack,
+        kVillageCancel
+    };
     std::vector<int> villageOptions_;
     int village_ = -1;
     void enterVillage(int unit, int settlement);
@@ -243,6 +252,7 @@ private:
         bool tiredAsked = false;
         int colony = -1;   // an undefended colony: its colonist defends
         int colonist = -1;
+        int settlement = -1; // a native settlement: a brave or its people defend
     };
     int defenderNation(const PendingAttack& a) const;
     int colonyAfterNotices_ = -1; // a colony just taken opens once its news is read

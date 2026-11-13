@@ -19,6 +19,7 @@ inline constexpr int kAttackBonus = 77;
 inline constexpr int kTerrain = 79;
 inline constexpr int kColony = 80;
 inline constexpr int kFortified = 81;
+inline constexpr int kSpainBonus = 82;
 inline constexpr int kArtilleryInOpen = 84;
 } // namespace combat_label
 
@@ -29,6 +30,7 @@ struct CombatBonus {
     int percent = 0; // +50, -75, ...
     bool terrainPicture = false; // the box shows the defender's square beside it
     bool colonyPicture = false;  // the box shows the defender's colony beside it
+    int settlementPicture = -1;  // the box shows this native settlement beside it
     // Named by this text instead of the label (a stockade's name, "Muskets").
     std::string text;
     // Added to the base ("+1") instead of a percentage.
@@ -42,6 +44,10 @@ struct CombatSide {
     int colony = -1;
     int colonist = -1;
     bool armed = false;
+    // A village's own brave (no unit stands there): the settlement, and
+    // the brave's unit type.
+    int settlement = -1;
+    int braveType = -1;
     int base = 0; // the unit type's attack or combat value
     std::vector<CombatBonus> bonuses;
     // The base with the bonuses added up (+50% and +50% make twice the

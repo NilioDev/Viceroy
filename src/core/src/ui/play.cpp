@@ -277,6 +277,25 @@ void PlayScreen::enterVillage(int unit, int settlement) {
         addOption(*dialog_, textLine(art_->names, "ACTIONS", 0, "Trade With Village"));
         villageOptions_.push_back(kVillageTrade);
     }
+    // Scouts: Ask to Speak With Chief (row 5).
+    if (game_.canSpeakWithChief(unit, settlement)) {
+        addOption(*dialog_, textLine(art_->names, "ACTIONS", 5, "Ask to Speak With Chief"));
+        villageOptions_.push_back(kVillageSpeak);
+    }
+    // Attack Village (row 8): first for soldiers and the stronger, last
+    // for a scout (read from the original's list, and seen).
+    const auto& types = game_.rules().units;
+    const int type = game_.unit(unit).type;
+    const bool strong = type >= 0 && type < static_cast<int>(types.size()) &&
+                        types[static_cast<std::size_t>(type)].attack > 1;
+    const auto offerAttack = [&] {
+        addOption(*dialog_, textLine(art_->names, "ACTIONS", 8, "Attack Village"));
+        villageOptions_.push_back(kVillageAttack);
+    };
+    const bool canAttack = game_.canAttackVillage(unit);
+    if (canAttack && strong) {
+        offerAttack();
+    }
     if (game_.canLiveAmongNatives(unit, settlement)) {
         addOption(*dialog_, textLine(art_->names, "ACTIONS", 4, "Live Among The Natives"));
         villageOptions_.push_back(kVillageLive);
@@ -286,15 +305,13 @@ void PlayScreen::enterVillage(int unit, int settlement) {
         addOption(*dialog_, textLine(art_->names, "ACTIONS", 2, "Establish Mission"));
         villageOptions_.push_back(kVillageMission);
     }
-    // Scouts: Ask to Speak With Chief (row 5).
-    if (game_.canSpeakWithChief(unit, settlement)) {
-        addOption(*dialog_, textLine(art_->names, "ACTIONS", 5, "Ask to Speak With Chief"));
-        villageOptions_.push_back(kVillageSpeak);
-    }
     // Units that can attack: Demand Tribute (row 7).
     if (game_.canDemandTribute(unit, settlement)) {
         addOption(*dialog_, textLine(art_->names, "ACTIONS", 7, "Demand Tribute"));
         villageOptions_.push_back(kVillageTribute);
+    }
+    if (canAttack && !strong) {
+        offerAttack();
     }
     addOption(*dialog_, textLine(art_->names, "ACTIONS", 9, "Cancel Action"));
     villageOptions_.push_back(kVillageCancel);
@@ -655,6 +672,14 @@ void PlayScreen::startAttack(int attacker, int defender, int colony) {
     continueAttack();
 }
 
+void PlayScreen::attackVillage(int unit) {
+    // Read from the original: choosing to attack makes war on the tribe
+    // at once; the fight follows as against any defender.
+    game_.attackVillageWar(unit, village_);
+    attack_ = PendingAttack{unit, game_.villageDefenderUnit(village_, unit), false, -1, -1, village_};
+    continueAttack();
+}
+
 void PlayScreen::continueAttack() {
     if (!attack_) {
         return;
@@ -683,7 +708,9 @@ void PlayScreen::resolveAttack() {
     }
     const auto fight = *attack_;
     attack_.reset();
-    if (fight.colony >= 0) {
+    if (fight.settlement >= 0) {
+        game_.attackVillage(fight.attacker, fight.settlement);
+    } else if (fight.colony >= 0) {
         // Seen: once the news is read the colony's screen opens.
         if (game_.attackColony(fight.attacker, fight.colony, fight.colonist) == CombatOutcome::AttackerWon) {
             colonyAfterNotices_ = fight.colony;
@@ -736,6 +763,23 @@ void PlayScreen::showNotices() {
             }
             notice.strings[static_cast<std::size_t>(string)] = adjective(nation);
         }
+    }
+    if ((notice.section == "LOOT" || notice.section == "LOOT2") && notice.strings.size() >= 3) {
+        // "Dutch loot and burn Apache Camp!": the second column of @LEVELS,
+        // by the tribe's level, or the capital's row.
+        if (const auto* levels = art_->names.find("LEVELS")) {
+            const auto row = static_cast<std::size_t>(std::max(0, notice.value));
+            const auto fields = row < levels->lines.size() ? splitFields(levels->lines[row]) : std::vector<std::string>{};
+            notice.strings[2] = fields.size() > 1 ? fields[1] : "";
+        }
+    }
+    if (notice.section == "INDIANBOW") {
+        // Read from the original: the chief speaks it.
+        ask(notice.section, -1, notice.strings);
+        if (dialog_) {
+            placeNative(notice.value);
+        }
+        return;
     }
     if (notice.section == "UNREST") {
         // "Colonists (%STRING1) now available in %STRING0."
@@ -815,9 +859,10 @@ void PlayScreen::showNotices() {
     if (dialog_) {
         // Measured: battles are told by the colonial advisor, the work of
         // pioneers by the frontiersman.
-        constexpr std::string_view kBattles[] = {"DEMOTE", "COLONISTCAPTURE", "COLONISTCAPTURE2", "WAGONCAPTURE",
-                                                 "LOOTCAPTURE", "ARTILLERY", "ARTILLERY2", "VETERAN", "VALOR",
-                                                 "CAPTURED"};
+        constexpr std::string_view kBattles[] = {"DEMOTE",     "COLONISTCAPTURE", "COLONISTCAPTURE2", "WAGONCAPTURE",
+                                                 "LOOTCAPTURE", "ARTILLERY",      "ARTILLERY2",       "VETERAN",
+                                                 "VALOR",       "CAPTURED",       "LOOT",             "LOOT2",
+                                                 "INDIANSLAVES"};
         if (std::find(std::begin(kBattles), std::end(kBattles), notice.section) != std::end(kBattles)) {
             placeMapDialog(*dialog_);
         } else {
@@ -888,6 +933,8 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
             startTrade(unit);
         } else if (option == kVillageTribute && village_ >= 0) {
             demandTribute(unit);
+        } else if (option == kVillageAttack && village_ >= 0) {
+            attackVillage(unit);
         }
     } else if (question == "LEARNSTAY") {
         // "Then I shall become a master ..." or "Not right now, thanks."
@@ -1811,7 +1858,8 @@ void PlayScreen::draw(Screen& screen, const Art& art) const {
     }
     if (analysisUp_ && attack_) {
         drawCombatAnalysis(screen, art, game_,
-                           attack_->colony >= 0
+                           attack_->settlement >= 0 ? game_.analyseVillageAttack(attack_->attacker, attack_->settlement)
+                           : attack_->colony >= 0
                                ? game_.analyseColonyAttack(attack_->attacker, attack_->colony, attack_->colonist)
                                : game_.analyseAttack(attack_->attacker, attack_->defender));
     }
