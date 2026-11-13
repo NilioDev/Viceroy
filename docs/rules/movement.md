@@ -21,8 +21,10 @@ rule as a guess until it is checked against the original.
   to go ashore.
 - Foreign units, colonies and settlements block the square (no combat or
   meetings yet).
-- Moving reveals the squares around the unit: one square, two for scouts and
-  dragoons. *Guess* for ships.
+- Moving reveals the squares around the unit (read from the original and
+  measured): one square; two for a galleon, privateer or frigate; a land
+  unit sees two with Hernando de Soto in congress, and a scout one more
+  than that (a dragoon 1, with de Soto 2; a scout 2, with de Soto 3).
 
 ## Turns
 
