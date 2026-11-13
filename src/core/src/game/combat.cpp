@@ -201,8 +201,8 @@ CombatAnalysis Game::analyseAttack(int attacker, int defender) const {
     return a;
 }
 
-CombatStrengths Game::combatStrengths(int attacker, int defender) const {
-    return strengthsAgainst(attacker, unit(defender), isShip(defender), isDamagedArtillery(defender), 0);
+CombatStrengths Game::combatStrengths(int attacker, int defender, bool beforeLevels) const {
+    return strengthsAgainst(attacker, unit(defender), isShip(defender), isDamagedArtillery(defender), 0, beforeLevels);
 }
 
 int Game::defenceStrength(int attacker, const SaveUnit& du, bool defenderShip, bool defenderDamaged,
@@ -246,7 +246,7 @@ int Game::defenceStrength(int attacker, const SaveUnit& du, bool defenderShip, b
 }
 
 CombatStrengths Game::strengthsAgainst(int attacker, const SaveUnit& du, bool defenderShip, bool defenderDamaged,
-                                       int defenderExtra) const {
+                                       int defenderExtra, bool beforeLevels) const {
     // Observed in the original with a debugger: the integer steps below, in
     // this order. Natives, ships and independence are not covered yet.
     const auto& au = unit(attacker);
@@ -315,6 +315,11 @@ CombatStrengths Game::strengthsAgainst(int attacker, const SaveUnit& du, bool de
     constexpr int kSpain = 2;
     if (settlement && au.nation == kSpain && !defenderEuropean) {
         a += a >> 1;
+    }
+    if (beforeLevels) {
+        // Where the original stops when a computer player only weighs an
+        // attack: the steps below are left out of its odds.
+        return {std::max(0, a), std::max(0, d)};
     }
     if (difficulty <= 1) {
         constexpr int kEarlyTurns = 80;
@@ -412,10 +417,10 @@ CombatAnalysis Game::analyseColonyAttack(int attacker, int colony, int colonist)
     return a;
 }
 
-CombatStrengths Game::colonyStrengths(int attacker, int colony, int colonist) const {
+CombatStrengths Game::colonyStrengths(int attacker, int colony, int colonist, bool beforeLevels) const {
     const auto& c = save_.colonies[static_cast<std::size_t>(colony)];
     const int extra = c.stock[kMuskets] >= kArmingMuskets ? 1 : 0;
-    return strengthsAgainst(attacker, colonistAsUnit(colony, colonist), false, false, extra);
+    return strengthsAgainst(attacker, colonistAsUnit(colony, colonist), false, false, extra, beforeLevels);
 }
 
 CombatOutcome Game::attackColony(int attacker, int colony, int colonist) {

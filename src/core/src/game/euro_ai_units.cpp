@@ -102,6 +102,11 @@ bool personType(int type) {
     return (type >= 0 && type <= 5) || type == 7 || type == 9;
 }
 
+// The original reckons in 16 bits.
+int wrap16(int v) {
+    return static_cast<std::int16_t>(static_cast<std::uint16_t>(v & 0xFFFF));
+}
+
 int signedByte(std::uint8_t b) {
     return b < 0x80 ? b : b - 256;
 }
@@ -1256,6 +1261,13 @@ void Game::aiGoToStep(int n, int i) {
     const int toY = u.y + kSteps[static_cast<std::size_t>(dir)].dy;
     const auto result = move(i, kSteps[static_cast<std::size_t>(dir)]);
     if (unitCount() != count || result == MoveResult::Lost) {
+        return;
+    }
+    if (result == MoveResult::Occupied && orders == kOrdersStep) {
+        // The direction choice steps onto someone else's square only to
+        // attack.
+        save_.units[static_cast<std::size_t>(i)].orders = SaveUnit::kNoOrders;
+        aiAttack(i, toX, toY);
         return;
     }
     if (result == MoveResult::Occupied) {
@@ -2530,6 +2542,8 @@ int Game::aiDecide(int n, int i) {
     }
     int best = -999;
     int dir = 8;
+    bool attackChosen = false;
+    bool attackWeighed = false;
     const int last = U().raw[kLastStep];
     const bool aboard = !ship && onWater;
     for (int d = 0; d < 8; ++d) {
@@ -2547,15 +2561,18 @@ int Game::aiDecide(int n, int i) {
             continue;
         }
         const auto there = unitsAt(sx, sy);
-        const int occupant = sq.region >> 4;
-        if (aboard && !there.empty() && occupant != n) {
-            continue;
-        }
-        // (No attacks yet: anyone else's unit or town is passed by.)
         const auto colony = colonyAt(sx, sy);
         const auto village = settlementAt(sx, sy);
-        if ((!there.empty() && unit(there.front()).nation != n) || village ||
-            (colony && save_.colonies[static_cast<std::size_t>(*colony)].nation != n)) {
+        const int top = there.empty() ? -1 : there.front();
+        int occupant = -1;
+        if (top >= 0) {
+            occupant = unit(top).nation;
+        } else if (colony) {
+            occupant = save_.colonies[static_cast<std::size_t>(*colony)].nation;
+        } else if (village) {
+            occupant = save_.settlements[static_cast<std::size_t>(*village)].nation;
+        }
+        if (aboard && top >= 0 && occupant != n) {
             continue;
         }
         const TerrainType* t = terrainOf(sx, sy);
@@ -2589,14 +2606,89 @@ int Game::aiDecide(int n, int i) {
         if (sq.terrain == kSeaLane) {
             s -= 16;
         }
-        if (!ship && attack > 0 && colony) {
+        if (!ship && attack > 1 && colony) {
             const auto& C = save_.colonies[static_cast<std::size_t>(*colony)];
-            if ((C.raw[kThreat] & 0x40) != 0) {
+            if (C.nation != n) {
+                s += 16;
+            } else if ((C.raw[kThreat] & 0x40) != 0) {
                 s += 10;
             } else if ((C.raw[kThreat] & 0x04) != 0) {
                 s += 6;
             } else if ((C.raw[kThreat] & 0x10) != 0) {
                 s += 3;
+            }
+        }
+        // Someone else there: an attack, weighed by its odds, or no way.
+        bool attackFlag = false;
+        if (occupant >= 0 && occupant != n) {
+            const int rel = aiRelation(n, occupant);
+            if (occupant >= kEuropeanNations) {
+                if (tribeTension(save_, occupant - kEuropeanNations, n) < 75 && (rel & 0x02) == 0) {
+                    continue;
+                }
+                if ((rel & 0x02) != 0) {
+                    s = wrap16(s * 2);
+                }
+                if (regionByte(kRegionColonies, n, REG) == 0) {
+                    continue;
+                }
+            } else if ((rel & 0x40) != 0 && type != kPrivateer && (top < 0 || unit(top).type != kPrivateer)) {
+                continue;
+            }
+            if (attack == 0) {
+                continue;
+            }
+            attackFlag = true;
+            attackWeighed = true;
+            int odds = aiAttackOdds(i, sx, sy);
+            const int count = std::max(1, aiStack(top, 2));
+            odds = wrap16(odds * ((aiStack(top, 0) + 1) / count));
+            odds /= std::max(1, ut.cost);
+            const bool fort = colony.has_value() || village.has_value();
+            if (colony) {
+                odds = wrap16(odds * 3);
+            }
+            if (village) {
+                odds = wrap16(odds * 2);
+            }
+            if (type == kArtillery && !fort) {
+                odds = 0;
+            }
+            if (n == human() && !fort && inOwnColony) {
+                odds >>= 1;
+            }
+            if ((roles & 0x10) != 0 && status == 4) {
+                odds = wrap16(odds * 3);
+            }
+            // Soldiers go for a colony with artillery only with more
+            // artillery of their own around it.
+            if ((type == unit_type::kSoldier || type == unit_type::kDragoon) && colony) {
+                const int theirs = aiStack(top, 12);
+                if (theirs != 0) {
+                    int ours = 0;
+                    for (int e = 0; e < 8; ++e) {
+                        const int nx = sx + kStepX[static_cast<std::size_t>(e)];
+                        const int ny = sy + kStepY[static_cast<std::size_t>(e)];
+                        if (!map.inside(nx, ny)) {
+                            continue;
+                        }
+                        const auto near = unitsAt(nx, ny);
+                        if (!near.empty() && unit(near.front()).nation == n) {
+                            ours += aiStack(near.front(), 12);
+                        }
+                    }
+                    if (theirs >= ours) {
+                        continue;
+                    }
+                }
+            }
+            if (odds >= 1000 || odds < 0) {
+                odds = 1000;
+            }
+            if (odds < 12 && !ship) {
+                s -= 999;
+            } else {
+                s += 4 * std::max(1, odds);
             }
         }
         if (last < 8) {
@@ -2667,7 +2759,16 @@ int Game::aiDecide(int n, int i) {
         if (s > best) {
             best = s;
             dir = d;
+            attackChosen = attackFlag;
         }
+    }
+    if (attackChosen) {
+        // An attack waits for a full move.
+        if (movesLeft(i) < 3) {
+            dir = 8;
+        }
+        U().raw[kGoal] = '9';
+        return step(dir);
     }
     if (garrison) {
         auto& C = save_.colonies[static_cast<std::size_t>(ncOwn.index)];
@@ -2686,8 +2787,65 @@ int Game::aiDecide(int n, int i) {
         U().raw[kGoal] = 'e';
         return stay();
     }
+    // An armed unit that weighed an attack and stands next to someone
+    // else's colony waits there.
+    if (!ship && attack > 1 && attackWeighed && !aboard) {
+        for (int d = 0; d < 8; ++d) {
+            const auto c = colonyAt(X + kStepX[static_cast<std::size_t>(d)], Y + kStepY[static_cast<std::size_t>(d)]);
+            if (c && save_.colonies[static_cast<std::size_t>(*c)].nation != n) {
+                U().raw[kGoal] = 'F';
+                return stay();
+            }
+        }
+    }
     U().raw[kGoal] = '9';
     return step(dir);
+}
+
+int Game::aiAttackOdds(int i, int x, int y) {
+    // The original's attack routine asked only for the odds: eight times
+    // the attack over the defence plus one, before the steps for the easy
+    // levels and for colonies. An empty colony is defended by one of its
+    // colonists picked at random, as in a real attack.
+    CombatStrengths s{};
+    const int defender = defenderAt(x, y, i);
+    const auto village = settlementAt(x, y);
+    const auto colony = colonyAt(x, y);
+    if (village) {
+        s = villageStrengths(i, *village, true);
+    } else if (defender >= 0) {
+        s = combatStrengths(i, defender, true);
+    } else if (colony && save_.colonies[static_cast<std::size_t>(*colony)].population > 0) {
+        s = colonyStrengths(i, *colony, pickColonyDefender(*colony), true);
+    } else {
+        return 0;
+    }
+    return wrap16(s.attack * 8) / (s.defense + 1);
+}
+
+void Game::aiAttack(int i, int x, int y) {
+    // The step the direction choice made onto someone else's square. With
+    // less than a full move left the original does not attack.
+    if (movesLeft(i) < 3 || !canAttack(i)) {
+        aiEndMoves(i);
+        return;
+    }
+    if (const auto village = settlementAt(x, y)) {
+        attackVillageWar(i, *village);
+        attackVillage(i, *village);
+        return;
+    }
+    const int defender = defenderAt(x, y, i);
+    if (defender >= 0) {
+        attack(i, defender);
+        return;
+    }
+    const auto colony = colonyAt(x, y);
+    if (colony && !isShip(i) && colonyUndefended(*colony)) {
+        attackColony(i, *colony, pickColonyDefender(*colony));
+        return;
+    }
+    aiEndMoves(i);
 }
 
 } // namespace viceroy

@@ -285,12 +285,48 @@ roads and rivers, by unexplored land ahead, less for turning back. A unit
 that chooses to stay fortifies; next to a colony of a nation at peace it
 does not.
 
+### Attacks
+
+A neighbour with someone else's unit, colony or village is weighed as an
+attack, or passed by:
+
+- A European nation's square is passed by when the two are at peace (the
+  treaty bit), unless a privateer attacks or defends.
+- A tribe's square is passed by unless the tribe is at least 75 tense
+  towards the nation or the war bit is set (which doubles the square's
+  chance), and unless the nation has a colony in the region.
+- A unit without an attack value passes by. So do soldiers and dragoons
+  facing a colony with artillery, unless more of their own artillery
+  stands around it.
+
+The odds come from the attack routine itself, asked only to weigh: eight
+times the attack over the defence plus one, with every step of a real
+fight up to Spain's bonus (the steps for the easy levels and for colonies
+are left out). An empty colony is weighed against one of its colonists
+picked at random. The odds are then multiplied by the defenders' strength
+plus one over their number, divided by the attacker's strength, tripled
+against a colony and doubled against a village; artillery weighs nothing
+outside a colony or village, and units of the role for attacks triple
+their odds in a region where their nation is the stronger. Odds of 1000 or
+more count as 1000. Under 12 a land unit turns away (999 less); otherwise
+the square gains four times the odds. An armed land unit also gains 16
+for a step onto someone else's colony.
+
+When the attack is chosen with less than a full move left, the unit
+waits. Otherwise it steps and fights as the player's units do: against
+the unit that defends the square, an empty colony's colonist, or the
+village (which is then at war with the nation). An armed unit that
+weighed an attack but chose none, and stands next to someone else's
+colony, waits there (goal `F`). The original checks there that the unit
+heads its square's stack; Viceroy only checks that it stands on land.
+
 ## Not done yet
 
-- Attacks: a square with another nation's or tribe's unit or town is
-  passed by. What the original's units do on reaching a village, and how
-  a wagon train trades there, is not read yet: Viceroy uses the player's
-  rules.
+- What the original's units do on reaching a village they were sent to,
+  and how a wagon train trades there, is not read yet: Viceroy uses the
+  player's rules.
+- Attacks after independence (the original then lets the computer's
+  units attack only the player's).
 - Missionaries pass by villages with a mission of their own (the
   original weighs those against the player, by a ranking of the nations
   not read yet).

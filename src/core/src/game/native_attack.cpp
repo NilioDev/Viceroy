@@ -180,12 +180,12 @@ CombatAnalysis Game::analyseVillageAttack(int attacker, int settlement) const {
     return a;
 }
 
-CombatStrengths Game::villageStrengths(int attacker, int settlement) const {
+CombatStrengths Game::villageStrengths(int attacker, int settlement, bool beforeLevels) const {
     const int defender = villageDefenderUnit(settlement, attacker);
     if (defender >= 0) {
-        return combatStrengths(attacker, defender);
+        return combatStrengths(attacker, defender, beforeLevels);
     }
-    return strengthsAgainst(attacker, villageBrave(settlement), false, false, 0);
+    return strengthsAgainst(attacker, villageBrave(settlement), false, false, 0, beforeLevels);
 }
 
 CombatOutcome Game::attackVillage(int attacker, int settlement) {
