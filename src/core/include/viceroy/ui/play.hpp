@@ -81,7 +81,12 @@ public:
     bool waitingForEndOfTurn() const { return game_.activeUnit() < 0; }
     const std::string& message() const { return view_.message; }
     // Set by the app after loading Art: needed for colony names.
-    void setColonyNames(const TextFile* names) { colonyNames_ = names; }
+    void setColonyNames(const TextFile* names) {
+        colonyNames_ = names;
+        if (names != nullptr) {
+            game_.setColonyNames(*names);
+        }
+    }
     void setColonyArt(const ColonyArt* art) { colonyArt_ = art; }
     // The colony screen, when one is open.
     const std::optional<ColonyViewState>& colonyScreen() const { return colonyScreen_; }

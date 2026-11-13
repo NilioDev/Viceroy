@@ -17,6 +17,7 @@ add_library(vcr_core STATIC
     src/game/native_trade.cpp
     src/game/native_tribute.cpp
     src/game/euro_ai.cpp
+    src/game/euro_ai_units.cpp
     src/game/native_attack.cpp
     src/game/native_contact.cpp
     src/game/native_incite.cpp

@@ -2,6 +2,7 @@
 #include "test.hpp"
 
 #include "viceroy/data/savegame.hpp"
+#include "viceroy/data/text_table.hpp"
 #include "viceroy/game/europe.hpp"
 #include "viceroy/game/game.hpp"
 #include "viceroy/game/natives.hpp"
@@ -209,5 +210,118 @@ VCR_TEST("original files: a nation's count matches the save (measured)") {
         Game g(save, art.rules);
         g.nationCensus(save.humanNation);
         VCR_CHECK(g.state().tribesAndMore == save.tribesAndMore);
+    }
+}
+
+VCR_TEST("european ai: a colonist on a good square by the sea founds a colony there") {
+    SaveGame s = aiSave();
+    constexpr int kFrench = 1;
+    s.units.push_back(unitAt(4, 4, unit_type::kColonist, kFrench));
+    s.units.back().profession = 0x1C;
+    // The square's worth for a colony, as the original keeps it in the
+    // seen layer; the others are worth nothing.
+    s.map.at(4, 4).seen = 0x05;
+    Game g(s, aiRules());
+    TextFile names;
+    names.sections.push_back({"FRENCH", {"Quebec,1608", "Montreal,1642"}});
+    g.setColonyNames(names);
+    g.europeanTurn(kFrench);
+    VCR_CHECK(g.state().colonies.size() == 1);
+    const auto& c = g.state().colonies.front();
+    VCR_CHECK(c.nation == kFrench && c.x == 4 && c.y == 4 && c.name == "Quebec");
+    VCR_CHECK((c.raw[0x1C] & 0x40) != 0); // by the water
+}
+
+VCR_TEST("european ai: a colonist joins a colony that asks for people") {
+    SaveGame s = aiSave();
+    constexpr int kFrench = 1;
+    SaveColony c;
+    c.x = 6;
+    c.y = 4;
+    c.nation = kFrench;
+    c.population = 1;
+    c.raw[0x1B] = 0x10; // marked for recruits
+    s.colonies.push_back(c);
+    s.units.push_back(unitAt(6, 4, unit_type::kColonist, kFrench));
+    s.units.back().profession = 0x1C;
+    Game g(s, aiRules());
+    g.europeanTurn(kFrench);
+    VCR_CHECK(g.state().colonies.front().population == 2);
+    for (const auto& u : g.state().units) {
+        VCR_CHECK(u.type != unit_type::kColonist || u.nation != kFrench);
+    }
+}
+
+VCR_TEST("european ai: treasure brought home goes to the Crown's nation") {
+    SaveGame s = aiSave();
+    constexpr int kSpanish = 2;
+    SaveColony c;
+    c.x = 6;
+    c.y = 4;
+    c.nation = kSpanish;
+    c.population = 2;
+    s.colonies.push_back(c);
+    s.units.push_back(unitAt(2, 2, 14, kSpanish)); // a merchantman, so no ship is bought
+    s.units.push_back(unitAt(6, 4, unit_type::kTreasure, kSpanish));
+    s.units.back().profession = 30; // 3000 gold
+    s.nations[kSpanish].gold = 0;
+    auto rules = aiRules();
+    rules.units[unit_type::kTreasure] = {"Treasure", 17, 1, 0, 0, 0, 6, 4, 0, 0, 0, 0};
+    Game g(s, rules);
+    g.europeanTurn(kSpanish);
+    VCR_CHECK(g.state().nations[kSpanish].gold == 3000);
+    const auto notices = g.takeNotices();
+    VCR_CHECK(!notices.empty() && notices.back().section == "LOOTFOREIGN");
+    VCR_CHECK(notices.back().numbers == std::vector<int>{3000});
+}
+
+VCR_TEST("original files: the natives' count notes the last tribe's settlements by region (measured)") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    for (const char* name : {"COLONY00.SAV", "COLONY04.SAV", "COLONY09.SAV"}) {
+        const auto file = findFileNoCase(dir, name);
+        if (!file) {
+            continue;
+        }
+        std::ifstream in(*file, std::ios::binary);
+        SaveGame save = readSaveGame(Bytes(std::istreambuf_iterator<char>(in), {}));
+        // Only the natives move: the other nations sit the turn out.
+        for (int n = 0; n < kEuropeanNations; ++n) {
+            if (n != save.humanNation) {
+                save.players[static_cast<std::size_t>(n)].control = 2;
+            }
+        }
+        const auto counts = [](const SaveGame& sg, int tribe) {
+            std::array<int, 16> c{};
+            for (const auto& st : sg.settlements) {
+                const int r = landRegion(sg.map, st.x, st.y);
+                if (tribeOf(st) == tribe && r >= 0) {
+                    ++c[static_cast<std::size_t>(r)];
+                }
+            }
+            return c;
+        };
+        const auto saved = [](const SaveGame& sg) {
+            std::array<int, 16> c{};
+            for (std::size_t r = 0; r < 16; ++r) {
+                c[r] = sg.tribesAndMore[kExtra + 140 + r];
+            }
+            return c;
+        };
+        int last = -1;
+        for (const auto& st : save.settlements) {
+            last = std::max(last, tribeOf(st));
+        }
+        VCR_CHECK(last >= 0 && saved(save) == counts(save, last));
+        Game g(save, art.rules);
+        g.endTurn();
+        int after = -1;
+        for (const auto& st : g.state().settlements) {
+            after = std::max(after, tribeOf(st));
+        }
+        VCR_CHECK(saved(g.state()) == counts(g.state(), after));
     }
 }

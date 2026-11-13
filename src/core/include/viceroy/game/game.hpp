@@ -80,6 +80,8 @@ struct GameNotice {
     std::vector<std::pair<int, int>> labels{};
     // %STRINGs that are a nation's country ("England", "the Netherlands").
     std::vector<std::pair<int, int>> countries{};
+    // %STRINGs that are a nation's home port ("London").
+    std::vector<std::pair<int, int>> ports{};
 };
 
 enum class FoundResult {
@@ -170,6 +172,8 @@ public:
     FoundResult foundColony(int index, const std::string& name);
     // A name for the next colony from COLONY.TXT, not yet in use.
     std::string suggestColonyName(const TextFile& colonyNames) const;
+    // COLONY.TXT, for the names the computer's nations give their colonies.
+    void setColonyNames(const TextFile& colonyNames);
 
     // --- Turns -------------------------------------------------------------
     // Ends the human's turn: everyone gets their moves back, and the
@@ -544,6 +548,35 @@ private:
         int privateerPeople = 0;
         int frigatePeople = 0;
         int openRegions = 0; // regions of 8 squares or more without a colony of its own
+        // The plan for the units: places worth going to, each with a kind
+        // (what may go there) and a weight.
+        struct Target {
+            int x = 0;
+            int y = 0;
+            int kind = -1; // -1: an empty entry
+            int prio = 0;
+        };
+        std::array<std::array<Target, 64>, 4> targets{};
+        std::array<int, 64> load{}; // units already sent to each target, from loadBase
+        int loadBase = 3;
+        // Colonies with goods to fetch, best first (for all nations at once,
+        // as in the original).
+        struct Pickup {
+            int colony = -1;
+            int value = 0;
+            int loads = 0;
+            int military = 0;
+        };
+        std::array<Pickup, 16> pickups{};
+        std::array<std::uint8_t, 270> blocks{};       // squares of 4 x 4 with own units or colonies
+        std::array<int, 16> founders{};               // units looking for a site, by region
+        std::array<int, 16> foreignPeople{};          // the largest foreign colony, by region
+        std::array<std::array<int, 16>, 8> tribePeople{};
+        std::array<std::array<int, 16>, 4> status{};  // what each region is to the nation (kept between turns)
+        std::array<int, 4> pickupCalls{};
+        int biggerRegions = 0; // regions where another nation is ahead (bits)
+        int emptyRegions = 0;  // regions without a colony of the nation (bits)
+        bool shipSent = false; // a ship was sent to Europe for recruits this turn
     };
     EuroAiState ai_;
     int aiRandom(int low, int high);
@@ -558,6 +591,32 @@ private:
     bool aiHasCollege(int nation) const;
     void aiSwapExpert(int nation, int unit);
     void aiSailFromEurope(int nation, int ship);
+    // The units on the map (euro_ai_units.cpp).
+    void aiPlan(int nation);
+    void aiMoveUnits(int nation);
+    bool aiUnitStep(int nation, int unit);
+    int aiDecide(int nation, int unit);
+    void aiExecute(int nation, int unit);
+    void aiGoToStep(int nation, int unit);
+    void aiAddTarget(int nation, int x, int y, int kind, int prio);
+    int aiTargetPrio(int nation, int x, int y, int kind) const;
+    void aiAddPickup(int colony, int value, int loads, int military);
+    int aiStack(int unit, int category) const;
+    int aiHostile(int nation, int other, bool tribes, int unit) const;
+    int aiThreatNear(int x, int y, int nation, bool tribes) const;
+    bool aiForeignNear(int x, int y, int nation) const;
+    int aiRegionScore(int nation, int region) const;
+    int aiFoundBias(int nation, int unit, int region) const;
+    int aiFoundScore(int nation, int unit) const;
+    int aiStepAround(int nation, int x, int y, bool score, bool artillery) const;
+    int aiRelation(int nation, int other) const;
+    void aiGoTo(int unit, char goal, int x, int y);
+    void aiToEurope(int unit);
+    void aiEndMoves(int unit);
+    void aiJoinColony(int unit, int colony);
+    void aiBoard(int unit, int ship);
+    std::string aiColonyName(int nation) const;
+    std::array<std::vector<std::string>, 4> colonyNames_{};
 
     SaveGame save_;
     Ruleset rules_;

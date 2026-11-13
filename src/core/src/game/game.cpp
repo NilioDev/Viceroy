@@ -388,6 +388,13 @@ FoundResult Game::foundColony(int index, const std::string& name) {
     colony.jobs[0] = 0; // farmer
     colony.skills[0] = static_cast<std::uint8_t>(u.profession);
     startLiberty(colony, save_.map, rules_, save_.difficulty);
+    // Byte 28, bit 0x40: the colony lies by the water (as in the saves).
+    for (const auto& s : kSteps) {
+        if (save_.map.inside(u.x + s.dx, u.y + s.dy) && save_.map.at(u.x + s.dx, u.y + s.dy).isWater()) {
+            colony.raw[0x1C] = static_cast<std::uint8_t>(colony.raw[0x1C] | 0x40);
+            break;
+        }
+    }
     save_.colonies.push_back(colony);
     auto& sq = save_.map.at(u.x, u.y);
     sq.flags = static_cast<std::uint8_t>(sq.flags | MapSquare::kHasColony | MapSquare::kRoad);
@@ -553,6 +560,35 @@ std::string Game::suggestColonyName(const TextFile& colonyNames) const {
             if (!used) {
                 return name;
             }
+        }
+    }
+    return "Colony " + std::to_string(save_.colonies.size() + 1);
+}
+
+void Game::setColonyNames(const TextFile& colonyNames) {
+    static constexpr const char* kSections[] = {"ENGLISH", "FRENCH", "SPANISH", "DUTCH"};
+    for (std::size_t n = 0; n < colonyNames_.size(); ++n) {
+        colonyNames_[n].clear();
+        const auto* section = colonyNames.find(kSections[n]);
+        if (section == nullptr) {
+            continue;
+        }
+        for (const auto& line : section->lines) {
+            const auto fields = splitFields(line);
+            if (!fields.empty() && !fields[0].empty()) {
+                colonyNames_[n].push_back(fields[0]);
+            }
+        }
+    }
+}
+
+std::string Game::aiColonyName(int nation) const {
+    // The first name of the nation's list that no colony has yet.
+    for (const auto& name : colonyNames_[static_cast<std::size_t>(nation & 3)]) {
+        const bool used = std::any_of(save_.colonies.begin(), save_.colonies.end(),
+                                      [&](const SaveColony& c) { return c.name == name; });
+        if (!used) {
+            return name;
         }
     }
     return "Colony " + std::to_string(save_.colonies.size() + 1);

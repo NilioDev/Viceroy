@@ -849,6 +849,14 @@ void PlayScreen::showNotices() {
             notice.strings[static_cast<std::size_t>(string)] = nation == 3 ? "the " + country : country;
         }
     }
+    for (const auto& [string, nation] : notice.ports) {
+        if (string >= 0) {
+            if (notice.strings.size() <= static_cast<std::size_t>(string)) {
+                notice.strings.resize(static_cast<std::size_t>(string) + 1);
+            }
+            notice.strings[static_cast<std::size_t>(string)] = textLine(art_->names, "HOMEPORT", nation, "");
+        }
+    }
     for (const auto& [string, row] : notice.labels) {
         if (string >= 0) {
             if (notice.strings.size() <= static_cast<std::size_t>(string)) {
