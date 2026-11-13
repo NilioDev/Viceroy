@@ -858,8 +858,22 @@ void Game::revealLand(int x, int y, int radius, int nation) {
 }
 
 int Game::sightRadius(int index) const {
-    const int type = unit(index).type;
-    return (type == unit_type::kScout || type == unit_type::kDragoon) ? 2 : 1;
+    // Read from the original and measured: one square; two for a galleon,
+    // privateer or frigate; a land unit sees two with Hernando de Soto in
+    // congress, and a scout one more than any other (measured: a dragoon
+    // 1, with de Soto 2; a scout 2, with de Soto 3).
+    constexpr int kGalleon = 15;
+    constexpr int kFrigate = 17;
+    constexpr int kDeSoto = 7;
+    const auto& u = unit(index);
+    int radius = u.type >= kGalleon && u.type <= kFrigate ? 2 : 1;
+    if (!isShip(index) && hasFather(u.nation, kDeSoto)) {
+        radius = 2;
+    }
+    if (u.type == unit_type::kScout) {
+        ++radius;
+    }
+    return radius;
 }
 
 void Game::addColonist(int x, int y, int nation) {

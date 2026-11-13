@@ -146,6 +146,38 @@ VCR_TEST("game: moving reveals the map") {
     VCR_CHECK(!g.state().map.at(5, 0).seenBy(1));
 }
 
+VCR_TEST("game: how far units see (measured)") {
+    // A colonist sees one square around, two with Hernando de Soto; a
+    // scout one more (measured: a dragoon 1 and 2, a scout 2 and 3).
+    const auto seen = [](bool deSoto, int type) {
+        SaveGame s = sampleSave();
+        s.map.width = 14;
+        s.map.height = 9;
+        s.map.squares.assign(14 * 9, MapSquare{});
+        for (auto& sq : s.map.squares) {
+            sq.terrain = 2;
+        }
+        s.units.resize(1);
+        s.units[0].x = 4;
+        s.units[0].y = 4;
+        s.units[0].type = type;
+        if (deSoto) {
+            s.nations[3].raw[7] |= 0x80; // father 7
+        }
+        Game g(s, sampleRules());
+        VCR_CHECK(g.move(0, {1, 0}) == MoveResult::Moved);
+        int far = 0;
+        while (g.state().map.at(5 + far + 1, 4).seenBy(3)) {
+            ++far;
+        }
+        return far;
+    };
+    VCR_CHECK(seen(false, unit_type::kColonist) == 1);
+    VCR_CHECK(seen(true, unit_type::kColonist) == 2);
+    VCR_CHECK(seen(false, unit_type::kScout) == 2);
+    VCR_CHECK(seen(true, unit_type::kScout) == 3);
+}
+
 VCR_TEST("game: colony names come from the nation's list") {
     Game g(sampleSave(), sampleRules());
     const std::string text = "@DUTCH\r\nNieuw,1600\r\nOud\r\n@STOP\r\n";
