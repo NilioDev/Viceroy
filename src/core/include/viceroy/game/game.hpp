@@ -109,6 +109,15 @@ public:
     // towns (-1: anyone's). Its working state lives on between calls, as in
     // the original.
     int routeStep(int index, int nation);
+    // Go To (orders 3): the colonies the unit can be sent to, sending it
+    // there or a ship to Europe, and moving the player's units that have
+    // it. See docs/rules/routes.md.
+    static constexpr int kGoToOrders = 3;
+    std::vector<int> goToColonies(int index) const;
+    void setGoTo(int index, int x, int y);
+    bool goToEurope(int index);
+    bool goToStep(int index); // true when the unit can go on
+    void moveGoToUnits();
     bool onMap(int index) const;
     // A land unit on a water square is aboard the ship there.
     bool isAboard(int index) const;

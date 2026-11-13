@@ -551,6 +551,20 @@ std::string lineOf(const Art& art, const char* section, int row, const char* fal
     return fallback;
 }
 
+// The panel's orders line. Seen: a unit under Go To shows the name of the
+// colony it is going to.
+std::string ordersText(const Art& art, const SaveGame& save, const SaveUnit& u) {
+    constexpr int kGoTo = 3;
+    if (u.orders == kGoTo) {
+        for (const auto& c : save.colonies) {
+            if (c.x == u.raw[9] && c.y == u.raw[10]) {
+                return c.name;
+            }
+        }
+    }
+    return lineOf(art, "ORDERS", u.orders, "No Orders");
+}
+
 std::string terrainName(const Art& art, const MapSquare& sq) {
     std::size_t row = sq.terrain & 7u;
     if (sq.mountains()) {
@@ -989,7 +1003,7 @@ void drawPanel(Screen& screen, const Art& art, const Game& game, const ViewState
         if (u.type == unit_type::kPioneer) {
             line("(" + std::to_string(u.tools) + " Tools)", gold);
         }
-        line(lineOf(art, "ORDERS", u.orders, "No Orders"), gold);
+        line(ordersText(art, save, u), gold);
         if (save.map.inside(u.x, u.y)) {
             const auto& sq = save.map.at(u.x, u.y);
             line("(" + terrainName(art, sq) + ")", green);
@@ -1094,7 +1108,7 @@ void drawSquarePanel(Screen& screen, const Art& art, const Game& game, const Vie
             name = textLine(art.labelText, "MISC", 65, "Veteran");
         }
         screen.text(art.tiny, 260, y + 4, name, gold);
-        screen.text(art.tiny, 260, y + 10, lineOf(art, "ORDERS", u.orders, "No Orders"), gold);
+        screen.text(art.tiny, 260, y + 10, ordersText(art, save, u), gold);
         y += 18;
         if (y > 160) {
             break;

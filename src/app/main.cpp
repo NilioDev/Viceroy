@@ -428,6 +428,8 @@ std::optional<Command> keyCommand(const SDL_KeyboardEvent& key) {
         return Command::BuildColony;
     case SDLK_C:
         return Command::Centre;
+    case SDLK_G:
+        return Command::GoTo;
     case SDLK_V:
         return Command::ViewMode;
     case SDLK_M:

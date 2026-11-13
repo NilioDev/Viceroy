@@ -637,6 +637,8 @@ void Game::endTurn() {
         save_.season = 0;
         ++save_.year;
     }
+    // The player's units under Go To set off before anyone is asked.
+    moveGoToUnits();
     save_.activeUnit = nextUnitNeedingOrders(-1);
 }
 
