@@ -68,11 +68,14 @@ int terrainRow(const MapSquare& square) {
     return square.terrain & 7;
 }
 
-WorkModifier workModifier(const SaveColony& colony, int difficulty) {
+WorkModifier workModifier(const SaveColony& colony, int difficulty, bool tories) {
     WorkModifier m;
     m.bonus = std::clamp(colony.libertyBonus, 0, 2);
-    const int tories = std::max(0, colony.population - rebelCount(colony));
-    m.penalty = tories / std::max(1, 10 - std::clamp(difficulty, 0, 4));
+    if (!tories) {
+        return m;
+    }
+    const int toryCount = std::max(0, colony.population - rebelCount(colony));
+    m.penalty = toryCount / std::max(1, 10 - std::clamp(difficulty, 0, 4));
     return m;
 }
 
@@ -318,9 +321,9 @@ int centreFoodYield(const Ruleset& rules, const MapSquare& square, int difficult
 }
 
 ColonyProduction colonyProduction(const SaveColony& colony, const SaveMap& map, const Ruleset& rules,
-                                  int difficulty) {
+                                  int difficulty, bool tories) {
     ColonyProduction p;
-    const WorkModifier modifier = workModifier(colony, difficulty);
+    const WorkModifier modifier = workModifier(colony, difficulty, tories);
     // The colony's own square gets the bonus but not the penalty.
     const WorkModifier centreModifier{modifier.bonus, 0};
     const int population = std::clamp(colony.population, 0, kMaxColonists);
@@ -725,11 +728,12 @@ void removeColonist(SaveColony& colony, int colonist) {
     colony.rebelDivisor -= 100;
 }
 
-ColonyTurn runColonyTurn(SaveColony& colony, const SaveMap& map, const Ruleset& rules, int difficulty) {
+ColonyTurn runColonyTurn(SaveColony& colony, const SaveMap& map, const Ruleset& rules, int difficulty,
+                         bool tories) {
     ColonyTurn turn;
     const auto before = colony.stock;
     turn.foodBefore = before[cargo::kFood];
-    const auto p = colonyProduction(colony, map, rules, difficulty);
+    const auto p = colonyProduction(colony, map, rules, difficulty, tories);
     std::array<int, cargo::kCount> made = p.produced;
 
     // Workshops: as much as their raw good allows, from this turn's

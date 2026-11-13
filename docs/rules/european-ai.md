@@ -402,9 +402,15 @@ this order. Viceroy follows it in `src/core/src/game/euro_ai_colony.cpp`.
     other turns, when it wants a pioneer and has 20 tools, it works one of
     its squares itself (see below). Either way it uses 20 tools and its
     count of saved-up turns (byte 140) starts again from 0.
-12. **What it builds** (see below).
-13. **Horses.** From turn 40, a colony with under 2 horses and a ship or
+12. **Who works where** (see below).
+13. **What it builds** (see below).
+14. **Teaching and training** (see below).
+15. **Horses.** From turn 40, a colony with under 2 horses and a ship or
     wagon train on its square buys 2 for 10 gold.
+
+Before the units join (step 7) it counts its colonists by skill, those who
+are no experts as free colonists; the jobs and the construction list use
+that count.
 
 ### A road to a neighbour
 
@@ -448,6 +454,137 @@ the forest, or plows the square for a worker in jobs 0 to 3, or builds a
 road for a worker in another job; with nobody there, it plows open land
 (rows 2 to 7) and builds a road on the rest.
 
+### Who works where
+
+Each turn every colonist leaves their work (their turns at the same work,
+kept in a nibble from byte 96, start again) and the colony gives the jobs
+out anew. Only the computer's colonies do this, and none of them loses
+work to tories (see liberty.md).
+
+**What it counts.** As the jobs are given, the colony keeps a balance of
+each good: what it makes, what it needs, how much it is short of after
+this turn's making (the deficit), and short even with its store (the
+shortfall). Food is needed for two a colonist plus what the horses eat:
+two horses for each started herd of 50 (25 with stables), fed with half
+the food left over and as far as the warehouse has room; the horses that
+cannot be fed are their shortfall. Lumber is needed for the hammers made.
+Each craft needs its raw good for what it makes, two thirds of it in a
+factory (when short in a factory, it is short of all of it, or of half as
+much again). Tools are needed for the muskets made, from the tools made
+less what is short of ore.
+
+**Placing a colonist on the land.** For each square that the colony may
+work and nobody works (not off the map, water only with docks, no other
+colony working it, no town on it, and no tribe's armed units standing
+fortified there) and each of the nine jobs on the land, the colonist's
+amount there is weighed. Asked for one job, the best amount wins (8 for
+each, plus 7 less the steps across and down). Asked for the best job:
+
+- the amount counts only up to the room left in the warehouse for the
+  job's good (as read, the job's own number picks the good: a fisherman's
+  room is that of the horses), at least 1;
+- when food is short (more is needed than made, the store is no fuller
+  than the warehouse and holds no more than 16 times the deficit, and
+  this is still the food step), food work counts 32 times over (a
+  fisherman 8 more first), less what the square is worth for other work
+  (its best yield times that good's highest starting price; 24 more on a
+  forest while the colony has at most 10 lumber and none is cut); and a
+  square a tribe claims counts half;
+- otherwise the work counts its price in Europe (food: 4 once the food
+  step is past and the colony has fewer than twice its squares in people,
+  else 0), plus 1, plus 1 when its good is short (twice over when even the
+  store does not cover it), less 1 for lumber when there is 2 at hand, plus
+  2 for a crop a craft uses (sugar, tobacco, cotton, furs, ore). From turn
+  80, ore mining in a colony of 8 counts 2 more, and when the nation ranks
+  at least as high as the player, the levels of its blacksmith's shop and
+  twice those of its armory. Land a tribe claims costs 4 − the tribe's
+  tension, twice that when the tribe is stronger than the nation in the
+  region, half again when the tribe is stronger overall, less one for each
+  armed unit on the colony's square. On a forest, work other than lumber
+  costs 10 when the colony has at most 10 lumber and none is cut.
+
+The best score takes the job and the square. (The nations' ranking: each
+scores its gold in hundreds, twice its colonies, its people and its attack
+force; the original sorts them from the weakest.)
+
+**The order.**
+
+1. *Food by skill.* While the colony has fewer people than twice its
+   squares, or between 2 horses and a full store of them, or has under 75
+   food, its expert farmers (and expert fishermen, with docks) go to their
+   own work, until it makes more food than it needs; one who would make
+   under 3 is sent back, and the rest of the food steps are passed by.
+2. *Food from the others.* In two rounds, while the store is down to 16
+   times the deficit or the colony is small or has horses to feed: with
+   more food than that only converts are placed in the first round, and
+   non-experts in the second; otherwise non-experts first and experts
+   second. Whoever would make under 3, or under 5 when there is food
+   enough, is sent back and the food steps end.
+3. *More people on the land.* While its land is not all taken and it is
+   below its size for its town hall, the colony weighs every colonist left
+   and puts the best on the land. (As read, it weighs them without placing
+   them, which leaves each with nothing, so this never puts anyone to work.)
+4. *Lumber*, unless the colony builds little (byte 29 bit 128): with under
+   10 lumber and none cut, an expert lumberjack, then a colonist who is no
+   expert, then anyone. Without lumber or a lumberjack, every eighth turn
+   it buys 100 lumber for 200 gold (the lumber comes even when the gold is
+   short).
+5. *Carpenters*, when there are 2 lumber at hand: master carpenters, then
+   free colonists, then indentured servants, then anyone, until hammers
+   are made. Servants and criminals become free colonists on the way, and
+   a colonist who is no expert in a colony of 6 without a master carpenter
+   becomes one at a chance of 1 in (17 − difficulty).
+6. *Experts on the land* at their own work, while their good's store is
+   not over full; an expert lumberjack only as the first, or when the
+   colony wants forest cleared or is short of lumber.
+7. *Experts in the buildings* at their own trade, three to a building: a
+   craftsman when the raw good is not short and there is some (in store or
+   made); a master carpenter when lumber is not short and there is some
+   (in a colony that builds little, a second master carpenter becomes a
+   free colonist instead); preachers and statesmen before independence (a
+   preacher after it becomes a free colonist).
+8. *The rest*, one by one: the best place on the land is weighed against
+   each building job (three to a building). Inside, the amount counts up
+   to the raw good at hand (as read, the jobs that use no good keep the
+   last count), weighed by the good's price less its raw good's price
+   (tools and muskets: price + 4, doubled from turn 50 when the player
+   ranks no higher), and for the others by 3; a carpenter by 5 less a third
+   of the hammers made (halved when the colony builds little), a preacher
+   by 3 less half the crosses made, the turn in hundreds and less 6; a
+   statesman by 4 for each printing press level, the tories, 7 and 4 for
+   byte 150, doubled with 10 tories, with Thomas Jefferson and after 1600 and
+   1700, nothing before 1540 or after independence, halved in a colony of
+   3 and again under 6, halved when the nation ranks above the player and
+   doubled below, halved with nation byte 0 bit 4, less the bells made, from
+   1 to 100. The score is (8 × amount + 5) × weight. When the land is worth
+   at least as much, the colonist goes on the land, and when no place is
+   found, to the church as a preacher (with a church, lumber to spare and
+   fewer than 3 preachers) or else as a carpenter.
+
+### Teaching and training
+
+**Teaching.** A colony with a schoolhouse teaches someone once its count
+of saved-up turns (byte 140, shared with its own land work) reaches 4 for
+each level (16 at the university). The lesson: while under 10 colonists
+and with no more food experts than food workers, fishing when it has fewer
+expert fishermen than ocean squares, else farming; then for each craft
+(armory, blacksmith, fur trader, distiller, tobacconist, weaver) whose
+building has its second level (the armory its first), whose raw good is
+made and that has no master yet, as read the craft's place in that list
+becomes the skill (farmer to lumberjack). Without a lesson, the colonist
+learns the work they do. One of the colonists and people on the square who
+are not already experts at their work (converts never) is picked at random,
+and the count of turns starts again.
+
+**Training.** A hungry colony (more than half its people on food, more
+than one, or short of food even with the store), in a nation with taxes of
+at most 25% and the price of an expert farmer in gold, trains its last
+colonist who is no expert (not a convert): as a fisherman when it has docks
+and no expert fisherman, else as a farmer when it has no expert farmer. As
+read, the price paid is the one listed for the expert at the colonist's own
+number in the list, and an expert that cannot be bought (-1) gives one gold
+piece back.
+
 ### What it builds
 
 The choice is made anew each turn, from nothing. It goes down this list;
@@ -476,7 +613,9 @@ the capitol.
    and experts together number 4.
 8. Under 6 colonists it notes that it builds little (byte 29 bit 128).
 9. The armory, when muskets cost 4 or more (counting half the difficulty) or
-   after turn 80, with 6 colonists and 40 tools or tools being made.
+   after turn 80, with 6 colonists and 40 tools or tools being made, or
+   when it has a master gunsmith; the church when it has a firebrand
+   preacher.
 10. The lumber mill, then the fort.
 11. The blacksmith's shop, when muskets cost 4 or more, with 4 colonists and
     40 ore or ore being mined.
@@ -507,14 +646,13 @@ the capitol.
 - Attacks after independence (the original then lets the computer's
   units attack only the player's).
 - Missionaries pass by villages with a mission of their own (the
-  original weighs those against the player, by a ranking of the nations
-  not read yet).
-
-- The rest of the colonies' own plans: the jobs of its colonists (a
-  colonist that joins takes the statesman's job for now), teaching and
-  buying training. The construction list also weighs two counts from the
-  job assignment (Viceroy takes them as 0, so it skips a church built
-  early and an extra armory).
+  original weighs those against the player by the nations' ranking).
+- In the original, once a colony's own land work has picked a square, the
+  rest of its plans read the nation from the units next to that square
+  (often nobody); Viceroy keeps the colony's own nation.
+- One mark of a square's state the original checks before giving it work
+  is not read; Viceroy uses the squares the player's colonies may work.
+- The original's message after training a colonist.
 - Diplomacy beyond the cooling of grudges.
 - Which units on the docks the original's ships take (Viceroy takes them
   in the order of the units), and what the original stores in a sailing

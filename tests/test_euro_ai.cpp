@@ -597,3 +597,103 @@ VCR_TEST("european ai: every seventh turn a colony builds road towards its neigh
     VCR_CHECK(roads == 1);
     VCR_CHECK(g.state().colonies[0].stock[cargo::kTools] == 0);
 }
+
+namespace {
+
+// The rules with land to work: plains give 3 food, 2 cotton and 1 ore.
+Ruleset jobRules() {
+    Ruleset r = buildRules();
+    r.terrain[2].yield[0] = 3;
+    r.terrain[2].yield[3] = 2;
+    r.terrain[2].yield[6] = 1;
+    r.jobs.resize(28);
+    r.jobs[0].europeCost = 1100;
+    return r;
+}
+
+int workingOnLand(const SaveColony& c, int colonist) {
+    for (std::size_t s = 0; s < 8; ++s) {
+        if (c.squares[s] == colonist) {
+            return static_cast<int>(s);
+        }
+    }
+    return -1;
+}
+
+} // namespace
+
+VCR_TEST("european ai: a colony short of food puts its expert farmer on the land") {
+    SaveGame s = colonySave(2);
+    s.colonies[0].skills[0] = 0; // an expert farmer
+    s.colonies[0].jobs[0] = 13;
+    Game g(s, jobRules());
+    g.europeanTurn(1);
+    const auto& c = g.state().colonies[0];
+    VCR_CHECK(c.jobs[0] == 0);
+    VCR_CHECK(workingOnLand(c, 0) >= 0);
+}
+
+VCR_TEST("european ai: with food in store and lumber at hand a colonist becomes a carpenter") {
+    SaveGame s = colonySave(3);
+    s.colonies[0].stock[cargo::kFood] = 150;
+    s.colonies[0].stock[cargo::kLumber] = 50;
+    Game g(s, jobRules());
+    g.europeanTurn(1);
+    const auto& c = g.state().colonies[0];
+    VCR_CHECK(c.jobs[0] == job::kCarpenter);
+    VCR_CHECK(workingOnLand(c, 0) < 0);
+}
+
+VCR_TEST("european ai: without lumber or a lumberjack the colony buys 100 every eighth turn") {
+    SaveGame s = colonySave(1);
+    s.turn = 16;
+    s.nations[1].gold = 1000;
+    Game g(s, jobRules());
+    g.europeanTurn(1);
+    VCR_CHECK(g.state().colonies[0].stock[cargo::kLumber] == 100);
+    VCR_CHECK(g.state().nations[1].gold <= 800);
+    s.turn = 17;
+    Game h(s, jobRules());
+    h.europeanTurn(1);
+    VCR_CHECK(h.state().colonies[0].stock[cargo::kLumber] == 0);
+}
+
+VCR_TEST("european ai: a schoolhouse teaches farming once its turns are saved up") {
+    SaveGame s = colonySave(1);
+    s.colonies[0].buildings |= std::uint64_t{1} << 12; // schoolhouse
+    s.colonies[0].raw[0x8C] = 10;
+    Game g(s, jobRules());
+    g.europeanTurn(1);
+    VCR_CHECK(g.state().colonies[0].skills[0] == 0);
+    VCR_CHECK(g.state().colonies[0].raw[0x8C] == 0);
+    s.colonies[0].raw[0x8C] = 2;
+    Game h(s, jobRules());
+    h.europeanTurn(1);
+    VCR_CHECK(h.state().colonies[0].skills[0] == skill::kFreeColonist);
+}
+
+VCR_TEST("european ai: a hungry colony has its last colonist trained as a farmer") {
+    SaveGame s = colonySave(2);
+    s.nations[1].gold = 2000;
+    s.colonies[0].stock[cargo::kTools] = 20; // none to buy
+    Ruleset r = jobRules();
+    r.terrain[2].yield = {}; // nothing grows
+    Game g(s, r);
+    g.europeanTurn(1);
+    const auto& c = g.state().colonies[0];
+    VCR_CHECK(c.skills[1] == 0);
+    VCR_CHECK(c.skills[0] == skill::kFreeColonist);
+    // As read: the price paid is the one listed at the colonist's number,
+    // row 1 here; one that cannot be bought (-1) gives a gold piece back.
+    r.jobs[1].europeCost = 300;
+    Game h(s, r);
+    h.europeanTurn(1);
+    VCR_CHECK(h.state().nations[1].gold == g.state().nations[1].gold - 301);
+}
+
+VCR_TEST("european ai: computer colonies lose no work to tories") {
+    SaveColony c;
+    c.population = 10;
+    VCR_CHECK(workModifier(c, 0).penalty == 1);
+    VCR_CHECK(workModifier(c, 0, false).penalty == 0);
+}

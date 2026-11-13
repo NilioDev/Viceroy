@@ -158,12 +158,13 @@ int terrainRow(const MapSquare& square);
 
 // How the Sons of Liberty change what each colonist makes: a bonus of 1
 // or 2 once membership has reached 50% or 100%, and a penalty of 1 for
-// every (10 - difficulty) tories.
+// every (10 - difficulty) tories. Seen with a debugger: only the player's
+// colonies pay the penalty (`tories` false for a computer nation's).
 struct WorkModifier {
     int bonus = 0;
     int penalty = 0;
 };
-WorkModifier workModifier(const SaveColony& colony, int difficulty);
+WorkModifier workModifier(const SaveColony& colony, int difficulty, bool tories = true);
 
 // What a colonist of this skill makes doing this job on a square. Fishing
 // gives 1 more than the yield where the water has land on at least 3 of its
@@ -179,7 +180,7 @@ int buildingYield(int level, int skill, int jobRow, WorkModifier modifier = {}, 
 int landAround(const SaveMap& map, int x, int y);
 
 ColonyProduction colonyProduction(const SaveColony& colony, const SaveMap& map, const Ruleset& rules,
-                                  int difficulty = 0);
+                                  int difficulty = 0, bool tories = true);
 
 // The building a job is done in, if any.
 std::optional<BuildingKind> buildingForJob(int jobRow);
@@ -281,7 +282,8 @@ int horsesBred(const SaveColony& colony, int foodSurplus);
 // Stores what the colony made this turn: workshops use what is there, food
 // is eaten, hammers go into the building under way, and the warehouse
 // throws away what it cannot hold.
-ColonyTurn runColonyTurn(SaveColony& colony, const SaveMap& map, const Ruleset& rules, int difficulty = 0);
+ColonyTurn runColonyTurn(SaveColony& colony, const SaveMap& map, const Ruleset& rules, int difficulty = 0,
+                         bool tories = true);
 
 // --- Sons of Liberty -----------------------------------------------------
 
