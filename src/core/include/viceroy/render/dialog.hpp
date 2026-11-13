@@ -86,7 +86,8 @@ void placeCentredDialog(Dialog& dialog);
 // A native of the tribe beside the box: what a settlement says. The mood
 // is the step of the tribe's tension toward the player (0 calm to 3
 // furious); it picks the figure IND<tribe>A<mood>.SS.
-void placeNativeDialog(Dialog& dialog, int tribe, int mood = 0);
+// With the chief's picture size, as measured; without it, an older guess.
+void placeNativeDialog(Dialog& dialog, int tribe, int mood = 0, int chiefWidth = 0, int chiefHeight = 0);
 // The naval advisor over the left end of the box (sea matters).
 void placeNavalDialog(Dialog& dialog);
 // The tutorial's hints: the naval advisor, his hands over the box.

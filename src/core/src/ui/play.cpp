@@ -315,6 +315,11 @@ void PlayScreen::enterVillage(int unit, int settlement) {
         addOption(*dialog_, textLine(art_->names, "ACTIONS", 2, "Establish Mission"));
         villageOptions_.push_back(kVillageMission);
     }
+    // Missionaries: Incite Indians (row 6).
+    if (game_.canIncite(unit, settlement)) {
+        addOption(*dialog_, textLine(art_->names, "ACTIONS", 6, "Incite Indians"));
+        villageOptions_.push_back(kVillageIncite);
+    }
     // Units that can attack: Demand Tribute (row 7).
     if (game_.canDemandTribute(unit, settlement)) {
         addOption(*dialog_, textLine(art_->names, "ACTIONS", 7, "Demand Tribute"));
@@ -343,8 +348,16 @@ void PlayScreen::placeNative(int tribe, int mood) {
     // Read from the original: the figure's mood is the step of the tribe's
     // tension toward the player.
     if (dialog_) {
-        placeNativeDialog(*dialog_, tribe,
-                          mood >= 0 ? mood : tensionLevel(tribeTension(game_.state(), tribe, game_.human())));
+        const int pose = std::clamp(
+            mood >= 0 ? mood : tensionLevel(tribeTension(game_.state(), tribe, game_.human())), 0, 3);
+        int width = 0;
+        int height = 0;
+        const auto sheet = static_cast<std::size_t>(kNativePortraits + 4 * tribe + pose);
+        if (art_ != nullptr && sheet < art_->portraits.size() && !art_->portraits[sheet].sprites.empty()) {
+            width = art_->portraits[sheet].sprites.front().image.width;
+            height = art_->portraits[sheet].sprites.front().image.height;
+        }
+        placeNativeDialog(*dialog_, tribe, pose, width, height);
     }
 }
 
@@ -453,6 +466,32 @@ void PlayScreen::demandTribute(int unit) {
     }
     placeNative(tribe, mood);
     question_ = "LESSONDONE";
+}
+
+void PlayScreen::startIncite(int unit) {
+    const auto& save = game_.state();
+    const int tribe = tribeOf(save.settlements[static_cast<std::size_t>(village_)]);
+    const auto& tribes = game_.rules().tribes;
+    const auto t = static_cast<std::size_t>(tribe);
+    // "The Apache tribe is ready to go on the warpath. Whom would you like
+    // us to attack?" The other nations, by name.
+    ask("INDIANWARPATH", unit, {t < tribes.size() ? tribes[t].adjective : ""});
+    for (const int nation : game_.inciteTargets(unit)) {
+        addOption(*dialog_, adjective(nation));
+        choices_.push_back(nation);
+    }
+    placeNative(tribe);
+}
+
+void PlayScreen::endIncite(int unit) {
+    // Seen: the missionary's turn is over.
+    game_.skipUnit(unit);
+    village_ = -1;
+    inciteTarget_ = -1;
+    for (auto& notice : game_.takeNotices()) {
+        notices_.push_back(std::move(notice));
+    }
+    advanceAfterNotices_ = true;
 }
 
 std::string PlayScreen::goodName(int good) const {
@@ -799,7 +838,8 @@ void PlayScreen::showNotices() {
         }
     }
     if (notice.section == "INDIANWELCOME" || notice.section == "INDIANPEACE" || notice.section == "INDIANCOME" ||
-        notice.section == "INDIANSHUN") {
+        notice.section == "INDIANSHUN" || notice.section == "NOCONTACT" || notice.section == "UNFORTUNATE" ||
+        notice.section == "ALREADYSMITE") {
         // Seen: the chief speaks, in the mood of the tribe's tension.
         ask(notice.section, -1, notice.strings, -1, notice.numbers);
         if (dialog_) {
@@ -896,7 +936,7 @@ void PlayScreen::showNotices() {
         constexpr std::string_view kBattles[] = {"DEMOTE",     "COLONISTCAPTURE", "COLONISTCAPTURE2", "WAGONCAPTURE",
                                                  "LOOTCAPTURE", "ARTILLERY",      "ARTILLERY2",       "VETERAN",
                                                  "VALOR",       "CAPTURED",       "LOOT",             "LOOT2",
-                                                 "INDIANSLAVES"};
+                                                 "INDIANSLAVES", "INDIANWARFARE"};
         if (std::find(std::begin(kBattles), std::end(kBattles), notice.section) != std::end(kBattles)) {
             placeMapDialog(*dialog_);
         } else {
@@ -965,6 +1005,8 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
             foundMission(unit);
         } else if (option == kVillageTrade && village_ >= 0) {
             startTrade(unit);
+        } else if (option == kVillageIncite && village_ >= 0) {
+            startIncite(unit);
         } else if (option == kVillageTribute && village_ >= 0) {
             demandTribute(unit);
         } else if (option == kVillageAttack && village_ >= 0) {
@@ -976,6 +1018,23 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
         for (auto& notice : game_.takeNotices()) {
             notices_.push_back(std::move(notice));
         }
+    } else if (question == "INDIANWARPATH") {
+        // Whom to attack: no contact ends it here, else the price.
+        inciteTarget_ = picked;
+        if (village_ >= 0 && game_.incite(unit, village_, picked, false) == Game::Incite::Done) {
+            const auto& save = game_.state();
+            const int tribe = tribeOf(save.settlements[static_cast<std::size_t>(village_)]);
+            ask("INDIANWARPATH2", unit, {adjective(picked)}, -1, {game_.incitePrice(unit, village_)});
+            placeNative(tribe);
+        } else {
+            endIncite(unit);
+        }
+    } else if (question == "INDIANWARPATH2") {
+        // "Pay 6552." or "Never mind."
+        if (yes && village_ >= 0) {
+            game_.incite(unit, village_, inciteTarget_, true);
+        }
+        endIncite(unit);
     } else if (question == "LEARNSTAY") {
         // "Then I shall become a master ..." or "Not right now, thanks."
         if (yes && village_ >= 0) {

@@ -352,6 +352,28 @@ public:
     // INDIANPEACE and INDIANCOME); no leaves the tribe 100 tense (notice
     // INDIANSHUN).
     void answerWelcome(int tribe, bool accept);
+    // The original's one way to make a tribe more or less tense toward a
+    // nation: rises are halved for the French and again with Pocahontas;
+    // the result stays within 0 to 100. A fall ends a war and calms the
+    // tribe's settlements.
+    void changeTension(int tribe, int nation, int amount);
+
+    // A missionary incites a tribe against another European nation. The
+    // price weighs the tribe's tension toward the missionary's nation, its
+    // settlements, defence, muskets and horses; the French pay a third
+    // less, and missions, a Jesuit and a capital make it cheaper (at least
+    // 500).
+    int incitePrice(int unit, int settlement) const;
+    // Read from the original: a missionary at a tribe with a treaty is
+    // always offered Incite Indians.
+    bool canIncite(int unit, int settlement) const;
+    // The nations a tribe can be incited against: the other Europeans.
+    std::vector<int> inciteTargets(int unit) const;
+    enum class Incite { NoContact, TooPoor, AlreadyAtWar, Done };
+    // Checks and, when the price is paid, does it: the tribe 100 more tense
+    // toward the target (halved as changeTension does) and the price off
+    // the treasury. Notices tell the answer.
+    Incite incite(int unit, int settlement, int target, bool pay);
 
     // A ship that lost a fight and is being repaired (bit 0x80 of byte 4).
     bool isDamagedShip(int index) const;

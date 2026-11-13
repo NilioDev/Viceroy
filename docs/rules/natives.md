@@ -36,14 +36,17 @@ Speak) to units with an attack above 1, and after Demand Tribute to the
 others (seen: artillery gets Attack Village, Demand Tribute, Cancel
 Action; a scout Speak, Demand Tribute, Attack Village, Cancel Action).
 Without contact with the tribe the others are not there. A missionary is
-offered **Establish Mission** at a settlement without a mission (the
-original also offers Incite Indians, and Denounce Heresy at another
-nation's mission, which Viceroy does not have yet).
+offered **Establish Mission** at a settlement without a mission, and
+**Incite Indians** (see below); the original also offers Denounce Heresy
+at another nation's mission, which Viceroy does not have yet.
 
 Every native answer is told by a figure of the tribe (`IND<tribe>A<mood>.SS`)
 whose mood is the step of the tribe's tension toward the player: 0 below
 25, 1 below 50, 2 below 75, 3 above. The Iroquois chief at tension 80
-was seen in his furious pose.
+was seen in his furious pose. The figure stands centred on the rows (its
+top at (198 − height) / 2). The Iroquois and the Apache stand left of the
+box, 6 pixels apart, and the two together are centred on the screen
+(measured on two Iroquois moods and the Apache); the others stand right.
 
 ## First contact
 
@@ -75,6 +78,50 @@ the original also has `INDIANTREATY` and `INDIANHELLO1`/`2` in GAME.TXT,
 which its code never asks for, and the welcome's map shows the unit still
 on its old square, where we draw it on the new one. Without the treaty
 bit a settlement offers only Cancel Action.
+
+## How tension moves
+
+The original changes a tribe's tension toward a nation in one place, which
+first contact, an attack, inciting and trade all use:
+
+- A rise is halved for the French, and halved again for a nation with
+  Pocahontas. The result stays within 0 to 100.
+- A fall ends a war (bit 0x04 off on both sides) and, below 75, clears bit
+  0x02 too. When it crosses a step of 5, each of the tribe's settlements
+  calms toward the nation: its alarm is cut to at most 0x20 (tension below
+  50) or 0x60.
+- Not done yet: a rise to 100 with a treaty may make the tribe declare war,
+  with a chance of the difficulty level plus 2 in 11 (3 in 11 for a
+  computer nation).
+
+## Inciting a tribe
+
+A missionary at a tribe its nation has a treaty with is always offered
+**Incite Indians** (after Establish Mission, or Denounce Heresy at another
+nation's mission). The chief asks `INDIANWARPATH`, "Whom would you like us
+to attack?", listing the other European nations by name.
+
+- If the tribe has not met that nation: `NOCONTACT`, "We have no contact
+  with the English."
+- Otherwise `INDIANWARPATH2` names the price, with **Pay** or **Never mind**.
+  The price is (the tribe's tension toward the missionary's nation + 75) ×
+  (6 × its settlements + its defence total / 4 rounded down to even + 2 ×
+  its bytes 7 and 8), the defence total being the one the force count of
+  [tribute](#counting-forces) keeps. The French pay two thirds. Each of the
+  tribe's settlements with a mission of the nation takes 250 off (1000 for
+  an expert mission; twice either at a capital), a Jesuit 1500, and a
+  capital 500. It is at least 500.
+- Paying with too little gold: `UNFORTUNATE`. A tribe already at 75 or
+  more toward the target: `ALREADYSMITE`.
+- Otherwise the colonial advisor tells `INDIANWARFARE`: "Apache nation
+  holds War Council! Dutch missionaries incite Apache to warfare against
+  the French!". The tribe's tension toward the target rises by 100 (as
+  above, so 50 for the French), and the price leaves the treasury.
+
+Either way the missionary's turn is over. Measured in DOSBox with a Dutch
+missionary at the Apache: 6552 at tension 51 with defence 56 (6
+settlements, bytes 0 and 1), 4650 at tension 0 with defence 100; paying
+took 4650 and put the Apache at 50 toward the French.
 
 ## Learning a skill
 

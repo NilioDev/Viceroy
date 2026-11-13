@@ -305,7 +305,7 @@ void placeCentredDialog(Dialog& d) {
     d.y = (Screen::kHeight - dialogHeight(d)) / 2;
 }
 
-void placeNativeDialog(Dialog& d, int tribe, int mood) {
+void placeNativeDialog(Dialog& d, int tribe, int mood, int chiefWidth, int chiefHeight) {
     // Measured on five tribes: the box is centred on the screen's rows; the
     // Iroquois and Apache stand left of it, the Arawaks, Cherokee and Sioux
     // right. The others are not measured yet and stand right like the Sioux.
@@ -320,6 +320,17 @@ void placeNativeDialog(Dialog& d, int tribe, int mood) {
     // The Sioux chief was measured at rows 10 to 186 right of the box.
     d.portraitY = 10;
     d.portraitX = left ? 4 : 210;
+    if (chiefWidth > 0 && chiefHeight > 0) {
+        // Measured on the Iroquois (two moods) and the Apache: the chief
+        // is centred on the rows; one standing left and the box, 6 apart,
+        // are centred together on the screen.
+        constexpr int kGap = 6;
+        d.portraitY = (Screen::kHeight - 2 - chiefHeight) / 2;
+        if (left) {
+            d.x = (Screen::kWidth + chiefWidth + kGap - w + 1) / 2;
+            d.portraitX = d.x - kGap - chiefWidth;
+        }
+    }
 }
 
 void placeNavalDialog(Dialog& d) {
