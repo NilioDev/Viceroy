@@ -2,10 +2,12 @@
 #include "test.hpp"
 
 #include "viceroy/data/savegame.hpp"
+#include "viceroy/game/colony.hpp"
 #include "viceroy/game/natives.hpp"
 #include "viceroy/game/resource.hpp"
 #include "viceroy/game_files.hpp"
 
+#include <algorithm>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -912,7 +914,7 @@ VCR_TEST("original files: the natives' turn (measured)") {
     const Art art = loadArt(dir);
     std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
     SaveGame save = readSaveGame(Bytes(std::istreambuf_iterator<char>(in), {}));
-    constexpr int kSioux = 4, kApache = 5, kCherokee = 6;
+    constexpr int kTribe = 4, kApache = 5, kCherokee = 6;
     const auto tribeAt = [](const SaveGame& s, int tribe, std::size_t at) {
         return s.tribesAndMore[static_cast<std::size_t>(tribe) * kTribeRecordSize + at];
     };
@@ -932,7 +934,7 @@ VCR_TEST("original files: the natives' turn (measured)") {
     int braves = 0;
     for (int i = units; i < game.unitCount(); ++i) {
         const auto& u = game.unit(i);
-        if (u.nation == 4 + kSioux) {
+        if (u.nation == 4 + kTribe) {
             ++braves;
             // Then it takes its first step (measured: to (25, 19)).
             VCR_CHECK(u.type == 19 && std::abs(u.x - 26) <= 1 && std::abs(u.y - 18) <= 1 && u.raw[6] == 12);
@@ -948,8 +950,8 @@ VCR_TEST("original files: the natives' turn (measured)") {
     VCR_CHECK(tribeAt(after, 3, 14) == 101 && tribeAt(after, 3, 22) == 58);
     // The new brave counts in the Sioux defence (in all and in region 1).
     const std::size_t extra = 8 * kTribeRecordSize;
-    VCR_CHECK(after.tribesAndMore[extra + 565 + kSioux] == 8);
-    VCR_CHECK(after.tribesAndMore[extra + 589 + 16 * kSioux + 1] == 8);
+    VCR_CHECK(after.tribesAndMore[extra + 565 + kTribe] == 8);
+    VCR_CHECK(after.tribesAndMore[extra + 589 + 16 * kTribe + 1] == 8);
     // Horses: the Cherokee own the last settlement in the list, so theirs
     // breed once for each of the five tribes left; the Apache's do not.
     // (A Cherokee brave staying home may take 25 of them for a horse.)
@@ -1017,4 +1019,131 @@ VCR_TEST("original files: the natives move on land and stop when their moves are
         }
     }
     VCR_CHECK(moved > 10); // measured: 22 of 25 moved in the original
+}
+
+namespace {
+
+// A free land square next to (x, y) for a brave to stand on.
+std::pair<int, int> besideOnLand(const Game& game, int x, int y) {
+    for (int dy = -1; dy <= 1; ++dy) {
+        for (int dx = -1; dx <= 1; ++dx) {
+            const int nx = x + dx;
+            const int ny = y + dy;
+            if ((dx != 0 || dy != 0) && game.state().map.inside(nx, ny) && game.state().map.at(nx, ny).isLand() &&
+                game.unitsAt(nx, ny).empty() && !game.colonyAt(nx, ny) && !game.settlementAt(nx, ny)) {
+                return {nx, ny};
+            }
+        }
+    }
+    return {-1, -1};
+}
+
+} // namespace
+
+VCR_TEST("original files: the natives attack units and colonies (read from the original)") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
+    const SaveGame original = readSaveGame(Bytes(std::istreambuf_iterator<char>(in), {}));
+    // Brave 1 is of tribe 2 and village 0; the Dutch play on the easiest level.
+    constexpr int kBrave = 1, kTribe = 2, kDutch = 3, kSpain = 2, kSoldier = 47;
+    constexpr int kIsabella = 1, kCartajena = 15;
+    const auto braveBeside = [&](int turn, int x, int y) {
+        SaveGame save = original;
+        save.turn = turn;
+        Game probe(save, art.rules);
+        const auto [bx, by] = besideOnLand(probe, x, y);
+        auto& b = save.units[kBrave];
+        b.x = bx;
+        b.y = by;
+        b.movesUsed = 0;
+        return save;
+    };
+    const auto alarmOf = [](const SaveGame& save, int nation) {
+        const auto& s = save.settlements[0];
+        return s.raw[static_cast<std::size_t>(10 + 2 * nation)] | (s.raw[static_cast<std::size_t>(11 + 2 * nation)] << 8);
+    };
+
+    {
+        // The ambush: in the open the brave has the square's bonus and the
+        // soldier none; against a fortified soldier it has neither. Here
+        // 8 per point, the bonus, the attack's half, and halved again
+        // against the player on the easiest level.
+        Game game(braveBeside(200, 23, 20), art.rules);
+        const auto& sq = game.state().map.at(23, 20);
+        const int bonus = art.rules.terrain[static_cast<std::size_t>(terrainRow(sq))].defenseBonus;
+        const auto s = game.combatStrengths(kBrave, kSoldier);
+        VCR_CHECK(s.attack == (((8 * (4 + bonus)) >> 2) * 3 >> 1) >> 1);
+        // A veteran soldier's 2 and half again, and the player's 4 on this
+        // level.
+        VCR_CHECK(s.defense == 2 * 8 * 3 / 2 + 4);
+        game.state().units[kSoldier].orders = SaveUnit::kFortified;
+        const auto f = game.combatStrengths(kBrave, kSoldier);
+        VCR_CHECK(f.attack == (8 * 3 >> 1) >> 1);
+    }
+
+    for (int turn = 200; turn < 230; ++turn) {
+        // A nation's last colony never falls to the natives: the brave
+        // dies and its tribe raids the colony; the village's alarm is spent.
+        SaveGame save = braveBeside(turn, 34, 10);
+        save.settlements[0].raw[10 + 2 * kSpain] = 0x40;
+        Game game(save, art.rules);
+        const int people = game.state().colonies[kCartajena].population;
+        const int units = game.unitCount();
+        VCR_CHECK(game.nativeAttack(kBrave, 34, 10) == CombatOutcome::DefenderWon);
+        VCR_CHECK(game.unitCount() == units - 1);
+        VCR_CHECK(game.state().colonies[kCartajena].population == people);
+        VCR_CHECK(alarmOf(game.state(), kSpain) == 0);
+    }
+
+    bool killed = false, raided = false, burned = false, ambushed = false;
+    for (int turn = 200; turn < 400 && !(killed && raided && burned && ambushed); ++turn) {
+        {
+            // Isabella, a Dutch colony of two with nobody under arms: a won
+            // fight kills one of its people, a lost one ends in a raid.
+            Game game(braveBeside(turn, 43, 29), art.rules);
+            const int before = tribeTension(game.state(), kTribe, kDutch);
+            const auto outcome = game.nativeAttack(kBrave, 43, 29);
+            const auto notices = game.takeNotices();
+            VCR_CHECK(!notices.empty());
+            if (outcome == CombatOutcome::AttackerWon) {
+                killed = true;
+                VCR_CHECK(game.state().colonies[kIsabella].population == 1);
+                VCR_CHECK(notices[0].section == "INDIANWINCOLONY" && notices[0].strings[3] == "Isabella");
+                VCR_CHECK(tribeTension(game.state(), kTribe, kDutch) <= before);
+            } else {
+                raided = true;
+                VCR_CHECK(notices[0].section.rfind("RAID", 0) == 0 && notices[0].colony == kIsabella);
+            }
+        }
+        {
+            // Martinique, the French colony of one, burns with its last.
+            Game game(braveBeside(turn, 27, 18), art.rules);
+            const auto colonies = game.state().colonies.size();
+            if (game.nativeAttack(kBrave, 27, 18) == CombatOutcome::AttackerWon) {
+                burned = true;
+                VCR_CHECK(game.state().colonies.size() == colonies - 1);
+                VCR_CHECK(!game.colonyAt(27, 18));
+                VCR_CHECK(game.takeNotices().empty()); // not the player's
+            }
+        }
+        {
+            // The Dutch soldier in the open: beaten, he loses his muskets to
+            // the brave.
+            Game game(braveBeside(turn, 23, 20), art.rules);
+            if (game.nativeAttack(kBrave, 23, 20) == CombatOutcome::AttackerWon) {
+                ambushed = true;
+                VCR_CHECK(game.unit(kBrave).type == 20);
+                VCR_CHECK(game.unit(kSoldier).type == 0);
+                const auto notices = game.takeNotices();
+                VCR_CHECK(std::any_of(notices.begin(), notices.end(), [](const GameNotice& n) {
+                    return n.section == "INDIANWIN1" && n.strings[3] == "Roanoke";
+                }));
+            }
+        }
+    }
+    VCR_CHECK(killed && raided && burned && ambushed);
 }

@@ -720,6 +720,9 @@ void removeColonist(SaveColony& colony, int colonist) {
         }
     }
     colony.population = population - 1;
+    // Read from the original: the Sons of Liberty total loses the 100 a
+    // colonist brought.
+    colony.rebelDivisor -= 100;
 }
 
 ColonyTurn runColonyTurn(SaveColony& colony, const SaveMap& map, const Ruleset& rules, int difficulty) {

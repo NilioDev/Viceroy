@@ -823,6 +823,14 @@ void PlayScreen::showNotices() {
             notice.strings[static_cast<std::size_t>(string)] = adjective(nation);
         }
     }
+    for (const auto& [string, row] : notice.labels) {
+        if (string >= 0) {
+            if (notice.strings.size() <= static_cast<std::size_t>(string)) {
+                notice.strings.resize(static_cast<std::size_t>(string) + 1);
+            }
+            notice.strings[static_cast<std::size_t>(string)] = textLine(art_->labelText, "MISC", row, "");
+        }
+    }
     if ((notice.section == "LOOT" || notice.section == "LOOT2") && notice.strings.size() >= 3) {
         // "Dutch loot and burn Apache Camp!": the second column of @LEVELS,
         // by the tribe's level, or the capital's row.
