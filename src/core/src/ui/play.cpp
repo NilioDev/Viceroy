@@ -202,7 +202,8 @@ void PlayScreen::moveActive(Step step) {
         const int defender = game_.canAttack(index) ? game_.defenderAt(tx, ty, index) : -1;
         const auto colony = game_.colonyAt(tx, ty);
         const auto settlement = game_.settlementAt(tx, ty);
-        if (settlement && !game_.isShip(index) && !game_.canAttack(index)) {
+        if (settlement && !game_.isShip(index) &&
+            (!game_.canAttack(index) || game_.unit(index).type == unit_type::kScout)) {
             enterVillage(index, *settlement);
         } else if (defender >= 0 && !settlement) {
             startAttack(index, defender);
@@ -271,6 +272,11 @@ void PlayScreen::enterVillage(int unit, int settlement) {
         addOption(*dialog_, textLine(art_->names, "ACTIONS", 4, "Live Among The Natives"));
         villageOptions_.push_back(kVillageLive);
     }
+    // Scouts: Ask to Speak With Chief (row 5).
+    if (game_.canSpeakWithChief(unit, settlement)) {
+        addOption(*dialog_, textLine(art_->names, "ACTIONS", 5, "Ask to Speak With Chief"));
+        villageOptions_.push_back(kVillageSpeak);
+    }
     addOption(*dialog_, textLine(art_->names, "ACTIONS", 9, "Cancel Action"));
     villageOptions_.push_back(kVillageCancel);
     placeCentredDialog(*dialog_);
@@ -285,6 +291,74 @@ void PlayScreen::showLesson(int unit, const std::string& section, const std::vec
     if (dialog_) {
         placeNativeDialog(*dialog_, tribe);
     }
+}
+
+void PlayScreen::speakWithChief(int unit) {
+    const auto& save = game_.state();
+    const int tribe = tribeOf(save.settlements[static_cast<std::size_t>(village_)]);
+    const int nation = game_.unit(unit).nation;
+    const auto talk = game_.speakWithChief(unit, village_);
+    const auto& rules = game_.rules();
+    const auto name = [](const auto& list, int row) {
+        return row >= 0 && static_cast<std::size_t>(row) < list.size() ? list[static_cast<std::size_t>(row)].name
+                                                                       : std::string();
+    };
+    // "The Arawak tribe": the tribe's adjective.
+    const std::string people = static_cast<std::size_t>(tribe) < rules.tribes.size()
+                                   ? rules.tribes[static_cast<std::size_t>(tribe)].adjective
+                                   : "";
+    chief_ = PendingChief{};
+    chief_->unit = talk.answer == Game::ChiefAnswer::Kill ? -1 : unit;
+    switch (talk.answer) {
+    case Game::ChiefAnswer::Kill: chief_->section = "CHIEFKILL"; chief_->strings = {people}; break;
+    case Game::ChiefAnswer::Bored: chief_->section = "CHIEFBORED"; chief_->strings = {people, adjective(nation)}; break;
+    case Game::ChiefAnswer::Guides: {
+        // "welcome you to our Camp": the second column of @LEVELS.
+        std::string place;
+        if (const auto* levels = art_->names.find("LEVELS")) {
+            const auto row = static_cast<std::size_t>(tribeLevel(save, tribe));
+            const auto fields = row < levels->lines.size() ? splitFields(levels->lines[row]) : std::vector<std::string>{};
+            place = fields.size() > 1 ? fields[1] : "";
+        }
+        chief_->section = "CHIEFGUIDES";
+        chief_->strings = {people, place};
+        break;
+    }
+    case Game::ChiefAnswer::Tales: chief_->section = "CHIEFAREA"; chief_->strings = {people}; break;
+    case Game::ChiefAnswer::Gift:
+        chief_->section = "CHIEFGIFT";
+        chief_->strings = {people, adjective(nation)};
+        chief_->numbers = {talk.gold};
+        break;
+    }
+    if (talk.welcome) {
+        const auto& jobs = rules.jobs;
+        const std::string experts = talk.skill >= 0 && static_cast<std::size_t>(talk.skill) < jobs.size()
+                                        ? jobs[static_cast<std::size_t>(talk.skill)].expertName
+                                        : "";
+        showLesson(unit, "CHIEFHOWDY",
+                   {experts, name(rules.cargo, talk.wants[0]), name(rules.cargo, talk.wants[1]),
+                    name(rules.cargo, talk.wants[2])});
+    } else {
+        showChiefAnswer();
+    }
+}
+
+void PlayScreen::showChiefAnswer() {
+    if (!chief_) {
+        return;
+    }
+    const auto c = std::move(*chief_);
+    chief_.reset();
+    const auto& save = game_.state();
+    const int tribe = village_ >= 0 && village_ < static_cast<int>(save.settlements.size())
+                          ? tribeOf(save.settlements[static_cast<std::size_t>(village_)])
+                          : 0;
+    ask(c.section, c.unit, c.strings, -1, c.numbers);
+    if (dialog_) {
+        placeNativeDialog(*dialog_, tribe);
+    }
+    question_ = "LESSONDONE";
 }
 
 void PlayScreen::ask(std::string_view section, int unit, std::vector<std::string> strings, int nation,
@@ -588,6 +662,8 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
             if (lesson.section != "LEARNSTAY") {
                 question_ = "LESSONDONE";
             }
+        } else if (option == kVillageSpeak && village_ >= 0) {
+            speakWithChief(unit);
         }
     } else if (question == "LEARNSTAY") {
         // "Then I shall become a master ..." or "Not right now, thanks."
@@ -605,6 +681,8 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
             showLesson(unit, "LEARNLATER", {});
         }
         question_ = "LESSONDONE";
+    } else if (question == "CHIEFHOWDY") {
+        showChiefAnswer();
     } else if (question == "LESSONDONE") {
         village_ = -1;
         advance();

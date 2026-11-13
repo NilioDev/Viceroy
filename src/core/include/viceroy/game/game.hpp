@@ -236,6 +236,19 @@ public:
     NativeLesson liveAmongNatives(int unit, int settlement);
     // The answer "Then I shall become a master ...": the unit learns.
     void learnFromNatives(int unit, int settlement);
+    // A scout may ask to speak with the chief of a tribe its nation has met.
+    bool canSpeakWithChief(int unit, int settlement) const;
+    enum class ChiefAnswer { Kill, Bored, Guides, Tales, Gift };
+    struct ChiefTalk {
+        bool welcome = false;      // CHIEFHOWDY comes first
+        int skill = -1;            // what the village teaches (row of @JOB)
+        std::array<int, 3> wants{}; // the goods asked for (rows of @CARGO)
+        ChiefAnswer answer = ChiefAnswer::Bored;
+        int gold = 0; // the gift
+    };
+    // The scout goes in; its turn is over. A killed scout is gone, a guided
+    // one is a seasoned scout, tales show the land around, a gift is paid.
+    ChiefTalk speakWithChief(int unit, int settlement);
 
     // A ship that lost a fight and is being repaired (bit 0x80 of byte 4).
     bool isDamagedShip(int index) const;
@@ -254,6 +267,9 @@ public:
 
     // --- Map -----------------------------------------------------------------
     void reveal(int x, int y, int radius, int nation);
+    // What a chief's tales show: the land of the same landmass within the
+    // radius, and every square next to (x, y).
+    void revealLand(int x, int y, int radius, int nation);
     int sightRadius(int index) const;
 
 private:

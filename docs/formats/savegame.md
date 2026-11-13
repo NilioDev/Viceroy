@@ -142,7 +142,7 @@ original offers only Cancel Action at the tribe's settlements.
 
 **Native settlement** (18 bytes): x, y, tribe (4 to 11, in `@TRIBES`
 order from the Inca), flags at 3 (0x02 has taught its skill, 0x04 the
-tribe's capital), population at 4, the nation whose mission is there at 5
+tribe's capital, 0x08 a scout has spoken with the chief), population at 4, the nation whose mission is there at 5
 (0xFF none), and from 10 one 16-bit alarm per European nation. See
 [natives](../rules/natives.md).
 

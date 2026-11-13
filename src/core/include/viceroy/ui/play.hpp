@@ -189,11 +189,21 @@ private:
     std::vector<int> unitOptions_;
     void openUnitOptions(int unit, bool first);
     // A unit at a native settlement: what each option of the greeting does.
-    enum VillageOption { kVillageLive, kVillageCancel };
+    enum VillageOption { kVillageLive, kVillageSpeak, kVillageCancel };
     std::vector<int> villageOptions_;
     int village_ = -1;
     void enterVillage(int unit, int settlement);
     void showLesson(int unit, const std::string& section, const std::vector<std::string>& strings);
+    // What the chief answers a scout, shown after his greeting.
+    struct PendingChief {
+        int unit = -1; // -1 when the scout is gone
+        std::string section;
+        std::vector<std::string> strings;
+        std::vector<int> numbers;
+    };
+    std::optional<PendingChief> chief_;
+    void speakWithChief(int unit);
+    void showChiefAnswer();
     std::vector<GameNotice> notices_; // messages still to show, first first
     const Art* art_ = nullptr;
     int lastColony_ = -1;

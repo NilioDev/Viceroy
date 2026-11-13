@@ -281,8 +281,8 @@ VillageEconomy villageEconomy(const SaveGame& save, int settlement) {
     // counts light forest and plain land, "food" heavy forest and more.
 
     VillageEconomy e;
-    auto& A = e.supply;
-    auto& B = e.demand;
+    auto& A = e.wants;
+    auto& B = e.makes;
     const int n = s.population + 1;
     int settlementsOfTribe = 0;
     for (const auto& other : save.settlements) {
@@ -337,23 +337,23 @@ VillageEconomy villageEconomy(const SaveGame& save, int settlement) {
     // other.
     for (std::size_t i = 0; i < 16; ++i) {
         const int held = t ? word(t + 0x0E + 2 * i) : 0;
-        const int demand = B[i];
-        const int supply = A[i];
+        const int made = B[i];
+        const int wanted = A[i];
         if (held > 0) {
-            A[i] = supply + 2 * divide(-50 - held, 100);
+            A[i] = wanted + 2 * divide(-50 - held, 100);
         } else if (held < 0) {
             B[i] += 2 * divide(held + 50, 100);
         }
-        const int adjustedDemand = B[i];
-        B[i] = std::max(B[i] - (A[i] >> 1), demand > 0 ? 1 : 0);
-        A[i] = std::max(A[i] - (adjustedDemand >> 1), supply > 0 ? 1 : 0);
+        const int adjustedMade = B[i];
+        B[i] = std::max(B[i] - (A[i] >> 1), made > 0 ? 1 : 0);
+        A[i] = std::max(A[i] - (adjustedMade >> 1), wanted > 0 ? 1 : 0);
     }
     return e;
 }
 
 int villageSkill(const SaveGame& save, int settlement) {
     const auto& s = save.settlements[static_cast<std::size_t>(settlement)];
-    auto weights = villageEconomy(save, settlement).demand;
+    auto weights = villageEconomy(save, settlement).makes;
     const int level = tribeLevel(save, tribeOf(s));
     // The pick is seeded with the square and the game's own seed, so a
     // village always teaches the same skill.
@@ -409,6 +409,75 @@ int villageSkill(const SaveGame& save, int settlement) {
         }
     }
     return skill;
+}
+
+namespace {
+
+// The original's own sort, read with a debugger: ascending, carrying an
+// index along. It takes the first value smaller than the one before it
+// and moves it in front of the first value that is not smaller; equal
+// values can change order, so the names the chief gives depend on it.
+void originalSort(std::array<int, 16>& values, std::array<int, 16>& order) {
+    for (std::size_t i = 0; i < 16; ++i) {
+        order[i] = static_cast<int>(i);
+    }
+    const auto less = [](int a, int b) {
+        return static_cast<std::uint16_t>(a) < static_cast<std::uint16_t>(b);
+    };
+    std::size_t i = 0;
+    while (true) {
+        while (i + 1 < 16 && !less(values[i + 1], values[i])) {
+            ++i;
+        }
+        if (i + 1 >= 16) {
+            return;
+        }
+        const int value = values[i + 1];
+        const int index = order[i + 1];
+        for (std::size_t k = i + 1; k + 1 < 16; ++k) {
+            values[k] = values[k + 1];
+            order[k] = order[k + 1];
+        }
+        std::size_t at = 0;
+        while (at < 15 && less(values[at], value)) {
+            ++at;
+        }
+        for (std::size_t k = 15; k > at; --k) {
+            values[k] = values[k - 1];
+            order[k] = order[k - 1];
+        }
+        values[at] = value;
+        order[at] = index;
+    }
+}
+
+} // namespace
+
+std::array<int, 3> villageWants(const SaveGame& save, int settlement) {
+    // Read from the original with a debugger and checked against what six
+    // chiefs asked for. The goods the village makes most of are not asked
+    // for, nor is food when it makes more food than trade goods, nor the two
+    // goods of the settlement's bytes 8 and 9.
+    const auto& s = save.settlements[static_cast<std::size_t>(settlement)];
+    auto e = villageEconomy(save, settlement);
+    const int food = e.makes[kFood];
+    e.makes[kFood] = 0;
+    if (food > e.makes[kTradeGoods]) {
+        e.wants[kFood] = 0;
+    }
+    std::array<int, 16> order{};
+    originalSort(e.makes, order);
+    for (std::size_t k = 1; k <= 3; ++k) {
+        e.wants[static_cast<std::size_t>(order[16 - k])] = 0;
+    }
+    for (const std::size_t byte : {std::size_t{8}, std::size_t{9}}) {
+        const auto good = static_cast<std::int8_t>(s.raw[byte]);
+        if (good >= 0 && good < 16) {
+            e.wants[static_cast<std::size_t>(good)] = 0;
+        }
+    }
+    originalSort(e.wants, order);
+    return {order[15], order[14], order[13]};
 }
 
 namespace {
@@ -468,6 +537,78 @@ Game::NativeLesson Game::liveAmongNatives(int index, int settlement) {
         lesson.section = "LEARNSTAY";
     }
     return lesson;
+}
+
+bool Game::canSpeakWithChief(int index, int settlement) const {
+    const auto& u = unit(index);
+    const auto& s = save_.settlements[static_cast<std::size_t>(settlement)];
+    return u.type == unit_type::kScout && u.nation < kEuropeanNations && metTribe(save_, u.nation, tribeOf(s));
+}
+
+Game::ChiefTalk Game::speakWithChief(int index, int settlement) {
+    // Read from the original with a debugger, in its order; see
+    // docs/rules/natives.md.
+    constexpr int kCoronado = 6; // row of @FATHERS
+    constexpr int kArawaks = 2;
+    constexpr int kTalesRadius = 6;
+    auto& s = save_.settlements[static_cast<std::size_t>(settlement)];
+    const int tribe = tribeOf(s);
+    const int nation = unit(index).nation;
+    const int expert = unit(index).profession == kScoutJob ? 1 : 0;
+    const int tension = tribeTension(save_, tribe, nation);
+    const auto roll = [this](int low, int high) { return low + nextRandom(high - low + 1); };
+    ChiefTalk talk;
+    save_.units[static_cast<std::size_t>(index)].movesUsed = movementAllowance(index);
+
+    // Taboos: a furious tribe, the chance an alarmed one finds offence, and
+    // the Arawaks' own temper.
+    bool taboo = tension >= 75;
+    const int luck = taboo ? 0 : roll(0, 100 + 40 * expert);
+    if (!taboo && tension >= 25 && (tension >> 2) >= luck) {
+        taboo = true;
+    }
+    if (!taboo && tribe == kArawaks && roll(0, (8 - save_.difficulty) << expert) == 0) {
+        taboo = true;
+    }
+    if (taboo) {
+        talk.answer = hasFather(nation, kCoronado) ? ChiefAnswer::Bored : ChiefAnswer::Kill;
+        if (talk.answer == ChiefAnswer::Kill) {
+            removeUnit(index);
+        }
+        return talk;
+    }
+
+    talk.welcome = true;
+    talk.skill = villageSkill(save_, settlement);
+    talk.wants = villageWants(save_, settlement);
+    if (luck <= tension || (s.raw[3] & kSettlementVisited) != 0) {
+        talk.answer = ChiefAnswer::Bored;
+        return talk;
+    }
+    s.raw[3] = static_cast<std::uint8_t>(s.raw[3] | kSettlementVisited);
+    auto& u = save_.units[static_cast<std::size_t>(index)];
+    switch (roll(1, 3)) {
+    case 1:
+        if (expert == 0) {
+            talk.answer = ChiefAnswer::Guides;
+            u.profession = kScoutJob;
+            break;
+        }
+        [[fallthrough]];
+    case 2:
+        talk.answer = ChiefAnswer::Tales;
+        revealLand(u.x, u.y, kTalesRadius, nation);
+        break;
+    default: {
+        talk.answer = ChiefAnswer::Gift;
+        const int most = 10 - save_.difficulty;
+        const int beads = roll(1, most) + roll(1, most) + roll(1, most);
+        talk.gold = beads * roll(1, 6) * 4 * (tribeLevel(save_, tribe) + 1);
+        save_.nations[static_cast<std::size_t>(nation)].gold += talk.gold;
+        break;
+    }
+    }
+    return talk;
 }
 
 void Game::learnFromNatives(int index, int settlement) {

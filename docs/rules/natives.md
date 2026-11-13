@@ -27,9 +27,12 @@ second the tribe's name ("Sioux").
 
 The options come from `@ACTIONS`. A colonist or pioneer of a nation that
 has met the tribe is offered **Live Among The Natives**; everyone is
-offered **Cancel Action**, which leaves the unit where it was. Without
-contact with the tribe only Cancel Action is there. Scouts, missionaries
-and soldiers get other options, which Viceroy does not have yet.
+offered **Cancel Action**, which leaves the unit where it was. A scout of
+a nation that has met the tribe is offered **Ask to Speak With Chief**;
+the original also offers it Demand Tribute and Attack Village, which
+Viceroy does not have yet. Without contact with the tribe only Cancel
+Action is there. Missionaries and soldiers get other options, which
+Viceroy does not have yet either.
 
 ## Learning a skill
 
@@ -49,6 +52,49 @@ in this order:
 7. Otherwise `@LEARNSTAY` offers the settlement's skill. Accepting makes
    the unit an expert in it (`@LEARNDONE`) and marks the settlement as
    having taught; declining answers `@LEARNLATER`.
+
+## A scout speaks with the chief
+
+Speaking with the chief uses up the scout's moves. The chief (the tribe's
+portrait) first checks for broken taboos:
+
+1. Tension 75 or more breaks a taboo.
+2. Otherwise a roll of 0 to 100 is made (0 to 140 for a seasoned scout).
+   With tension 25 or more, a roll at or below a quarter of the tension
+   breaks a taboo.
+3. The Arawaks also take offence on a roll of 0 out of 0 to
+   8 − difficulty (doubled for a seasoned scout).
+
+A broken taboo kills the scout (`@CHIEFKILL`). A nation with Francisco
+Coronado in its congress is only told it is welcome (`@CHIEFBORED`)
+instead.
+
+Otherwise the chief greets the scout (`@CHIEFHOWDY`). The greeting names
+the village's experts (the second column of `@JOB` for the skill it
+teaches) and the three goods it wants most. Those come from the
+settlement's economy, after taking out the goods it makes most of, food
+when it makes more food than trade goods, and the goods in the
+settlement's bytes 8 and 9. They are sorted with the original's own
+sort, whose order for equal values decides ties.
+
+Then, if the roll was above the tension and no scout has spoken with this
+chief before, the settlement remembers the visit and a roll of 1 to 3
+decides:
+
+1. **Guides** (`@CHIEFGUIDES`): the scout becomes a seasoned scout. A
+   seasoned scout gets the tales instead.
+2. **Tales of nearby lands** (`@CHIEFAREA`): the squares next to the
+   scout and the land of the same region within 6 squares are explored.
+3. **A gift** (`@CHIEFGIFT`): three rolls of 1 to 10 − difficulty, added
+   up, times a roll of 1 to 6, times 4, times the tribe's level + 1, in
+   gold.
+
+In every other case the chief only says the scout is welcome
+(`@CHIEFBORED`). The tribe is named by its adjective ("Arawak") and the
+nation by its own ("Dutch").
+
+Checked on six settlements of four tribes: the experts and the goods
+asked for match the original's greetings.
 
 ## The skill a settlement teaches
 
