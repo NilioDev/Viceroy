@@ -63,7 +63,10 @@ touch controls.
 > original's order and buys in Europe as the original's computer players
 > do (ships when it is short of them, recruits, soldiers, dragoons,
 > pioneers, artillery and the goods its colonies ask for), helped by the
-> Crown's gold. Their units don't act on the map yet. Wagon trains and ships can trade with the
+> Crown's gold. Their units act on the map as the original's do: they
+> look for sites and found colonies, join colonies, guard them, build
+> roads, explore, visit villages, and their ships carry people and goods
+> between Europe and their colonies (they don't attack yet). Wagon trains and ships can trade with the
 > natives: sell, haggle, give and buy at the original's prices. Soldiers,
 > scouts and other armed units can demand tribute, which a village pays
 > in goods for your nearest colony when your forces nearby impress it, and

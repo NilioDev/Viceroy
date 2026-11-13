@@ -1011,6 +1011,8 @@ void Game::europeanTurn(int n) {
     aiTallies(n);
     aiRelations(n);
     aiEurope(n);
+    aiPlan(n);
+    aiMoveUnits(n);
 }
 
 } // namespace viceroy

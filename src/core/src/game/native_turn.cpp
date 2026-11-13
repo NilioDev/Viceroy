@@ -39,6 +39,8 @@ constexpr std::size_t kTribeDefence = kExtra + 565;
 constexpr std::size_t kTribePeople = kExtra + 573;
 constexpr std::size_t kSettlementCounts = kExtra + 581;
 constexpr std::size_t kTribeRegionDefence = kExtra + 589;
+// The settlements of the tribe counted last, by region (16 bytes).
+constexpr std::size_t kRegionSettlements = kExtra + 140;
 
 // In each settlement's record.
 constexpr std::uint8_t kNeedsBrave = 0x01; // byte 3: its brave is gone
@@ -149,8 +151,13 @@ void Game::countTribe(int tribe) {
     block[kSettlementCounts + t] = 0;
     std::fill_n(block.begin() + static_cast<std::ptrdiff_t>(kTribeRegionDefence + kRegions * t), kRegions,
                 std::uint8_t{0});
+    std::fill_n(block.begin() + static_cast<std::ptrdiff_t>(kRegionSettlements), kRegions, std::uint8_t{0});
     for (const auto& s : save_.settlements) {
         if (tribeOf(s) == tribe) {
+            const int region = landRegion(save_.map, s.x, s.y);
+            if (region >= 0) {
+                ++block[kRegionSettlements + static_cast<std::size_t>(region)];
+            }
             ++block[kSettlementCounts + t];
             block[kTribePeople + t] = static_cast<std::uint8_t>(block[kTribePeople + t] + s.population);
         }

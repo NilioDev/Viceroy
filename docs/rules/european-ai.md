@@ -8,8 +8,9 @@ description of that behaviour. Viceroy follows it in
 
 What is done so far: the order of the turns, the count of each nation's
 forces and people, the tallies the plans start from, the cooling of old
-grudges, and everything the computer buys in Europe. What each unit does
-on the map, the colonies' own plans and diplomacy are still to come.
+grudges, everything the computer buys in Europe, the plan each nation
+makes for its units, and what each unit then does on the map, but for
+attacks. Attacks, the colonies' own plans and diplomacy are still to come.
 
 ## The round
 
@@ -66,6 +67,10 @@ The region flags (16 bytes at 156) say, for the nation counted last, where
 another European nation's units are (2), where another's colonies are (4),
 where there are native settlements (1), and where its own armed units stand
 fortified outside a colony (8).
+
+The natives' count, each tribe's turn, keeps the settlements of the tribe
+counted last by region in the 16 bytes at 140 (the plans below weigh a
+region's room by them, oddly enough only for that one tribe).
 
 The count reproduces the block in the original's saves byte for byte for
 the player's nation (whose count is the last one in a save made during the
@@ -163,11 +168,136 @@ muskets down to food, when enough colonies ask for it, there is room and
 the gold to pay; then every ship sails for the New World, taking the
 people on the docks along.
 
+## The plan
+
+After Europe the nation makes its plan, in memory only. Its heart is a
+list of up to 64 places worth going to, each with a kind (what may go
+there: each unit type has a role bit for each kind) and a weight. The
+list is kept heaviest first; a place already listed at least as heavily
+is not added again, and when the list is full the lightest falls off.
+
+The kinds: 0 a place at sea for warships, 1 a landing for colonists and
+pioneers, 2 where a wagon train, treasure or artillery has stopped, 3 a
+colony short of guards, 4 a town to deal with, 7 a landing beside a rival.
+
+The plan goes through:
+
+- **Its own units.** Goal `A` (guard) becomes `G`. A ship (or a square)
+  with armed units or pioneers that is full may land them (flags 8 and
+  4), and one ship a turn is chosen to fetch recruits from Europe: a
+  merchantman when it has one and two of merchantmen and galleons
+  together, else a caravel when it has two. Units off the map are put to
+  sleep; on the map, their 4 × 4 block of the map is marked as held. Units
+  asleep, or on their way to anything but a target, lose their orders; a
+  unit with a threat next to it (below) gets orders 10; a land unit on a
+  ship sleeps.
+- **The other nations' ships** it can see: a privateer, or any ship but a
+  frigate of a nation it is at war with, is a place for warships (weight 3).
+- **The other nations' colonies.** Early in the game, on the easier
+  levels, a player's colony it has not seen is passed by. A colony in a
+  region where the nation has units or colonies is a town to deal with,
+  three turns in four, when it holds more than 6 less a fiftieth of the
+  turn in people and units (weight 3 at peace, 5 otherwise). At war, the
+  open sea two squares from a colony by the water that looks on most of
+  the colony's waters is a place for warships (weight 2 to 4 by its
+  people). And when the rival has more colonies in the region (with 8
+  people or more there), or the nation has none there and the rival fewer
+  than 8 people, the best water square up to three away with the region's
+  land next to it is a landing: weight 2 (3 for a stronger rival), more
+  against the player and in a large region the player has to itself,
+  less in a crowded region, more at war, twice as much before turn 150.
+- **Its own colonies by the water**: threatened from the sea, a place for
+  warships (weight 8 for a frigate, 5 for others). The pioneers and spare
+  soldiers there, and the goods above what the warehouse keeps (horses
+  less), add up to what a ship could fetch; the colonies worth a visit go
+  on a list of up to 16, best first. A colony short of guards (byte 0x8E)
+  is a place for soldiers, and its units stay to guard it, artillery
+  first, then soldiers, veterans, dragoons.
+- **The settlements**: a furious tribe's village in a region where the
+  nation is present is a town to deal with (weight 4, 2 with a mission),
+  and in a region without a colony of the nation the water next to a
+  village with the most land of the region beside it is a landing.
+
+Then what each region is to the nation: 0 when it is crowded (twenty
+times the colonies there, its own counted twice, beyond the region's land
+squares), 6 when open, 4 where it is the stronger of the rivals at war
+there (or has no colony there itself, or nothing at all), 3 where it is
+the weaker. The rivals are the other nations at war or without a treaty,
+and the furious tribes, weighed by their forces in the region. The
+largest colony of others in a region, or up to 4 of their units, is
+noted too.
+
+Last, every unit of the nation with no orders or fortified takes the
+target that suits it best: the number already sent there (starting at an
+eighth of its units, at least 3) times the distance, divided by the
+weight plus one, as long as that is at most one and a half times the
+weight in eighths of that start. Soldiers and dragoons stay when they are
+two or fewer in a region. A fortified unit only leaves for a heavy
+target, never from a colony. The unit goes there with goal `1` (`t` for a
+landing, `i` beside a rival).
+
+## The units
+
+Then the units take their turns, from the last unit down: in each round
+the first treasure, artillery or wagon train with moves left, then the
+first unit of any kind, each until its moves are spent (or 20 steps). A
+treasure, artillery or wagon train that stops is a place of kind 2.
+
+A unit on its way goes on without thinking again, unless it is a warship
+with someone next to it. Otherwise it decides:
+
+- **Guards** stay in their colony; the last one keeps it.
+- In a crowded region, units go back to their colony.
+- A **scout** next to a village whose chief it has not met goes in; a
+  free colonist or servant next to a village that has not taught goes in
+  to learn.
+- A colonist or pioneer (and a soldier or dragoon with no orders, in an
+  open region, or where the nation has no colony and little force) looks
+  for a **site** for a colony within three squares (fewer as it searches
+  again and again, and near other nations): a square by the open sea, not
+  next to another colony, not too near another or a village, worth most
+  by the seen layer's number for it. On the site it founds the colony
+  (with the next name of its nation's list); otherwise it goes there.
+  Three units at most search in a region a turn (two colonists).
+- A **colonist** that is not looking joins the nearest colony of its
+  region marked for recruits, the smaller first; with none, a colonist in
+  a colony becomes a pioneer with 20 tools.
+- **Ships and wagon trains** in a colony unload everything; a ship takes
+  aboard the pioneers and soldiers waiting there, then each loads the
+  goods worth most (a wagon train what the natives pay well for, and goes
+  trading with them).
+- **Ships** put ashore those aboard whose work lies on the land next to
+  them, carry the rest to the colony that needs them most, deliver
+  muskets, horses, tools and trade goods to the colony that lacks them
+  most (or sell them where they are), fetch goods from the list of
+  colonies, and sail to Europe when there are more people on the docks
+  than ships on the way, when chosen to fetch recruits, or now and then.
+- **Treasure** goes to the nearest colony; there the gold goes to the
+  nation, and the player hears of it.
+- **Missionaries** go to the village where the tribe is most tense,
+  nearest first; with none left they become colonists.
+- A **pioneer** with nothing better builds a road, unless a village or a
+  rival's colony is near.
+- A unit called by its colony goes back.
+
+The rest choose a direction: each neighbour by chance, by the terrain, by
+roads and rivers, by unexplored land ahead, less for turning back. A unit
+that chooses to stay fortifies; next to a colony of a nation at peace it
+does not.
+
 ## Not done yet
 
-- What the computer's units do on the map, the plans behind it, and the
-  colonies' own plans (which also set the good each colony asks for and
-  the colonies marked for recruits).
+- Attacks: a square with another nation's or tribe's unit or town is
+  passed by. What the original's units do on reaching a village, and how
+  a wagon train trades there, is not read yet: Viceroy uses the player's
+  rules.
+- Missionaries pass by villages with a mission of their own (the
+  original weighs those against the player, by a ranking of the nations
+  not read yet).
+
+- The colonies' own plans (which also set the good each colony asks for,
+  the guards it wants and the colonies marked for recruits), and which
+  job a colonist takes on joining a colony.
 - Diplomacy beyond the cooling of grudges.
 - Which units on the docks the original's ships take (Viceroy takes them
   in the order of the units), and what the original stores in a sailing

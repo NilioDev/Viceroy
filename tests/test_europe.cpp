@@ -219,6 +219,13 @@ VCR_TEST("original files: colonists on the docks board a ship in port") {
     }
     const Art art = loadArt(dir);
     Game game = loadSave(art, "COLONY00.SAV");
+    // The other nations sit this out: their units would move and change
+    // the numbers of the units looked at here.
+    for (int n = 0; n < kEuropeanNations; ++n) {
+        if (n != game.human()) {
+            game.state().players[static_cast<std::size_t>(n)].control = 2;
+        }
+    }
     // The galleon and its three colonists, back in port; the colonists on the docks.
     for (const int u : {56, 85, 86, 87}) {
         setEuropeStage(game.state().units[static_cast<std::size_t>(u)], kPortStage);
