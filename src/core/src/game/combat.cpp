@@ -133,7 +133,9 @@ CombatAnalysis Game::analyseAttack(int attacker, int defender) const {
     a.attacker.bonuses.push_back({kAttackBonus, 50});
     // Measured: no penalty against a fortified unit (the manual: artillery
     // is good at attacking fortified units).
-    if (au.type == kArtillery && !defenderInColony && du.orders != SaveUnit::kFortified) {
+    const bool dugIn = (du.orders == SaveUnit::kFortify || du.orders == SaveUnit::kFortified) &&
+                       du.nation < kEuropeanNations;
+    if (au.type == kArtillery && !defenderInColony && !dugIn) {
         a.attacker.bonuses.push_back({kArtilleryInOpen, -75});
     }
 
@@ -158,15 +160,99 @@ CombatAnalysis Game::analyseAttack(int attacker, int defender) const {
     if (du.orders == SaveUnit::kFortified) {
         a.defender.bonuses.push_back({kFortified, 50});
     }
-    if (du.type == kArtillery && !defenderInColony) {
+    if (du.type == kArtillery && !defenderInColony && !dugIn) {
         a.defender.bonuses.push_back({kArtilleryInOpen, -75});
     }
     return a;
 }
 
+CombatStrengths Game::combatStrengths(int attacker, int defender) const {
+    // Observed in the original with a debugger: the integer steps below, in
+    // this order. Natives, ships and independence are not covered yet.
+    const auto& au = unit(attacker);
+    const auto& du = unit(defender);
+    const auto typeOf = [&](int type) -> const UnitType* {
+        return type >= 0 && type < static_cast<int>(rules_.units.size()) ? &rules_.units[static_cast<std::size_t>(type)]
+                                                                         : nullptr;
+    };
+    const auto strength8 = [&](int index, bool attacking) {
+        const auto& u = unit(index);
+        const UnitType* t = typeOf(u.type);
+        int v = t ? (attacking ? t->attack : t->combat) : 0;
+        if (isDamagedArtillery(index)) {
+            v -= 2;
+        }
+        v = std::max(0, v) * 8;
+        if ((u.type == unit_type::kSoldier || u.type == unit_type::kDragoon) && u.profession == kVeteranSoldier) {
+            v += v >> 1;
+        }
+        return v;
+    };
+    const bool attackerEuropean = au.nation < kEuropeanNations;
+    const bool defenderEuropean = du.nation < kEuropeanNations;
+    const bool attackerHuman = au.nation == human();
+    const bool defenderHuman = du.nation == human();
+    const int difficulty = save_.difficulty;
+    const auto colony = colonyAt(du.x, du.y);
+
+    // The defender's bonus, in quarters.
+    int m = 0;
+    if (colony) {
+        m = 2 * (buildingLevel(save_.colonies[static_cast<std::size_t>(*colony)], BuildingKind::Fortification) + 1);
+    } else if (attackerEuropean && defenderEuropean) {
+        const int row = terrainRow(save_.map.at(du.x, du.y));
+        if (row >= 0 && row < static_cast<int>(rules_.terrain.size())) {
+            m = rules_.terrain[static_cast<std::size_t>(row)].defenseBonus;
+        }
+    }
+    if (du.orders == SaveUnit::kFortified && !isShip(defender) && m < 5) {
+        m += 2;
+    }
+    int d = strength8(defender, false) * (4 + m) >> 2;
+    int a = strength8(attacker, true);
+    a = a * 3 >> 1; // the attack bonus
+    if (attackerHuman) {
+        a += 4 - difficulty;
+    }
+    if (defenderHuman) {
+        d += 4 - difficulty;
+    }
+    const int thirds = std::clamp(movesLeft(attacker), 0, 3);
+    if (thirds < 3) {
+        a = a * thirds / 3;
+    }
+    const UnitType* at = typeOf(au.type);
+    const UnitType* dt = typeOf(du.type);
+    if (!isShip(attacker) && !isShip(defender) && at && at->attack > 1 && dt && dt->combat < 2) {
+        d >>= 1; // someone who cannot fight
+    }
+    const bool dugIn = (du.orders == SaveUnit::kFortify || du.orders == SaveUnit::kFortified) && defenderEuropean;
+    if (!colony && !dugIn) {
+        if (au.type == kArtillery) {
+            a >>= 2;
+        }
+        if (du.type == kArtillery) {
+            d >>= 2;
+        }
+    }
+    if (difficulty <= 1) {
+        constexpr int kEarlyTurns = 80;
+        if (defenderHuman && save_.turn < kEarlyTurns && colony) {
+            a = difficulty == 0 ? a - (a >> 2) : a >> 1;
+        }
+        if (defenderHuman && (!attackerEuropean || save_.turn < kEarlyTurns)) {
+            a >>= 1;
+        }
+        if (difficulty == 0 && attackerHuman) {
+            a <<= 1;
+        }
+    }
+    return {std::max(0, a), std::max(0, d)};
+}
+
 bool Game::attackerWins(int attack, int defense, int roll) {
-    // Not measured: the attacker wins in proportion to the two strengths.
-    return roll < attack || defense <= 0;
+    (void)defense;
+    return roll <= attack;
 }
 
 int Game::nextRandom(int range) {
@@ -178,13 +264,9 @@ int Game::nextRandom(int range) {
 }
 
 CombatOutcome Game::attack(int attacker, int defender) {
-    const auto analysis = analyseAttack(attacker, defender);
-    const int thirds = std::clamp(movesLeft(attacker), 0, 3);
-    // Measured text: a tired unit fights at the thirds of a move it has
-    // left.
-    const int attack = analysis.attacker.strength() * thirds / 3;
-    const int defense = analysis.defender.strength();
-    const bool won = attackerWins(attack, defense, nextRandom(attack + defense));
+    const auto s = combatStrengths(attacker, defender);
+    const int roll = 1 + nextRandom(s.attack + s.defense);
+    const bool won = s.attack + s.defense > 0 && attackerWins(s.attack, s.defense, roll);
     auto& a = save_.units[static_cast<std::size_t>(attacker)];
     a.movesUsed = movementAllowance(attacker);
     if (won) {

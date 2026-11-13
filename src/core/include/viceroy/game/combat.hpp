@@ -40,6 +40,14 @@ struct CombatAnalysis {
     CombatSide defender;
 };
 
+// The two numbers the original rolls against: the attacker wins when a
+// roll of 1 to attack + defense comes out at attack or less. They are the
+// strengths in eighths of a point, after every adjustment.
+struct CombatStrengths {
+    int attack = 0;
+    int defense = 0;
+};
+
 enum class CombatOutcome {
     AttackerWon,
     DefenderWon,

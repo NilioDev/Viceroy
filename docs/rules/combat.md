@@ -40,8 +40,36 @@ Damaged artillery (bit `0x80` of the unit's fifth byte) attacks at 5
 instead of 7 and is drawn with its own, smaller picture. Its defence of 3
 is the manual's value and not measured.
 
-Who wins is not measured yet: we let the attacker win in proportion to the
-two strengths.
+## Who wins
+
+The box rounds things off. The fight itself is rolled on two whole numbers,
+watched in the original with a debugger and checked on a test fight (a
+veteran soldier attacking a dragoon in forest on Discoverer: 80 against 36).
+
+1. Each side starts from its base (damaged artillery: 2 less) × 8. A
+   veteran soldier or dragoon adds half of that.
+2. The defender's bonus `m`, in quarters: in a colony 2 × (stockade level
+   + 1), so 2, 4, 6 or 8; outside one, the square's defence value when both
+   sides are European. A fortified unit (not a ship) adds 2 more when `m` is
+   below 5. Defence = strength × (4 + m) / 4.
+3. Attack × 3/2, the attack bonus.
+4. A human attacker adds 4 − difficulty to its attack, a human defender the
+   same to its defence.
+5. With less than a full move left, the attack is cut to the thirds left.
+6. Against someone who cannot fight (combat below 2), an attacker with an
+   attack above 1 halves the defence.
+7. Outside a colony, artillery fights at a quarter, unless the defender is
+   a European fortifying or fortified.
+8. On Discoverer and Explorer: before turn 80 an attack on a human colony is
+   cut by a quarter (Discoverer) or a half (Explorer); a human defender is
+   attacked at half strength before turn 80 or by natives; and on Discoverer
+   a human attacker doubles its attack.
+9. A roll from 1 to attack + defence: the attacker wins at the attack or
+   below.
+
+All divisions round down. Not covered yet: natives' settlements and
+ambushes, ships, a colony's own garrison bonus, and the rules after
+independence.
 
 ## What the loser loses
 
