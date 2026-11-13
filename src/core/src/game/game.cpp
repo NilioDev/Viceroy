@@ -384,6 +384,11 @@ FoundResult Game::foundColony(int index, const std::string& name) {
     colony.name = name.substr(0, 23);
     colony.nation = u.nation;
     colony.population = 1;
+    // As in the saves, a new colony has its town hall, carpenter's shop,
+    // blacksmith's house and the four craft houses (rows of @BUILDING).
+    for (const int row : {9, 21, 24, 27, 32, 35, 39}) {
+        colony.buildings |= std::uint64_t{1} << row;
+    }
     // The founder works as a farmer; the eight squares around are free.
     colony.jobs[0] = 0; // farmer
     colony.skills[0] = static_cast<std::uint8_t>(u.profession);

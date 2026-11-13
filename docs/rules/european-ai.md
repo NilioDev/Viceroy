@@ -10,9 +10,10 @@ What is done so far: the order of the turns, the count of each nation's
 forces and people, the tallies the plans start from, the cooling of old
 grudges, everything the computer buys in Europe, the plan each nation
 makes for its units, what each unit then does on the map, its attacks,
-and the first part of each colony's own plans (its guards, what it is
-short of, the units it takes in or sends out, and the goods it asks for).
-The colony's jobs, buildings and teaching and diplomacy are still to come.
+and most of each colony's own plans (its guards, what it is short of, the
+units it takes in or sends out, the goods it asks for, its own work on the
+land and what it builds). The colony's jobs and teaching and diplomacy are
+still to come.
 
 ## The round
 
@@ -396,8 +397,107 @@ this order. Viceroy follows it in `src/core/src/game/euro_ai_colony.cpp`.
    in Europe (up to 20 lots).
 10. **Tools.** When it needs a pioneer, or every tenth turn, and has under 20
     tools, it buys 20 in Europe if the nation has the gold.
-11. **Horses.** From turn 40, a colony with under 2 horses and a ship or
+11. **Its own work on the land.** Every seventh turn, with 20 tools, it may
+    lay a road towards another of its nation's colonies (see below). On the
+    other turns, when it wants a pioneer and has 20 tools, it works one of
+    its squares itself (see below). Either way it uses 20 tools and its
+    count of saved-up turns (byte 140) starts again from 0.
+12. **What it builds** (see below).
+13. **Horses.** From turn 40, a colony with under 2 horses and a ship or
     wagon train on its square buys 2 for 10 gold.
+
+### A road to a neighbour
+
+When the nation has at least two colonies in the land, each other colony of
+the nation in the same land within six squares each way gets a 1 in
+(colonies − 1) chance, in the order of the colonies. The route finder walks
+from this colony towards it, with every step costing the same; the first
+square on the way that is neither a town nor has a road is the one. It is
+skipped when someone else's units or town are there, or when it is the
+worked land of a nation the mover's relation marks. The road is laid at
+once when the colony has saved up the square's improvement value + 2
+turns; when it has not, nothing is done this turn.
+
+### Working a square
+
+Of its eight squares that are land, with no town, nobody else's units and
+no other colony working them, it picks the one worth most:
+
+- the terrain's value from `NAMES.TXT`, or the resource's own value when
+  there is one (silver 12, sugar 7, fish 5, minerals and grain 4, an oasis
+  3, the others and spent silver 6; no resources at all when the map's
+  resource seed is 0);
+- twice that for a forest when it wants forest cleared, or for a square its
+  worker would do better on: unplowed for a farmer, planter or the like
+  (jobs 0 to 3), without a road for the rest;
+- squares that have both a road and a plow are left alone (but for
+  forest clearing);
+- land a tribe claims costs the colony goodwill: 4 − the tribe's tension,
+  twice that on a resource, and twice again when the region has
+  settlements and the colony is not marked for that (where it only clears
+  forest); the cost is taken twice from the value while the nation has
+  under 2000 gold, a half after. A tribe claims a square within reach of
+  its nearest settlement in the land (1 square, 2 for the Aztecs' level, 3
+  for the Incas'), once met, but never a square the colony works, water,
+  land marked 16 or with Peter Minuit.
+
+It does nothing when the player's units stand next to the square, unless
+its own nation's units are on it, or when it has not saved up the square's
+improvement value + 2 turns (+ 2 more to clear a forest). Then it clears
+the forest, or plows the square for a worker in jobs 0 to 3, or builds a
+road for a worker in another job; with nobody there, it plows open land
+(rows 2 to 7) and builds a road on the rest.
+
+### What it builds
+
+The choice is made anew each turn, from nothing. It goes down this list;
+for each building it takes the building, or else the level below that is
+still missing (when that can be built). A building can be built when the
+level below stands, the colony is big enough, and for the docks when it
+has water among its squares, the drydock when it lies by the sea, the
+warehouse expansion below a store of 300, the custom house with Peter
+Stuyvesant and the factories with Adam Smith; never the upper town halls or
+the capitol.
+
+1. The docks, when its land squares are no more than its colonists, or it
+   has water and is hungry (more than half its people on food, or not
+   enough food even with the store).
+2. The stockade; the stables with 2 horses.
+3. Under 4 colonists it stops here.
+4. A warehouse, when it has no warehouse and at least 6 colonists for each
+   level it would have.
+5. With 6 colonists or more: the custom house, when ships threaten it, the
+   player has more than 2 armed ships more than the nation, or it has 12
+   colonists.
+6. Before 1600, in a region with settlements, a colony not marked for them
+   and near a tribe with tension under 50 and no enemy next to it builds a
+   wagon train.
+7. The schoolhouse, when one of its experts could teach and its colonists
+   and experts together number 4.
+8. Under 6 colonists it notes that it builds little (byte 29 bit 128).
+9. The armory, when muskets cost 4 or more (counting half the difficulty) or
+   after turn 80, with 6 colonists and 40 tools or tools being made.
+10. The lumber mill, then the fort.
+11. The blacksmith's shop, when muskets cost 4 or more, with 4 colonists and
+    40 ore or ore being mined.
+12. The warehouse expansion, for 6 colonists per level.
+13. The newspaper (after the printing press) once it makes 4 bells.
+14. The college with level-2 teachers and 10 colonists and experts; under 8
+    colonists it stops here; the university with level-3 teachers and 16.
+15. The church, then the fortress with 10 colonists.
+16. With one of its crafts at its top level and by the sea: the shipyard,
+    then ships: a galleon while the nation's holds fall short of half its
+    people and its colonies, else a privateer, a frigate when it has none.
+17. With a craft at its top level and no artillery on its square, or no
+    guards wanted: the armory when it has tools, then artillery.
+18. The next level of each craft's building (weaver, tobacconist,
+    distiller, fur trader, blacksmith, armory, in that order) when its raw
+    good is made 3 a turn (level 2) or 8 a turn, or 100 are stored (level 3).
+19. The cathedral. Then, with a shipyard, galleons up to the nation's armed
+    ships (at most 8), or a frigate while it has fewer than 8.
+20. Under 10 colonists it is marked for recruits. With fewer than 3
+    artillery: the armory, then artillery, through the arsenal once muskets
+    are made. With 3 it builds nothing.
 
 ## Not done yet
 
@@ -411,8 +511,10 @@ this order. Viceroy follows it in `src/core/src/game/euro_ai_colony.cpp`.
   not read yet).
 
 - The rest of the colonies' own plans: the jobs of its colonists (a
-  colonist that joins takes the statesman's job for now), what it builds,
-  its own work on the land, teaching and buying training.
+  colonist that joins takes the statesman's job for now), teaching and
+  buying training. The construction list also weighs two counts from the
+  job assignment (Viceroy takes them as 0, so it skips a church built
+  early and an extra armory).
 - Diplomacy beyond the cooling of grudges.
 - Which units on the docks the original's ships take (Viceroy takes them
   in the order of the units), and what the original stores in a sailing
