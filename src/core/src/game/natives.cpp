@@ -359,8 +359,9 @@ int villageSkill(const SaveGame& save, int settlement) {
     // village always teaches the same skill.
     std::uint32_t gameSeed = 0;
     if (save.tail.size() >= 612) {
-        gameSeed = static_cast<std::uint32_t>(save.tail[608] | (save.tail[609] << 8) | (save.tail[610] << 16) |
-                                              (static_cast<std::uint32_t>(save.tail[611]) << 24));
+        for (int i = 3; i >= 0; --i) {
+            gameSeed = (gameSeed << 8) | save.tail[static_cast<std::size_t>(608 + i)];
+        }
     }
     OriginalRandom random((static_cast<std::uint32_t>((s.y << 8) | s.x) + gameSeed) & 0x7FFF);
     weights[kHorses] = 0;
