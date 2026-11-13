@@ -272,6 +272,11 @@ void PlayScreen::enterVillage(int unit, int settlement) {
         addOption(*dialog_, textLine(art_->names, "ACTIONS", 4, "Live Among The Natives"));
         villageOptions_.push_back(kVillageLive);
     }
+    // Missionaries: Establish Mission (row 2).
+    if (game_.canEstablishMission(unit, settlement)) {
+        addOption(*dialog_, textLine(art_->names, "ACTIONS", 2, "Establish Mission"));
+        villageOptions_.push_back(kVillageMission);
+    }
     // Scouts: Ask to Speak With Chief (row 5).
     if (game_.canSpeakWithChief(unit, settlement)) {
         addOption(*dialog_, textLine(art_->names, "ACTIONS", 5, "Ask to Speak With Chief"));
@@ -342,6 +347,28 @@ void PlayScreen::speakWithChief(int unit) {
     } else {
         showChiefAnswer();
     }
+}
+
+void PlayScreen::foundMission(int unit) {
+    const auto& save = game_.state();
+    const auto& s = save.settlements[static_cast<std::size_t>(village_)];
+    const int tribe = tribeOf(s);
+    const int nation = game_.unit(unit).nation;
+    const auto news = game_.establishMission(unit, village_);
+    // "Church of Curacao mission founded in Autumn, 1653. Apache are
+    // offended." Without a colony the home port names it (not measured).
+    const std::string church = textLine(art_->names, "MISSION", nation, "");
+    const std::string place = news.colony >= 0 ? save.colonies[static_cast<std::size_t>(news.colony)].name
+                                               : textLine(art_->names, "HOMEPORT", nation, "");
+    const auto& tribes = game_.rules().tribes;
+    const std::string people =
+        static_cast<std::size_t>(tribe) < tribes.size() ? tribes[static_cast<std::size_t>(tribe)].adjective : "";
+    ask("MISSION" + std::to_string(news.reaction), -1, {church, place, seasonName(*art_, save.season), people}, -1,
+        {save.year});
+    if (dialog_) {
+        placeReligiousDialog(*dialog_);
+    }
+    question_ = "LESSONDONE";
 }
 
 void PlayScreen::showChiefAnswer() {
@@ -664,6 +691,8 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
             }
         } else if (option == kVillageSpeak && village_ >= 0) {
             speakWithChief(unit);
+        } else if (option == kVillageMission && village_ >= 0) {
+            foundMission(unit);
         }
     } else if (question == "LEARNSTAY") {
         // "Then I shall become a master ..." or "Not right now, thanks."

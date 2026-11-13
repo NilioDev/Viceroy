@@ -121,6 +121,40 @@ int tribeTension(const SaveGame& save, int tribe, int nation) {
     return word(t + 70 + 2 * nation);
 }
 
+void setTribeTension(SaveGame& save, int tribe, int nation, int tension) {
+    const auto offset = static_cast<std::size_t>(tribe) * kTribeRecordSize + 70 + 2 * static_cast<std::size_t>(nation);
+    if (tribe < 0 || tribe >= kTribes || nation < 0 || nation >= kEuropeanNations || save.tribesAndMore.size() < offset + 2) {
+        return;
+    }
+    const auto value = static_cast<std::uint16_t>(tension);
+    save.tribesAndMore[offset] = static_cast<std::uint8_t>(value & 0xFF);
+    save.tribesAndMore[offset + 1] = static_cast<std::uint8_t>(value >> 8);
+}
+
+int missionOf(const SaveSettlement& settlement) {
+    const auto byte = static_cast<std::int8_t>(settlement.raw[5]);
+    return byte < 0 ? -1 : byte & 0x0F;
+}
+
+int nearestColony(const SaveGame& save, int x, int y, int nation) {
+    int best = -1;
+    int bestDistance = 9999;
+    for (std::size_t i = 0; i < save.colonies.size(); ++i) {
+        const auto& c = save.colonies[i];
+        if (c.nation != nation) {
+            continue;
+        }
+        const int dx = std::abs(c.x - x);
+        const int dy = std::abs(c.y - y);
+        const int distance = std::max(dx, dy) + std::min(dx, dy) / 2;
+        if (distance <= bestDistance) {
+            best = static_cast<int>(i);
+            bestDistance = distance;
+        }
+    }
+    return best;
+}
+
 int tensionLevel(int tension) {
     return tension < 25 ? 0 : tension < 50 ? 1 : tension < 75 ? 2 : 3;
 }
@@ -609,6 +643,67 @@ Game::ChiefTalk Game::speakWithChief(int index, int settlement) {
     }
     }
     return talk;
+}
+
+bool Game::canEstablishMission(int index, int settlement) const {
+    const auto& u = unit(index);
+    const auto& s = save_.settlements[static_cast<std::size_t>(settlement)];
+    return u.type == unit_type::kMissionary && u.nation < kEuropeanNations && missionOf(s) < 0 &&
+           metTribe(save_, u.nation, tribeOf(s));
+}
+
+Game::MissionNews Game::establishMission(int index, int settlement) {
+    // Read from the original with a debugger; see docs/rules/natives.md.
+    constexpr int kPocahontas = 16, kBrebeuf = 22, kSepulveda = 23, kLasCasas = 24; // rows of @FATHERS
+    constexpr int kFrench = 1;
+    constexpr int kJesuitJob = 24;
+    auto& s = save_.settlements[static_cast<std::size_t>(settlement)];
+    const int tribe = tribeOf(s);
+    const auto& u = unit(index);
+    const int nation = u.nation;
+    // The tribe minds each mission the nation already has among it.
+    int missions = 0;
+    for (const auto& other : save_.settlements) {
+        missions += tribeOf(other) == tribe && missionOf(other) == nation ? 1 : 0;
+    }
+    if (hasFather(nation, kSepulveda)) {
+        missions <<= 1;
+    }
+    if (hasFather(nation, kLasCasas)) {
+        missions >>= 1;
+    }
+    if (hasFather(nation, kPocahontas)) {
+        missions >>= 1;
+    }
+    if (nation == kFrench) {
+        missions >>= 1;
+    }
+    const int tension = tribeTension(save_, tribe, nation);
+    const int level = tensionLevel(tension);
+    constexpr std::array<int, 4> kCalm{25, 15, 10, 5};
+    int change = missions * 8 - kCalm[static_cast<std::size_t>(level)];
+    if ((s.raw[3] & kSettlementCapital) != 0) {
+        change += 8 * (change > 0 ? 1 : change < 0 ? -1 : 0);
+    }
+    MissionNews news;
+    news.reaction = level;
+    if (change >= -5) {
+        news.reaction = std::max(news.reaction, 1);
+    }
+    if (change > 0) {
+        news.reaction = std::max(news.reaction, 2);
+    }
+    if (change >= 10) {
+        news.reaction = 3;
+    }
+    news.colony = nearestColony(save_, s.x, s.y, nation);
+    s.raw[5] = static_cast<std::uint8_t>(nation);
+    if (u.profession == kJesuitJob || hasFather(nation, kBrebeuf)) {
+        s.raw[5] = static_cast<std::uint8_t>(s.raw[5] | kExpertMission);
+    }
+    removeUnit(index);
+    setTribeTension(save_, tribe, nation, std::max(0, tension + change));
+    return news;
 }
 
 void Game::learnFromNatives(int index, int settlement) {
