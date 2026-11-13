@@ -355,8 +355,12 @@ public:
     // The original's one way to make a tribe more or less tense toward a
     // nation: rises are halved for the French and again with Pocahontas;
     // the result stays within 0 to 100. A fall ends a war and calms the
-    // tribe's settlements.
+    // tribe's settlements. At 100 a tribe with a treaty may burn the
+    // nation's missions.
     void changeTension(int tribe, int nation, int amount);
+    // Takes the nation's missions out of the tribe's settlements (notice
+    // INDIANBURN to the human when there were any).
+    void burnMissions(int tribe, int nation);
 
     // A missionary incites a tribe against another European nation. The
     // price weighs the tribe's tension toward the missionary's nation, its

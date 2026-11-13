@@ -24,6 +24,8 @@ constexpr std::size_t kTribeRelations = 58;
 constexpr std::uint8_t kMet = 0x20;
 constexpr std::uint8_t kWar = 0x04;
 constexpr std::uint8_t kAngry = 0x02; // cleared when the tension falls below 75
+constexpr std::uint8_t kTreaty = 0x40;
+constexpr int kBurnRoll = 11; // a roll of 0 to 10
 
 // In the block after the tribe records: each tribe's defence in all and
 // its number of settlements (one byte each).
@@ -91,8 +93,38 @@ void Game::changeTension(int tribe, int nation, int amount) {
             }
         }
     }
-    // Not done yet: a rise to 100 with a treaty may make the tribe declare
-    // war (a chance of the difficulty level plus 2 in 11).
+    // At 100 a tribe with a treaty may burn the nation's missions: a roll of
+    // 0 to 10 at most the difficulty level plus 1 (1 plus 1 for a computer
+    // player).
+    if (after >= kMaxTension &&
+        (blockByte(save_, static_cast<std::size_t>(tribe) * kTribeRecordSize + kTribeRelations +
+                              static_cast<std::size_t>(nation)) &
+         kTreaty) != 0) {
+        const int level = nation == human() ? save_.difficulty : 1;
+        if (nextRandom(kBurnRoll) <= level + 1) {
+            burnMissions(tribe, nation);
+        }
+    }
+}
+
+void Game::burnMissions(int tribe, int nation) {
+    bool burned = false;
+    for (auto& s : save_.settlements) {
+        if (tribeOf(s) == tribe && (s.raw[5] & 0x0F) == nation) {
+            s.raw[5] = 0xFF;
+            burned = true;
+        }
+    }
+    if (!burned || nation != human()) {
+        return;
+    }
+    // "Apache burn Dutch missions! Church authorities are outraged!"
+    const auto& tribes = rules().tribes;
+    const auto t = static_cast<std::size_t>(tribe);
+    GameNotice notice{"INDIANBURN", {t < tribes.size() ? tribes[t].name : "", ""}};
+    notice.value = tribe;
+    notice.adjectives = {{1, nation}};
+    notices_.push_back(std::move(notice));
 }
 
 int Game::incitePrice(int index, int settlement) const {

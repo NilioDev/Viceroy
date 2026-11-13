@@ -46,7 +46,7 @@ touch controls.
 > offers you peace; refusing it angers the tribe. Missionaries can found missions,
 > which the tribe takes well or badly as in the original, pay a tribe to
 > go to war against another nation, or denounce another nation's mission
-> to take it over. The other
+> to take it over. A furious tribe with a treaty may burn your missions. The other
 > nations don't move yet. Wagon trains and ships can trade with the
 > natives: sell, haggle, give and buy at the original's prices. Soldiers,
 > scouts and other armed units can demand tribute, which a village pays

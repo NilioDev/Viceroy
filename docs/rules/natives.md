@@ -90,9 +90,15 @@ first contact, an attack, inciting and trade all use:
   0x02 too. When it crosses a step of 5, each of the tribe's settlements
   calms toward the nation: its alarm is cut to at most 0x20 (tension below
   50) or 0x60.
-- Not done yet: a rise to 100 with a treaty may make the tribe declare war,
-  with a chance of the difficulty level plus 2 in 11 (3 in 11 for a
-  computer nation).
+- When the tension ends at 100 and the tribe has a treaty with the nation
+  (bit 0x40 of the tribe's side), a roll of 0 to 10 is made. At most the
+  difficulty level plus 1 (2 for a computer nation), the tribe burns the
+  nation's missions: every one of its settlements whose mission belongs to
+  the nation (low four bits of byte 5, expert or not) loses it (byte 5 set
+  to 0xFF). If any burned and the
+  nation is a human's, the colonial advisor says `INDIANBURN`, "Apache
+  burn Dutch missions! Church authorities are outraged!". Read from the
+  code; the roll has not been seen to come up in a test run yet.
 
 ## Inciting a tribe
 
