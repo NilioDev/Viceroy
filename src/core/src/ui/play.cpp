@@ -207,8 +207,7 @@ void PlayScreen::moveActive(Step step) {
         const int defender = game_.canAttack(index) ? game_.defenderAt(tx, ty, index) : -1;
         const auto colony = game_.colonyAt(tx, ty);
         const auto settlement = game_.settlementAt(tx, ty);
-        if (settlement && (game_.isShip(index) || !game_.canAttack(index) ||
-                           game_.unit(index).type == unit_type::kScout)) {
+        if (settlement) {
             enterVillage(index, *settlement);
         } else if (defender >= 0 && !settlement) {
             startAttack(index, defender);
@@ -292,6 +291,11 @@ void PlayScreen::enterVillage(int unit, int settlement) {
         addOption(*dialog_, textLine(art_->names, "ACTIONS", 5, "Ask to Speak With Chief"));
         villageOptions_.push_back(kVillageSpeak);
     }
+    // Units that can attack: Demand Tribute (row 7).
+    if (game_.canDemandTribute(unit, settlement)) {
+        addOption(*dialog_, textLine(art_->names, "ACTIONS", 7, "Demand Tribute"));
+        villageOptions_.push_back(kVillageTribute);
+    }
     addOption(*dialog_, textLine(art_->names, "ACTIONS", 9, "Cancel Action"));
     villageOptions_.push_back(kVillageCancel);
     placeCentredDialog(*dialog_);
@@ -304,7 +308,16 @@ void PlayScreen::showLesson(int unit, const std::string& section, const std::vec
                           : 0;
     ask(section, unit, strings);
     if (dialog_) {
-        placeNativeDialog(*dialog_, tribe);
+        placeNative(tribe);
+    }
+}
+
+void PlayScreen::placeNative(int tribe, int mood) {
+    // Read from the original: the figure's mood is the step of the tribe's
+    // tension toward the player.
+    if (dialog_) {
+        placeNativeDialog(*dialog_, tribe,
+                          mood >= 0 ? mood : tensionLevel(tribeTension(game_.state(), tribe, game_.human())));
     }
 }
 
@@ -381,6 +394,40 @@ void PlayScreen::foundMission(int unit) {
     question_ = "LESSONDONE";
 }
 
+void PlayScreen::demandTribute(int unit) {
+    const auto& save = game_.state();
+    const int tribe = tribeOf(save.settlements[static_cast<std::size_t>(village_)]);
+    const int nation = game_.unit(unit).nation;
+    // The chief answers before the tribe's tension moves.
+    const int mood = tensionLevel(tribeTension(save, tribe, game_.human()));
+    const auto answer = game_.demandTribute(unit, village_);
+    const auto& tribes = game_.rules().tribes;
+    const auto t = static_cast<std::size_t>(tribe);
+    const std::string people = t < tribes.size() ? tribes[t].name : "";
+    // "Great Discoverer": the title is the game's difficulty.
+    const std::string title = textLine(art_->names, "DIFFICULTY", save.difficulty, "");
+    switch (answer.reply) {
+    case Game::Tribute::Reply::Laugh:
+        ask("EXTORTLAUGH", unit, {t < tribes.size() ? tribes[t].adjective : ""});
+        break;
+    case Game::Tribute::Reply::Refuse: {
+        const std::string leader =
+            nation >= 0 && nation < kEuropeanNations ? save.players[static_cast<std::size_t>(nation)].name : "";
+        ask("EXTORTNO", unit, {title, leader, people});
+        break;
+    }
+    case Game::Tribute::Reply::Poor: ask("EXTORTPOOR", unit, {title, people}); break;
+    case Game::Tribute::Reply::Goods: {
+        const std::string colony =
+            answer.colony >= 0 ? save.colonies[static_cast<std::size_t>(answer.colony)].name : "";
+        ask("EXTORTSTUFF", unit, {title, people, goodName(answer.good), colony}, -1, {answer.amount});
+        break;
+    }
+    }
+    placeNative(tribe, mood);
+    question_ = "LESSONDONE";
+}
+
 std::string PlayScreen::goodName(int good) const {
     const auto& cargo = game_.rules().cargo;
     return good >= 0 && static_cast<std::size_t>(good) < cargo.size() ? cargo[static_cast<std::size_t>(good)].name : "";
@@ -429,7 +476,7 @@ void PlayScreen::showSale() {
     ask(sale.haggles == 0 ? "TRADE0" : "TRADE1", trade_->unit,
         {textLine(art_->names, "VALUES", sale.quality, ""), goodName(sale.good)}, -1, {sale.price, sale.ask});
     if (dialog_) {
-        placeNativeDialog(*dialog_, tribeOf(save.settlements[static_cast<std::size_t>(village_)]));
+        placeNative(tribeOf(save.settlements[static_cast<std::size_t>(village_)]));
     }
 }
 
@@ -496,7 +543,7 @@ void PlayScreen::showPurchase() {
     question_ = section;
     questionUnit_ = trade_->unit;
     choices_.clear();
-    placeNativeDialog(*dialog_, tribeOf(save.settlements[static_cast<std::size_t>(village_)]));
+    placeNative(tribeOf(save.settlements[static_cast<std::size_t>(village_)]));
 }
 
 void PlayScreen::endTrade(const std::string& section, std::vector<std::string> strings, std::vector<int> numbers) {
@@ -510,7 +557,7 @@ void PlayScreen::endTrade(const std::string& section, std::vector<std::string> s
     const auto& save = game_.state();
     ask(section, unit, std::move(strings), -1, std::move(numbers));
     if (dialog_) {
-        placeNativeDialog(*dialog_, tribeOf(save.settlements[static_cast<std::size_t>(village_)]));
+        placeNative(tribeOf(save.settlements[static_cast<std::size_t>(village_)]));
     }
     question_ = "LESSONDONE";
 }
@@ -527,7 +574,7 @@ void PlayScreen::showChiefAnswer() {
                           : 0;
     ask(c.section, c.unit, c.strings, -1, c.numbers);
     if (dialog_) {
-        placeNativeDialog(*dialog_, tribe);
+        placeNative(tribe);
     }
     question_ = "LESSONDONE";
 }
@@ -839,6 +886,8 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
             foundMission(unit);
         } else if (option == kVillageTrade && village_ >= 0) {
             startTrade(unit);
+        } else if (option == kVillageTribute && village_ >= 0) {
+            demandTribute(unit);
         }
     } else if (question == "LEARNSTAY") {
         // "Then I shall become a master ..." or "Not right now, thanks."

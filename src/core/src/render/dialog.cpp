@@ -303,11 +303,11 @@ void placeCentredDialog(Dialog& d) {
     d.y = (Screen::kHeight - dialogHeight(d)) / 2;
 }
 
-void placeNativeDialog(Dialog& d, int tribe) {
+void placeNativeDialog(Dialog& d, int tribe, int mood) {
     // Measured on five tribes: the box is centred on the screen's rows; the
     // Iroquois and Apache stand left of it, the Arawaks, Cherokee and Sioux
     // right. The others are not measured yet and stand right like the Sioux.
-    d.portrait = kNativePortraits + tribe;
+    d.portrait = kNativePortraits + 4 * tribe + std::clamp(mood, 0, 3);
     d.portraitBehind = false;
     const int w = boxWidth(d);
     d.y = (Screen::kHeight - dialogHeight(d)) / 2;

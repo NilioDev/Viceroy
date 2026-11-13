@@ -548,6 +548,9 @@ std::string Game::suggestColonyName(const TextFile& colonyNames) const {
 
 void Game::endTurn() {
     lastTurnNews_.clear();
+    // Seen with a debugger: the count of forces is redone when the
+    // player's turn ends.
+    countForces();
     // Measured: the original goes through the colonies from the last
     // founded to the first, which sets the order of its messages.
     for (std::size_t c = save_.colonies.size(); c-- > 0;) {

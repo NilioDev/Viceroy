@@ -41,7 +41,7 @@ inline constexpr int kFrontiersman = 2; // MSS3.SS: tells about pioneers' work
 inline constexpr int kReligiousAdvisor = 3; // MSS4.SS: immigration
 inline constexpr int kColonialAdvisor = 4;  // MSS1.SS: Sons of Liberty
 inline constexpr int kBuyAdvisor = 5;       // MSS5.SS: buying a construction
-inline constexpr int kNativePortraits = 6;  // IND0A0.SS ...: one per tribe
+inline constexpr int kNativePortraits = 6;  // IND0A0.SS to IND7A3.SS: four moods per tribe
 
 // The box for a GAME.TXT section, with %STRING0, %STRING1, ... and
 // %NUMBER0, ... filled in. Text is joined and wrapped to the section's
@@ -83,8 +83,10 @@ void placeUnitDialog(Dialog& dialog, int unit);
 // A box centred on the screen with nobody beside it (the greeting at a
 // native settlement).
 void placeCentredDialog(Dialog& dialog);
-// A native of the tribe beside the box: what a settlement says.
-void placeNativeDialog(Dialog& dialog, int tribe);
+// A native of the tribe beside the box: what a settlement says. The mood
+// is the step of the tribe's tension toward the player (0 calm to 3
+// furious); it picks the figure IND<tribe>A<mood>.SS.
+void placeNativeDialog(Dialog& dialog, int tribe, int mood = 0);
 // The naval advisor over the left end of the box (sea matters).
 void placeNavalDialog(Dialog& dialog);
 // The tutorial's hints: the naval advisor, his hands over the box.

@@ -301,6 +301,24 @@ public:
     // The scout goes in; its turn is over. A killed scout is gone, a guided
     // one is a seasoned scout, tales show the land around, a gift is paid.
     ChiefTalk speakWithChief(int unit, int settlement);
+    // Any land unit that can attack, except a missionary, may demand
+    // tribute from a tribe its nation has met.
+    bool canDemandTribute(int unit, int settlement) const;
+    struct Tribute {
+        // EXTORTLAUGH, EXTORTNO, EXTORTPOOR or EXTORTSTUFF.
+        enum class Reply { Laugh, Refuse, Poor, Goods };
+        Reply reply = Reply::Poor;
+        int colony = -1; // the nation's nearest colony in the region
+        int good = -1;   // what the village hands over (row of @CARGO)
+        int amount = 0;
+    };
+    // The unit's turn is over. Goods go to the colony's warehouse.
+    Tribute demandTribute(int unit, int settlement);
+    // Counts each nation's forces by region, as the original does at the
+    // end of the player's turn; the tribute's answer weighs them.
+    void countForces();
+    // A unit's attack (or defence) in eighths, as the count weighs it.
+    int unitForce(const SaveUnit& u, bool attacking) const;
 
     // A ship that lost a fight and is being repaired (bit 0x80 of byte 4).
     bool isDamagedShip(int index) const;

@@ -189,7 +189,7 @@ private:
     std::vector<int> unitOptions_;
     void openUnitOptions(int unit, bool first);
     // A unit at a native settlement: what each option of the greeting does.
-    enum VillageOption { kVillageTrade, kVillageLive, kVillageMission, kVillageSpeak, kVillageCancel };
+    enum VillageOption { kVillageTrade, kVillageLive, kVillageMission, kVillageSpeak, kVillageTribute, kVillageCancel };
     std::vector<int> villageOptions_;
     int village_ = -1;
     void enterVillage(int unit, int settlement);
@@ -205,6 +205,8 @@ private:
     void speakWithChief(int unit);
     void showChiefAnswer();
     void foundMission(int unit);
+    void demandTribute(int unit);
+    void placeNative(int tribe, int mood = -1);
     // A trade at a settlement, step by step.
     struct VillageTrade {
         int unit = -1;
