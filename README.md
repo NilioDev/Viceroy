@@ -59,7 +59,11 @@ touch controls.
 > colonies and wagon trains: a hungry tribe begs for food, a friendly one
 > brings food, goods or converts from your mission, and an unfriendly one
 > demands goods as reparations, which you may hand over or refuse. The
-> other European nations don't play yet. Wagon trains and ships can trade with the
+> other European nations have begun to play: each takes its turn in the
+> original's order and buys in Europe as the original's computer players
+> do (ships when it is short of them, recruits, soldiers, dragoons,
+> pioneers, artillery and the goods its colonies ask for), helped by the
+> Crown's gold. Their units don't act on the map yet. Wagon trains and ships can trade with the
 > natives: sell, haggle, give and buy at the original's prices. Soldiers,
 > scouts and other armed units can demand tribute, which a village pays
 > in goods for your nearest colony when your forces nearby impress it, and
