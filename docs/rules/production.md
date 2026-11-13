@@ -196,8 +196,16 @@ A line break in `GAME.TXT` counts as two spaces when the original wraps a
 report (it is drawn as one): "Your Excellency. Our fur traders" leaves
 "cannot" for the next line although one space would just fit.
 
-**Not yet done:** the tutorial's hints (`@TUTORIAL6` "there are 100 Cotton
-in ..." followed the cargo report in our test game).
+With the Tutorial Hints option on (header byte 18, bit 7), the first cargo
+report of the game is followed by `@TUTORIAL6` ("there are 100 Cotton in
+...", the amount rounded down to whole holds) from the naval advisor
+(`MSS0.SS`) with his hands over the box. He stands 4 columns left of the box
+and 71 rows above it, and the two are centred on the screen together. Bit 9
+of the word at header bytes 22–23 then records it: it never came again,
+also not when the store passed a hundred once more, and never with the
+option off. The other tutorial hints (`@TUTORIAL15` came from the woman
+advisor when new colonists arrived) and their bits are still to be
+measured.
 
 ## What a colony can build
 

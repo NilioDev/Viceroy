@@ -428,6 +428,14 @@ void Game::storageNotices(const ColonyTurn& turn, int c) {
             const bool full = colony.stock[g] >= limit;
             const char* section = !full ? "CARGOREADY0" : canExpand ? "CARGOREADY1" : "CARGOREADY2";
             notices_.push_back(GameNotice{section, {colony.name, goodName(good)}, -1, {limit}, c});
+            // Measured: with Tutorial Hints on, the naval advisor follows the
+            // first cargo report of the game with how to ship it home
+            // ("there are 100 Cotton in ..."); never again after that.
+            if (tutorialHints() && !tutorialShown(kTutorialCargo)) {
+                markTutorialShown(kTutorialCargo);
+                notices_.push_back(GameNotice{"TUTORIAL6", {goodName(good), colony.name}, -1,
+                                              {colony.stock[g] / kHoldSize * kHoldSize}});
+            }
         } else if (turn.wasted[g] > 0) {
             spoiled = good;
             ++spoiledKinds;
@@ -442,6 +450,25 @@ void Game::storageNotices(const ColonyTurn& turn, int c) {
     } else if (spoiledKinds > 1) {
         notices_.push_back(GameNotice{canExpand ? "SPOIL2" : "SPOIL4", {colony.name}, -1, {}, c});
     }
+}
+
+// Game options: header byte 18, bit 7 (seen in the Game Options box with
+// the savegame edited).
+bool Game::tutorialHints() const {
+    return (save_.header[18] & 0x80) != 0;
+}
+
+// The hints already given: bits of the 16-bit word at header bytes 22-23
+// (measured for the cargo hint only, bit 9).
+bool Game::tutorialShown(int bit) const {
+    const int word = save_.header[22] | (save_.header[23] << 8);
+    return (word >> bit & 1) != 0;
+}
+
+void Game::markTutorialShown(int bit) {
+    const int byte = 22 + bit / 8;
+    save_.header[static_cast<std::size_t>(byte)] =
+        static_cast<std::uint8_t>(save_.header[static_cast<std::size_t>(byte)] | (1 << (bit % 8)));
 }
 
 std::string Game::suggestColonyName(const TextFile& colonyNames) const {

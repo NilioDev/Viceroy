@@ -163,6 +163,14 @@ public:
     // A free colonist appears on the square (born in a colony).
     void addColonist(int x, int y, int nation);
 
+    // --- Tutorial hints ------------------------------------------------------
+    // The "Tutorial Hints" game option.
+    bool tutorialHints() const;
+    // Each hint is given once a game; the savegame remembers which.
+    static constexpr int kTutorialCargo = 9; // @TUTORIAL6: ship a cargo home
+    bool tutorialShown(int bit) const;
+    void markTutorialShown(int bit);
+
     // --- Europe --------------------------------------------------------------
     // A ship on the high seas sets sail for Europe with everyone aboard. It
     // will come back to this square.
