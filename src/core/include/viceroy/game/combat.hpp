@@ -5,6 +5,7 @@
 // docs/rules/combat.md.
 #pragma once
 
+#include <string>
 #include <vector>
 
 namespace viceroy {
@@ -16,18 +17,31 @@ inline constexpr int kTitle = 75; // "COMBAT ANALYSIS"
 inline constexpr int kFatigue = 76;
 inline constexpr int kAttackBonus = 77;
 inline constexpr int kTerrain = 79;
+inline constexpr int kColony = 80;
 inline constexpr int kFortified = 81;
 inline constexpr int kArtilleryInOpen = 84;
 } // namespace combat_label
 
 struct CombatBonus {
+    CombatBonus() = default;
+    CombatBonus(int l, int p, bool picture = false) : label(l), percent(p), terrainPicture(picture) {}
     int label = 0;   // row of LABELS.TXT @MISC
     int percent = 0; // +50, -75, ...
     bool terrainPicture = false; // the box shows the defender's square beside it
+    bool colonyPicture = false;  // the box shows the defender's colony beside it
+    // Named by this text instead of the label (a stockade's name, "Muskets").
+    std::string text;
+    // Added to the base ("+1") instead of a percentage.
+    int points = 0;
 };
 
 struct CombatSide {
     int unit = -1;
+    // A colony's colonist defending it (no unit stands there): the colony,
+    // the colonist's place in it, and whether 50 muskets arm them.
+    int colony = -1;
+    int colonist = -1;
+    bool armed = false;
     int base = 0; // the unit type's attack or combat value
     std::vector<CombatBonus> bonuses;
     // The base with the bonuses added up (+50% and +50% make twice the

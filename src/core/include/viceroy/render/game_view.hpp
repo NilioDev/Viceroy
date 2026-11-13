@@ -103,6 +103,12 @@ std::uint8_t nationColour(const Art& art, int nation);
 // The box with the nation's colour and the orders letter beside a unit
 // drawn at (px, py).
 void drawUnitOrders(Screen& screen, const Art& art, const Game& game, int index, int px, int py);
+// A colony's colonist standing up to defend it, like a unit at (px, py):
+// in plain clothes, or with a musket when the colony arms them.
+void drawColonyDefender(Screen& screen, const Art& art, const Game& game, int colony, int colonist, bool armed,
+                        int px, int py);
+// A colony's map picture (with its stockade) and pennant at (px, py).
+void drawColonyPicture(Screen& screen, const Art& art, const SaveColony& colony, int px, int py);
 // The same in the colony's list of units present: a unit without orders
 // shows as on sentry, and artillery has a smaller picture.
 void drawUnitInColonyList(Screen& screen, const Art& art, const Game& game, int index, int px, int py);

@@ -10,6 +10,7 @@
 #include <cctype>
 #include <fstream>
 #include <iterator>
+#include <utility>
 
 namespace viceroy {
 
@@ -194,10 +195,14 @@ void PlayScreen::moveActive(Step step) {
     }
     case MoveResult::Occupied: {
         const auto& u = game_.unit(index);
-        const int defender = game_.canAttack(index) ? game_.defenderAt(u.x + step.dx, u.y + step.dy, index) : -1;
-        if (defender >= 0 && !game_.colonyAt(u.x + step.dx, u.y + step.dy) &&
-            !game_.settlementAt(u.x + step.dx, u.y + step.dy)) {
+        const int tx = u.x + step.dx;
+        const int ty = u.y + step.dy;
+        const int defender = game_.canAttack(index) ? game_.defenderAt(tx, ty, index) : -1;
+        const auto colony = game_.colonyAt(tx, ty);
+        if (defender >= 0 && !game_.settlementAt(tx, ty)) {
             startAttack(index, defender);
+        } else if (colony && game_.canAttack(index) && game_.colonyUndefended(*colony)) {
+            startAttack(index, -1, *colony);
         } else {
             say("Someone else is there.");
         }
@@ -290,10 +295,17 @@ std::string PlayScreen::adjective(int nation) const {
     return "";
 }
 
-void PlayScreen::startAttack(int attacker, int defender) {
-    attack_ = PendingAttack{attacker, defender, false};
+int PlayScreen::defenderNation(const PendingAttack& a) const {
+    if (a.colony >= 0) {
+        return game_.state().colonies[static_cast<std::size_t>(a.colony)].nation;
+    }
+    return game_.unit(a.defender).nation;
+}
+
+void PlayScreen::startAttack(int attacker, int defender, int colony) {
+    attack_ = PendingAttack{attacker, defender, false, colony, colony >= 0 ? game_.pickColonyDefender(colony) : -1};
     const int us = game_.unit(attacker).nation;
-    const int them = game_.unit(defender).nation;
+    const int them = defenderNation(*attack_);
     if (game_.atPeace(us, them)) {
         // "We have signed a peace treaty with the French, Your Excellency."
         ask("HAVETREATY", attacker, {adjective(them)});
@@ -333,7 +345,14 @@ void PlayScreen::resolveAttack() {
     }
     const auto fight = *attack_;
     attack_.reset();
-    game_.attack(fight.attacker, fight.defender);
+    if (fight.colony >= 0) {
+        // Seen: once the news is read the colony's screen opens.
+        if (game_.attackColony(fight.attacker, fight.colony, fight.colonist) == CombatOutcome::AttackerWon) {
+            colonyAfterNotices_ = fight.colony;
+        }
+    } else {
+        game_.attack(fight.attacker, fight.defender);
+    }
     for (auto& notice : game_.takeNotices()) {
         tell(std::move(notice));
     }
@@ -362,6 +381,9 @@ void PlayScreen::showNotices() {
         if (advanceAfterNotices_) {
             advanceAfterNotices_ = false;
             advance();
+        }
+        if (colonyAfterNotices_ >= 0) {
+            openColony(std::exchange(colonyAfterNotices_, -1));
         }
     }
     if (dialog_ || notices_.empty() || art_ == nullptr) {
@@ -439,7 +461,8 @@ void PlayScreen::showNotices() {
         // Measured: battles are told by the colonial advisor, the work of
         // pioneers by the frontiersman.
         constexpr std::string_view kBattles[] = {"DEMOTE", "COLONISTCAPTURE", "COLONISTCAPTURE2", "WAGONCAPTURE",
-                                                 "LOOTCAPTURE", "ARTILLERY", "ARTILLERY2", "VETERAN", "VALOR"};
+                                                 "LOOTCAPTURE", "ARTILLERY", "ARTILLERY2", "VETERAN", "VALOR",
+                                                 "CAPTURED"};
         if (std::find(std::begin(kBattles), std::end(kBattles), notice.section) != std::end(kBattles)) {
             placeMapDialog(*dialog_);
         } else {
@@ -498,7 +521,7 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
         // "Cancel Action." or "Break Treaty."
         if (choice == 1 && attack_) {
             const int us = game_.unit(attack_->attacker).nation;
-            const int them = game_.unit(attack_->defender).nation;
+            const int them = defenderNation(*attack_);
             game_.declareWar(us, them);
             // Measured: "Spanish cancel peace treaty with Dutch." when the
             // Dutch attack the Spanish.
@@ -1334,7 +1357,10 @@ void PlayScreen::draw(Screen& screen, const Art& art) const {
         drawMenuBar(screen, art, art.menus, &*menu_);
     }
     if (analysisUp_ && attack_) {
-        drawCombatAnalysis(screen, art, game_, game_.analyseAttack(attack_->attacker, attack_->defender));
+        drawCombatAnalysis(screen, art, game_,
+                           attack_->colony >= 0
+                               ? game_.analyseColonyAttack(attack_->attacker, attack_->colony, attack_->colonist)
+                               : game_.analyseAttack(attack_->attacker, attack_->defender));
     }
     if (dialog_) {
         drawDialog(screen, art, *dialog_);

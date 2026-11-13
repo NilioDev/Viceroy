@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "viceroy/render/dialog.hpp"
 
+#include "viceroy/game/europe.hpp"
+#include "viceroy/render/game_view.hpp"
 #include <algorithm>
+#include <optional>
 #include <sstream>
 
 namespace viceroy {
@@ -390,10 +393,18 @@ void drawCombatAnalysis(Screen& screen, const Art& art, const Game& game, const 
     const auto label = [&](int row) { return textLine(art.labelText, "MISC", row, ""); };
     const auto side = [&](const CombatSide& s, int left) {
         int y = box.y + 24;
+        std::string name;
         if (s.unit >= 0) {
             drawUnitOrders(screen, art, game, s.unit, left, y - 1);
+            name = game.unitName(s.unit);
+        } else if (s.colony >= 0 && s.colony < static_cast<int>(game.state().colonies.size())) {
+            // Seen: the colonist by their skill, "Ore Miner".
+            drawColonyDefender(screen, art, game, s.colony, s.colonist, s.armed, left, y - 1);
+            const auto& c = game.state().colonies[static_cast<std::size_t>(s.colony)];
+            const int job = professionJob(c.skills[static_cast<std::size_t>(std::clamp(s.colonist, 0, kMaxColonists - 1))]);
+            const auto& jobs = game.rules().jobs;
+            name = job >= 0 && job < static_cast<int>(jobs.size()) ? jobs[static_cast<std::size_t>(job)].name : "";
         }
-        const std::string name = s.unit >= 0 ? game.unitName(s.unit) : "";
         screen.text(font, left + 17, y + 5, name, kBasic);
         const std::string base = std::to_string(s.base);
         screen.text(font, left + 80 - Screen::textWidth(font, base), y + 5, base, kHilite);
@@ -403,8 +414,18 @@ void drawCombatAnalysis(Screen& screen, const Art& art, const Game& game, const 
                 const auto& u = game.unit(s.unit);
                 drawTerrain(screen, art, game, u.x, u.y, left, y - 1);
             }
-            screen.text(font, b.terrainPicture ? left + 17 : left, y + 5, label(b.label), kBasic);
-            const std::string value = (b.percent > 0 ? "+" : "") + std::to_string(b.percent) + "%";
+            const bool picture = b.terrainPicture || b.colonyPicture;
+            if (b.colonyPicture) {
+                const int x = s.unit >= 0 ? game.unit(s.unit).x : -1;
+                const int yy = s.unit >= 0 ? game.unit(s.unit).y : -1;
+                const auto colony = s.colony >= 0 ? std::optional<int>(s.colony) : game.colonyAt(x, yy);
+                if (colony) {
+                    drawColonyPicture(screen, art, game.state().colonies[static_cast<std::size_t>(*colony)], left, y - 1);
+                }
+            }
+            screen.text(font, picture ? left + 17 : left, y + 5, b.text.empty() ? label(b.label) : b.text, kBasic);
+            const std::string value = b.points != 0 ? (b.points > 0 ? "+" : "") + std::to_string(b.points)
+                                                    : (b.percent > 0 ? "+" : "") + std::to_string(b.percent) + "%";
             screen.text(font, left + 80 - Screen::textWidth(font, value), y + 5, value, kHilite);
         }
     };

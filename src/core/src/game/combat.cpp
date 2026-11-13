@@ -11,10 +11,12 @@ namespace viceroy {
 
 int CombatSide::strength() const {
     int percent = 100;
+    int points = base;
     for (const auto& b : bonuses) {
         percent += b.percent;
+        points += b.points;
     }
-    return std::max(0, base * std::max(0, percent));
+    return std::max(0, points * std::max(0, percent));
 }
 
 namespace {
@@ -112,6 +114,21 @@ bool Game::combatAnalysisShown() const {
     return (save_.header[kHeaderOptions] & kCombatAnalysisOption) != 0;
 }
 
+int Game::addColonyBonus(CombatSide& side, int colony) const {
+    // Seen in the box: "Colony +50%" with the colony's picture, or the
+    // stockade's name ("Fort +150%") with its picture.
+    const auto& c = save_.colonies[static_cast<std::size_t>(colony)];
+    const int level = buildingLevel(c, BuildingKind::Fortification);
+    const int quarters = 2 * (level + 1);
+    CombatBonus bonus{combat_label::kColony, quarters * 25};
+    bonus.colonyPicture = true;
+    if (level > 0 && level - 1 < static_cast<int>(rules_.buildings.size())) {
+        bonus.text = rules_.buildings[static_cast<std::size_t>(level - 1)].name;
+    }
+    side.bonuses.push_back(bonus);
+    return quarters;
+}
+
 CombatAnalysis Game::analyseAttack(int attacker, int defender) const {
     using namespace combat_label;
     CombatAnalysis a;
@@ -162,7 +179,12 @@ CombatAnalysis Game::analyseAttack(int attacker, int defender) const {
             }
         }
     }
-    if (du.orders == SaveUnit::kFortified) {
+    int quarters = 0;
+    if (defenderInColony) {
+        quarters = addColonyBonus(a.defender, *colonyAt(du.x, du.y));
+    }
+    // Fortified adds +50% only where the colony gives less than +125%.
+    if (du.orders == SaveUnit::kFortified && quarters < 5) {
         a.defender.bonuses.push_back({kFortified, 50});
     }
     if (du.type == kArtillery && !defenderInColony && !dugIn) {
@@ -172,19 +194,22 @@ CombatAnalysis Game::analyseAttack(int attacker, int defender) const {
 }
 
 CombatStrengths Game::combatStrengths(int attacker, int defender) const {
+    return strengthsAgainst(attacker, unit(defender), isShip(defender), isDamagedArtillery(defender), 0);
+}
+
+CombatStrengths Game::strengthsAgainst(int attacker, const SaveUnit& du, bool defenderShip, bool defenderDamaged,
+                                       int defenderExtra) const {
     // Observed in the original with a debugger: the integer steps below, in
     // this order. Natives, ships and independence are not covered yet.
     const auto& au = unit(attacker);
-    const auto& du = unit(defender);
     const auto typeOf = [&](int type) -> const UnitType* {
         return type >= 0 && type < static_cast<int>(rules_.units.size()) ? &rules_.units[static_cast<std::size_t>(type)]
                                                                          : nullptr;
     };
-    const auto strength8 = [&](int index, bool attacking) {
-        const auto& u = unit(index);
+    const auto strength8 = [&](const SaveUnit& u, bool attacking, bool damaged, int extra) {
         const UnitType* t = typeOf(u.type);
-        int v = t ? (attacking ? t->attack : t->combat) : 0;
-        if (isDamagedArtillery(index)) {
+        int v = (t ? (attacking ? t->attack : t->combat) : 0) + extra;
+        if (damaged) {
             v -= 2;
         }
         v = std::max(0, v) * 8;
@@ -210,11 +235,11 @@ CombatStrengths Game::combatStrengths(int attacker, int defender) const {
             m = rules_.terrain[static_cast<std::size_t>(row)].defenseBonus;
         }
     }
-    if (du.orders == SaveUnit::kFortified && !isShip(defender) && m < 5) {
+    if (du.orders == SaveUnit::kFortified && !defenderShip && m < 5) {
         m += 2;
     }
-    int d = strength8(defender, false) * (4 + m) >> 2;
-    int a = strength8(attacker, true);
+    int d = strength8(du, false, defenderDamaged, defenderExtra) * (4 + m) >> 2;
+    int a = strength8(au, true, isDamagedArtillery(attacker), 0);
     a = a * 3 >> 1; // the attack bonus
     if (attackerHuman) {
         a += 4 - difficulty;
@@ -228,7 +253,7 @@ CombatStrengths Game::combatStrengths(int attacker, int defender) const {
     }
     const UnitType* at = typeOf(au.type);
     const UnitType* dt = typeOf(du.type);
-    if (!isShip(attacker) && !isShip(defender) && at && at->attack > 1 && dt && dt->combat < 2) {
+    if (!isShip(attacker) && !defenderShip && at && at->attack > 1 && dt && dt->combat < 2) {
         d >>= 1; // someone who cannot fight
     }
     const bool dugIn = (du.orders == SaveUnit::kFortify || du.orders == SaveUnit::kFortified) && defenderEuropean;
@@ -253,6 +278,127 @@ CombatStrengths Game::combatStrengths(int attacker, int defender) const {
         }
     }
     return {std::max(0, a), std::max(0, d)};
+}
+
+bool Game::colonyUndefended(int colony) const {
+    if (colony < 0 || colony >= static_cast<int>(save_.colonies.size())) {
+        return false;
+    }
+    const auto& c = save_.colonies[static_cast<std::size_t>(colony)];
+    return c.population > 0 && unitsAt(c.x, c.y).empty();
+}
+
+int Game::pickColonyDefender(int colony) {
+    // Seen: a different colonist of Quebec stood up in each try.
+    const auto& c = save_.colonies[static_cast<std::size_t>(colony)];
+    return nextRandom(std::max(1, c.population));
+}
+
+SaveUnit Game::colonistAsUnit(int colony, int colonist) const {
+    const auto& c = save_.colonies[static_cast<std::size_t>(colony)];
+    SaveUnit u;
+    u.x = c.x;
+    u.y = c.y;
+    u.type = unit_type::kColonist;
+    u.nation = c.nation;
+    u.profession = c.skills[static_cast<std::size_t>(std::clamp(colonist, 0, kMaxColonists - 1))];
+    u.orders = SaveUnit::kNoOrders;
+    return u;
+}
+
+namespace {
+constexpr int kMuskets = 15;      // row of @CARGO
+constexpr int kArmingMuskets = 50; // measured: 49 give nothing, 50 give +1
+} // namespace
+
+CombatAnalysis Game::analyseColonyAttack(int attacker, int colony, int colonist) const {
+    // The attacker's side is the same as against a unit.
+    CombatAnalysis a;
+    const auto& au = unit(attacker);
+    const UnitType* at = au.type >= 0 && au.type < static_cast<int>(rules_.units.size())
+                             ? &rules_.units[static_cast<std::size_t>(au.type)]
+                             : nullptr;
+    a.attacker.unit = attacker;
+    a.attacker.base = isDamagedArtillery(attacker) ? kDamagedArtilleryAttack : at ? at->attack : 0;
+    if (armed(au.type) && au.profession == kVeteranSoldier) {
+        a.attacker.bonuses.push_back({combat_label::kVeteran, 50});
+    }
+    a.attacker.bonuses.push_back({combat_label::kAttackBonus, 50});
+
+    // Seen: the colonist by their skill ("Ore Miner 1"), "Muskets +1" when
+    // the colony has 50, then the colony.
+    const auto& c = save_.colonies[static_cast<std::size_t>(colony)];
+    a.defender.colony = colony;
+    a.defender.colonist = colonist;
+    a.defender.base = rules_.units.size() > unit_type::kColonist ? rules_.units[unit_type::kColonist].combat : 1;
+    a.defender.armed = c.stock[kMuskets] >= kArmingMuskets;
+    if (a.defender.armed) {
+        CombatBonus muskets{0, 0};
+        muskets.points = 1;
+        muskets.text = kMuskets < static_cast<int>(rules_.cargo.size()) ? rules_.cargo[kMuskets].name : "Muskets";
+        a.defender.bonuses.push_back(muskets);
+    }
+    addColonyBonus(a.defender, colony);
+    return a;
+}
+
+CombatStrengths Game::colonyStrengths(int attacker, int colony, int colonist) const {
+    const auto& c = save_.colonies[static_cast<std::size_t>(colony)];
+    const int extra = c.stock[kMuskets] >= kArmingMuskets ? 1 : 0;
+    return strengthsAgainst(attacker, colonistAsUnit(colony, colonist), false, false, extra);
+}
+
+CombatOutcome Game::attackColony(int attacker, int colony, int colonist) {
+    const auto s = colonyStrengths(attacker, colony, colonist);
+    const int roll = 1 + nextRandom(s.attack + s.defense);
+    const bool won = s.attack + s.defense > 0 && attackerWins(s.attack, s.defense, roll);
+    auto& a = save_.units[static_cast<std::size_t>(attacker)];
+    a.movesUsed = movementAllowance(attacker);
+    if (won) {
+        captureColony(colony, attacker);
+        promote(attacker, s.attack, s.defense);
+    } else {
+        loseBattle(attacker, -1);
+    }
+    refreshUnitFlags();
+    return won ? CombatOutcome::AttackerWon : CombatOutcome::DefenderWon;
+}
+
+void Game::captureColony(int colony, int attacker) {
+    // Measured on Martinique and Quebec: the attacker marches in, the
+    // colony changes hands with its people, buildings and goods, its
+    // liberty bells start again, and the owner's gold goes with it in
+    // proportion to the colony's share of the owner's colonists (1000 gold,
+    // 1 of 16 colonists: 62; 11 of 16: 687).
+    auto& c = save_.colonies[static_cast<std::size_t>(colony)];
+    const int loser = c.nation;
+    auto& a = save_.units[static_cast<std::size_t>(attacker)];
+    int people = 0;
+    for (const auto& other : save_.colonies) {
+        if (other.nation == loser) {
+            people += other.population;
+        }
+    }
+    int plunder = 0;
+    if (loser >= 0 && loser < kEuropeanNations && people > 0) {
+        auto& from = save_.nations[static_cast<std::size_t>(loser)];
+        plunder = static_cast<int>(static_cast<long long>(std::max(0, from.gold)) * c.population / people);
+        from.gold -= plunder;
+        if (a.nation >= 0 && a.nation < kEuropeanNations) {
+            save_.nations[static_cast<std::size_t>(a.nation)].gold += plunder;
+        }
+    }
+    c.nation = a.nation;
+    c.rebelDividend = 0;
+    a.x = c.x;
+    a.y = c.y;
+    a.orders = SaveUnit::kNoOrders;
+    reveal(c.x, c.y, 2, a.nation);
+    // "Dutch march into Martinique! 62 plundered!"
+    GameNotice notice{"CAPTURED", {"", "", c.name}};
+    notice.adjectives = {{0, a.nation}};
+    notice.numbers = {plunder};
+    notices_.push_back(std::move(notice));
 }
 
 bool Game::attackerWins(int attack, int defense, int roll) {
@@ -350,7 +496,6 @@ void Game::promote(int index, int own, int opponent) {
 
 void Game::loseBattle(int loser, int winner) {
     auto& l = save_.units[static_cast<std::size_t>(loser)];
-    const auto& w = unit(winner);
     const auto name = [&](int type) {
         return type >= 0 && type < static_cast<int>(rules_.units.size()) ? rules_.units[static_cast<std::size_t>(type)].name
                                                                          : std::string();
@@ -378,6 +523,10 @@ void Game::loseBattle(int loser, int winner) {
         }
         return;
     }
+    if (winner < 0) {
+        return; // only fighters attack a colony
+    }
+    const auto& w = unit(winner);
     // Someone who cannot fight is taken by the winner (measured for
     // colonists: they change sides, stand on the winner's square and wait
     // for orders).
