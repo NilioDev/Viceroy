@@ -375,6 +375,21 @@ public:
     // the treasury. Notices tell the answer.
     Incite incite(int unit, int settlement, int target, bool pay);
 
+    // The European pressure on a native settlement, as the original weighs
+    // it: each colony within 6 squares by its buildings, people and
+    // distance (the player's by difficulty), plus that nation's armed
+    // units within two squares, halved for the French and with Pocahontas;
+    // a mission moves it. Returns the nation pressing hardest (or -1) and
+    // sets its pressure.
+    int settlementPressure(int settlement, int* pressure = nullptr) const;
+    // A missionary at a tribe with a treaty may denounce another nation's
+    // mission there.
+    bool canDenounce(int unit, int settlement) const;
+    // The missionary is gone either way. On success (notice HERESY0) the
+    // mission becomes the nation's; otherwise (HERESY1) the missionary is
+    // burned. The tribe's tension toward both nations moves.
+    bool denounceHeresy(int unit, int settlement);
+
     // A ship that lost a fight and is being repaired (bit 0x80 of byte 4).
     bool isDamagedShip(int index) const;
     // A ship's odds in getting away from a stronger one: its share of the

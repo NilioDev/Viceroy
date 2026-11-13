@@ -44,8 +44,9 @@ touch controls.
 > speak with the chief for guides, tales of the land, a gift or an
 > early death, as in the original. A tribe you meet for the first time
 > offers you peace; refusing it angers the tribe. Missionaries can found missions,
-> which the tribe takes well or badly as in the original, or pay a tribe
-to go to war against another nation. The other
+> which the tribe takes well or badly as in the original, pay a tribe to
+> go to war against another nation, or denounce another nation's mission
+> to take it over. The other
 > nations don't move yet. Wagon trains and ships can trade with the
 > natives: sell, haggle, give and buy at the original's prices. Soldiers,
 > scouts and other armed units can demand tribute, which a village pays

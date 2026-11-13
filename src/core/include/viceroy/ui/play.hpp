@@ -197,6 +197,7 @@ private:
         kVillageSpeak,
         kVillageTribute,
         kVillageIncite,
+        kVillageDenounce,
         kVillageAttack,
         kVillageCancel
     };

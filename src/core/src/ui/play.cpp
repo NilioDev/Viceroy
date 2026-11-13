@@ -315,6 +315,16 @@ void PlayScreen::enterVillage(int unit, int settlement) {
         addOption(*dialog_, textLine(art_->names, "ACTIONS", 2, "Establish Mission"));
         villageOptions_.push_back(kVillageMission);
     }
+    // Missionaries at another nation's mission: Denounce Heresy of French
+    // Mission (row 3).
+    if (game_.canDenounce(unit, settlement)) {
+        std::string line = textLine(art_->names, "ACTIONS", 3, "Denounce Heresy of %Fs Mission");
+        if (const auto at = line.find("%Fs"); at != std::string::npos) {
+            line.replace(at, 3, adjective(missionOf(game_.state().settlements[static_cast<std::size_t>(settlement)])));
+        }
+        addOption(*dialog_, line);
+        villageOptions_.push_back(kVillageDenounce);
+    }
     // Missionaries: Incite Indians (row 6).
     if (game_.canIncite(unit, settlement)) {
         addOption(*dialog_, textLine(art_->names, "ACTIONS", 6, "Incite Indians"));
@@ -855,6 +865,14 @@ void PlayScreen::showNotices() {
         }
         return;
     }
+    if (notice.section == "HERESY0" || notice.section == "HERESY1") {
+        // Seen: the religious advisor tells it.
+        ask(notice.section, -1, notice.strings);
+        if (dialog_) {
+            placeReligiousDialog(*dialog_);
+        }
+        return;
+    }
     if (notice.section == "UNREST") {
         // "Colonists (%STRING1) now available in %STRING0."
         const auto& jobs = game_.rules().jobs;
@@ -1005,6 +1023,13 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
             foundMission(unit);
         } else if (option == kVillageTrade && village_ >= 0) {
             startTrade(unit);
+        } else if (option == kVillageDenounce && village_ >= 0) {
+            game_.denounceHeresy(unit, village_);
+            village_ = -1;
+            for (auto& notice : game_.takeNotices()) {
+                notices_.push_back(std::move(notice));
+            }
+            advanceAfterNotices_ = true;
         } else if (option == kVillageIncite && village_ >= 0) {
             startIncite(unit);
         } else if (option == kVillageTribute && village_ >= 0) {

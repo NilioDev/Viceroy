@@ -792,3 +792,56 @@ VCR_TEST("original files: the original's tension change") {
     VCR_CHECK(tribeTension(game.state(), kApache, kDutch) == 0);
     VCR_CHECK((game.state().nations[kDutch].raw[52 + 4 + kApache] & 0x04) == 0);
 }
+
+VCR_TEST("original files: a missionary denounces another nation's mission") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
+    SaveGame save = readSaveGame(Bytes(std::istreambuf_iterator<char>(in), {}));
+    // As seen in the original: a Dutch missionary beside the Iroquois
+    // capital at (27, 14), which has a French mission.
+    constexpr int kDutch = 3, kFrench = 1, kIroquois = 3, kCapital = 1, kUnit = 47;
+    auto& u = save.units[kUnit];
+    u.type = 3;
+    u.profession = 0x1C;
+    u.x = 28;
+    u.y = 14;
+    u.movesUsed = 0;
+    u.orders = SaveUnit::kNoOrders;
+    save.nations[kDutch].raw[52 + 4 + kIroquois] = 0x60;
+    save.tribesAndMore[kIroquois * 78 + 58 + kDutch] = 0x60;
+    {
+        // The French colonies of Quebec and Montreal press on the capital
+        // and two villages near them.
+        const Game game(save, art.rules);
+        int pressure = 0;
+        VCR_CHECK(game.settlementPressure(kCapital, &pressure) == kFrench && pressure == 3);
+        VCR_CHECK(game.settlementPressure(2, &pressure) == kFrench && pressure == 2);
+        VCR_CHECK(game.settlementPressure(4, &pressure) == -1 && pressure == 0);
+    }
+    PlayScreen play(Game(save, art.rules), {});
+    play.setArt(&art);
+    play.game().setActiveUnit(kUnit);
+    const auto units = play.game().state().units.size();
+    play.handle(Command::MoveW);
+    // Denounce Heresy of French Mission, Incite Indians, Cancel Action.
+    VCR_CHECK(play.dialog().has_value() && play.dialog()->options.size() == 3);
+    VCR_CHECK(play.dialog()->options[0] == "Denounce Heresy of French Mission");
+    play.handle(Command::Confirm);
+    VCR_CHECK(play.dialog().has_value());
+    const auto& after = play.game().state();
+    VCR_CHECK(after.units.size() == units - 1);
+    if (missionOf(after.settlements[kCapital]) == kDutch) {
+        // Seen twice: the converts burn the French mission; the Iroquois
+        // a step calmer toward the Dutch (2 to 0) and 1 tenser toward the
+        // French (2, halved).
+        VCR_CHECK(tribeTension(after, kIroquois, kDutch) == 0);
+        VCR_CHECK(tribeTension(after, kIroquois, kFrench) == 1);
+    } else {
+        VCR_CHECK(missionOf(after.settlements[kCapital]) == kFrench);
+        VCR_CHECK(tribeTension(after, kIroquois, kDutch) == 4);
+    }
+}

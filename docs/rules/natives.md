@@ -36,9 +36,9 @@ Speak) to units with an attack above 1, and after Demand Tribute to the
 others (seen: artillery gets Attack Village, Demand Tribute, Cancel
 Action; a scout Speak, Demand Tribute, Attack Village, Cancel Action).
 Without contact with the tribe the others are not there. A missionary is
-offered **Establish Mission** at a settlement without a mission, and
-**Incite Indians** (see below); the original also offers Denounce Heresy
-at another nation's mission, which Viceroy does not have yet.
+offered **Establish Mission** at a settlement without a mission,
+**Denounce Heresy of French Mission** at another nation's mission, and
+**Incite Indians** (see below).
 
 Every native answer is told by a figure of the tribe (`IND<tribe>A<mood>.SS`)
 whose mood is the step of the tribe's tension toward the player: 0 below
@@ -122,6 +122,59 @@ Either way the missionary's turn is over. Measured in DOSBox with a Dutch
 missionary at the Apache: 6552 at tension 51 with defence 56 (6
 settlements, bytes 0 and 1), 4650 at tension 0 with defence 100; paying
 took 4650 and put the Apache at 50 toward the French.
+
+## Pressure on a settlement
+
+The original weighs how hard the Europeans press on a native settlement
+(read with a debugger; denouncing heresy uses it):
+
+- Each European nation's armed units on land within two squares count:
+  the attack values above 1 of the units on a square (ships left out),
+  halved when the square is a colony and halved again two squares out.
+- Each colony within 6 (the longer side plus half the shorter) scores
+  ((people beyond 6) × 2 + min(people / 2, the tribe's level) + min(people,
+  6) + B) × 2 − distance − 1, divided by distance + 4. B is (buildings −
+  8) / 4, where buildings counts the colony's building bits; for the
+  player's colonies each bit weighs 1, 3, 1, 3, 2 and the sum is divided
+  by 2, 4, 1, 2, 1 on difficulty levels 0 to 4, and the difficulty level is
+  added to B. The score is halved for a colony on other land, then the
+  nation's armed units are added, and it is halved for the French and
+  again with Pocahontas.
+- The colony with the highest score names the nation pressing hardest. A
+  mission of another nation adds half (an expert mission doubles it); the
+  nation's own mission takes a quarter off (an expert mission half).
+
+## Denouncing heresy
+
+A missionary at another nation's mission weighs the two sides:
+
+- For each of the tribe's settlements, the pressure goes to the
+  denouncer when the mission's nation presses hardest, and to the
+  mission's nation when the denouncer does. Every settlement with a
+  mission also adds its people (doubled for an expert mission and again
+  for a capital) to the denouncer; the original's test there compares the
+  two nations rather than the mission's, so it always takes this branch.
+- The denouncer adds the tribe's tension toward the mission's nation (×16
+  at a capital); the other side the tension toward the denouncer, halved
+  (nothing at a capital, where the original shifts by 29).
+- Each side's anger is its weight's tension step + 1 (0 to 3, from the
+  weights so far). At a capital both weights get 1 to 20 more and both
+  angers double. A missionary whose profession byte is 3 doubles the
+  denouncer's weight and the anger toward the mission's nation (the
+  original compares 3, not the Jesuit's 24); an expert mission doubles the
+  other side's.
+- A roll from 1 to the sum at most the denouncer's weight wins:
+  `HERESY0`, "Iroquois converts burn French mission and erect a new, Dutch
+  one!"; the mission becomes the denouncer's, and the tribe calms toward
+  the denouncer by its anger and grows tenser toward the other nation by
+  its anger (through [the tension rule](#how-tension-moves)). Otherwise
+  `HERESY1`: the missionary is burned at the stake, and the tribe calms
+  toward the other nation and grows tenser toward the denouncer.
+- The religious advisor tells either; the missionary is gone either way.
+
+Seen twice in DOSBox at the Iroquois capital with a French mission: the
+Dutch won, the mission turned Dutch, and the tension went from 2 to 0
+toward the Dutch and from 0 to 1 toward the French.
 
 ## Learning a skill
 
