@@ -295,6 +295,31 @@ void placeUnitDialog(Dialog& d, int unit) {
     d.y = (Screen::kHeight - dialogHeight(d)) / 2;
 }
 
+void placeCentredDialog(Dialog& d) {
+    // Measured: the box centred on the screen, rows 68 to 131 for a box
+    // 64 high.
+    d.portrait = -1;
+    d.x = (Screen::kWidth - boxWidth(d)) / 2;
+    d.y = (Screen::kHeight - dialogHeight(d)) / 2;
+}
+
+void placeNativeDialog(Dialog& d, int tribe) {
+    // Measured on four tribes: the box is centred on the screen's rows; the
+    // Iroquois and Apache stand left of it, the Cherokee and Sioux right.
+    // The others are not measured yet and stand right like the Sioux.
+    d.portrait = kNativePortraits + tribe;
+    d.portraitBehind = false;
+    const int w = boxWidth(d);
+    d.y = (Screen::kHeight - dialogHeight(d)) / 2;
+    constexpr int kIroquois = 3, kCherokee = 4, kApache = 5;
+    const bool left = tribe == kIroquois || tribe == kApache;
+    const int centre = left ? 207 : tribe == kCherokee ? 132 : 105;
+    d.x = std::clamp(centre - w / 2, 0, Screen::kWidth - w);
+    // The Sioux chief was measured at rows 10 to 186 right of the box.
+    d.portraitY = 10;
+    d.portraitX = left ? 4 : 210;
+}
+
 void placeNavalDialog(Dialog& d) {
     // Measured with the high seas question: the naval adviser stands over
     // the box's left end.

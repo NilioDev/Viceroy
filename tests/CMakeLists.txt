@@ -16,6 +16,7 @@ add_executable(vcr_tests
     test_liberty.cpp
     test_colony_reports.cpp
     test_combat.cpp
+    test_natives.cpp
     test_menu.cpp
     test_title.cpp
 )

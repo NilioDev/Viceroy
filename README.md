@@ -39,8 +39,10 @@ touch controls.
 > on the easy levels), the loser is demoted, damaged or captured, and a
 > winning soldier can harden to a veteran. Warships fight other ships: the
 > weaker one may evade, and a beaten ship sinks or limps to a drydock or
-> Europe for repairs. The other nations don't move
-> yet, and meeting the natives is still to come. Fish,
+> Europe for repairs. Colonists can walk into a native settlement and
+> live among the natives to learn the skill it teaches, with the chief
+> answering as in the original. The other nations don't move yet, and
+> trade, missions and scouting the natives are still to come. Fish,
 > ore and the other resources show on the map where the original puts them
 > and add to what your colonists make there;
 > lost city rumours are not drawn yet.
