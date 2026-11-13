@@ -32,7 +32,8 @@ touch controls.
 > bring colonists over from the docks for free. Liberty bells win colonists
 > for the Sons of Liberty: at 50% and 100% membership a colony works
 > better, and too many tories slow it down. Soldiers, dragoons and
-> artillery can attack the other nations' units on the map: you are asked
+> artillery can attack the other nations' units and colonies on the map,
+> and take a colony with its share of the owner's gold: you are asked
 > before breaking a peace treaty, the Combat Analysis option shows the
 > odds, the fight is rolled the way the original rolls it (with its help
 > on the easy levels), the loser is demoted, damaged or captured, and a

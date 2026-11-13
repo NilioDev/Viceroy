@@ -235,3 +235,103 @@ VCR_TEST("combat: without Washington the opponent's share is the chance to harde
     g.promote(0, 80, 0);
     VCR_CHECK(g.unit(0).profession == 0x1C);
 }
+
+namespace {
+// The French colony at (1, 1) with `population` colonists (expert ore
+// miners) and nobody on its square; another French colony far away makes
+// up the rest of their 16 colonists. France has 1000 gold.
+Game colonyBattle(int population, int muskets = 0, int colonistCombat = -1) {
+    Game g = battle(unit_type::kSoldier, unit_type::kColonist, colonistCombat);
+    auto& s = g.state();
+    s.units.pop_back();
+    s.units[0].profession = 0x15;
+    s.turn = 120;
+    SaveColony c;
+    c.x = 1;
+    c.y = 1;
+    c.name = "Martinique";
+    c.nation = kFrench;
+    c.population = population;
+    for (int i = 0; i < population; ++i) {
+        c.skills[static_cast<std::size_t>(i)] = 6;
+    }
+    c.stock[15] = muskets;
+    c.rebelDividend = 40;
+    s.colonies.push_back(c);
+    SaveColony other = c;
+    other.x = 2;
+    other.y = 2;
+    other.population = 16 - population;
+    s.colonies.push_back(other);
+    s.map.at(1, 1).flags |= MapSquare::kHasColony;
+    s.nations[kFrench].gold = 1000;
+    s.nations[kDutch].gold = 100;
+    return g;
+}
+} // namespace
+
+VCR_TEST("combat: a colony with nobody on its square is defended by a colonist (measured)") {
+    using namespace combat_label;
+    Game g = colonyBattle(1);
+    VCR_CHECK(g.colonyUndefended(0));
+    const auto a = g.analyseColonyAttack(0, 0, 0);
+    VCR_CHECK(a.defender.unit == -1 && a.defender.colony == 0 && !a.defender.armed);
+    VCR_CHECK(a.defender.base == 1);
+    VCR_CHECK(a.defender.bonuses.size() == 1);
+    VCR_CHECK(a.defender.bonuses[0].label == kColony && a.defender.bonuses[0].percent == 50);
+    VCR_CHECK(a.defender.bonuses[0].colonyPicture);
+    // 8 x 6/4 = 12, halved for a colonist: 6 against the veteran's 80.
+    const auto s = g.colonyStrengths(0, 0, 0);
+    VCR_CHECK(s.attack == 80);
+    VCR_CHECK(s.defense == 6);
+}
+
+VCR_TEST("combat: 50 muskets arm the colony's defender with +1 (measured)") {
+    Game g = colonyBattle(1, 49);
+    VCR_CHECK(!g.analyseColonyAttack(0, 0, 0).defender.armed);
+    g.state().colonies[0].stock[15] = 50;
+    const auto a = g.analyseColonyAttack(0, 0, 0);
+    VCR_CHECK(a.defender.armed);
+    VCR_CHECK(a.defender.bonuses.size() == 2 && a.defender.bonuses[0].points == 1);
+    VCR_CHECK(g.colonyStrengths(0, 0, 0).defense == 12); // 16 x 6/4, halved
+}
+
+VCR_TEST("combat: taking a colony plunders its share of the owner's gold (measured)") {
+    // A defender of no strength always loses.
+    Game g = colonyBattle(1, 0, 0);
+    VCR_CHECK(g.attackColony(0, 0, 0) == CombatOutcome::AttackerWon);
+    const auto& c = g.state().colonies[0];
+    VCR_CHECK(c.nation == kDutch);
+    VCR_CHECK(c.rebelDividend == 0);
+    VCR_CHECK(c.population == 1);
+    VCR_CHECK(g.unit(0).x == 1 && g.unit(0).y == 1);
+    VCR_CHECK(g.movesLeft(0) == 0);
+    VCR_CHECK(g.state().nations[kFrench].gold == 938); // 1000 x 1/16 = 62
+    VCR_CHECK(g.state().nations[kDutch].gold == 162);
+    const auto notices = g.takeNotices();
+    VCR_CHECK(notices.size() == 1 && notices[0].section == "CAPTURED");
+    VCR_CHECK(notices[0].strings.at(2) == "Martinique");
+    VCR_CHECK(notices[0].numbers == std::vector<int>{62});
+    VCR_CHECK(notices[0].adjectives == (std::vector<std::pair<int, int>>{{0, kDutch}}));
+}
+
+VCR_TEST("combat: Quebec's share of 16 colonists is 11 (measured: 687 of 1000)") {
+    Game g = colonyBattle(11, 0, 0);
+    VCR_CHECK(g.attackColony(0, 0, 3) == CombatOutcome::AttackerWon);
+    VCR_CHECK(g.state().nations[kFrench].gold == 313);
+}
+
+VCR_TEST("combat: units in a colony get its bonus instead of the terrain's") {
+    using namespace combat_label;
+    Game g = colonyBattle(1);
+    SaveUnit d = g.state().units[0];
+    d.nation = kFrench;
+    d.x = 1;
+    d.y = 1;
+    d.profession = 0x1C;
+    d.orders = SaveUnit::kFortified;
+    g.state().units.push_back(d);
+    VCR_CHECK(!g.colonyUndefended(0));
+    const auto a = g.analyseAttack(0, 1);
+    VCR_CHECK(labels(a.defender) == std::vector<int>{kColony, kFortified});
+}

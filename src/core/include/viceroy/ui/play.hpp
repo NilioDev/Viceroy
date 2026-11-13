@@ -166,7 +166,7 @@ private:
     void showNotices(); // the next waiting message, when no box is up
     // A fight, step by step: the treaty question, the tired men, the
     // Combat Analysis box, then the result.
-    void startAttack(int attacker, int defender);
+    void startAttack(int attacker, int defender, int colony = -1);
     void continueAttack();
     void resolveAttack();
     std::string adjective(int nation) const; // "French"
@@ -203,7 +203,11 @@ private:
         int attacker = -1;
         int defender = -1;
         bool tiredAsked = false;
+        int colony = -1;   // an undefended colony: its colonist defends
+        int colonist = -1;
     };
+    int defenderNation(const PendingAttack& a) const;
+    int colonyAfterNotices_ = -1; // a colony just taken opens once its news is read
     std::optional<PendingAttack> attack_;
     bool advanceAfterNotices_ = false; // the next unit once the news is read
     bool analysisUp_ = false; // the Combat Analysis box waits for a key

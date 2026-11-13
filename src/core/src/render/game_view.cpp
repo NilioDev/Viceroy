@@ -430,6 +430,47 @@ void drawUnitOnSquare(Screen& screen, const Art& art, const Game& game, int inde
     drawUnitParts(screen, art, game, index, *image, px + place.spriteX, py, box, game.unit(index).orders, false);
 }
 
+} // namespace
+
+void drawColonyDefender(Screen& screen, const Art& art, const Game& game, int colony, int colonist, bool armed,
+                        int px, int py) {
+    const auto& c = game.state().colonies[static_cast<std::size_t>(colony)];
+    const int skill = c.skills[static_cast<std::size_t>(std::clamp(colonist, 0, kMaxColonists - 1))];
+    // Seen: an armed colonist looks like a soldier who is no veteran.
+    const auto& types = game.rules().units;
+    const int icon = armed && types.size() > unit_type::kSoldier ? types[unit_type::kSoldier].icon - 1 - 28
+                                                                  : colonistIcon(skill);
+    const auto* image = sprite(art.icons, icon);
+    if (image == nullptr || image->width <= 0) {
+        return;
+    }
+    const int x = image->width <= 7 ? 3 : 2;
+    for (int j = 0; j < image->height; ++j) {
+        for (int i = 0; i < image->width; ++i) {
+            if (image->pixels[static_cast<std::size_t>(j * image->width + i)] != kTransparent) {
+                screen.pixel(px + x - 2 + i, py + j, kBlack);
+            }
+        }
+    }
+    const Rect box{px + x + image->width - 2, py + 7, 7, 9};
+    screen.fill(box, nationColour(art, c.nation));
+    screen.frame(box, kBlack);
+    const int w = Screen::textWidth(art.tiny, "-");
+    screen.text(art.tiny, box.x + (box.w - w) / 2 + 1, box.y + 2, "-", {kBlack, kNoColour, kNoColour});
+    screen.blit(*image, px + x, py);
+}
+
+void drawColonyPicture(Screen& screen, const Art& art, const SaveColony& c, int px, int py) {
+    const int fortification = c.raw[132] & 7;
+    const int icon = fortification == 0 ? kColonyOpen : fortification == 1 ? 0 : fortification == 3 ? 1 : 2;
+    if (const auto* image = sprite(art.icons, icon)) {
+        screen.blit(*image, px + (kSquare - image->width) / 2, py);
+    }
+    blitSprite(screen, art.icons, kNationFlagBase + std::clamp(c.nation, 0, kEuropeanNations - 1), px + 3, py);
+}
+
+namespace {
+
 void drawCentredText(Screen& screen, const Font& font, int cx, int y, const std::string& s, TextColours colours) {
     screen.text(font, cx - Screen::textWidth(font, s) / 2, y, s, colours);
 }

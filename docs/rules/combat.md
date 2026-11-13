@@ -16,6 +16,9 @@ Combat Analysis switched on in the game options.
   nation first).
 - A unit with less than a full move left is asked about (`@HALF`): it
   fights at the thirds of a move it has left.
+- A foreign colony can be attacked too. Units on its square defend it as
+  anywhere else. With nobody there, one of its colonists, picked at random
+  (seen: a different one in each try on Quebec), stands up to defend it.
 
 ## The strengths
 
@@ -30,7 +33,9 @@ The Combat Analysis box lists them in this order:
 | Attacker | Artillery In Open | −75% | artillery attacking outside a colony a unit that is not fortified |
 | Defender | Veteran | +50% | a veteran soldier or dragoon |
 | Defender | Terrain | the square's defence value × 25% | outside a colony; shown with the square's picture |
-| Defender | Fortified | +50% | orders "fortified" |
+| Defender | Muskets | +1 to the base | a colony's colonist, when the colony has 50 muskets (49 give nothing) |
+| Defender | Colony | +50%, +100%, +150%, +200% | in a colony; named after its stockade, fort or fortress when it has one, shown with the colony's picture |
+| Defender | Fortified | +50% | orders "fortified", where the colony gives less than +125% |
 | Defender | Artillery In Open | −75% | artillery outside a colony |
 
 Artillery against a fortified unit gets no penalty, which matches the
@@ -88,6 +93,26 @@ is a soldier or dragoon, may move up:
   below the opponent's number. So an unlikely win hardens more often.
 - The human player is told: `@VETERAN` for a new veteran, `@VALOR` for a
   servant or criminal moving up, both by the colonial advisor.
+
+## Taking a colony
+
+Measured on Martinique (1 colonist) and Quebec (11) of a French nation with
+16 colonists in its colonies and 1000 gold:
+
+- The colonist fights with the colonist's combat value of 1, named by their
+  skill ("Ore Miner"). They count as someone who cannot fight, so the
+  defence is halved as for any colonist.
+- When the attacker wins it marches in: the colony changes hands with its
+  colonists, buildings and goods, and its liberty bells start again.
+- The owner loses gold × the colony's colonists / all their colonists in
+  colonies, rounded down, to the attacker: 62 for Martinique, 687 for
+  Quebec. `@CAPTURED` says so: "Dutch march into Martinique! 62 plundered!"
+- Then the colony's screen opens.
+- When the colonist wins, the attacker loses as in any fight.
+
+Not covered yet: ships in the harbour (an attack is refused while one is
+there), what the defending colonist's win does, and the foreign affairs
+counts in the save.
 
 ## What the loser loses
 

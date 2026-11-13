@@ -215,6 +215,15 @@ public:
     CombatOutcome attack(int attacker, int defender);
     // The numbers the fight is rolled on (see docs/rules/combat.md).
     CombatStrengths combatStrengths(int attacker, int defender) const;
+    // A foreign colony with nobody on its square: one of its colonists,
+    // picked at random, defends it.
+    bool colonyUndefended(int colony) const;
+    int pickColonyDefender(int colony);
+    CombatAnalysis analyseColonyAttack(int attacker, int colony, int colonist) const;
+    CombatStrengths colonyStrengths(int attacker, int colony, int colonist) const;
+    // Fights the colonist; when the attacker wins it marches in and takes
+    // the colony with its share of the owner's gold.
+    CombatOutcome attackColony(int attacker, int colony, int colonist);
     // The attacker wins with a roll of 1 to attack + defense at or below
     // attack.
     static bool attackerWins(int attack, int defense, int roll);
@@ -255,6 +264,11 @@ private:
     std::uint32_t random_ = 0;
     int nextRandom(int range); // 0 .. range - 1
     void loseBattle(int loser, int winner);
+    CombatStrengths strengthsAgainst(int attacker, const SaveUnit& defender, bool defenderShip, bool defenderDamaged,
+                                     int defenderExtra) const;
+    SaveUnit colonistAsUnit(int colony, int colonist) const;
+    void captureColony(int colony, int attacker);
+    int addColonyBonus(CombatSide& side, int colony) const; // its quarters
 };
 
 } // namespace viceroy
