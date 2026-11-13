@@ -159,3 +159,30 @@ VCR_TEST("colony reports: a workshop out of its raw good (measured)") {
     VCR_CHECK(find(none, "FURS") != nullptr && find(none, "FURS")->strings == std::vector<std::string>{"New Amsterdam"});
     VCR_CHECK(find(furTrader(1), "FURS") == nullptr);
 }
+
+VCR_TEST("colony reports: the cargo tutorial hint, once a game and only with hints on (measured)") {
+    const auto setup = [](SaveColony& c) {
+        c.raw[149] = 1;
+        c.stock[3] = 98;
+    };
+    {
+        Game g = reportGame(1, 1494, 0, setup, true);
+        auto n = afterTurn(g);
+        VCR_CHECK(find(n, "TUTORIAL6") == nullptr);
+    }
+    Game g = reportGame(1, 1494, 0, setup, true);
+    g.state().header[18] |= 0x80;
+    VCR_CHECK(g.tutorialHints());
+    auto n = afterTurn(g);
+    const auto* hint = find(n, "TUTORIAL6");
+    VCR_CHECK(hint != nullptr);
+    VCR_CHECK(hint->strings == std::vector<std::string>{"Cotton", "New Amsterdam"});
+    VCR_CHECK(hint->numbers == std::vector<int>{100});
+    VCR_CHECK(g.tutorialShown(Game::kTutorialCargo));
+    VCR_CHECK(g.state().header[23] == 0x02);
+    // The cotton is sold off and grows past a hundred again: no second hint.
+    g.state().colonies[0].stock[3] = 98;
+    n = afterTurn(g);
+    VCR_CHECK(find(n, "CARGOREADY0") != nullptr);
+    VCR_CHECK(find(n, "TUTORIAL6") == nullptr);
+}

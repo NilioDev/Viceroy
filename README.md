@@ -22,7 +22,8 @@ touch controls.
 > sentry or fortify it. At the end of the turn colonies
 > store what they make, breed horses from spare food, grow and finish
 > the buildings, wagon trains, artillery and ships under way, and your
-> advisors report full warehouses, waste, food running low and workshops
+> advisors report full warehouses (with Tutorial Hints on, the first time
+> comes with a hint on shipping the cargo home), waste, food running low and workshops
 > out of raw goods. Ships sail to Europe from
 > the high seas, sell and buy goods there (prices move as you trade), take colonists from the docks and
 > sail back. In Europe you can recruit colonists, buy artillery and ships,

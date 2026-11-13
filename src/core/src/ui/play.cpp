@@ -422,6 +422,18 @@ void PlayScreen::showNotices() {
         }
         return;
     }
+    if (notice.section.rfind("TUTORIAL", 0) == 0) {
+        // %STRING2 of the cargo hint is the home port.
+        if (notice.strings.size() < 3) {
+            notice.strings.resize(3);
+        }
+        notice.strings[2] = textLine(art_->names, "HOMEPORT", game_.human(), "");
+        ask(notice.section, -1, notice.strings, game_.human(), notice.numbers);
+        if (dialog_) {
+            placeTutorialDialog(*dialog_);
+        }
+        return;
+    }
     ask(notice.section, -1, notice.strings, -1, notice.numbers);
     if (dialog_) {
         // Measured: battles are told by the colonial advisor, the work of

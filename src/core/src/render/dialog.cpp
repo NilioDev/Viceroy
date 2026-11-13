@@ -292,6 +292,18 @@ void placeUnitDialog(Dialog& d, int unit) {
     d.y = (Screen::kHeight - dialogHeight(d)) / 2;
 }
 
+void placeTutorialDialog(Dialog& d) {
+    d.portrait = kNavalAdvisor;
+    d.portraitBehind = false; // his hands lie over the box
+    // The advisor stands 4 columns left of the box and 71 rows above it; the
+    // two together are centred on the screen (measured with one box; the
+    // woman advisor's tutorial box follows the same rule).
+    d.x = (Screen::kWidth + 4 - boxWidth(d)) / 2;
+    d.y = (Screen::kHeight + 72 - dialogHeight(d)) / 2;
+    d.portraitX = d.x - 4;
+    d.portraitY = d.y - 71;
+}
+
 void placeTradeDialog(Dialog& d) {
     placeBuyDialog(d);
     d.y = (262 - dialogHeight(d)) / 2;
