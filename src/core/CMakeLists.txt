@@ -13,6 +13,7 @@ add_library(vcr_core STATIC
     src/pack/library.cpp
     src/game/game.cpp
     src/game/combat.cpp
+    src/game/congress.cpp
     src/game/natives.cpp
     src/game/native_trade.cpp
     src/game/native_tribute.cpp

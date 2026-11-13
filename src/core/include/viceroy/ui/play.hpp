@@ -100,6 +100,8 @@ public:
     // A question in a message box, when one is up.
     const std::optional<Dialog>& dialog() const { return dialog_; }
     bool combatAnalysisUp() const { return analysisUp_; }
+    // The hall of the Continental Congress with a new father in it.
+    bool congressHallUp() const { return congressHall_ >= 0; }
     // Set by the app after loading Art: needed for message boxes.
     void setArt(const Art* art) { art_ = art; }
     // The colony opened last, or -1.
@@ -214,6 +216,7 @@ private:
     std::vector<int> villageOptions_;
     int village_ = -1;
     int welcomeTribe_ = -1; // the tribe whose welcome is up
+    int congressHall_ = -1; // the father just come into the hall, shown until a key
     int inciteTarget_ = -1; // the nation a missionary would have the tribe attack
     void startIncite(int unit);
     void endIncite(int unit);

@@ -479,6 +479,24 @@ public:
     // A founding father in the nation's congress (row of @FATHERS).
     bool hasFather(int nation, int father) const;
 
+    // --- Continental Congress (docs/rules/congress.md) -----------------------
+    static constexpr int kFoundingFathers = 25;
+    static constexpr int kFatherCategories = 5; // trade, exploration, military, political, religious
+    // Each colony's bells go to its nation's congress at the start of its
+    // turn: the next father is put up for election when there is none,
+    // and joins when the bells are enough.
+    void addCongressBells(int nation, int bells);
+    int congressBells(int nation) const;
+    int bellsForNextFather(int nation) const;
+    int fatherInElection(int nation) const; // -1 for none
+    int fatherCount(int nation) const;
+    bool independenceDeclared() const;
+    // The player picks the next father (notice WHICHFREEDOM): one
+    // candidate per category, -1 where there is none.
+    bool fatherElectionWaiting() const { return electionNation_ >= 0; }
+    const std::array<int, kFatherCategories>& fatherCandidates() const { return fatherCandidates_; }
+    void chooseFather(int category);
+
     // --- Map -----------------------------------------------------------------
     void reveal(int x, int y, int radius, int nation);
     // What a chief's tales show: the land of the same landmass within the
@@ -685,6 +703,14 @@ private:
     };
     Burial burial_;
     void searchBurial(const Burial& b);
+    // The Continental Congress.
+    int fatherEra() const;
+    int fathersAvailable(int nation, int category) const;
+    int aiFatherCategory(int nation) const;
+    void electFathers(int nation);
+    void joinCongress(int nation, int father);
+    std::array<int, kFatherCategories> fatherCandidates_{-1, -1, -1, -1, -1};
+    int electionNation_ = -1;
     // The original's counts since the game was started (not saved): the
     // rumours explored and the cities of gold found.
     int rumoursExplored_ = 0;

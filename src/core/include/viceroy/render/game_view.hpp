@@ -36,11 +36,18 @@ struct Art {
     TextFile gameText;    // GAME.TXT: the messages
     std::vector<MenuDef> menus; // MENU.TXT: the menu bar
     std::vector<SpriteSheet> portraits; // advisors: MSS0.SS, ...
+    Picture congressHall;               // CCBKGD.PIK
+    std::vector<SpriteSheet> fathers;   // CC-00.SS to CC-24.SS, by row of @FATHERS
     Ruleset rules;
 };
 
 // Loads everything from the imported original files. Throws FormatError.
 Art loadArt(const std::filesystem::path& folder);
+
+// The hall of the Continental Congress with the fathers the nation has
+// (row of @FATHERS, true when in congress), each where the original
+// stands it.
+void drawCongressHall(Screen& screen, const Art& art, const std::vector<bool>& fathers);
 
 // The map window and the panel.
 inline constexpr int kViewColumns = 15;

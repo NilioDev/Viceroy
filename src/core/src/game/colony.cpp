@@ -841,6 +841,7 @@ ColonyTurn runColonyTurn(SaveColony& colony, const SaveMap& map, const Ruleset& 
 
     // Bells: membership moves, and then the bonus the next turn works with.
     turn.libertyBefore = colony.libertyBonus;
+    turn.bells = p.produced[cargo::kBells];
     gatherBells(colony, p.produced[cargo::kBells]);
     updateLibertyBonus(colony);
     turn.libertyAfter = colony.libertyBonus;

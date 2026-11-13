@@ -696,6 +696,26 @@ std::string textLine(const TextFile& file, const char* section, int row, const c
     return fallback;
 }
 
+void drawCongressHall(Screen& screen, const Art& art, const std::vector<bool>& fathers) {
+    // Read from the original: the hall's own colours, then the fathers
+    // from the back of the hall to the front, each standing with its feet
+    // on the point its sheet gives (x the middle).
+    static constexpr std::array<int, 25> kBackToFront{6,  20, 1,  23, 24, 22, 7, 3,  8,  18, 4,  21, 10,
+                                                      13, 0,  17, 5,  12, 15, 11, 2, 9, 14, 19, 16};
+    if (art.congressHall.palette) {
+        screen.setColours(*art.congressHall.palette, 0, 255);
+    }
+    screen.blit(art.congressHall.image, 0, 0);
+    for (const int f : kBackToFront) {
+        const auto i = static_cast<std::size_t>(f);
+        if (i >= fathers.size() || !fathers[i] || i >= art.fathers.size() || art.fathers[i].sprites.empty()) {
+            continue;
+        }
+        const auto& sprite = art.fathers[i].sprites.front();
+        screen.blit(sprite.image, sprite.x - sprite.image.width / 2, sprite.y - sprite.image.height + 1);
+    }
+}
+
 Art loadArt(const std::filesystem::path& folder) {
     Art art;
     art.palette = readVgaPalette(readFile(folder, "VICEROY.PAL"));
@@ -716,6 +736,10 @@ Art loadArt(const std::filesystem::path& folder) {
     art.gameText = parseTextFile(readFile(folder, "GAME.TXT"));
     art.menus = readMenus(parseTextFile(readFile(folder, "MENU.TXT")));
     placeMenus(art, art.menus);
+    art.congressHall = readPicture(readFile(folder, "CCBKGD.PIK"));
+    for (int f = 0; f < 25; ++f) {
+        art.fathers.push_back(readSpriteSheet(readFile(folder, (f < 10 ? "CC-0" : "CC-") + std::to_string(f) + ".SS")));
+    }
     art.portraits.push_back(readSpriteSheet(readFile(folder, "MSS0.SS")));
     art.portraits.push_back(readSpriteSheet(readFile(folder, "MSS2.SS")));
     art.portraits.push_back(readSpriteSheet(readFile(folder, "MSS3.SS")));
