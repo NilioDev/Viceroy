@@ -61,10 +61,6 @@ void addWord(std::uint8_t* p, int by) {
     p[1] = static_cast<std::uint8_t>(v >> 8);
 }
 
-void changeTension(SaveGame& save, int tribe, int nation, int by) {
-    setTribeTension(save, tribe, nation, std::max(0, tribeTension(save, tribe, nation) + by));
-}
-
 } // namespace
 
 bool Game::canTradeWithVillage(int index, int settlement) const {
@@ -142,7 +138,7 @@ void Game::sellToVillage(int index, int settlement, const VillageSale& sale) {
     }
     s.raw[kRefused] = kNoGood;
     if (sale.calm > 0) {
-        changeTension(save_, tribe, nation, -2 * sale.calm);
+        changeTension(tribe, nation, -2 * sale.calm);
         calmAlarm(s, nation, sale.amount, sale.amount);
     }
     // The original compares the unit's number, not the good, with muskets
@@ -172,7 +168,7 @@ bool Game::haggleSale(int index, int settlement, VillageSale& sale) {
         return true;
     }
     s.raw[kRefused] = static_cast<std::uint8_t>(sale.good);
-    changeTension(save_, tribeOf(s), nation, (sale.temper >> 1) + 1);
+    changeTension(tribeOf(s), nation, (sale.temper >> 1) + 1);
     return false;
 }
 
@@ -185,7 +181,7 @@ void Game::giveToVillage(int index, int settlement, const VillageSale& sale) {
     s.raw[kRefused] = kNoGood;
     s.raw[kLastSold] = index == kMuskets || index == kHorses ? kNoGood : static_cast<std::uint8_t>(sale.good);
     if (sale.calm >= 0) {
-        changeTension(save_, tribe, nation, -4 * (sale.calm + 1));
+        changeTension(tribe, nation, -4 * (sale.calm + 1));
         calmAlarm(s, nation, 2 * sale.amount, sale.amount);
     }
     auto* t = tribeBytes(save_, tribe);
@@ -262,7 +258,7 @@ bool Game::buyFromVillage(int index, int settlement, const VillagePurchase& purc
     const int tribe = tribeOf(s);
     auto& nation = save_.nations[static_cast<std::size_t>(u.nation)];
     if (nation.gold < purchase.price) {
-        changeTension(save_, tribe, u.nation, 1);
+        changeTension(tribe, u.nation, 1);
         return false;
     }
     nation.gold -= purchase.price;
@@ -273,7 +269,7 @@ bool Game::buyFromVillage(int index, int settlement, const VillagePurchase& purc
     setHold(u, u.holds, purchase.good, purchase.amount);
     ++u.holds;
     const int calm = nextRandom(purchase.price / 25 + 2);
-    changeTension(save_, tribe, u.nation, -calm);
+    changeTension(tribe, u.nation, -calm);
     return true;
 }
 
@@ -293,12 +289,12 @@ bool Game::hagglePurchase(int index, int settlement, VillagePurchase& purchase) 
     if (purchase.price > 10 && patience > save_.difficulty + 1) {
         purchase.price = std::max(10, purchase.price - std::max(1, purchase.price / 4));
         if (roll(1, 8 - save_.difficulty) == 1) {
-            changeTension(save_, tribe, u.nation, 1);
+            changeTension(tribe, u.nation, 1);
         }
         purchase.haggles = 1;
         return true;
     }
-    changeTension(save_, tribe, u.nation, 2);
+    changeTension(tribe, u.nation, 2);
     s.raw[kRefused] = kRefusesToSell;
     return false;
 }

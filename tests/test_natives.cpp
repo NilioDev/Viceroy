@@ -290,7 +290,7 @@ VCR_TEST("original files: a missionary founds a mission (measured)") {
     play.game().setActiveUnit(missionary);
     play.handle(Command::MoveE);
     VCR_CHECK(play.dialog().has_value());
-    VCR_CHECK(play.dialog()->options.size() == 2); // Establish Mission, Cancel Action
+    VCR_CHECK(play.dialog()->options.size() == 3); // Establish Mission, Incite Indians, Cancel Action
     play.handle(Command::Confirm);
     // Seen in the original: "Church of Curacao mission founded in Autumn,
     // 1653. Apache are offended.", and the tension went from 51 to 41.
@@ -688,4 +688,107 @@ VCR_TEST("original files: first contact with a tribe (measured)") {
         // Met once: the next step brings no welcome.
         VCR_CHECK(!play.game().meetNeighbours(kUnit));
     }
+}
+
+VCR_TEST("original files: a missionary incites a tribe (measured)") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
+    const SaveGame original = readSaveGame(Bytes(std::istreambuf_iterator<char>(in), {}));
+    // As measured: a Dutch missionary (unit 47) beside the Apache camp at
+    // (4, 18). The Apache have met the French but not the English.
+    constexpr int kDutch = 3, kFrench = 1, kApache = 5, kCamp = 15, kUnit = 47;
+    const auto start = [&](int tension, int defence) {
+        SaveGame save = original;
+        auto& u = save.units[kUnit];
+        u.type = 3;
+        u.profession = 0x1C;
+        u.x = 3;
+        u.y = 18;
+        u.movesUsed = 0;
+        u.orders = SaveUnit::kNoOrders;
+        save.nations[kDutch].raw[52 + 4 + kApache] = 0x60;
+        setTribeTension(save, kApache, kDutch, tension);
+        save.tribesAndMore[8 * 78 + 565 + kApache] = static_cast<std::uint8_t>(defence);
+        return save;
+    };
+    const auto lines = [](const Dialog& d) {
+        std::string all;
+        for (const auto& l : d.lines) {
+            all += l + " ";
+        }
+        return all;
+    };
+    // (tension + 75) x (6 x settlements + defence / 4 + 2 x (muskets +
+    // byte 8)): 126 x 52 and 75 x 62.
+    VCR_CHECK(Game(start(51, 56), art.rules).incitePrice(kUnit, kCamp) == 6552);
+    VCR_CHECK(Game(start(0, 100), art.rules).incitePrice(kUnit, kCamp) == 4650);
+    {
+        PlayScreen play(Game(start(51, 56), art.rules), {});
+        play.setArt(&art);
+        play.game().setActiveUnit(kUnit);
+        play.handle(Command::MoveE);
+        // Establish Mission, Incite Indians, Cancel Action.
+        VCR_CHECK(play.dialog().has_value() && play.dialog()->options.size() == 3);
+        play.handle(Command::Down);
+        play.handle(Command::Confirm);
+        // Whom to attack: English, French, Spanish.
+        VCR_CHECK(play.dialog().has_value() && play.dialog()->options.size() == 3);
+        VCR_CHECK(play.dialog()->options[0] == "English");
+        play.handle(Command::Confirm);
+        // "We have no contact with the English."
+        VCR_CHECK(play.dialog().has_value() && lines(*play.dialog()).find("no contact") != std::string::npos);
+    }
+    {
+        PlayScreen play(Game(start(51, 56), art.rules), {});
+        play.setArt(&art);
+        play.game().setActiveUnit(kUnit);
+        const int gold = play.game().state().nations[kDutch].gold;
+        play.handle(Command::MoveE);
+        play.handle(Command::Down);
+        play.handle(Command::Confirm);
+        play.handle(Command::Down);
+        play.handle(Command::Confirm);
+        // "We will gladly drive the French ... in exchange for 6552."
+        VCR_CHECK(play.dialog().has_value() && lines(*play.dialog()).find("6552") != std::string::npos);
+        VCR_CHECK(play.dialog()->options.size() == 2);
+        play.handle(Command::Confirm);
+        // Paid: the Apache 50 more tense toward the French (100, halved for
+        // them), and the War Council.
+        const auto& after = play.game().state();
+        VCR_CHECK(after.nations[kDutch].gold == gold - 6552);
+        VCR_CHECK(tribeTension(after, kApache, kFrench) == 50);
+        VCR_CHECK(play.dialog().has_value() && lines(*play.dialog()).find("War Council") != std::string::npos);
+        play.handle(Command::Confirm);
+        VCR_CHECK(!play.dialog().has_value());
+    }
+}
+
+VCR_TEST("original files: the original's tension change") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
+    SaveGame save = readSaveGame(Bytes(std::istreambuf_iterator<char>(in), {}));
+    constexpr int kDutch = 3, kFrench = 1, kApache = 5;
+    setTribeTension(save, kApache, kDutch, 0);
+    setTribeTension(save, kApache, kFrench, 0);
+    save.nations[kDutch].raw[52 + 4 + kApache] = 0x64; // at war
+    Game game(save, art.rules);
+    game.changeTension(kApache, kDutch, 30);
+    VCR_CHECK(tribeTension(game.state(), kApache, kDutch) == 30);
+    game.changeTension(kApache, kFrench, 30); // the French take rises at half
+    VCR_CHECK(tribeTension(game.state(), kApache, kFrench) == 15);
+    game.changeTension(kApache, kDutch, 200);
+    VCR_CHECK(tribeTension(game.state(), kApache, kDutch) == 100);
+    VCR_CHECK((game.state().nations[kDutch].raw[52 + 4 + kApache] & 0x04) != 0);
+    // A fall ends the war.
+    game.changeTension(kApache, kDutch, -200);
+    VCR_CHECK(tribeTension(game.state(), kApache, kDutch) == 0);
+    VCR_CHECK((game.state().nations[kDutch].raw[52 + 4 + kApache] & 0x04) == 0);
 }

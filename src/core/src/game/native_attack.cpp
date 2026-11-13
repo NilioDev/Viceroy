@@ -94,7 +94,7 @@ void Game::attackVillageWar(int index, int settlement) {
         auto& back = save_.tribesAndMore[tribeByte(tribe, kTribeRelations + static_cast<std::size_t>(nation))];
         back = static_cast<std::uint8_t>(back | kWar);
     }
-    setTribeTension(save_, tribe, nation, tribeTension(save_, tribe, nation) + kAttackTension + 2 * save_.difficulty);
+    changeTension(tribe, nation, kAttackTension + 2 * save_.difficulty);
     addAlarm(s, nation, kAttackAlarm);
 }
 
