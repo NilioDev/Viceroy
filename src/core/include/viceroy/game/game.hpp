@@ -339,6 +339,15 @@ public:
     // Counts each nation's forces by region, as the original does at the
     // end of the player's turn; the tribute's answer weighs them.
     void countForces();
+    // A European nation the computer plays takes its turn: it counts its
+    // forces and people (kept in the save as the original keeps them), and
+    // buys in Europe. See docs/rules/european-ai.md.
+    void europeanTurn(int nation);
+    void nationCensus(int nation);
+    // How many more colonies the nation wants, from its last count.
+    int aiColonyNeed(int nation) const;
+    // Every profession but free colonists, servants, criminals and converts.
+    static bool isExpert(int profession);
     // A unit's attack (or defence) in eighths, as the count weighs it.
     int unitForce(const SaveUnit& u, bool attacking) const;
     // Any land unit with an attack value may attack a village, met or not.
@@ -521,6 +530,34 @@ private:
     int nationPeople(int nation) const;
     int randomRecruit(int nation);
     void gatherCrosses(); // immigration at the end of the turn
+    // What the computer's nations plan with, kept in memory only, as the
+    // original keeps it.
+    struct EuroAiState {
+        std::array<int, 16> wants{};       // colonies asking for each good, less what is on the way
+        std::array<int, 16> wantsBefore{}; // the same before the ships' cargo
+        std::array<int, 4> marked{};       // colonies marked for recruits
+        std::array<int, 4> inPort{};       // land units on the docks
+        std::array<int, 4> homeward{};     // ships on the way to Europe
+        int fortifiedRegions = 0;
+        int privateerThreat = 0; // colonies with armed ships of others near
+        int frigateThreat = 0;   // the same with a frigate
+        int privateerPeople = 0;
+        int frigatePeople = 0;
+        int openRegions = 0; // regions of 8 squares or more without a colony of its own
+    };
+    EuroAiState ai_;
+    int aiRandom(int low, int high);
+    void aiTallies(int nation);
+    void aiRelations(int nation);
+    void aiEurope(int nation);
+    int aiCreateInEurope(int nation, int type, int profession);
+    bool aiBuyItem(int nation, int item);
+    int aiRecruitSlot(int nation, int slot);
+    void aiMarket(int nation, int good, int amount);
+    void aiMarketBack(int nation, int good, int amount);
+    bool aiHasCollege(int nation) const;
+    void aiSwapExpert(int nation, int unit);
+    void aiSailFromEurope(int nation, int ship);
 
     SaveGame save_;
     Ruleset rules_;

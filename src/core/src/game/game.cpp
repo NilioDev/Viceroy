@@ -626,6 +626,12 @@ void Game::endTurn() {
             }
         }
     }
+    // The original's round: the natives, then the nations in order. The
+    // computer's nations after the player's move before the year turns,
+    // the ones before it after.
+    for (int n = human() + 1; n < kEuropeanNations; ++n) {
+        europeanTurn(n);
+    }
     nativesTurn();
     ++save_.turn;
     if (save_.year < 1600) {
@@ -636,6 +642,9 @@ void Game::endTurn() {
     } else {
         save_.season = 0;
         ++save_.year;
+    }
+    for (int n = 0; n < human(); ++n) {
+        europeanTurn(n);
     }
     // The player's units under Go To set off before anyone is asked.
     moveGoToUnits();
