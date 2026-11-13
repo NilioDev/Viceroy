@@ -295,10 +295,9 @@ A step onto a square with a European unit or colony is an attack (see
 below), but only with a whole move (3 thirds) left; short of that the
 unit's turn ends. An attack (flag 8) on the player's unit or colony is
 announced first with `INDIANSURPRISE`, naming the player's colony nearest
-the target ("Sioux make surprise raid near Jamestown!"). Not done yet: the brave's visit (its gifts and requests;
-first contact is done). The original's route finder for heading
-to a colony is not read yet: Viceroy takes the neighbouring square closest
-to the colony.
+the target ("Sioux make surprise raid near Jamestown!"). A brave heading for a
+colony takes its steps from the original's route finder (see
+[routes](routes.md)), with no nation kept out of its way.
 
 ## When the natives attack
 

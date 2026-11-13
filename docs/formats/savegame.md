@@ -183,5 +183,9 @@ regions (16 bytes per nation), at 565 each tribe's defence in all (a byte
 each), at 573 its people in all and at 581 its number of settlements (a
 byte each), and at 589 its defence in each region (16 bytes per tribe).
 
-In the block after the map, bytes 608 to 611 hold the game's own random
+In the block after the map, bytes 0 to 269 and 270 to 539 hold the links
+between the map's 4 × 4 blocks for the sea and for the land, one byte per
+block (15 across, 18 down, column by column), bit d set when the block is
+joined to its neighbour in direction d; the route finder uses them (see
+[routes](../rules/routes.md)). Bytes 608 to 611 hold the game's own random
 seed (the skill each settlement teaches is drawn from it).

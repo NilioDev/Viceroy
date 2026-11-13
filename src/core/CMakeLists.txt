@@ -24,6 +24,7 @@ add_library(vcr_core STATIC
     src/game/native_raid.cpp
     src/game/native_visit.cpp
     src/game/rumour.cpp
+    src/game/route.cpp
     src/game/native_turn.cpp
     src/game/colony.cpp
     src/game/europe.cpp

@@ -18,6 +18,7 @@ add_executable(vcr_tests
     test_combat.cpp
     test_natives.cpp
     test_rumours.cpp
+    test_routes.cpp
     test_menu.cpp
     test_title.cpp
 )
