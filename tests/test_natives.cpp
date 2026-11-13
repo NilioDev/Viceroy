@@ -902,3 +902,54 @@ VCR_TEST("original files: a tribe at 100 with a treaty burns the nation's missio
     VCR_CHECK(!notices.empty() && notices[0].section == "INDIANBURN");
     VCR_CHECK(!notices.empty() && notices[0].strings[0] == "Apache");
 }
+
+VCR_TEST("original files: the natives' turn (measured)") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
+    SaveGame save = readSaveGame(Bytes(std::istreambuf_iterator<char>(in), {}));
+    constexpr int kSioux = 4, kApache = 5, kCherokee = 6;
+    const auto tribeAt = [](const SaveGame& s, int tribe, std::size_t at) {
+        return s.tribesAndMore[static_cast<std::size_t>(tribe) * kTribeRecordSize + at];
+    };
+    // Measured with byte 8 at 5 for the Apache and 3 for the Cherokee,
+    // who hold 10 horses.
+    save.tribesAndMore[kApache * kTribeRecordSize + 8] = 5;
+    save.tribesAndMore[kCherokee * kTribeRecordSize + 8] = 3;
+    save.tribesAndMore[kCherokee * kTribeRecordSize + 10] = 10;
+    const int units = static_cast<int>(save.units.size());
+    Game game(save, art.rules);
+    game.endTurn();
+    const auto& after = game.state();
+    // The Sioux capital at (26, 18) had lost its brave and had 14 + 7 in
+    // byte 6: it raises a new brave and starts again from 0.
+    const auto& capital = after.settlements[12];
+    VCR_CHECK(capital.raw[3] == 6 && capital.raw[6] == 0);
+    int braves = 0;
+    for (int i = units; i < game.unitCount(); ++i) {
+        const auto& u = game.unit(i);
+        if (u.nation == 4 + kSioux) {
+            ++braves;
+            VCR_CHECK(u.type == 19 && u.x == 26 && u.y == 18 && u.raw[6] == 12);
+        }
+    }
+    VCR_CHECK(braves == 1);
+    VCR_CHECK(after.settlements[13].raw[6] == 15); // 10 + 5 people
+    // The French press on settlements 2, 3 and 12: their alarm rises.
+    VCR_CHECK(after.settlements[2].raw[12] == 6);
+    VCR_CHECK(after.settlements[3].raw[12] == 13);
+    VCR_CHECK(capital.raw[12] == 58);
+    // The tribe at index 3 (level 1) uses up two of each good.
+    VCR_CHECK(tribeAt(after, 3, 14) == 101 && tribeAt(after, 3, 22) == 58);
+    // The new brave counts in the Sioux defence (in all and in region 1).
+    const std::size_t extra = 8 * kTribeRecordSize;
+    VCR_CHECK(after.tribesAndMore[extra + 565 + kSioux] == 8);
+    VCR_CHECK(after.tribesAndMore[extra + 589 + 16 * kSioux + 1] == 8);
+    // Horses: the Cherokee own the last settlement in the list, so theirs
+    // breed once for each of the five tribes left; the Apache's do not.
+    VCR_CHECK(tribeAt(after, kCherokee, 10) == 25);
+    VCR_CHECK(tribeAt(after, kApache, 10) == 0);
+}

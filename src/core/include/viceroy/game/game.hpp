@@ -424,6 +424,17 @@ private:
     void chainPassengers(int ship, const std::vector<int>& passengers);
     void removeUnit(int index);
     int addUnitInEurope(int type, int profession);
+    // The original holds at most 300 units and makes no more past that.
+    static constexpr int kMaxUnits = 300;
+    // A new unit of the tribe on (x, y); its index, or -1 if there is no
+    // room for it.
+    int addNativeUnit(int type, int tribe, int x, int y);
+    // The natives' part of the turn: each tribe that is left looks after
+    // its settlements, uses up goods, breeds horses and counts its forces.
+    void nativesTurn();
+    void tribeTurn(int tribe);
+    void settlementTurn(int settlement);
+    void countTribe(int tribe);
     int randomRecruit();
     void gatherCrosses(); // immigration at the end of the turn
 
