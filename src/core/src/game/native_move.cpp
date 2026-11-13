@@ -704,8 +704,8 @@ int Game::nativeUnitAI(int index) {
         bestFlags &= ~kVisiting;
     }
     if ((u.raw[kUnitFlags] & kVisitDue) != 0) {
-        // The visit it came for. Not done yet: the brave's gifts and
-        // requests; meeting a nation for the first time is.
+        // The visit it came for: it looks around as after a step (a
+        // meeting, a visit).
         u.raw[kUnitFlags] = static_cast<std::uint8_t>(u.raw[kUnitFlags] & ~kVisitDue);
         meetNeighbours(index);
         return stay();

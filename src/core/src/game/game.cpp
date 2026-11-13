@@ -554,6 +554,7 @@ std::string Game::suggestColonyName(const TextFile& colonyNames) const {
 
 void Game::endTurn() {
     lastTurnNews_.clear();
+    visits_.clear(); // a visit the player never answered is let go
     // Seen with a debugger: the count of forces is redone when the
     // player's turn ends.
     countForces();

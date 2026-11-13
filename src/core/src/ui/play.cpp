@@ -855,6 +855,23 @@ void PlayScreen::showNotices() {
             centreOn(view_, game_, u.x, u.y);
         }
     }
+    const bool visit = notice.section == "INDIANBEGFOOD" || notice.section == "INDIANCITY" ||
+                       notice.section == "INDIANWAGONS" || notice.section == "INDIANCOMMENT" ||
+                       notice.section == "INDIANGIVEFOOD" || notice.section == "INDIANGIVESTUFF" ||
+                       notice.section == "INDIANSCONVERT";
+    if (visit) {
+        // A brave's visit: the map centres on the brave and its chief
+        // speaks.
+        if (notice.unit >= 0 && notice.unit < game_.unitCount()) {
+            const auto& u = game_.unit(notice.unit);
+            centreOn(view_, game_, u.x, u.y);
+        }
+        ask(notice.section, -1, notice.strings, -1, notice.numbers);
+        if (dialog_) {
+            placeNative(notice.value);
+        }
+        return;
+    }
     if (notice.section == "INDIANWELCOME" || notice.section == "INDIANPEACE" || notice.section == "INDIANCOME" ||
         notice.section == "INDIANSHUN" || notice.section == "NOCONTACT" || notice.section == "UNFORTUNATE" ||
         notice.section == "ALREADYSMITE") {
@@ -1044,6 +1061,14 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
             demandTribute(unit);
         } else if (option == kVillageAttack && village_ >= 0) {
             attackVillage(unit);
+        }
+    } else if (question == "INDIANBEGFOOD" || question == "INDIANCITY" || question == "INDIANWAGONS") {
+        // Begging: "I'm sorry ..." or "We offer you ...". A demand on a
+        // colony: "Man the stockade." or "Hand them over."; on a wagon
+        // train: "Hand them over." or "Circle the wagons."
+        game_.answerVisit(question == "INDIANWAGONS" ? choice == 0 : choice == 1);
+        for (auto& notice : game_.takeNotices()) {
+            notices_.push_back(std::move(notice));
         }
     } else if (question == "INDIANWELCOME") {
         // "Will you accept our treaty ...?" Yes or No.

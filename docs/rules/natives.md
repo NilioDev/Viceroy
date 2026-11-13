@@ -390,6 +390,80 @@ Tension changes are skipped while the tribe is angry, as above. At the end
 the home village forgets its alarm toward the nation. The player's raids
 are reported with "Zoom to colony".
 
+## Braves visit
+
+Read from the original's code. Every time a tribe's unit has moved (or
+waits a turn for the visit it set out on; see above), it looks at the
+eight squares around it as when two peoples meet. Next to a nation the
+tribe has met, it visits: a colony, a wagon train, or any unit. Each
+nation is visited once per look; a visit that does nothing lets the next
+square of the same nation be tried.
+
+**No visit** when the brave stands in a village, set out for this visit
+this same turn (bit `0x08` of its byte 4), has no home village (byte 6),
+or the tribe's tension toward the nation is 75 or more (war). The home
+village's alarm toward the nation decides the mood: *angry* when it is
+`0x80` or more, or when the tribe already made a demand on the nation this
+turn (its word at 46 + 2 × nation is 1). An angry brave walks away when a
+roll of 1 to 128 is below the alarm less `0x80`.
+
+**Friendly** when (the tension above 25) × 4 plus the alarm is at most a
+roll of 1 to 328, and the brave is not angry. A friendly tribe at 50 or more
+is not friendly after all and counts the nation as met this turn (the word
+at 46 is 2).
+
+1. **Begging**: when the village grows less food than it wants (as for
+   trade, see below), the colony has 75 food or more, and a roll of 1 to
+   100 is at most the shortfall, the tribe asks for half the food
+   (`INDIANBEGFOOD`). A computer player gives, except Spain.
+   - *Given*: the colony loses half its food, the village forgets its
+     alarm, and the tension falls by 5 (10 for a capital), 5 more at a time
+     until it is at most 70. A tribe that was not friendly turns friendly
+     only on a roll of 0 in 0 to the level; otherwise the visit ends.
+   - *Refused*: the village's alarm grows by half. (The original means to
+     raise the tension too, by half the level and 1, doubled for a capital
+     and halved on a friendly roll, but gives the tribe where the nation
+     belongs, so nothing changes; Viceroy leaves it out.) The mark of the
+     meeting is taken back; a friendly tribe leaves.
+2. **A friendly visit** needs a colony. The tribe counts the nation as met
+   this turn and the village forgets its alarm. Then the first of these:
+   - **Converts**: with the nation's own mission in the village, a roll of
+     0 to 15 below the tribe's level + 2 (doubled for an expert's mission)
+     brings an Indian convert to the colony (`INDIANSCONVERT`).
+   - **Food**: when the village grows more food than it wants, did not beg
+     on this visit and the colony has 25 food or less, it brings the colony
+     up to 75 (`INDIANGIVEFOOD`).
+   - **Goods**: one of the three goods the village makes most of (picked
+     at random, the next one when that is food, or silver from a tribe below
+     cities). Goods the colony has almost no room for (more than its limit
+     less 10) count as made once only. The amount is 100 / (the good's price
+     in the nation's European market + 1), at most what the village makes +
+     5, within 5 to 100, at most the room left and at least 2
+     (`INDIANGIVESTUFF`).
+3. **An unfriendly visit** that has not met the nation this turn demands:
+   - **From a colony**: the good with the highest worth × stock (stock up
+     to 100). The worth is its European price; for horses 10 more less the
+     tribe's herds (byte 8); for muskets 1 to 4 more, less the tribe's level,
+     plus the difficulty and 4. The amount is the stock up to 100, halved on
+     a roll of 0 in 0 to the difficulty + 1 (`INDIANCITY`, "Man the
+     stockade." or "Hand them over."). A computer player hands them over,
+     but not muskets nor when a unit with an attack above 1 is in the colony.
+     With nothing worth taking, the wagon train is asked instead.
+   - **From a wagon train**: its first load (`INDIANWAGONS`). A computer
+     player always hands it over.
+   - *Handed over*: the village forgets its alarm and the tension falls by
+     4 % of the worth × amount (for a colony then 5 more at a time until at
+     most 70). Muskets arm the brave, or add one to the tribe's muskets
+     (byte 7); horses mount it, or add 50 to the tribe's horses, and the
+     herds (byte 8) grow by one.
+   - *Refused*: the village's alarm grows by `0x80`.
+4. **Otherwise** the tribe only speaks its concern about the colonies
+   (`INDIANCOMMENT`) and the village forgets its alarm.
+
+Begging, a gift, converts or a demand end the brave's turn. The messages
+go to the player only. The original also picks here, when it is the
+player's colony, whether to play the tribe's music (a roll of 0 to 8).
+
 ## Denouncing heresy
 
 A missionary at another nation's mission weighs the two sides:
