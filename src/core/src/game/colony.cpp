@@ -19,6 +19,13 @@ constexpr int kRowMountains = 19;
 constexpr int kRowHills = 20;
 constexpr int kForestedRows = 8;
 
+// Rows of @FATHERS that change what colonies make.
+constexpr int kHudson = 8;
+constexpr int kJefferson = 15;
+constexpr int kPaine = 17;
+constexpr int kBolivar = 18;
+constexpr int kPenn = 21;
+
 bool isExpert(int skill, int jobRow) {
     return skill == jobRow && jobRow < job::kTeacher;
 }
@@ -66,6 +73,20 @@ int terrainRow(const MapSquare& square) {
         return kForestedRows + (square.terrain & 7);
     }
     return square.terrain & 7;
+}
+
+NationEffects nationEffects(const SaveGame& save, int nation) {
+    NationEffects e;
+    if (nation < 0 || nation >= kEuropeanNations) {
+        return e;
+    }
+    const auto& n = save.nations[static_cast<std::size_t>(nation)];
+    constexpr std::size_t kFatherBits = 7;
+    for (std::size_t i = 0; i < 4; ++i) {
+        e.fathers |= static_cast<std::uint32_t>(n.raw[kFatherBits + i]) << (8 * i);
+    }
+    e.tax = n.taxRate;
+    return e;
 }
 
 WorkModifier workModifier(const SaveColony& colony, int difficulty, bool tories) {
@@ -217,6 +238,11 @@ int squareYield(const Ruleset& rules, const MapSquare& square, int jobRow, int s
     if (square.river()) {
         amount += 1;
     }
+    // Read from the original: with Henry Hudson the land's furs count
+    // twice.
+    if (jobRow == 4 && modifier.hudson) {
+        amount *= 2;
+    }
     if (resourceDoubles(resource, jobRow)) {
         amount *= 2;
     }
@@ -321,9 +347,10 @@ int centreFoodYield(const Ruleset& rules, const MapSquare& square, int difficult
 }
 
 ColonyProduction colonyProduction(const SaveColony& colony, const SaveMap& map, const Ruleset& rules,
-                                  int difficulty, bool tories) {
+                                  int difficulty, bool tories, const NationEffects& nation) {
     ColonyProduction p;
-    const WorkModifier modifier = workModifier(colony, difficulty, tories);
+    WorkModifier modifier = workModifier(colony, difficulty, tories);
+    modifier.hudson = nation.has(kHudson);
     // The colony's own square gets the bonus but not the penalty.
     const WorkModifier centreModifier{modifier.bonus, 0};
     const int population = std::clamp(colony.population, 0, kMaxColonists);
@@ -405,6 +432,11 @@ ColonyProduction colonyProduction(const SaveColony& colony, const SaveMap& map, 
                 }
             }
         }
+        // Read from the original: William Penn adds half to each
+        // preacher's crosses.
+        if (work.square < 0 && work.good == cargo::kCrosses && nation.has(kPenn)) {
+            work.amount += work.amount / 2;
+        }
         if (work.good >= 0) {
             p.produced[static_cast<std::size_t>(work.good)] += work.amount;
         }
@@ -414,6 +446,26 @@ ColonyProduction colonyProduction(const SaveColony& colony, const SaveMap& map, 
     // church makes one more (measured: Fort Orange in COLONY06).
     p.produced[cargo::kBells] += 1;
     p.produced[cargo::kCrosses] += 1 + buildingLevel(colony, BuildingKind::Church);
+    // Read from the original, in its order: Thomas Jefferson adds half the
+    // bells, Thomas Paine the tax rate in percent of them, Simon Bolivar a
+    // fifth of the people (rounded up from 2) in a computer nation's colony,
+    // and the printing press half or the newspaper as much again.
+    auto& bells = p.produced[cargo::kBells];
+    if (nation.has(kJefferson)) {
+        bells += bells / 2;
+    }
+    if (nation.has(kPaine)) {
+        bells += bells * std::max(0, nation.tax) / 100;
+    }
+    if (nation.has(kBolivar) && !tories) {
+        bells += (population + 3) / 5;
+    }
+    const int press = buildingLevel(colony, BuildingKind::PrintingPress);
+    if (press >= 2) {
+        bells *= 2;
+    } else if (press == 1) {
+        bells += bells / 2;
+    }
     p.foodEaten = 2 * population;
     return p;
 }
@@ -729,11 +781,11 @@ void removeColonist(SaveColony& colony, int colonist) {
 }
 
 ColonyTurn runColonyTurn(SaveColony& colony, const SaveMap& map, const Ruleset& rules, int difficulty,
-                         bool tories) {
+                         bool tories, const NationEffects& nation) {
     ColonyTurn turn;
     const auto before = colony.stock;
     turn.foodBefore = before[cargo::kFood];
-    const auto p = colonyProduction(colony, map, rules, difficulty, tories);
+    const auto p = colonyProduction(colony, map, rules, difficulty, tories, nation);
     std::array<int, cargo::kCount> made = p.produced;
 
     // Workshops: as much as their raw good allows, from this turn's

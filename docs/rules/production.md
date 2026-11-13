@@ -109,7 +109,9 @@ A free colonist makes 3, an expert 6, an indentured servant 2 and a petty
 criminal or a convert 1. A shop (and the lumber mill) doubles that and a
 factory adds half again: a colonist makes 3 in a house, 6 in a shop and 9
 in a factory. Every colony also makes 1 bell and 1 cross of its own, and the church 1
-more cross for each of its levels (see europe.md for immigration).
+more cross for each of its levels (see europe.md for immigration). A
+printing press adds half to the bells and a newspaper doubles them, after
+the founding fathers' share (see congress.md).
 Workshops use up as much of their raw good as they make, except the
 factory's extra half, which is free (a colonist in a fur factory: 6 furs
 make 9 coats).
