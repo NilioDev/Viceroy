@@ -30,7 +30,7 @@ constexpr std::size_t kAttack = kExtra + 44; // words
 constexpr std::size_t kByType = kExtra + 64;
 constexpr std::size_t kRegionFlags = kExtra + 156;
 constexpr std::size_t kRegionAttackOut = kExtra + 300;
-constexpr std::size_t kTribeSettlements = kExtra + 581;
+constexpr std::size_t kTribeDefence = kExtra + 565; // each tribe's strength, from its count
 constexpr std::size_t kTribeRegionDefence = kExtra + 589;
 constexpr std::size_t kBlockEnd = kExtra + 727;
 
@@ -370,7 +370,7 @@ void Game::aiColonyPlan(int c) {
                 const auto t = static_cast<std::size_t>(tribe);
                 // A tribe small enough against the nation's force, and
                 // weak in the region, is marked for war.
-                if (block[kTribeSettlements + t] <= force &&
+                if (block[kTribeDefence + t] <= force &&
                     block[kTribeRegionDefence + kRegions * t + static_cast<std::size_t>(REG)] < local &&
                     (tribeTension(save_, tribe, n) > 25 || n == kSpain)) {
                     const int other = kEuropeanNations + tribe;

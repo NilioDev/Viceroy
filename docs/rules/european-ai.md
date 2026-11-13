@@ -366,9 +366,10 @@ this order. Viceroy follows it in `src/core/src/game/euro_ai_colony.cpp`.
    plowing sets bit 128 (a pioneer wanted).
 6. **War on a tribe.** When the nation is set on attacking in the region
    (its attack count there at least 2), the nearest tribe in the same land
-   is marked for war when it has few enough settlements for the nation's
-   forces, is weak in the region and is tense with the nation (above 25;
-   Spain does not wait for that). Both relation bytes get bit 2.
+   is marked for war when its strength in the natives' count is
+   at most twice the nation's attack, its defence in the region is under
+   four times the nation's attack out there (both doubled for Spain), and
+   it is tense with the nation (above 25; Spain does not wait for that). Both relation bytes get bit 2.
 7. **Units join.** While it wants people, people on its square join it,
    one at a time: a soldier or dragoon when it has too many guards (and
    it then wants one more), a pioneer when it needs one but has no tools
