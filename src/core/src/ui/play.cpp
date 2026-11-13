@@ -692,6 +692,11 @@ bool PlayScreen::handleDialog(Command command) {
     case Command::Skip:
         break;
     case Command::Cancel:
+        if (question_ == "WHICHFREEDOM") {
+            // Read from the original: the question comes back until a
+            // father is chosen.
+            return true;
+        }
         if (question_ == "SAILPORT" || question_ == "TRAVELPLACE") {
             // Go To has no "None": Escape leaves the unit as it was.
             dialog_.reset();
@@ -888,6 +893,41 @@ void PlayScreen::showNotices() {
             const auto& u = game_.unit(notice.unit);
             centreOn(view_, game_, u.x, u.y);
         }
+    }
+    if (notice.section == "CONGRESSHALL") {
+        // Read from the original: the new father stands in the hall with
+        // the others until a key is pressed.
+        congressHall_ = std::max(0, notice.value);
+        return;
+    }
+    if (notice.section == "FREEDOM") {
+        // Seen: a plain box in the middle of the screen, nobody behind it.
+        ask(notice.section, -1, notice.strings);
+        return;
+    }
+    if (notice.section == "WHICHFREEDOM") {
+        // "Which Founding Father shall we appoint ...?": a candidate of
+        // each category, as "Peter Minuit (Trade Adviser)" (seen).
+        Dialog d = makeDialog(*art_, "WHICHFREEDOM");
+        choices_.clear();
+        const auto& candidates = game_.fatherCandidates();
+        const auto& fathers = game_.rules().fathers;
+        const std::string adviser = textLine(art_->labelText, "MISC", 103, "Adviser");
+        for (int c = 0; c < Game::kFatherCategories; ++c) {
+            const int f = candidates[static_cast<std::size_t>(c)];
+            if (f < 0 || static_cast<std::size_t>(f) >= fathers.size()) {
+                continue;
+            }
+            addOption(d, fathers[static_cast<std::size_t>(f)].name + " (" + textLine(art_->names, "FOUNDING", c, "") +
+                             " " + adviser + ")");
+            choices_.push_back(c);
+        }
+        d.selected = 0;
+        d.help = true;
+        dialog_ = d;
+        question_ = "WHICHFREEDOM";
+        questionUnit_ = -1;
+        return;
     }
     if (notice.section == "LOSTCITY0") {
         // A Fountain of Youth: "Which of the following individuals shall
@@ -1206,6 +1246,12 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
         goTo(picked);
     } else if (question == "LOSTCITY0") {
         game_.recruitFree(picked);
+    } else if (question == "WHICHFREEDOM") {
+        // A father who joins at once is announced before the rest of the
+        // news, as in the original.
+        game_.chooseFather(picked);
+        auto news = game_.takeNotices();
+        notices_.insert(notices_.begin(), std::make_move_iterator(news.begin()), std::make_move_iterator(news.end()));
     } else if (question == "LOSTCITY4") {
         // "Let us search for treasure!" or "Stay clear of those!"
         game_.answerBurial(yes);
@@ -1911,6 +1957,12 @@ bool PlayScreen::handle(Command command) {
         // Input waits until the unit has arrived.
         return true;
     }
+    if (congressHall_ >= 0) {
+        // Any key leaves the hall.
+        congressHall_ = -1;
+        showNotices();
+        return true;
+    }
     if (dialog_) {
         return handleDialog(command);
     }
@@ -2168,6 +2220,14 @@ void PlayScreen::finishSlide() {
 }
 
 void PlayScreen::draw(Screen& screen, const Art& art) const {
+    if (congressHall_ >= 0) {
+        std::vector<bool> fathers(static_cast<std::size_t>(Game::kFoundingFathers));
+        for (int f = 0; f < Game::kFoundingFathers; ++f) {
+            fathers[static_cast<std::size_t>(f)] = game_.hasFather(game_.human(), f);
+        }
+        drawCongressHall(screen, art, fathers);
+        return;
+    }
     drawScreen(screen, art);
     if (menu_ && !colonyScreen_ && !europeScreen_) {
         drawMenuBar(screen, art, art.menus, &*menu_);

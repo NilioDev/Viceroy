@@ -615,6 +615,9 @@ void Game::endTurn() {
         const bool tories = colony.nation >= 0 && colony.nation < kEuropeanNations &&
                             save_.players[static_cast<std::size_t>(colony.nation)].control == 0;
         const ColonyTurn turn = runColonyTurn(colony, save_.map, rules_, save_.difficulty, tories);
+        // Read from the original: the colony's bells go to the congress
+        // first, before its messages.
+        addCongressBells(colony.nation, turn.bells);
         const bool ours = colony.nation == human();
         if (ours && turn.libertyAfter != turn.libertyBefore) {
             const bool up = turn.libertyAfter > turn.libertyBefore;

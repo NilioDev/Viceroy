@@ -234,6 +234,7 @@ struct ColonyTurn {
     int foodShort = 0;       // how much more food it eats than it makes
     int foodMissing = 0;     // how far below nothing the store would have gone
     int foodBefore = 0;      // the food in store when the turn began
+    int bells = 0;           // liberty bells made this turn
 };
 
 // A colonist leaves the colony (starved): the ones after it move up, and

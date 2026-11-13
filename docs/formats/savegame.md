@@ -139,6 +139,12 @@ then per good the trade volume at 92 (16 bits), the gold it brought in at 124
 and the tons traded at 188 and again at 252 (32 bits each).
 The recruit, artillery and crosses fields were confirmed by changing them in
 a save and reading the prices the original then asks.
+The Continental Congress (see [congress](../rules/congress.md)) keeps the
+founding fathers as one bit each at 7 to 10, the bells toward the next
+father at 12 and a second count of them at 14 (16 bits each), the father up
+for election at 18 (16 bits, -1 for none) and the number of fathers at 20.
+The header keeps the first nation to get each father at 57 + its row (-1
+for none).
 
 The nation's bytes 52 to 63 hold its relation to each of the twelve
 nations (the four European ones, then the eight tribes in `@TRIBES`
