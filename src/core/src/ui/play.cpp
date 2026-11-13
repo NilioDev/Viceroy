@@ -954,7 +954,7 @@ void PlayScreen::showNotices() {
         constexpr std::string_view kBattles[] = {"DEMOTE",     "COLONISTCAPTURE", "COLONISTCAPTURE2", "WAGONCAPTURE",
                                                  "LOOTCAPTURE", "ARTILLERY",      "ARTILLERY2",       "VETERAN",
                                                  "VALOR",       "CAPTURED",       "LOOT",             "LOOT2",
-                                                 "INDIANSLAVES", "INDIANWARFARE"};
+                                                 "INDIANSLAVES", "INDIANWARFARE", "INDIANBURN"};
         if (std::find(std::begin(kBattles), std::end(kBattles), notice.section) != std::end(kBattles)) {
             placeMapDialog(*dialog_);
         } else {

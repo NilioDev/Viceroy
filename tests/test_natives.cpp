@@ -845,3 +845,60 @@ VCR_TEST("original files: a missionary denounces another nation's mission") {
         VCR_CHECK(tribeTension(after, kIroquois, kDutch) == 4);
     }
 }
+
+VCR_TEST("original files: a tribe at 100 with a treaty burns the nation's missions") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
+    SaveGame save = readSaveGame(Bytes(std::istreambuf_iterator<char>(in), {}));
+    constexpr int kDutch = 3, kFrench = 1, kApache = 5;
+    std::vector<int> apache;
+    for (int i = 0; i < static_cast<int>(save.settlements.size()); ++i) {
+        if (tribeOf(save.settlements[static_cast<std::size_t>(i)]) == kApache) {
+            apache.push_back(i);
+        }
+    }
+    VCR_CHECK(apache.size() >= 2);
+    if (apache.size() < 2) {
+        return;
+    }
+    save.settlements[static_cast<std::size_t>(apache[0])].raw[5] = 0x10 | kDutch; // an expert's mission
+    save.settlements[static_cast<std::size_t>(apache[1])].raw[5] = kFrench;
+    const auto relation = static_cast<std::size_t>(kApache) * kTribeRecordSize + 58 + kDutch;
+    const auto missions = [&](const Game& game, int nation) {
+        int n = 0;
+        for (int i : apache) {
+            n += missionOf(game.state().settlements[static_cast<std::size_t>(i)]) == nation ? 1 : 0;
+        }
+        return n;
+    };
+    {
+        // Without a treaty the missions stay, however tense the tribe.
+        SaveGame copy = save;
+        copy.tribesAndMore[relation] = 0x20;
+        Game game(copy, art.rules);
+        for (int i = 0; i < 40; ++i) {
+            game.changeTension(kApache, kDutch, 100);
+        }
+        VCR_CHECK(missions(game, kDutch) == 1);
+        VCR_CHECK(game.takeNotices().empty());
+    }
+    save.tribesAndMore[relation] = 0x60;
+    save.humanNation = kDutch;
+    Game game(save, art.rules);
+    int tries = 0;
+    while (missions(game, kDutch) > 0 && tries < 40) {
+        game.changeTension(kApache, kDutch, 100);
+        ++tries;
+    }
+    VCR_CHECK(missions(game, kDutch) == 0);
+    VCR_CHECK(missions(game, kFrench) == 1);
+    VCR_CHECK(game.state().settlements[static_cast<std::size_t>(apache[0])].raw[5] == 0xFF);
+    const auto notices = game.takeNotices();
+    VCR_CHECK(notices.size() == 1);
+    VCR_CHECK(!notices.empty() && notices[0].section == "INDIANBURN");
+    VCR_CHECK(!notices.empty() && notices[0].strings[0] == "Apache");
+}
