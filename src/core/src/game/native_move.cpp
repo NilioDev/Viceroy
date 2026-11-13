@@ -644,7 +644,9 @@ int Game::nativeUnitAI(int index) {
 
     u.raw[kLastStep] = static_cast<std::uint8_t>(bestDir);
     const auto stay = [&]() {
-        u.movesUsed = movementAllowance(index);
+        // Looked up again: a visit may have added units (a gift of
+        // converts) and moved the list.
+        save_.units[static_cast<std::size_t>(index)].movesUsed = movementAllowance(index);
         return kStay;
     };
     if (bestDir == kStay) {

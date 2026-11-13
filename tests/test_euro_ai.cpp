@@ -325,3 +325,69 @@ VCR_TEST("original files: the natives' count notes the last tribe's settlements 
         VCR_CHECK(saved(g.state()) == counts(g.state(), after));
     }
 }
+
+namespace {
+
+// A French dragoon next to a Spanish colonist in the open; both nations
+// have met, and the French hold a colony in the region.
+SaveGame attackSave(std::uint8_t relation) {
+    SaveGame s = aiSave();
+    constexpr int kFrench = 1;
+    constexpr int kSpanish = 2;
+    constexpr std::size_t kRelations = 52;
+    s.nations[kFrench].raw[kRelations + kSpanish] = relation;
+    s.nations[kSpanish].raw[kRelations + kFrench] = relation;
+    s.players[kSpanish].control = 2; // the Spanish sit their turn out
+    // A wide land (its size as the map's count keeps it), so the region
+    // is not crowded and the dragoon need not go home.
+    s.tail[576] = 0xE8;
+    s.tail[577] = 0x03;
+    SaveColony c;
+    c.x = 9;
+    c.y = 8;
+    c.nation = kFrench;
+    c.population = 2;
+    s.colonies.push_back(c);
+    s.units.push_back(unitAt(6, 4, unit_type::kDragoon, kFrench));
+    s.units.push_back(unitAt(7, 4, unit_type::kColonist, kSpanish));
+    s.units.back().profession = 0x1C;
+    return s;
+}
+
+} // namespace
+
+VCR_TEST("european ai: a dragoon attacks a colonist of a nation it is not at peace with") {
+    Game g(attackSave(0x20), aiRules());
+    g.europeanTurn(1);
+    // Measured in the original: an unarmed colonist beaten in the open
+    // goes over to the winner.
+    bool captured = false;
+    for (const auto& u : g.state().units) {
+        captured = captured || (u.type == unit_type::kColonist && u.nation == 1);
+    }
+    VCR_CHECK(captured);
+}
+
+VCR_TEST("european ai: no attack on a nation at peace") {
+    Game g(attackSave(0x60), aiRules());
+    g.europeanTurn(1);
+    for (const auto& u : g.state().units) {
+        if (u.type == unit_type::kColonist) {
+            VCR_CHECK(u.nation == 2);
+        }
+        if (u.type == unit_type::kDragoon) {
+            VCR_CHECK(!(u.x == 7 && u.y == 4));
+        }
+    }
+}
+
+VCR_TEST("european ai: an attack waits for a full move") {
+    SaveGame s = attackSave(0x20);
+    s.units[0].movesUsed = 10; // two thirds left of four moves
+    Game g(s, aiRules());
+    g.europeanTurn(1);
+    const auto& d = g.state().units[0];
+    VCR_CHECK(d.type == unit_type::kDragoon && d.x == 6 && d.y == 4);
+    VCR_CHECK(d.raw[7] == '9');
+    VCR_CHECK(g.state().units[1].nation == 2);
+}

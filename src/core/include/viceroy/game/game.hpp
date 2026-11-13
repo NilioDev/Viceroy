@@ -239,14 +239,16 @@ public:
     // Fights it out: the loser is demoted, damaged or captured, and the
     // attacker's turn is over. Notices tell what happened.
     CombatOutcome attack(int attacker, int defender);
-    // The numbers the fight is rolled on (see docs/rules/combat.md).
-    CombatStrengths combatStrengths(int attacker, int defender) const;
+    // The numbers the fight is rolled on (see docs/rules/combat.md). With
+    // beforeLevels, only the steps a computer player weighs an attack by
+    // (the original leaves out the steps for the easy levels and colonies).
+    CombatStrengths combatStrengths(int attacker, int defender, bool beforeLevels = false) const;
     // A foreign colony with nobody on its square: one of its colonists,
     // picked at random, defends it.
     bool colonyUndefended(int colony) const;
     int pickColonyDefender(int colony);
     CombatAnalysis analyseColonyAttack(int attacker, int colony, int colonist) const;
-    CombatStrengths colonyStrengths(int attacker, int colony, int colonist) const;
+    CombatStrengths colonyStrengths(int attacker, int colony, int colonist, bool beforeLevels = false) const;
     // Fights the colonist; when the attacker wins it marches in and takes
     // the colony with its share of the owner's gold.
     CombatOutcome attackColony(int attacker, int colony, int colonist);
@@ -366,7 +368,7 @@ public:
     int villageDefenderUnit(int settlement, int attacker) const;
     SaveUnit villageBrave(int settlement) const;
     CombatAnalysis analyseVillageAttack(int attacker, int settlement) const;
-    CombatStrengths villageStrengths(int attacker, int settlement) const;
+    CombatStrengths villageStrengths(int attacker, int settlement, bool beforeLevels = false) const;
     // Fights it out. A won fight against the village's own people costs it
     // a person, and the last one burns it: treasure, the mission's
     // missionary back, converts for the mission's nation. The attacker's
@@ -610,6 +612,8 @@ private:
     int aiFoundScore(int nation, int unit) const;
     int aiStepAround(int nation, int x, int y, bool score, bool artillery) const;
     int aiRelation(int nation, int other) const;
+    int aiAttackOdds(int unit, int x, int y);
+    void aiAttack(int unit, int x, int y);
     void aiGoTo(int unit, char goal, int x, int y);
     void aiToEurope(int unit);
     void aiEndMoves(int unit);
@@ -675,7 +679,7 @@ private:
     // True when the loser is gone (unit numbers after it move down).
     bool loseBattle(int loser, int winner);
     CombatStrengths strengthsAgainst(int attacker, const SaveUnit& defender, bool defenderShip, bool defenderDamaged,
-                                     int defenderExtra) const;
+                                     int defenderExtra, bool beforeLevels = false) const;
     // The defender's part of it alone: its strength with the bonus of where
     // it stands, before the human's bonus and the rest.
     int defenceStrength(int attacker, const SaveUnit& defender, bool defenderShip, bool defenderDamaged,
