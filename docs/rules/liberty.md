@@ -56,7 +56,8 @@ while the box is shown. The second choice opens the colony.
 
 The bonus is added to a colonist's work, and tories take some away: 1 for
 every 10 − difficulty of them (10 tories at Discoverer, 6 at Viceroy). A
-colony of 12 with no rebels at Viceroy loses 2.
+colony of 12 with no rebels at Viceroy loses 2. Seen with a debugger: only
+the player's colonies lose work to tories; the computer nations' never do.
 
 - On the land the bonus goes into the land's own yield, before anything
   doubles it: a lumberjack expert on forest that gives 12 gives 16 with +1

@@ -619,7 +619,9 @@ private:
     void aiSendOut(int colony, int colonist, int role);
     bool aiRoadToColony(int colony);
     bool aiImproveLand(int colony, int region);
-    // What a colony's construction choice weighs from the rest of its plans.
+    // The tribe that claims square k around a colony (-1 for none).
+    int aiTribeClaim(const SaveColony& colony, int k, int region) const;
+    // What a colony's later plans weigh from the earlier ones.
     struct AiColonyView {
         int region = -1;
         int tribe = -1;    // the nearest tribe in its land
@@ -627,7 +629,18 @@ private:
         int adjacent = 0;  // enemy units right next to it
         int squares = 8;   // squares it can work
         int water = 0;     // of those, water or off the map
+        int ocean = 0;     // of those, ocean (docks or not)
+        int tories = 0;    // colonists not in the Sons of Liberty
+        // Its colonists by skill (those who are no experts as free
+        // colonists, 19), counted before anyone comes or goes.
+        std::array<int, 32> skills{};
     };
+    void aiAssignJobs(int colony, AiColonyView& view);
+    void aiTeach(int colony, const AiColonyView& view);
+    void aiTrain(int colony);
+    // The nations from weakest (0) to strongest (3), as the plans rank
+    // them; for a nation outside 0-3, the player's rank.
+    int aiRank(int nation) const;
     void aiChooseConstruction(int colony, const AiColonyView& view);
     bool aiCanBuild(int colony, int row) const;
     bool aiTryBuild(int colony, int row);

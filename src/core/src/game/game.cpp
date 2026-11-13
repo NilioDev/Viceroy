@@ -611,7 +611,10 @@ void Game::endTurn() {
     // founded to the first, which sets the order of its messages.
     for (std::size_t c = save_.colonies.size(); c-- > 0;) {
         auto& colony = save_.colonies[c];
-        const ColonyTurn turn = runColonyTurn(colony, save_.map, rules_, save_.difficulty);
+        // Only the player's colonies lose work to tories.
+        const bool tories = colony.nation >= 0 && colony.nation < kEuropeanNations &&
+                            save_.players[static_cast<std::size_t>(colony.nation)].control == 0;
+        const ColonyTurn turn = runColonyTurn(colony, save_.map, rules_, save_.difficulty, tories);
         const bool ours = colony.nation == human();
         if (ours && turn.libertyAfter != turn.libertyBefore) {
             const bool up = turn.libertyAfter > turn.libertyBefore;
