@@ -246,9 +246,10 @@ struct Balance {
     std::array<int, 20> shortfall{};
 };
 
-Balance balanceOf(const SaveColony& colony, const SaveMap& map, const Ruleset& rules, int difficulty) {
+Balance balanceOf(const SaveColony& colony, const SaveMap& map, const Ruleset& rules, int difficulty,
+                  const NationEffects& nation) {
     Balance b;
-    const auto p = colonyProduction(colony, map, rules, difficulty, false);
+    const auto p = colonyProduction(colony, map, rules, difficulty, false, nation);
     for (std::size_t g = 0; g < p.produced.size(); ++g) {
         b.made[g] = p.produced[g];
     }
@@ -719,7 +720,8 @@ void Game::aiColonyPlan(int c) {
     }
 
     // The goods it asks for.
-    const auto production = colonyProduction(colony(), map, rules_, save_.difficulty, false);
+    const auto production =
+        colonyProduction(colony(), map, rules_, save_.difficulty, false, nationEffects(save_, colony().nation));
     const auto ask = [&](int good, bool on) {
         auto& C = colony();
         if (C.stock[static_cast<std::size_t>(good)] >= storageLimit(C) ||
@@ -1224,9 +1226,12 @@ void Game::aiChooseConstruction(int c, const AiColonyView& view) {
             }
         }
     }
-    const auto production = colonyProduction(colony(), save_.map, rules_, save_.difficulty, false);
+    const auto production =
+        colonyProduction(colony(), save_.map, rules_, save_.difficulty, false, nationEffects(save_, colony().nation));
     const auto made = [&](int good) { return production.produced[static_cast<std::size_t>(good)]; };
-    const bool starving = balanceOf(colony(), save_.map, rules_, save_.difficulty).shortfall[cargo::kFood] != 0;
+    const bool starving =
+        balanceOf(colony(), save_.map, rules_, save_.difficulty, nationEffects(save_, colony().nation))
+            .shortfall[cargo::kFood] != 0;
     const bool hungry = ((pop >> 1) < foodWorkers && foodWorkers > 1) || starving;
 
     if (view.squares - view.water <= pop || (view.water != 0 && hungry)) {
@@ -1469,7 +1474,7 @@ void Game::aiAssignJobs(int c, AiColonyView& view) {
     const int REG = view.region;
     const WorkModifier modifier{std::clamp(C.libertyBonus, 0, 2), 0};
     const auto stock = [&](int g) { return g >= 0 && g < kGoodsKinds ? C.stock[static_cast<std::size_t>(g)] : 0; };
-    const auto balance = [&] { return balanceOf(C, map, rules_, save_.difficulty); };
+    const auto balance = [&] { return balanceOf(C, map, rules_, save_.difficulty, nationEffects(save_, C.nation)); };
     const int rankHere = aiRank(n);
     const int rankHuman = aiRank(human());
 
@@ -2087,7 +2092,7 @@ void Game::aiTeach(int c, const AiColonyView& view) {
         }
         what = fishers < view.ocean ? job::kFisherman : job::kFarmer;
     }
-    const Balance bal = balanceOf(C, save_.map, rules_, save_.difficulty);
+    const Balance bal = balanceOf(C, save_.map, rules_, save_.difficulty, nationEffects(save_, C.nation));
     for (std::size_t k = 0; k < kCrafts.size(); ++k) {
         const auto& craft = kCrafts[k];
         const int needed = craft.building == 3 ? 1 : 2;
@@ -2154,7 +2159,7 @@ void Game::aiTrain(int c) {
         const int j = C.jobs[static_cast<std::size_t>(k)];
         foodWorkers += j == job::kFarmer || j == job::kFisherman ? 1 : 0;
     }
-    const Balance bal = balanceOf(C, save_.map, rules_, save_.difficulty);
+    const Balance bal = balanceOf(C, save_.map, rules_, save_.difficulty, nationEffects(save_, C.nation));
     const bool hungry = ((pop >> 1) < foodWorkers && foodWorkers > 1) || bal.shortfall[cargo::kFood] != 0;
     const auto price = [&](int row) {
         return row >= 0 && static_cast<std::size_t>(row) < rules_.jobs.size()

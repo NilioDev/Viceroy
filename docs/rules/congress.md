@@ -74,7 +74,22 @@ Some fathers act at once:
 | Bartolome de las Casas | native converts, in the field and in the colonies, become free colonists |
 
 The others work from then on wherever they matter (see the rules for
-combat, natives, Europe and production).
+combat, natives, Europe and production, and below).
+
+## Fathers in the colonies' work
+
+Read from the original's production of a colony:
+
+- Henry Hudson: the furs a colonist takes from the land count twice
+  (after the land's own yield, its improvements and the river, before a
+  resource or an expert doubles them).
+- William Penn: each preacher's crosses get half again (after the
+  cathedral's doubling).
+- The bells of a colony are its statesmen's plus its own 1. To these, in
+  this order: Thomas Jefferson adds half (rounded down); Thomas Paine adds
+  the nation's tax rate in percent of them (rounded down); Simon Bolivar,
+  in a computer nation's colony only, adds (people + 3) / 5; a printing
+  press adds half, a newspaper doubles them instead.
 
 ## Not done yet
 
@@ -83,5 +98,6 @@ combat, natives, Europe and production).
   yet.
 - What the bells do after the declaration of independence.
 - The Continental Congress report.
-- Fathers whose effect lasts (Jefferson, Paine, Penn, Hudson, Magellan and
-  others) where it is not yet in our rules.
+- Fathers whose effect lasts outside the colonies' work (Adam Smith,
+  Peter Stuyvesant and Peter Minuit for the player, Magellan, Drake,
+  Revere, Franklin, de Witt and others) where it is not yet in our rules.

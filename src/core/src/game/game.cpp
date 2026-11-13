@@ -614,7 +614,8 @@ void Game::endTurn() {
         // Only the player's colonies lose work to tories.
         const bool tories = colony.nation >= 0 && colony.nation < kEuropeanNations &&
                             save_.players[static_cast<std::size_t>(colony.nation)].control == 0;
-        const ColonyTurn turn = runColonyTurn(colony, save_.map, rules_, save_.difficulty, tories);
+        const ColonyTurn turn = runColonyTurn(colony, save_.map, rules_, save_.difficulty, tories,
+                                              nationEffects(save_, colony.nation));
         // Read from the original: the colony's bells go to the congress
         // first, before its messages.
         addCongressBells(colony.nation, turn.bells);
@@ -1069,7 +1070,8 @@ void Game::gatherCrosses() {
     int crosses = 2;
     for (const auto& colony : save_.colonies) {
         if (colony.nation == human()) {
-            crosses += colonyProduction(colony, save_.map, rules_, save_.difficulty).produced[cargo::kCrosses];
+            crosses += colonyProduction(colony, save_.map, rules_, save_.difficulty, true,
+                                        nationEffects(save_, colony.nation)).produced[cargo::kCrosses];
         }
     }
     nation.crosses += crosses;

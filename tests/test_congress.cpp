@@ -2,6 +2,7 @@
 #include "test.hpp"
 
 #include "viceroy/data/savegame.hpp"
+#include "viceroy/game/colony.hpp"
 #include "viceroy/game/europe.hpp"
 #include "viceroy/game/game.hpp"
 #include "viceroy/game/natives.hpp"
@@ -176,4 +177,82 @@ VCR_TEST("congress: what some fathers do when they join") {
         VCR_CHECK(g.unit(0).profession == 0x1C);
         VCR_CHECK(g.state().colonies[0].skills[0] == 0x1C);
     }
+}
+
+namespace {
+
+// A colony on plains with one colonist at the given job, and a map of
+// plains around it.
+struct Workshop {
+    SaveMap map;
+    SaveColony colony;
+    Ruleset rules;
+};
+
+Workshop workshop(int jobRow, int skill, BuildingKind building) {
+    Workshop w;
+    w.map.width = 5;
+    w.map.height = 5;
+    w.map.squares.resize(25);
+    for (auto& sq : w.map.squares) {
+        sq.terrain = 2;
+    }
+    w.rules.terrain.resize(30);
+    w.rules.terrain[2].yield[4] = 2; // furs
+    w.colony.x = 2;
+    w.colony.y = 2;
+    w.colony.population = 1;
+    w.colony.jobs[0] = static_cast<std::uint8_t>(jobRow);
+    w.colony.skills[0] = static_cast<std::uint8_t>(skill);
+    setBuildingLevel(w.colony, building, 1);
+    return w;
+}
+
+NationEffects with(std::initializer_list<int> fathers, int tax = 0) {
+    NationEffects e;
+    for (const int f : fathers) {
+        e.fathers |= 1U << f;
+    }
+    e.tax = tax;
+    return e;
+}
+
+int bells(const Workshop& w, const NationEffects& e, bool tories = true) {
+    return colonyProduction(w.colony, w.map, w.rules, 0, tories, e).produced[cargo::kBells];
+}
+
+} // namespace
+
+VCR_TEST("congress: fathers and the printing press add bells") {
+    Workshop w = workshop(job::kStatesman, skill::kFreeColonist, BuildingKind::TownHall);
+    const int plain = bells(w, {});
+    VCR_CHECK(plain >= 2);
+    VCR_CHECK(bells(w, with({15})) == plain + plain / 2);                // Jefferson
+    VCR_CHECK(bells(w, with({17}, 50)) == plain + plain * 50 / 100);     // Paine at 50% tax
+    VCR_CHECK(bells(w, with({18})) == plain);                            // Bolivar: not for the player
+    VCR_CHECK(bells(w, with({18}), false) == plain + (1 + 3) / 5);       // but for a computer nation
+    setBuildingLevel(w.colony, BuildingKind::PrintingPress, 1);
+    VCR_CHECK(bells(w, {}) == plain + plain / 2);
+    setBuildingLevel(w.colony, BuildingKind::PrintingPress, 2);
+    VCR_CHECK(bells(w, {}) == 2 * plain);
+    const int jefferson = plain + plain / 2;
+    VCR_CHECK(bells(w, with({15})) == 2 * jefferson);
+}
+
+VCR_TEST("congress: Penn's preachers and Hudson's furs") {
+    Workshop w = workshop(job::kPreacher, skill::kFreeColonist, BuildingKind::Church);
+    const auto crosses = [&](const NationEffects& e) {
+        return colonyProduction(w.colony, w.map, w.rules, 0, true, e).colonists[0].amount;
+    };
+    const int plain = crosses({});
+    VCR_CHECK(plain > 0);
+    VCR_CHECK(crosses(with({21})) == plain + plain / 2);
+
+    Workshop f = workshop(4, skill::kFreeColonist, BuildingKind::Church);
+    f.colony.squares[0] = 0; // works the square to the north
+    const auto furs = [&](const NationEffects& e) {
+        return colonyProduction(f.colony, f.map, f.rules, 0, true, e).colonists[0].amount;
+    };
+    VCR_CHECK(furs({}) == 2);
+    VCR_CHECK(furs(with({8})) == 4);
 }

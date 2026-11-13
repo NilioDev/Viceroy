@@ -48,8 +48,10 @@ touch controls.
 > one candidate of each kind, and when enough bells have rung he joins and
 > appears in the hall of congress, with what he brings at once (a frigate
 > from John Paul Jones, stockades from La Salle, calm tribes from
-> Pocahontas and so on). The other nations elect their own fathers as the
-> original's do. A tribe you meet for the first time
+> Pocahontas and so on), and Jefferson, Paine, Penn and Hudson make your
+> colonies ring more bells, preach more and trap more furs from then on, as
+> printing presses and newspapers do. The other nations elect their own
+> fathers as the original's do. A tribe you meet for the first time
 > offers you peace; refusing it angers the tribe. Missionaries can found missions,
 > which the tribe takes well or badly as in the original, pay a tribe to
 > go to war against another nation, or denounce another nation's mission

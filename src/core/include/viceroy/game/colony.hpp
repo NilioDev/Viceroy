@@ -15,6 +15,7 @@
 #include "viceroy/rules/ruleset.hpp"
 
 #include <array>
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <vector>
@@ -163,7 +164,19 @@ int terrainRow(const MapSquare& square);
 struct WorkModifier {
     int bonus = 0;
     int penalty = 0;
+    bool hudson = false; // Henry Hudson in congress: furs from the land doubled
 };
+
+// What the owner's Continental Congress and taxes do to a colony's work
+// (docs/rules/congress.md): the founding fathers as one bit each by row of
+// @FATHERS, and the tax rate.
+struct NationEffects {
+    std::uint32_t fathers = 0;
+    int tax = 0;
+    bool has(int father) const { return father >= 0 && father < 32 && ((fathers >> father) & 1U) != 0; }
+};
+// From the nation's record in the save; none for a tribe.
+NationEffects nationEffects(const SaveGame& save, int nation);
 WorkModifier workModifier(const SaveColony& colony, int difficulty, bool tories = true);
 
 // What a colonist of this skill makes doing this job on a square. Fishing
@@ -180,7 +193,7 @@ int buildingYield(int level, int skill, int jobRow, WorkModifier modifier = {}, 
 int landAround(const SaveMap& map, int x, int y);
 
 ColonyProduction colonyProduction(const SaveColony& colony, const SaveMap& map, const Ruleset& rules,
-                                  int difficulty = 0, bool tories = true);
+                                  int difficulty = 0, bool tories = true, const NationEffects& nation = {});
 
 // The building a job is done in, if any.
 std::optional<BuildingKind> buildingForJob(int jobRow);
@@ -284,7 +297,7 @@ int horsesBred(const SaveColony& colony, int foodSurplus);
 // is eaten, hammers go into the building under way, and the warehouse
 // throws away what it cannot hold.
 ColonyTurn runColonyTurn(SaveColony& colony, const SaveMap& map, const Ruleset& rules, int difficulty = 0,
-                         bool tories = true);
+                         bool tories = true, const NationEffects& nation = {});
 
 // --- Sons of Liberty -----------------------------------------------------
 

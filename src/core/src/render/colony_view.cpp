@@ -681,7 +681,8 @@ void drawColonyScreen(Screen& screen, const Art& art, const ColonyArt& colonyArt
         return;
     }
     const auto& colony = save.colonies[static_cast<std::size_t>(view.colony)];
-    const auto production = colonyProduction(colony, save.map, game.rules(), save.difficulty);
+    const auto production = colonyProduction(colony, save.map, game.rules(), save.difficulty, true,
+                                             nationEffects(save, colony.nation));
 
     screen.resetClip();
     screen.clear(kBlack);
