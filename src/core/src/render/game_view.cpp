@@ -645,6 +645,10 @@ Art loadArt(const std::filesystem::path& folder) {
     art.portraits.push_back(readSpriteSheet(readFile(folder, "MSS4.SS")));
     art.portraits.push_back(readSpriteSheet(readFile(folder, "MSS1.SS")));
     art.portraits.push_back(readSpriteSheet(readFile(folder, "MSS5.SS")));
+    // The natives: one figure per tribe (IND0A0.SS to IND7A0.SS).
+    for (int tribe = 0; tribe < 8; ++tribe) {
+        art.portraits.push_back(readSpriteSheet(readFile(folder, "IND" + std::to_string(tribe) + "A0.SS")));
+    }
     art.rules = readRuleset(art.names);
     return art;
 }

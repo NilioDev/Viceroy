@@ -4,6 +4,8 @@
 #include "viceroy/data/reader.hpp"
 #include "viceroy/game/colony.hpp"
 #include "viceroy/game/europe.hpp"
+#include "viceroy/game/natives.hpp"
+#include "viceroy/data/text_table.hpp"
 #include "viceroy/game_files.hpp"
 
 #include <algorithm>
@@ -199,7 +201,10 @@ void PlayScreen::moveActive(Step step) {
         const int ty = u.y + step.dy;
         const int defender = game_.canAttack(index) ? game_.defenderAt(tx, ty, index) : -1;
         const auto colony = game_.colonyAt(tx, ty);
-        if (defender >= 0 && !game_.settlementAt(tx, ty)) {
+        const auto settlement = game_.settlementAt(tx, ty);
+        if (settlement && !game_.isShip(index) && !game_.canAttack(index)) {
+            enterVillage(index, *settlement);
+        } else if (defender >= 0 && !settlement) {
             startAttack(index, defender);
         } else if (colony && !game_.isShip(index) && game_.canAttack(index) && game_.colonyUndefended(*colony)) {
             startAttack(index, -1, *colony);
@@ -234,6 +239,52 @@ void PlayScreen::openEurope() {
     const auto ships = unitsInEurope(game_.state(), game_.rules(), game_.human(), EuropePlace::InPort, true);
     state.ship = ships.empty() ? -1 : ships.front();
     europeScreen_ = state;
+}
+
+void PlayScreen::enterVillage(int unit, int settlement) {
+    if (art_ == nullptr) {
+        return;
+    }
+    say("");
+    const auto& save = game_.state();
+    const int tribe = tribeOf(save.settlements[static_cast<std::size_t>(settlement)]);
+    const int nation = game_.unit(unit).nation;
+    // "a Camp of Sioux": the settlement's word for the tribe's level.
+    std::string place;
+    if (const auto* levels = art_->names.find("LEVELS")) {
+        const auto row = static_cast<std::size_t>(tribeLevel(save, tribe));
+        const auto fields = row < levels->lines.size() ? splitFields(levels->lines[row]) : std::vector<std::string>{};
+        place = fields.size() > 1 ? fields[1] : "";
+    }
+    const auto& tribes = game_.rules().tribes;
+    const std::string people =
+        static_cast<std::size_t>(tribe) < tribes.size() ? tribes[static_cast<std::size_t>(tribe)].name : "";
+    ask(villageGreeting(save, settlement, nation), unit, {place, people});
+    if (!dialog_) {
+        return;
+    }
+    village_ = settlement;
+    villageOptions_.clear();
+    // The options read from the original's @ACTIONS: Live Among The Natives
+    // (row 4) for colonists the tribe knows, and Cancel Action (row 9).
+    if (game_.canLiveAmongNatives(unit, settlement)) {
+        addOption(*dialog_, textLine(art_->names, "ACTIONS", 4, "Live Among The Natives"));
+        villageOptions_.push_back(kVillageLive);
+    }
+    addOption(*dialog_, textLine(art_->names, "ACTIONS", 9, "Cancel Action"));
+    villageOptions_.push_back(kVillageCancel);
+    placeCentredDialog(*dialog_);
+}
+
+void PlayScreen::showLesson(int unit, const std::string& section, const std::vector<std::string>& strings) {
+    const auto& save = game_.state();
+    const int tribe = village_ >= 0 && village_ < static_cast<int>(save.settlements.size())
+                          ? tribeOf(save.settlements[static_cast<std::size_t>(village_)])
+                          : 0;
+    ask(section, unit, strings);
+    if (dialog_) {
+        placeNativeDialog(*dialog_, tribe);
+    }
 }
 
 void PlayScreen::ask(std::string_view section, int unit, std::vector<std::string> strings, int nation,
@@ -525,7 +576,39 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
             }
         }
     };
-    if (question == kColonyReport) {
+    const bool villageQuestion = question.rfind("VILLAGE", 0) == 0;
+    if (villageQuestion) {
+        const int option = choice >= 0 && choice < static_cast<int>(villageOptions_.size())
+                               ? villageOptions_[static_cast<std::size_t>(choice)]
+                               : kVillageCancel;
+        villageOptions_.clear();
+        if (option == kVillageLive && village_ >= 0) {
+            const auto lesson = game_.liveAmongNatives(unit, village_);
+            showLesson(unit, lesson.section, lesson.strings);
+            if (lesson.section != "LEARNSTAY") {
+                question_ = "LESSONDONE";
+            }
+        }
+    } else if (question == "LEARNSTAY") {
+        // "Then I shall become a master ..." or "Not right now, thanks."
+        if (yes && village_ >= 0) {
+            game_.learnFromNatives(unit, village_);
+            const auto& jobs = game_.rules().jobs;
+            const int job = game_.unit(unit).profession;
+            const auto& tribes = game_.rules().tribes;
+            const int tribe = tribeOf(game_.state().settlements[static_cast<std::size_t>(village_)]);
+            showLesson(unit, "LEARNDONE",
+                       {static_cast<std::size_t>(tribe) < tribes.size() ? tribes[static_cast<std::size_t>(tribe)].name : "",
+                        job >= 0 && static_cast<std::size_t>(job) < jobs.size() ? jobs[static_cast<std::size_t>(job)].name
+                                                                               : ""});
+        } else {
+            showLesson(unit, "LEARNLATER", {});
+        }
+        question_ = "LESSONDONE";
+    } else if (question == "LESSONDONE") {
+        village_ = -1;
+        advance();
+    } else if (question == kColonyReport) {
         if (choice == 1) {
             openColony(unit);
         }

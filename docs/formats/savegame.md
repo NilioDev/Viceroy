@@ -21,7 +21,7 @@ understood; the parts marked *opaque* are kept byte for byte.
 | Map: mask | width × height |
 | Map: path | width × height |
 | Map: seen | width × height |
-| Rest | 1502 (*opaque*; byte 612 is the seed of the resource pattern) |
+| Rest | 1502 (*opaque*; bytes 608 to 611 are the game's seed, byte 612 the seed of the resource pattern) |
 
 The three counts come from the header, so the start of the map moves with
 the number of colonies, units and settlements. In all ten saves the blocks
@@ -135,4 +135,23 @@ and the tons traded at 188 and again at 252 (32 bits each).
 The recruit, artillery and crosses fields were confirmed by changing them in
 a save and reading the prices the original then asks.
 
-**Native settlement** (18 bytes): x, y, tribe (4 to 11), …, population at 4.
+The nation's bytes 52 to 63 hold its relation to each of the twelve
+nations (the four European ones, then the eight tribes in `@TRIBES`
+order); bit 0x40 on a tribe means the nation has met it. Without it the
+original offers only Cancel Action at the tribe's settlements.
+
+**Native settlement** (18 bytes): x, y, tribe (4 to 11, in `@TRIBES`
+order from the Inca), flags at 3 (0x02 has taught its skill, 0x04 the
+tribe's capital), population at 4, the nation whose mission is there at 5
+(0xFF none), and from 10 one 16-bit alarm per European nation. See
+[natives](../rules/natives.md).
+
+**Tribe** (78 bytes, eight of them at the start of the block after the
+settlements, in `@TRIBES` order): the tribe's level at 2 (0 semi-nomadic
+to 3 civilized), two numbers at 7 and 8 that its economy reads for
+muskets and horses, its horses at 10 and silver at 12 (16 bits), what it
+holds of each of the 16 goods from 14 (16 bits each), and its tension
+toward each European nation from 70 (16 bits each).
+
+In the block after the map, bytes 608 to 611 hold the game's own random
+seed (the skill each settlement teaches is drawn from it).

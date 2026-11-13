@@ -224,6 +224,19 @@ public:
     // Fights the colonist; when the attacker wins it marches in and takes
     // the colony with its share of the owner's gold.
     CombatOutcome attackColony(int attacker, int colony, int colonist);
+    // Native settlements. A colonist or pioneer of a nation that has met
+    // the tribe may live among the natives to learn their skill.
+    bool canLiveAmongNatives(int unit, int settlement) const;
+    struct NativeLesson {
+        std::string section;              // LEARNSTAY (an offer), LEARNMAD, ...
+        std::vector<std::string> strings; // the tribe, the skill
+        int skill = -1;                   // the village's skill (row of @JOB)
+    };
+    // The unit goes in; its turn is over. LEARNSTAY asks whether to learn.
+    NativeLesson liveAmongNatives(int unit, int settlement);
+    // The answer "Then I shall become a master ...": the unit learns.
+    void learnFromNatives(int unit, int settlement);
+
     // A ship that lost a fight and is being repaired (bit 0x80 of byte 4).
     bool isDamagedShip(int index) const;
     // A ship's odds in getting away from a stronger one: its share of the
