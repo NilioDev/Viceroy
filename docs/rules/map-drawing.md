@@ -208,12 +208,12 @@ swamp (see production.md).
 
 ## Lost city rumours
 
-Sprite 103. Seen on 36 squares in two games: every one is on the resource
-pattern moved by (8, 8), so (x + 8, y + 8) is on the pattern, on land, and
-the high nibble of the third map layer is 0xF there. About 40 % of the
-squares that meet all of that have one; what decides the rest is not yet
-known (no layer, bit array or list in the savegame matches), so Viceroy does
-not draw rumours yet.
+Sprite 103. Read from the original: a rumour lies on land that is not
+arctic, where the high four bits of the path layer are 0xF (nobody has been
+there), on a pattern set by the resource seed s: the square (x, y) with
+(x mod 4) × 4 + (y mod 4) equal to (19 × ⌊y / 4⌋ + 17 × ⌊x / 4⌋ + s + 8)
+mod 32. That is about half of the resource pattern moved by (8, 8), as the
+36 rumours seen in two games showed. Viceroy does not draw rumours yet.
 
 ## Water colour cycling
 

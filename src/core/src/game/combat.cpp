@@ -205,6 +205,46 @@ CombatStrengths Game::combatStrengths(int attacker, int defender) const {
     return strengthsAgainst(attacker, unit(defender), isShip(defender), isDamagedArtillery(defender), 0);
 }
 
+int Game::defenceStrength(int attacker, const SaveUnit& du, bool defenderShip, bool defenderDamaged,
+                          int defenderExtra) const {
+    // The defender's strength before the steps that depend on who attacks
+    // (the human's bonus and the rest): eight per point of combat, with the
+    // bonus of its colony, settlement or square in quarters.
+    const auto& au = unit(attacker);
+    const bool attackerEuropean = au.nation < kEuropeanNations;
+    const bool defenderEuropean = du.nation < kEuropeanNations;
+    const auto colony = colonyAt(du.x, du.y);
+    const auto settlement = colony ? std::nullopt : settlementAt(du.x, du.y);
+    int v = 0;
+    if (du.type >= 0 && du.type < static_cast<int>(rules_.units.size())) {
+        v = rules_.units[static_cast<std::size_t>(du.type)].combat;
+    }
+    v += defenderExtra;
+    if (defenderDamaged) {
+        v -= 2;
+    }
+    v = std::max(0, v) * 8;
+    if ((du.type == unit_type::kSoldier || du.type == unit_type::kDragoon) && du.profession == kVeteranSoldier) {
+        v += v >> 1;
+    }
+    // The defender's bonus, in quarters.
+    int m = 0;
+    if (colony) {
+        m = 2 * (buildingLevel(save_.colonies[static_cast<std::size_t>(*colony)], BuildingKind::Fortification) + 1);
+    } else if (settlement) {
+        m = settlementQuarters(*settlement);
+    } else if (!defenderEuropean || attackerEuropean) {
+        const int row = terrainRow(save_.map.at(du.x, du.y));
+        if (row >= 0 && row < static_cast<int>(rules_.terrain.size())) {
+            m = rules_.terrain[static_cast<std::size_t>(row)].defenseBonus;
+        }
+    }
+    if (du.orders == SaveUnit::kFortified && !defenderShip && m < 5) {
+        m += 2;
+    }
+    return v * (4 + m) >> 2;
+}
+
 CombatStrengths Game::strengthsAgainst(int attacker, const SaveUnit& du, bool defenderShip, bool defenderDamaged,
                                        int defenderExtra) const {
     // Observed in the original with a debugger: the integer steps below, in
@@ -234,22 +274,7 @@ CombatStrengths Game::strengthsAgainst(int attacker, const SaveUnit& du, bool de
     const auto colony = colonyAt(du.x, du.y);
     const auto settlement = colony ? std::nullopt : settlementAt(du.x, du.y);
 
-    // The defender's bonus, in quarters.
-    int m = 0;
-    if (colony) {
-        m = 2 * (buildingLevel(save_.colonies[static_cast<std::size_t>(*colony)], BuildingKind::Fortification) + 1);
-    } else if (settlement) {
-        m = settlementQuarters(*settlement);
-    } else if (!defenderEuropean || attackerEuropean) {
-        const int row = terrainRow(save_.map.at(du.x, du.y));
-        if (row >= 0 && row < static_cast<int>(rules_.terrain.size())) {
-            m = rules_.terrain[static_cast<std::size_t>(row)].defenseBonus;
-        }
-    }
-    if (du.orders == SaveUnit::kFortified && !defenderShip && m < 5) {
-        m += 2;
-    }
-    int d = strength8(du, false, defenderDamaged, defenderExtra) * (4 + m) >> 2;
+    int d = defenceStrength(attacker, du, defenderShip, defenderDamaged, defenderExtra);
     int a = strength8(au, true, isDamagedArtillery(attacker), 0);
     a = a * 3 >> 1; // the attack bonus
     if (attackerHuman) {

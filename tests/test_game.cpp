@@ -70,8 +70,10 @@ VCR_TEST("game: units move, pay for terrain and stop when out of moves") {
     VCR_CHECK(g.move(1, {1, -1}) == MoveResult::Moved); // into the forest
     VCR_CHECK(g.unit(1).x == 4 && g.unit(1).y == 1);
     VCR_CHECK(g.movesLeft(1) == 6);
-    VCR_CHECK(g.move(1, {1, 0}) == MoveResult::NoMovesLeft); // mountains cost 9
-    VCR_CHECK(g.unit(1).x == 4);
+    // Mountains cost 9: with 6 left the unit gets there two times in three,
+    // or its turn is over.
+    const MoveResult r = g.move(1, {1, 0});
+    VCR_CHECK((r == MoveResult::NoMovesLeft && g.unit(1).x == 4) || (r == MoveResult::Moved && g.unit(1).x == 5));
     VCR_CHECK(g.movesLeft(1) == 0);
 
     // A unit that has not moved yet always gets one step.

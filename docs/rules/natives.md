@@ -192,8 +192,109 @@ tribe record has been cleared:
    always that tribe's horses that breed, by its own byte 8, once for
    every tribe's turn (measured: 3 in the Cherokee byte 8 gave 15 more
    horses with five tribes left, and 5 in the Apache byte 8 gave none).
-6. Its units move. Not done yet, nor the war of independence, when a
-   tribe may take the Crown's side (`@INDIANGRUDGE`).
+6. Its units move (see below). Not done yet: the war of independence, when
+   a tribe may take the Crown's side (`@INDIANGRUDGE`).
+
+## How the braves move
+
+Read from the original's code and checked against one of its turns (on
+`COLONY00.SAV`, every brave whose best step stands out by more than the
+chance below takes the same step as in the original).
+
+The tribe's units step one at a time: the first of its units (in unit order)
+that has moves left takes a step, and the search starts again from the
+first unit. Byte 22 counts a unit's steps; after 20 its turn is over. Each
+step is chosen like this.
+
+**What the unit knows.** A unit whose home (byte 6) is no settlement is
+removed. Its *clock* is the turn less a 25th of it; byte 18 (16 bits) holds
+the turn of its last visit (at first the turn it was raised in). The *nearest
+colony* is the nearest of anyone's on its land; it counts as *near home*
+when it is no farther from the home settlement than half its people (at
+least 2). A *threat* is two or more armed men (attack over 1, not ships)
+of a nation on the eight squares around home, less a quarter of the people
+of a colony there. The *grudges* count, over the four nations, a tension of
+75 or more and a home alarm (settlement word at 10 + 2 × nation) of 128 or
+more.
+
+The high four bits of a square's path layer name the nation that last came
+onto it (see [the savegame](../formats/savegame.md)); the AI reads a square's
+unit or town owner from them.
+
+**The score of each square around it, and of staying (the ninth).** Water,
+arctic squares and lost city rumours are left out. Each starts at 200:
+
+- Last visited by someone else: the settlement is *angry* with them when
+  its alarm is 128 or more, when the tribe's tension is 75 or more (*war*),
+  or when they are the threat at home.
+- Next to it, a colony or settlement, or a wagon train, of a European
+  nation: 100 (50 for the wagon train) plus half the tribe's tension. With
+  the best of these, a calm tribe skips the square until 2 × its distance
+  from home + 5 turns of the clock have passed since its last visit;
+  otherwise the square gains that value and twice the turns since the last
+  visit, and is a *visit* when not at war.
+- With nobody next to it, a colony near home pulls: once its nation's
+  people (colonists and colony people, at most 255) over 8 + twice the
+  distance from home + 5 turns have passed since the last visit, (12 − its
+  distance) × 10.
+- Someone else's unit or town on it: only if they are European. Their
+  tension t (at most 100). For units, the terrain's defence bonus × 4 and,
+  for each unit there, colonist +5, pioneer and scout +10, artillery +35,
+  treasure +50 (when the brave is alone), soldiers and dragoons near home
+  (the threat + 5) × 4, a wagon train +2 (+8 with goods, +10 more when alone
+  on its square, otherwise only with a roll of 50 to 100 under t). A town
+  +20 at t 75 and +10 at t 50. A tribe at t 25 or less that is not angry
+  only goes for a lone treasure, one time in eight; otherwise an alarm of
+  32 makes it angry where there is no town. Then 50 − t is taken off, and
+  the square is an *attack* when the brave is angry or there is something
+  to take, else it is left out.
+- At home, +20 for muskets waiting (an unarmed brave) and +20 for 25 horses
+  (an unmounted one).
+- A step onto its own tribe's unit: −40, and left out onto two or more
+  outside a town. Staying: −40 for each other unit on its square, and −25
+  when an attack was seen or by a roll of 1 in 4 × (level + 1) + 1.
+- The same direction as its last step (byte 11) +4, a neighbouring one +3,
+  turning back −6. Road to road (towns count) +4, else river to river
+  straight (not diagonal) +4.
+- Staying is left out when there are no grudges, nobody is next to it and
+  nothing waits at home. Next to a European nation it gains
+  (tension − 50) / 2 + 8 when that tension is 25 or more (+5 instead of 8
+  with grudges, +16 at a tension of 95).
+- Farther than 2 from home: −3 × the distance, halved with grudges, halved
+  with muskets, a quarter when mounted.
+- Next to another tribe's unit or town −25; next to a European one +50 if
+  they have not met, and (tension − 50) / 4 at a tension of 25 or more.
+- Without grudges: +5 for a square nobody has been on, and the nearest
+  colony on this land pulls by (12 − distance) × (tension step + 1) / 4.
+  With grudges: a calm square with a town is left out; an angry one +5,
+  +10 for a resource, +500 for a colony, and against units the brave's
+  attack (1½ × its strength) against the best defender's defence (an
+  eighth for artillery), with something for each unit there; the colony
+  pulls the same way, or at a tension of 75 pushes by 2 × its distance.
+- Plus a roll of 1 to 5. The highest wins (the first of equals).
+
+**After the choice.** Its last step is noted (byte 11). A unit that stays
+fortifies (orders 5, then 6) and, at home, takes up muskets (one used with
+a chance of 1 in the difficulty + 1) and 25 horses. An attack is made once
+a turn per tribe and nation (the word at 46 + 2 × nation, 2 in a turn of
+first meeting stops it) and needs a full move left. At war or attacking,
+any visit is called off. A visit planned earlier (bit 0x08 of byte 4) is
+made now: the brave stays. A new visit marks bit 0x08 and its turn in byte
+18. Every so often (the nation's people over 8 + 4 × the distance from home
++ 10 turns of the clock since the last visit) a brave with nothing better
+to do heads for the colony near home (its x and y in bytes 9 and 10). A
+step onto a square last visited by someone else, after it has already
+moved, ends its turn.
+
+**The step.** The cost is paid first (any unit: roads and rivers followed
+straight cost a third, a colony or settlement at most a move). Short of
+moves, and not on its first step, it gets there with a chance of its moves
+left in the cost; otherwise its turn is over.
+
+Not done yet: the attacks themselves and the brave's visit (its gifts and
+requests; first contact is done). The original's route finder for heading
+to a colony is not read yet: Viceroy takes the neighbouring square closest
+to the colony.
 
 ## Denouncing heresy
 

@@ -3,6 +3,7 @@
 
 #include "viceroy/data/savegame.hpp"
 #include "viceroy/game/natives.hpp"
+#include "viceroy/game/resource.hpp"
 #include "viceroy/game_files.hpp"
 
 #include <cstdlib>
@@ -933,7 +934,8 @@ VCR_TEST("original files: the natives' turn (measured)") {
         const auto& u = game.unit(i);
         if (u.nation == 4 + kSioux) {
             ++braves;
-            VCR_CHECK(u.type == 19 && u.x == 26 && u.y == 18 && u.raw[6] == 12);
+            // Then it takes its first step (measured: to (25, 19)).
+            VCR_CHECK(u.type == 19 && std::abs(u.x - 26) <= 1 && std::abs(u.y - 18) <= 1 && u.raw[6] == 12);
         }
     }
     VCR_CHECK(braves == 1);
@@ -950,6 +952,69 @@ VCR_TEST("original files: the natives' turn (measured)") {
     VCR_CHECK(after.tribesAndMore[extra + 589 + 16 * kSioux + 1] == 8);
     // Horses: the Cherokee own the last settlement in the list, so theirs
     // breed once for each of the five tribes left; the Apache's do not.
-    VCR_CHECK(tribeAt(after, kCherokee, 10) == 25);
+    // (A Cherokee brave staying home may take 25 of them for a horse.)
+    int mounted = 0;
+    for (int i = 0; i < game.unitCount(); ++i) {
+        const auto& u = game.unit(i);
+        if (u.nation == 4 + kCherokee && (u.type == 21 || u.type == 22)) {
+            ++mounted;
+        }
+    }
+    VCR_CHECK(tribeAt(after, kCherokee, 10) + 25 * mounted == 25);
     VCR_CHECK(tribeAt(after, kApache, 10) == 0);
+}
+
+VCR_TEST("original files: the braves choose their steps as the original's (measured)") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
+    SaveGame save = readSaveGame(Bytes(std::istreambuf_iterator<char>(in), {}));
+    for (auto& u : save.units) {
+        u.movesUsed = 0;
+    }
+    Game game(save, art.rules);
+    // Measured in the original's next turn: the brave at (11, 12) goes east
+    // along the river, the one in the village at (16, 17) west along its
+    // river (then tried south-west), each by a margin the chance of one to
+    // five added to every score cannot undo.
+    VCR_CHECK(game.unit(15).x == 11 && game.unit(15).y == 12);
+    VCR_CHECK(game.nativeUnitAI(15) == 2);
+    VCR_CHECK(game.unit(15).raw[11] == 2 && game.unit(15).orders == SaveUnit::kNoOrders);
+    VCR_CHECK(game.unit(12).x == 16 && game.unit(12).y == 17);
+    VCR_CHECK(game.nativeUnitAI(12) == 6);
+}
+
+VCR_TEST("original files: the natives move on land and stop when their moves are used") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
+    SaveGame save = readSaveGame(Bytes(std::istreambuf_iterator<char>(in), {}));
+    Game game(save, art.rules);
+    std::vector<std::pair<int, int>> before;
+    for (int i = 0; i < game.unitCount(); ++i) {
+        before.emplace_back(game.unit(i).x, game.unit(i).y);
+    }
+    game.endTurn();
+    int moved = 0;
+    const auto& map = game.state().map;
+    for (int i = 0; i < static_cast<int>(before.size()) && i < game.unitCount(); ++i) {
+        const auto& u = game.unit(i);
+        if (u.nation < 4 || !game.onMap(i)) {
+            continue;
+        }
+        // On land, not on a lost city rumour, its moves used up, and marked
+        // in the path layer as the last to come there.
+        VCR_CHECK(map.at(u.x, u.y).isLand() && !rumourAt(map, u.x, u.y));
+        VCR_CHECK(game.movesLeft(i) == 0);
+        if (std::make_pair(u.x, u.y) != before[static_cast<std::size_t>(i)]) {
+            ++moved;
+        }
+    }
+    VCR_CHECK(moved > 10); // measured: 22 of 25 moved in the original
 }

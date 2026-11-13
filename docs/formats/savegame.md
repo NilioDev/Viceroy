@@ -70,8 +70,13 @@ bit 2 no fish on this pattern square of the sea, or silver instead of ore
 on a mountain (see [map drawing](../rules/map-drawing.md)), bit 3 road,
 bit 6 plowed. The other bits are kept as they are.
 
-**Path.** Region numbers used for route finding (kept as they are). Lost
-city rumours were only seen on squares where the high nibble is 0xF.
+**Path.** The low four bits are region numbers used for route finding
+(kept as they are). The high four bits name the nation that last came onto
+the square, 0xF for none (read from the original): a unit arriving on an
+empty square writes its nation there and leaves it when it goes, a native
+unit not on a lost city rumour's square. With the mask's unit and colony
+bits it tells whose unit or town stands on a square, and a rumour lies only
+where nobody has been.
 
 **Seen.** Bits 4 to 7: explored by the English, French, Spanish and Dutch.
 Checked: in `COLONY00.SAV` (a Dutch game) exactly the squares without bit

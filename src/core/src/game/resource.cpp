@@ -80,4 +80,18 @@ Resource resourceAt(const SaveMap& map, int x, int y) {
     return kOpen[ground];
 }
 
+bool rumourAt(const SaveMap& map, int x, int y) {
+    // Read from the original: the squares of a pattern set by the resource
+    // seed, on land that is not arctic, where nobody stands.
+    if (!map.inside(x, y) || map.resourceSeed == 0) {
+        return false;
+    }
+    const auto& sq = map.at(x, y);
+    if (!sq.isLand() || sq.terrain == 24 || (sq.region >> 4) != 0x0F) {
+        return false;
+    }
+    const int v = ((y >> 2) * 19 + (x >> 2) * 17 + map.resourceSeed + 8) & 31;
+    return v - ((x & 3) << 2) == (y & 3);
+}
+
 } // namespace viceroy
