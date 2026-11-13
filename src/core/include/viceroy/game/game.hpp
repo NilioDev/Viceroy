@@ -224,6 +224,11 @@ public:
     // Fights the colonist; when the attacker wins it marches in and takes
     // the colony with its share of the owner's gold.
     CombatOutcome attackColony(int attacker, int colony, int colonist);
+    // A ship that lost a fight and is being repaired (bit 0x80 of byte 4).
+    bool isDamagedShip(int index) const;
+    // A ship's odds in getting away from a stronger one: its share of the
+    // two ships' values decides.
+    int evasion(int ship) const;
     // The attacker wins with a roll of 1 to attack + defense at or below
     // attack.
     static bool attackerWins(int attack, int defense, int roll);
@@ -268,6 +273,8 @@ private:
                                      int defenderExtra) const;
     SaveUnit colonistAsUnit(int colony, int colonist) const;
     void captureColony(int colony, int attacker);
+    void loseShip(int loser, int winner);
+    void repairShips();
     int addColonyBonus(CombatSide& side, int colony) const; // its quarters
 };
 

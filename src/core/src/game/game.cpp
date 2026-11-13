@@ -119,7 +119,7 @@ int Game::moveCost(int index, int fromX, int fromY, int toX, int toY) const {
 
 MoveResult Game::move(int index, Step step) {
     auto& u = save_.units[static_cast<std::size_t>(index)];
-    if (!onMap(index)) {
+    if (!onMap(index) || isDamagedShip(index)) {
         return MoveResult::Blocked;
     }
     const int toX = u.x + step.dx;
@@ -221,7 +221,8 @@ void Game::setActiveUnit(int index) {
 
 bool Game::needsOrders(int index) const {
     const auto& u = unit(index);
-    return u.nation == human() && onMap(index) && u.orders == SaveUnit::kNoOrders && movesLeft(index) > 0;
+    return u.nation == human() && onMap(index) && u.orders == SaveUnit::kNoOrders && movesLeft(index) > 0 &&
+           !isDamagedShip(index);
 }
 
 std::vector<int> Game::passengers(int ship) const {
@@ -593,6 +594,7 @@ void Game::endTurn() {
         }
     }
     gatherCrosses();
+    repairShips();
     sailOn();
     for (int i = 0; i < unitCount(); ++i) {
         auto& u = save_.units[static_cast<std::size_t>(i)];
@@ -737,7 +739,7 @@ void Game::leaveShipInPort(int index) {
 }
 
 bool Game::sailToNewWorld(int ship) {
-    if (!isShip(ship) || europePlace(unit(ship)) != EuropePlace::InPort) {
+    if (!isShip(ship) || isDamagedShip(ship) || europePlace(unit(ship)) != EuropePlace::InPort) {
         return false;
     }
     const auto aboard = passengersInPort(ship);

@@ -6,6 +6,8 @@
 #include "viceroy/game/game.hpp"
 
 #include <algorithm>
+#include <cstdlib>
+#include <functional>
 
 namespace viceroy {
 
@@ -64,7 +66,7 @@ int demotedType(int type) {
 
 bool Game::canAttack(int index) const {
     const auto& u = unit(index);
-    if (!onMap(index) || isShip(index) || isAboard(index) || u.type < 0 ||
+    if (!onMap(index) || isAboard(index) || isDamagedShip(index) || u.type < 0 ||
         u.type >= static_cast<int>(rules_.units.size())) {
         return false;
     }
@@ -75,7 +77,8 @@ int Game::defenderAt(int x, int y, int attacker) const {
     int best = -1;
     int bestStrength = -1;
     for (const int other : unitsAt(x, y)) {
-        if (unit(other).nation == unit(attacker).nation || isShip(other)) {
+        // Ships fight ships, land units land units.
+        if (unit(other).nation == unit(attacker).nation || isShip(other) != isShip(attacker)) {
             continue;
         }
         const int strength = analyseAttack(attacker, other).defender.strength();
@@ -401,6 +404,151 @@ void Game::captureColony(int colony, int attacker) {
     notices_.push_back(std::move(notice));
 }
 
+bool Game::isDamagedShip(int index) const {
+    return isShip(index) && (unit(index).raw[4] & SaveUnit::kDamaged) != 0;
+}
+
+namespace {
+constexpr int kGalleon = 15;
+constexpr int kPrivateer = 16;
+constexpr int kFrigate = 17;
+constexpr int kManOWar = 18;
+} // namespace
+
+int Game::evasion(int ship) const {
+    // Read from the original: the ship's moves in thirds plus a move, twice
+    // that for a privateer, a move more for a galleon, and a move and a
+    // third less for each hold in use; at least 1. Checked: frigate 21,
+    // merchantman 18, galleon 24, privateer 54.
+    int v = movementAllowance(ship) + 3;
+    const int type = unit(ship).type;
+    if (type == kPrivateer) {
+        v *= 2;
+    }
+    if (type == kGalleon) {
+        v += 3;
+    }
+    v -= 4 * unit(ship).holds;
+    return std::max(1, v);
+}
+
+void Game::loseShip(int loser, int winner) {
+    // Read from the original and checked in six fights: the winner's guns
+    // against the loser's hull decide between damaged and sunk, but a
+    // nation's last ship of a kind is only damaged.
+    const auto& lt = rules_.units[static_cast<std::size_t>(unit(loser).type)];
+    const auto& wt = rules_.units[static_cast<std::size_t>(unit(winner).type)];
+    const int nation = unit(loser).nation;
+    const bool winnerShip = isShip(winner);
+    bool damaged = true;
+    if (wt.attack > 0 && wt.guns > 0) {
+        damaged = 1 + nextRandom(wt.guns + lt.hull) <= lt.hull;
+        if (!damaged) {
+            int same = 0;
+            for (const auto& u : save_.units) {
+                same += u.nation == nation && u.type == unit(loser).type ? 1 : 0;
+            }
+            damaged = same < 2;
+        }
+    }
+    const auto aboard = passengers(loser);
+    if (!damaged) {
+        // "Dutch Frigate sunk by English Privateer!"
+        GameNotice notice{"SHIPSUNK", {"", lt.name, "", wt.name}};
+        notice.adjectives = {{0, nation}, {2, unit(winner).nation}};
+        notices_.push_back(std::move(notice));
+        std::vector<int> gone = aboard;
+        gone.push_back(loser);
+        std::sort(gone.begin(), gone.end(), std::greater<>());
+        for (const int g : gone) {
+            removeUnit(g);
+        }
+        return;
+    }
+    // Damaged: cargo and passengers are lost and the ship goes at once to
+    // the nearest of its nation's colonies with a drydock, or to Europe.
+    std::vector<int> gone = aboard;
+    std::sort(gone.begin(), gone.end(), std::greater<>());
+    int ship = loser;
+    for (const int g : gone) {
+        removeUnit(g);
+        if (g < ship) {
+            --ship;
+        }
+    }
+    auto& l = save_.units[static_cast<std::size_t>(ship)];
+    l.raw[4] = static_cast<std::uint8_t>(l.raw[4] | SaveUnit::kDamaged);
+    l.holds = 0;
+    l.orders = SaveUnit::kNoOrders;
+    l.movesUsed = movementAllowance(ship);
+    // The repair starts from how much the winner fell short of the loser's
+    // strength (measured: a frigate beaten by a merchantman starts at 10 of
+    // 16).
+    const int beat = wt.combat * (winnerShip ? 1 : 2);
+    int start = std::max(0, lt.combat - beat);
+    if (l.type == kFrigate) {
+        start = std::max(start, 4);
+    } else if (l.type == kManOWar) {
+        start = std::max(start, 8);
+    }
+    l.workTurns = start;
+    int best = -1;
+    int bestDistance = 0;
+    for (std::size_t c = 0; c < save_.colonies.size(); ++c) {
+        const auto& col = save_.colonies[c];
+        if (col.nation != nation || buildingLevel(col, BuildingKind::Docks) < 2) {
+            continue;
+        }
+        const int distance = std::max(std::abs(col.x - l.x), std::abs(col.y - l.y));
+        if (best < 0 || distance < bestDistance) {
+            best = static_cast<int>(c);
+            bestDistance = distance;
+        }
+    }
+    GameNotice notice{"SHIPDAMAGE", {"", lt.name, ""}};
+    notice.adjectives = {{0, nation}};
+    if (best >= 0) {
+        const auto& col = save_.colonies[static_cast<std::size_t>(best)];
+        l.x = col.x;
+        l.y = col.y;
+        notice.strings[2] = col.name;
+    } else {
+        setEuropeStage(l, kPortStage);
+        notice.value = nation; // the screen names the home port
+    }
+    notices_.push_back(std::move(notice));
+}
+
+void Game::repairShips() {
+    // Read from the original: a damaged ship's counter (byte 22) goes up a
+    // turn, two in a drydock on the map, until it reaches the ship's
+    // combat value. Measured: 10 of 16 for a frigate at Jamestown was
+    // repaired three turns later.
+    for (int i = 0; i < unitCount(); ++i) {
+        if (!isDamagedShip(i)) {
+            continue;
+        }
+        auto& u = save_.units[static_cast<std::size_t>(i)];
+        u.workTurns += onMap(i) ? 2 : 1;
+        const int needed = rules_.units[static_cast<std::size_t>(u.type)].combat;
+        if (u.workTurns < needed) {
+            continue;
+        }
+        u.raw[4] = static_cast<std::uint8_t>(u.raw[4] & ~SaveUnit::kDamaged);
+        u.workTurns = 0;
+        if (u.nation == human()) {
+            // "Frigate has completed its repairs in Jamestown."
+            GameNotice notice{"REFIT", {rules_.units[static_cast<std::size_t>(u.type)].name, ""}};
+            if (const auto colony = colonyAt(u.x, u.y)) {
+                notice.strings[1] = save_.colonies[static_cast<std::size_t>(*colony)].name;
+            } else {
+                notice.value = u.nation;
+            }
+            notices_.push_back(std::move(notice));
+        }
+    }
+}
+
 bool Game::attackerWins(int attack, int defense, int roll) {
     (void)defense;
     return roll <= attack;
@@ -420,6 +568,32 @@ CombatOutcome Game::attack(int attacker, int defender) {
     const bool won = s.attack + s.defense > 0 && attackerWins(s.attack, s.defense, roll);
     auto& a = save_.units[static_cast<std::size_t>(attacker)];
     a.movesUsed = movementAllowance(attacker);
+    if (isShip(attacker) && isShip(defender)) {
+        // Observed: after the roll, whoever won, a ship with less attack than
+        // its attacker may get away; the odds are its share of the two
+        // ships' speeds.
+        const auto& at = rules_.units[static_cast<std::size_t>(unit(attacker).type)];
+        const auto& dt = rules_.units[static_cast<std::size_t>(unit(defender).type)];
+        if (dt.attack < at.attack) {
+            const int fa = evasion(attacker);
+            const int fd = evasion(defender);
+            if (1 + nextRandom(fa + fd) <= fd) {
+                // "English Merchantman evades Dutch Frigate."
+                GameNotice notice{"EVASIVE", {"", dt.name, "", at.name}};
+                notice.adjectives = {{0, unit(defender).nation}, {2, unit(attacker).nation}};
+                notices_.push_back(std::move(notice));
+                refreshUnitFlags();
+                return CombatOutcome::Evaded;
+            }
+        }
+        if (won) {
+            loseShip(defender, attacker);
+        } else {
+            loseShip(attacker, defender);
+        }
+        refreshUnitFlags();
+        return won ? CombatOutcome::AttackerWon : CombatOutcome::DefenderWon;
+    }
     if (won) {
         loseBattle(defender, attacker);
         promote(attacker, s.attack, s.defense);

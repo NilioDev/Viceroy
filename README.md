@@ -37,7 +37,9 @@ touch controls.
 > before breaking a peace treaty, the Combat Analysis option shows the
 > odds, the fight is rolled the way the original rolls it (with its help
 > on the easy levels), the loser is demoted, damaged or captured, and a
-> winning soldier can harden to a veteran. The other nations don't move
+> winning soldier can harden to a veteran. Warships fight other ships: the
+> weaker one may evade, and a beaten ship sinks or limps to a drydock or
+> Europe for repairs. The other nations don't move
 > yet, and meeting the natives is still to come. Fish,
 > ore and the other resources show on the map where the original puts them
 > and add to what your colonists make there;
@@ -86,7 +88,7 @@ saved in the first free slot, or over the savegame saved longest ago.
 | Move the active unit | Numeric keypad 1-9, arrow keys, Home / PgUp / End / PgDn for diagonals, or click a square next to it | Left stick or D-pad |
 | Move the map | Click any other square to bring it to the middle, or click the small map | Right stick |
 | No orders this turn | Space | A |
-| Attack a foreign unit | Move a soldier, dragoon or artillery onto its square; any key closes the Combat Analysis | Left stick or D-pad |
+| Attack a foreign unit | Move a soldier, dragoon, artillery or warship onto its square; any key closes the Combat Analysis | Left stick or D-pad |
 | End the turn (when asked) | Enter | A |
 | End the turn now | Ctrl+E | Y |
 | Wait (come back to this unit later) | W | |

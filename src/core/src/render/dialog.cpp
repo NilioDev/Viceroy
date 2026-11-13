@@ -295,6 +295,16 @@ void placeUnitDialog(Dialog& d, int unit) {
     d.y = (Screen::kHeight - dialogHeight(d)) / 2;
 }
 
+void placeNavalDialog(Dialog& d) {
+    // Measured with the high seas question: the naval adviser stands over
+    // the box's left end.
+    d.portrait = kNavalAdvisor;
+    d.x = 64;
+    d.y = 108;
+    d.portraitX = 60;
+    d.portraitY = 37;
+}
+
 void placeTutorialDialog(Dialog& d) {
     d.portrait = kNavalAdvisor;
     d.portraitBehind = false; // his hands lie over the box

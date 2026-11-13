@@ -201,7 +201,7 @@ void PlayScreen::moveActive(Step step) {
         const auto colony = game_.colonyAt(tx, ty);
         if (defender >= 0 && !game_.settlementAt(tx, ty)) {
             startAttack(index, defender);
-        } else if (colony && game_.canAttack(index) && game_.colonyUndefended(*colony)) {
+        } else if (colony && !game_.isShip(index) && game_.canAttack(index) && game_.colonyUndefended(*colony)) {
             startAttack(index, -1, *colony);
         } else {
             say("Someone else is there.");
@@ -212,12 +212,7 @@ void PlayScreen::moveActive(Step step) {
         say("");
         ask("SAILHOME", index);
         if (dialog_) {
-            // Measured: the naval adviser stands over the box's left end.
-            dialog_->x = 64;
-            dialog_->y = 108;
-            dialog_->portrait = kNavalAdvisor;
-            dialog_->portraitX = 60;
-            dialog_->portraitY = 37;
+            placeNavalDialog(*dialog_);
         }
         break;
     }
@@ -409,6 +404,23 @@ void PlayScreen::showNotices() {
         ask(notice.section, -1, notice.strings, game_.human());
         if (dialog_) {
             placeReligiousDialog(*dialog_);
+        }
+        return;
+    }
+    if (notice.section == "EVASIVE" || notice.section == "SHIPDAMAGE" || notice.section == "SHIPSUNK" ||
+        notice.section == "REFIT") {
+        // Sea battles and repairs: a ship sent to Europe names the home
+        // port. Observed: the naval advisor tells them.
+        if (notice.value >= 0) {
+            const std::size_t port = notice.section == "REFIT" ? 1 : 2;
+            if (notice.strings.size() <= port) {
+                notice.strings.resize(port + 1);
+            }
+            notice.strings[port] = textLine(art_->names, "HOMEPORT", notice.value, "");
+        }
+        ask(notice.section, -1, notice.strings, -1, notice.numbers);
+        if (dialog_) {
+            placeNavalDialog(*dialog_);
         }
         return;
     }

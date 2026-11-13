@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "test.hpp"
 
+#include "viceroy/game/colony.hpp"
+#include "viceroy/game/europe.hpp"
 #include "viceroy/game/game.hpp"
 
 #include <algorithm>
+#include <functional>
 
 using namespace viceroy;
 
@@ -334,4 +337,174 @@ VCR_TEST("combat: units in a colony get its bonus instead of the terrain's") {
     VCR_CHECK(!g.colonyUndefended(0));
     const auto a = g.analyseAttack(0, 1);
     VCR_CHECK(labels(a.defender) == std::vector<int>{kColony, kFortified});
+}
+
+namespace {
+constexpr int kMerchantman = 14;
+constexpr int kGalleon = 15;
+constexpr int kPrivateer = 16;
+constexpr int kFrigate = 17;
+
+// A 3 × 3 sea with a Dutch frigate at (1, 0) and a French merchantman at
+// (1, 1); the corner (2, 2) is land. `turn` changes the dice.
+Game seaBattle(int turn, int attackerType = kFrigate, int defenderType = kMerchantman) {
+    SaveGame s;
+    s.year = 1600;
+    s.turn = turn;
+    s.humanNation = kDutch;
+    s.map.width = 3;
+    s.map.height = 3;
+    s.map.squares.resize(9);
+    for (auto& sq : s.map.squares) {
+        sq.terrain = 25;
+    }
+    s.map.at(2, 2).terrain = 0;
+    SaveUnit a;
+    a.x = 1;
+    a.y = 0;
+    a.type = attackerType;
+    a.nation = kDutch;
+    SaveUnit d = a;
+    d.y = 1;
+    d.type = defenderType;
+    d.nation = kFrench;
+    s.units = {a, d};
+    Ruleset rules;
+    rules.units.resize(19);
+    const auto set = [&](int row, const char* name, int movement, int attack, int combat, int guns, int hull) {
+        auto& u = rules.units[static_cast<std::size_t>(row)];
+        u.name = name;
+        u.movement = movement;
+        u.attack = attack;
+        u.combat = combat;
+        u.cargoSlots = 4;
+        u.guns = guns;
+        u.hull = hull;
+    };
+    set(unit_type::kColonist, "Colonists", 1, 0, 1, 0, 0);
+    set(kMerchantman, "Merchantman", 5, 0, 6, 0, 6);
+    set(kGalleon, "Galleon", 6, 0, 10, 0, 10);
+    set(kPrivateer, "Privateer", 8, 8, 8, 8, 8);
+    set(kFrigate, "Frigate", 6, 16, 16, 16, 16);
+    rules.terrain.resize(27);
+    return Game(std::move(s), rules);
+}
+
+// Fights in fresh games until the outcome comes up.
+Game seaBattleUntil(CombatOutcome wanted, const std::function<void(Game&)>& setUp = {}) {
+    for (int turn = 0; turn < 2000; ++turn) {
+        Game g = seaBattle(turn);
+        if (setUp) {
+            setUp(g);
+        }
+        if (g.attack(0, 1) == wanted) {
+            return g;
+        }
+    }
+    VCR_CHECK(false);
+    return seaBattle(0);
+}
+} // namespace
+
+VCR_TEST("combat: how well a ship gets away (read from the original)") {
+    Game g = seaBattle(0);
+    VCR_CHECK(g.evasion(0) == 21); // frigate: 6 moves in thirds, plus 3
+    VCR_CHECK(g.evasion(1) == 18);
+    g.state().units[1].holds = 2;
+    VCR_CHECK(g.evasion(1) == 10); // 4 less for each hold in use
+    g.state().units[1].holds = 5;
+    VCR_CHECK(g.evasion(1) == 1);
+    g.state().units[1].holds = 0;
+    g.state().units[1].type = kGalleon;
+    VCR_CHECK(g.evasion(1) == 24);
+    g.state().units[1].type = kPrivateer;
+    VCR_CHECK(g.evasion(1) == 54);
+}
+
+VCR_TEST("combat: a merchantman may evade a frigate") {
+    Game g = seaBattleUntil(CombatOutcome::Evaded);
+    VCR_CHECK(g.unitCount() == 2);
+    VCR_CHECK(!g.isDamagedShip(0) && !g.isDamagedShip(1));
+    VCR_CHECK(g.movesLeft(0) == 0);
+    const auto notices = g.takeNotices();
+    VCR_CHECK(notices.size() == 1 && notices[0].section == "EVASIVE");
+}
+
+VCR_TEST("combat: a nation's last ship of a kind is damaged, not sunk") {
+    for (int i = 0; i < 10; ++i) {
+        Game g = seaBattleUntil(CombatOutcome::AttackerWon, [i](Game& game) { game.state().turn += 2000 * (i + 1); });
+        VCR_CHECK(g.unitCount() == 2);
+        VCR_CHECK(g.isDamagedShip(1));
+    }
+}
+
+VCR_TEST("combat: a sunk ship takes its passengers down") {
+    bool sank = false;
+    for (int i = 0; i < 20 && !sank; ++i) {
+        Game g = seaBattleUntil(CombatOutcome::AttackerWon, [i](Game& game) {
+            auto& s = game.state();
+            s.turn += 2000 * (i + 1);
+            SaveUnit other = s.units[1];
+            other.x = 0;
+            other.y = 2;
+            SaveUnit passenger = s.units[1];
+            passenger.type = unit_type::kColonist;
+            s.units.push_back(other);
+            s.units.push_back(passenger);
+        });
+        if (g.unitCount() == 2) {
+            sank = true;
+            const auto notices = g.takeNotices();
+            VCR_CHECK(notices.size() == 1 && notices[0].section == "SHIPSUNK");
+            VCR_CHECK(g.unit(1).x == 0 && g.unit(1).y == 2);
+        } else {
+            VCR_CHECK(g.unitCount() == 3); // damaged: the passenger is lost
+            VCR_CHECK(g.isDamagedShip(1));
+        }
+    }
+    VCR_CHECK(sank);
+}
+
+VCR_TEST("combat: a frigate beaten by a merchantman is repaired at the drydock (measured)") {
+    Game g = seaBattleUntil(CombatOutcome::DefenderWon, [](Game& game) {
+        auto& s = game.state();
+        SaveColony c;
+        c.x = 2;
+        c.y = 2;
+        c.name = "Jamestown";
+        c.nation = kDutch;
+        setBuildingLevel(c, BuildingKind::Docks, 2);
+        s.colonies.push_back(c);
+        s.map.at(2, 2).flags |= MapSquare::kHasColony;
+        s.units[0].holds = 3;
+    });
+    VCR_CHECK(g.isDamagedShip(0));
+    VCR_CHECK(g.unit(0).x == 2 && g.unit(0).y == 2);
+    VCR_CHECK(g.unit(0).holds == 0);
+    VCR_CHECK(g.unit(0).workTurns == 10); // 16 - 6
+    auto notices = g.takeNotices();
+    VCR_CHECK(notices.size() == 1 && notices[0].section == "SHIPDAMAGE");
+    VCR_CHECK(notices[0].strings.at(2) == "Jamestown");
+    VCR_CHECK(g.move(0, {1, 0}) == MoveResult::Blocked);
+    VCR_CHECK(!g.needsOrders(0));
+    VCR_CHECK(!g.canAttack(0));
+    g.endTurn();
+    g.endTurn();
+    VCR_CHECK(g.isDamagedShip(0));
+    g.endTurn();
+    VCR_CHECK(!g.isDamagedShip(0));
+    notices = g.takeNotices();
+    VCR_CHECK(std::any_of(notices.begin(), notices.end(), [](const GameNotice& n) {
+        return n.section == "REFIT" && n.strings.at(1) == "Jamestown";
+    }));
+}
+
+VCR_TEST("combat: without a drydock a damaged ship goes back to Europe") {
+    Game g = seaBattleUntil(CombatOutcome::DefenderWon);
+    VCR_CHECK(g.isDamagedShip(0));
+    VCR_CHECK(!g.onMap(0));
+    VCR_CHECK(europePlace(g.unit(0)) == EuropePlace::InPort);
+    VCR_CHECK(!g.sailToNewWorld(0));
+    const auto notices = g.takeNotices();
+    VCR_CHECK(notices.size() == 1 && notices[0].section == "SHIPDAMAGE" && notices[0].value == kDutch);
 }
