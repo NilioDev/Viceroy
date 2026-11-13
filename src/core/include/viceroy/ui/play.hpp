@@ -189,7 +189,7 @@ private:
     std::vector<int> unitOptions_;
     void openUnitOptions(int unit, bool first);
     // A unit at a native settlement: what each option of the greeting does.
-    enum VillageOption { kVillageLive, kVillageMission, kVillageSpeak, kVillageCancel };
+    enum VillageOption { kVillageTrade, kVillageLive, kVillageMission, kVillageSpeak, kVillageCancel };
     std::vector<int> villageOptions_;
     int village_ = -1;
     void enterVillage(int unit, int settlement);
@@ -205,6 +205,25 @@ private:
     void speakWithChief(int unit);
     void showChiefAnswer();
     void foundMission(int unit);
+    // A trade at a settlement, step by step.
+    struct VillageTrade {
+        int unit = -1;
+        Game::VillageSale sale;
+        Game::VillagePurchase purchase;
+        std::vector<int> holds;    // the TRADEWHICH list
+        std::vector<int> forSale;  // the BUYWHICH list
+        int sold = -1;             // the good offered, -1 for none
+        int amount = 0;            // and how much
+    };
+    std::optional<VillageTrade> trade_;
+    void startTrade(int unit);
+    void offerHold(int hold);
+    void showSale();
+    void afterSale();
+    void offerToBuy();
+    void showPurchase();
+    void endTrade(const std::string& section, std::vector<std::string> strings, std::vector<int> numbers = {});
+    std::string goodName(int good) const;
     std::vector<GameNotice> notices_; // messages still to show, first first
     const Art* art_ = nullptr;
     int lastColony_ = -1;

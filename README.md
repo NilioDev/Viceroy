@@ -44,8 +44,8 @@ touch controls.
 > speak with the chief for guides, tales of the land, a gift or an
 > early death, as in the original. Missionaries can found missions,
 > which the tribe takes well or badly as in the original. The other
-> nations don't move yet, and trade with the natives is still to come.
-> Fish,
+> nations don't move yet. Wagon trains and ships can trade with the
+> natives: sell, haggle, give and buy at the original's prices. Fish,
 > ore and the other resources show on the map where the original puts them
 > and add to what your colonists make there;
 > lost city rumours are not drawn yet.
