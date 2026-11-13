@@ -79,6 +79,8 @@ void placeBuyDialog(Dialog& dialog);
 // Options for a unit in a colony: the unit's picture at the top left, the
 // text beside it, the box centred on the screen.
 void placeUnitDialog(Dialog& dialog, int unit);
+// The naval advisor over the left end of the box (sea matters).
+void placeNavalDialog(Dialog& dialog);
 // The tutorial's hints: the naval advisor, his hands over the box.
 void placeTutorialDialog(Dialog& dialog);
 // The name of a European nation as the messages use it ("the Netherlands").

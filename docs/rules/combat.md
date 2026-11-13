@@ -130,6 +130,42 @@ All told by the colonial advisor, box at x 54 centred on row 139:
 The map stays on the fight while the message is up; then the next unit
 gets its turn.
 
+## Naval combat
+
+Measured the same way, with a Dutch frigate (and a Dutch merchantman as
+the attacked side) next to English and French ships, and partly read from
+the original with a debugger.
+
+- A ship with an attack value attacks a foreign ship by sailing onto it.
+  Ships only fight ships; a ship cannot attack a colony.
+- The strengths and the roll are those of a land fight.
+- After the roll, whatever it gave, a defender with less attack than its
+  attacker may get away: a second roll of 1 to `f(attacker) + f(defender)`
+  at or below `f(defender)` lets it evade (`@EVASIVE`). `f` is the ship's
+  moves in thirds plus 3, doubled for a privateer, plus 3 for a galleon,
+  minus 4 for each hold in use, and at least 1.
+- The losing ship is sunk or damaged: a roll of 1 to the winner's guns
+  plus the loser's hull at or below the hull means damaged. A nation's last
+  ship of a kind is always damaged, and so is a ship beaten by one without
+  guns. A sunk ship (`@SHIPSUNK`) takes the units aboard down with it.
+- The attacker can lose too: a frigate attacking a merchantman (392 to
+  48 with its bonuses) lost about one fight in nine.
+- A damaged ship (bit `0x80` of byte 4) loses its cargo and the units
+  aboard and goes at once to the nearest of its nation's colonies with a
+  drydock, or else to the docks in Europe (`@SHIPDAMAGE`). It cannot move
+  or sail until it is repaired.
+- Its repair counter (byte 22) starts at the loser's combat minus the
+  winner's (doubled if the winner is not a ship), at least 4 for a frigate
+  and 8 for a man-o-war. Each turn it goes up 1, or 2 at a colony on the
+  map, and the ship is repaired once it reaches its combat value
+  (`@REFIT`). Measured: a frigate beaten by a merchantman started at 10 and
+  was repaired after three turns at Jamestown.
+- These messages come from the naval advisor.
+
+Not measured yet: the exact rules for which ships may be sunk in some rarer
+cases, how the nearest drydock is counted, and repairs in Europe (taken as
+1 a turn).
+
 ## The Combat Analysis box
 
 214 pixels wide and 26 + 20 per row high, centred on the screen, in the

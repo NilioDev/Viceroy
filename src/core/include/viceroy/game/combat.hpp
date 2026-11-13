@@ -65,6 +65,7 @@ struct CombatStrengths {
 enum class CombatOutcome {
     AttackerWon,
     DefenderWon,
+    Evaded, // a ship got away
 };
 
 } // namespace viceroy
