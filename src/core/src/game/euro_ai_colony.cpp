@@ -9,6 +9,7 @@
 #include "viceroy/game/europe.hpp"
 #include "viceroy/game/game.hpp"
 #include "viceroy/game/natives.hpp"
+#include "viceroy/game/resource.hpp"
 
 #include <algorithm>
 #include <cstdlib>
@@ -32,6 +33,11 @@ constexpr std::size_t kRegionFlags = kExtra + 156;
 constexpr std::size_t kRegionAttackOut = kExtra + 300;
 constexpr std::size_t kTribeDefence = kExtra + 565; // each tribe's strength, from its count
 constexpr std::size_t kTribeRegionDefence = kExtra + 589;
+constexpr std::size_t kColonyCount = kExtra + 16;
+constexpr std::size_t kPeople = kExtra + 28;
+constexpr std::size_t kHoldsAll = kExtra + 36;
+constexpr std::size_t kArmedShips = kExtra + 52;
+constexpr std::size_t kRegionColonies = kExtra + 236;
 constexpr std::size_t kBlockEnd = kExtra + 727;
 
 // Nation record.
@@ -108,6 +114,105 @@ int distance(int dx, int dy) {
     const int ax = std::abs(dx);
     const int ay = std::abs(dy);
     return std::max(ax, ay) + std::min(ax, ay) / 2;
+}
+
+// A building's levels in the original's chain of rows: the next row up
+// (-1 at the top) and the one it needs below (-1 at the bottom).
+int nextRow(int row) {
+    for (const auto& f : kBuildingFields) {
+        if (row >= f.shift && row < f.shift + f.bits) {
+            return row + 1 < f.shift + f.bits ? row + 1 : (row == 15 ? 16 : -1);
+        }
+    }
+    return -1;
+}
+
+int rowBelow(int row) {
+    if (row == 16) {
+        return 15;
+    }
+    for (const auto& f : kBuildingFields) {
+        if (row >= f.shift && row < f.shift + f.bits) {
+            return row > f.shift ? row - 1 : -1;
+        }
+    }
+    return -1;
+}
+
+// The levels built from this row up its chain.
+int levelsFrom(const SaveColony& c, int row) {
+    int n = 0;
+    for (; row >= 0; row = nextRow(row)) {
+        n += hasBuilding(c, row) ? 1 : 0;
+    }
+    return n;
+}
+
+int topRow(int row) {
+    while (nextRow(row) >= 0) {
+        row = nextRow(row);
+    }
+    return row;
+}
+
+// Each craft as the plans see it: its building, the good its people make
+// and the raw good they use.
+struct Craft {
+    int building;
+    int job;
+    int raw;
+};
+constexpr std::array<Craft, 6> kCrafts{{
+    {3, 15, cargo::kTools},  // armory: muskets from tools
+    {39, 14, cargo::kOre},   // blacksmith: tools from ore
+    {32, 12, cargo::kFurs},  // fur trader: coats from furs
+    {27, 9, cargo::kSugar},  // distiller: rum from sugar
+    {24, 10, cargo::kTobacco}, // tobacconist: cigars from tobacco
+    {21, 11, cargo::kCotton},  // weaver: cloth from cotton
+}};
+
+// The value of a resource to the colony's work on the land, by the
+// original's order of resources.
+int resourceValue(Resource r) {
+    switch (r) {
+    case Resource::DepletedSilver:
+        return 6;
+    case Resource::Oasis:
+        return 3;
+    case Resource::Grain:
+        return 4;
+    case Resource::Cotton:
+    case Resource::Tobacco:
+    case Resource::Beaver:
+    case Resource::Deer:
+    case Resource::Timber:
+    case Resource::HillsOre:
+        return 6;
+    case Resource::Sugar:
+        return 7;
+    case Resource::Minerals:
+        return 4;
+    case Resource::Fish:
+        return 5;
+    case Resource::Silver:
+        return 12;
+    case Resource::None:
+        break;
+    }
+    return -1;
+}
+
+// Whose units, or else whose colony or settlement, are on the square.
+int ownerOn(const SaveMap& map, int x, int y) {
+    if (!map.inside(x, y)) {
+        return -1;
+    }
+    const auto& sq = map.at(x, y);
+    if ((sq.flags & (MapSquare::kHasUnit | MapSquare::kHasColony)) == 0) {
+        return -1;
+    }
+    const int who = sq.region >> 4;
+    return who == 0x0F ? -1 : who;
 }
 
 int alarmFor(const SaveSettlement& s, int nation) {
@@ -556,6 +661,22 @@ void Game::aiColonyPlan(int c) {
         }
     }
 
+    // Every seventh turn, a road towards a colony nearby; on other turns,
+    // its own work on the land. Either uses 20 tools.
+    bool worked = false;
+    if (toolsOk && save_.turn % 7 == 0) {
+        worked = aiRoadToColony(c);
+    } else if ((needs & kWantsPioneer) != 0 && toolsOk) {
+        worked = aiImproveLand(c, REG);
+    }
+    if (worked) {
+        colony().stock[cargo::kTools] -= std::min(20, colony().stock[cargo::kTools]);
+        colony().raw[kWorkTools] = 0;
+    }
+
+    // What it builds next.
+    aiChooseConstruction(c, {REG, tribe, want, adjacent, squares, waterSquares});
+
     // Two horses, bought for a ship or wagon train in port.
     if (colony().stock[cargo::kHorses] < 2 && save_.turn >= 40) {
         const auto here = unitsAt(X, Y);
@@ -619,6 +740,543 @@ void Game::aiSendOut(int c, int colonist, int role) {
     }
     removeColonist(colony, colonist);
     refreshUnitFlags();
+}
+
+bool Game::aiRoadToColony(int c) {
+    // A road square towards another of the nation's colonies within six
+    // squares in the same land, along the route finder's way there.
+    const auto& colony = save_.colonies[static_cast<std::size_t>(c)];
+    const int n = colony.nation;
+    const auto& map = save_.map;
+    const int REG = landRegion(map, colony.x, colony.y);
+    const auto& block = save_.tribesAndMore;
+    if (REG < 0 || block.size() < kBlockEnd) {
+        return false;
+    }
+    const int count = block[kRegionColonies + kRegions * static_cast<std::size_t>(n) + static_cast<std::size_t>(REG)];
+    if (count < 2) {
+        return false;
+    }
+    for (std::size_t o = 0; o < save_.colonies.size(); ++o) {
+        const auto& other = save_.colonies[o];
+        if (other.nation != n || static_cast<int>(o) == c || std::abs(other.x - colony.x) >= 7 ||
+            std::abs(other.y - colony.y) >= 7 || landRegion(map, other.x, other.y) != REG ||
+            aiRandom(0, count - 2) != 0) {
+            continue;
+        }
+        // Walk the way there; the first square that is not a town and has
+        // no road is the one.
+        route_.nation = -1;
+        route_.type = unit_type::kSoldier;
+        route_.roads = true;
+        route_.targetX = other.x;
+        route_.targetY = other.y;
+        int x = colony.x;
+        int y = colony.y;
+        bool found = false;
+        for (int steps = 0; steps < 64; ++steps) {
+            const int d = routeFlood(x, y, 99);
+            if (d < 0 || d >= 8) {
+                break;
+            }
+            x += kSteps[static_cast<std::size_t>(d)].dx;
+            y += kSteps[static_cast<std::size_t>(d)].dy;
+            if (x == other.x && y == other.y) {
+                break;
+            }
+            if (!colonyAt(x, y) && (map.at(x, y).flags & (MapSquare::kHasColony | MapSquare::kRoad)) == 0) {
+                found = true;
+                break;
+            }
+        }
+        route_.roads = false;
+        if (!found) {
+            continue;
+        }
+        const int owner = ownerOn(map, x, y);
+        if ((owner >= 0 && owner != n) || (routeEnemyLand(x, y, n) >= 0)) {
+            continue;
+        }
+        const auto row = static_cast<std::size_t>(terrainRow(map.at(x, y)));
+        const int need = (row < rules_.terrain.size() ? rules_.terrain[row].improvementTurns : 0) + 2;
+        if (need > colony.raw[kWorkTools]) {
+            return false;
+        }
+        auto& sq = save_.map.at(x, y);
+        sq.flags = static_cast<std::uint8_t>(sq.flags | MapSquare::kRoad);
+        return true;
+    }
+    return false;
+}
+
+bool Game::aiImproveLand(int c, int REG) {
+    // The colony plows, clears or builds a road on its best square itself,
+    // as a pioneer would in a turn, when it has saved up enough turns.
+    const auto& colony = save_.colonies[static_cast<std::size_t>(c)];
+    const int n = colony.nation;
+    const auto& map = save_.map;
+    const auto& block = save_.tribesAndMore;
+    const auto& nation = save_.nations[static_cast<std::size_t>(n)];
+    const std::uint8_t needs = colony.raw[kNeeds];
+    const bool clearForest = (needs & kForestToClear) != 0;
+    const std::uint8_t regionFlags =
+        block.size() >= kBlockEnd && REG >= 0 ? block[kRegionFlags + static_cast<std::size_t>(REG)] : 0;
+    const auto jobAt = [&](int k) {
+        const int w = k < 8 ? colony.squares[static_cast<std::size_t>(k)] : -1;
+        return w >= 0 && w < colony.population ? static_cast<int>(colony.jobs[static_cast<std::size_t>(w)]) : -1;
+    };
+    // A square is free when no town stands on it, nobody else's units are
+    // there and no other colony works it.
+    const auto free = [&](int x, int y) {
+        if (colonyAt(x, y) || settlementAt(x, y)) {
+            return false;
+        }
+        const int owner = ownerOn(map, x, y);
+        if (owner >= 0 && owner != n) {
+            return false;
+        }
+        for (const auto& other : save_.colonies) {
+            if (&other == &colony || std::abs(other.x - x) > 1 || std::abs(other.y - y) > 1) {
+                continue;
+            }
+            for (std::size_t s = 0; s < 8; ++s) {
+                if (other.squares[s] >= 0 && other.x + kRingX[s] == x && other.y + kRingY[s] == y) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    };
+    // The tribe whose land the square is: the nearest settlement's within
+    // its reach (1, or 2 and 3 for the cities), once met; never a square
+    // the colony works, water, land marked 16, or with Peter Minuit.
+    const auto claimOn = [&](int k, int x, int y) {
+        if (colony.squares[static_cast<std::size_t>(k)] >= 0 || map.at(x, y).isWater() ||
+            (map.at(x, y).flags & 0x10) != 0 || hasFather(n, 2)) {
+            return -1;
+        }
+        int nearest = -1;
+        int nearestDistance = INT32_MAX;
+        for (std::size_t s = 0; s < save_.settlements.size(); ++s) {
+            const auto& st = save_.settlements[s];
+            if (REG >= 0 && landRegion(map, st.x, st.y) != REG) {
+                continue;
+            }
+            const int d = distance(st.x - x, st.y - y);
+            if (d <= nearestDistance) {
+                nearestDistance = d;
+                nearest = static_cast<int>(s);
+            }
+        }
+        if (nearest < 0) {
+            return -1;
+        }
+        const int tribe = tribeOf(save_.settlements[static_cast<std::size_t>(nearest)]);
+        const int level = tribeLevel(save_, tribe);
+        const int reach = level <= 1 ? 1 : level == 2 ? 2 : 3;
+        if (nearestDistance > reach) {
+            return -1;
+        }
+        const int other = kEuropeanNations + tribe;
+        if ((nation.raw[kRelations + static_cast<std::size_t>(other)] & 0x20) == 0) {
+            return -1;
+        }
+        return tribe;
+    };
+    int best = -1;
+    int bestValue = -1;
+    for (int k = 0; k < 8; ++k) {
+        const int x = colony.x + kRingX[static_cast<std::size_t>(k)];
+        const int y = colony.y + kRingY[static_cast<std::size_t>(k)];
+        if (!map.inside(x, y) || map.at(x, y).isWater() || !free(x, y)) {
+            continue;
+        }
+        const auto& sq = map.at(x, y);
+        const int kind = terrainKind(sq);
+        const auto row = static_cast<std::size_t>(terrainRow(sq));
+        int value = row < rules_.terrain.size() ? rules_.terrain[row].value : 0;
+        // (The original's resource test gives none at all with a seed of 0.)
+        const Resource res = map.resourceSeed != 0 ? resourceAt(map, x, y) : Resource::None;
+        if (resourceValue(res) >= 0) {
+            value = resourceValue(res);
+        }
+        const bool roadOrTown = (sq.flags & (MapSquare::kHasColony | MapSquare::kRoad)) != 0;
+        const bool plowed = (sq.flags & MapSquare::kPlowed) != 0;
+        if (clearForest && kind >= 8 && kind < 24) {
+            value *= 2;
+        } else {
+            const int job = jobAt(k);
+            if (job >= 0 && (job < 4 ? !plowed : !roadOrTown)) {
+                value *= 2;
+            }
+            if (roadOrTown && plowed) {
+                continue;
+            }
+        }
+        // Land a tribe claims costs it goodwill.
+        const int claim = claimOn(k, x, y);
+        if (claim >= 0) {
+            int cost = 4 - tribeTension(save_, claim, n);
+            if (resourceValue(res) >= 0) {
+                cost *= 2;
+            }
+            if ((regionFlags & 0x01) != 0 && (colony.raw[kMarks] & 0x20) == 0) {
+                if (!clearForest) {
+                    continue;
+                }
+                cost *= 2;
+            }
+            value -= nation.gold < 2000 ? 2 * cost : cost >> 1;
+        }
+        if (value > bestValue) {
+            bestValue = value;
+            best = k;
+        }
+    }
+    if (best < 0) {
+        return false;
+    }
+    const int x = colony.x + kRingX[static_cast<std::size_t>(best)];
+    const int y = colony.y + kRingY[static_cast<std::size_t>(best)];
+    // Not with the player's units next to it, unless the nation's own
+    // stand on the square.
+    bool ok = true;
+    for (const auto& s : kSteps) {
+        const int who = ownerOn(map, x + s.dx, y + s.dy);
+        if (who >= 0 && who < kEuropeanNations && save_.players[static_cast<std::size_t>(who)].control == 0) {
+            ok = false;
+        }
+    }
+    if (ownerOn(map, x, y) == n) {
+        ok = true;
+    }
+    if (!ok) {
+        return false;
+    }
+    auto& sq = save_.map.at(x, y);
+    const int kind = terrainKind(sq);
+    const bool clear = clearForest && kind >= 8 && kind < 24;
+    const auto row = static_cast<std::size_t>(terrainRow(sq));
+    const int need = (row < rules_.terrain.size() ? rules_.terrain[row].improvementTurns : 0) + 2 + (clear ? 2 : 0);
+    if (colony.raw[kWorkTools] < need) {
+        return false;
+    }
+    const auto plow = [&] {
+        if (sq.isForest()) {
+            sq.terrain = static_cast<std::uint8_t>(sq.terrain - 8);
+        } else {
+            sq.flags = static_cast<std::uint8_t>(sq.flags | MapSquare::kPlowed);
+        }
+        return true;
+    };
+    const auto road = [&] {
+        sq.flags = static_cast<std::uint8_t>(sq.flags | MapSquare::kRoad);
+        return true;
+    };
+    if (clear) {
+        return plow();
+    }
+    const int job = jobAt(best);
+    const bool plowed = (sq.flags & MapSquare::kPlowed) != 0;
+    const bool roadOrTown = (sq.flags & (MapSquare::kHasColony | MapSquare::kRoad)) != 0;
+    if (job >= 0 && job < 4 && !plowed) {
+        return plow();
+    }
+    if (job >= 4 && !roadOrTown) {
+        return road();
+    }
+    if (kind >= 2 && kind <= 7) {
+        return !plowed && plow();
+    }
+    return !roadOrTown && road();
+}
+
+bool Game::aiCanBuild(int c, int row) const {
+    // As the colony screen offers it, with the founding fathers some rows
+    // need.
+    const auto& colony = save_.colonies[static_cast<std::size_t>(c)];
+    if (row < 0 || row >= 42 || hasBuilding(colony, row)) {
+        return false;
+    }
+    const int below = rowBelow(row);
+    if (below >= 0 && !hasBuilding(colony, below)) {
+        return false;
+    }
+    if (static_cast<std::size_t>(row) >= rules_.buildings.size() ||
+        rules_.buildings[static_cast<std::size_t>(row)].minColonySize > colony.population) {
+        return false;
+    }
+    switch (row) {
+    case 10:
+    case 11:
+    case 30:
+        return false;
+    case 6: { // docks: water among its squares
+        bool water = false;
+        for (std::size_t k = 0; k < 8; ++k) {
+            const int x = colony.x + kRingX[k];
+            const int y = colony.y + kRingY[k];
+            water = water || (save_.map.inside(x, y) && save_.map.at(x, y).isWater());
+        }
+        return water;
+    }
+    case 7: // drydock: by the sea
+        return (colony.raw[kMarks] & 0x40) != 0;
+    case 16:
+        return storageLimit(colony) < 300;
+    case 18: // custom house: Peter Stuyvesant
+        return hasFather(colony.nation, 3);
+    case 5:
+    case 23:
+    case 26:
+    case 29:
+    case 34:
+    case 41: // factories: Adam Smith
+        return hasFather(colony.nation, 0);
+    default:
+        return true;
+    }
+}
+
+bool Game::aiTryBuild(int c, int row) {
+    // True to go on down the list: the row is built already, or neither
+    // it nor what it needs can be built. False once a choice is made.
+    auto& colony = save_.colonies[static_cast<std::size_t>(c)];
+    if (row < 0 || hasBuilding(colony, row)) {
+        return true;
+    }
+    bool goOn = false;
+    if (aiCanBuild(c, row)) {
+        colony.construction = row;
+    } else if (aiTryBuild(c, rowBelow(row))) {
+        goOn = true;
+    }
+    if (!goOn) {
+        save_.colonies[static_cast<std::size_t>(c)].raw[kMarks] &= 0x7F;
+    }
+    return goOn;
+}
+
+void Game::aiChooseConstruction(int c, const AiColonyView& view) {
+    auto colony = [&]() -> SaveColony& { return save_.colonies[static_cast<std::size_t>(c)]; };
+    const int n = colony().nation;
+    const auto un = static_cast<std::size_t>(n);
+    const auto& block = save_.tribesAndMore;
+    const bool blockOk = block.size() >= kBlockEnd;
+    const auto& nation = save_.nations[un];
+    const int pop = colony().population;
+    const auto jobCount = [&](int job) {
+        int count = 0;
+        for (int k = 0; k < pop; ++k) {
+            count += colony().jobs[static_cast<std::size_t>(k)] == job ? 1 : 0;
+        }
+        return count;
+    };
+    const int foodWorkers = jobCount(0) + jobCount(8);
+    colony().raw[0x1D] &= 0x7F;
+    colony().construction = -1;
+    const auto unitChoice = [&](int type) {
+        colony().raw[kMarks] &= 0x7F;
+        colony().construction = type + 0x1F;
+    };
+    const auto mark = [&] { colony().raw[0x1D] |= 0x80; };
+
+    // Its experts, and the highest teaching level among them.
+    int experts = 0;
+    int teach = 0;
+    {
+        std::vector<int> skills;
+        for (int k = 0; k < pop; ++k) {
+            skills.push_back(colony().skills[static_cast<std::size_t>(k)]);
+        }
+        for (const int i : unitsAt(colony().x, colony().y)) {
+            if (roleOf(unit(i).type) >= 0) {
+                skills.push_back(unit(i).profession);
+            }
+        }
+        for (const int s : skills) {
+            if (!isExpert(s)) {
+                continue;
+            }
+            ++experts;
+            if (s >= 0 && static_cast<std::size_t>(s) < rules_.jobs.size()) {
+                teach = std::max(teach, rules_.jobs[static_cast<std::size_t>(s)].skillLevel % 4);
+            }
+        }
+    }
+    const auto production = colonyProduction(colony(), save_.map, rules_, save_.difficulty);
+    const auto made = [&](int good) { return production.produced[static_cast<std::size_t>(good)]; };
+    const bool starving =
+        production.foodEaten > made(cargo::kFood) + colony().stock[cargo::kFood];
+    const bool hungry = ((pop >> 1) < foodWorkers && foodWorkers > 1) || starving;
+
+    if (view.squares - view.water <= pop || (view.water != 0 && hungry)) {
+        if (!aiTryBuild(c, 6)) {
+            return;
+        }
+    }
+    if (!aiTryBuild(c, 0)) {
+        return;
+    }
+    if (colony().stock[cargo::kHorses] >= 2 && !aiTryBuild(c, 17)) {
+        return;
+    }
+    if (pop < 4) {
+        mark();
+        return;
+    }
+    const int sixths = pop / 6;
+    if (sixths > colony().raw[149] && colony().raw[149] < 1 && !aiTryBuild(c, 16)) {
+        return;
+    }
+    const int armed = blockOk ? block[kArmedShips + un] : 0;
+    const int humanArmed = blockOk && human() >= 0 && human() < kEuropeanNations
+                               ? block[kArmedShips + static_cast<std::size_t>(human())]
+                               : 0;
+    if (pop >= 6 && ((colony().raw[kNeeds] & 0x03) != 0 || humanArmed - 2 > armed || pop >= 12) &&
+        !aiTryBuild(c, 18)) {
+        return;
+    }
+    const std::uint8_t regionFlags =
+        blockOk && view.region >= 0 ? block[kRegionFlags + static_cast<std::size_t>(view.region)] : 0;
+    if ((colony().raw[kMarks] & 0x20) == 0 && save_.year < 1600 && (regionFlags & 0x01) != 0 && view.tribe >= 0 &&
+        tribeTension(save_, view.tribe, n) < 50 && view.adjacent == 0) {
+        unitChoice(unit_type::kWagonTrain);
+        return;
+    }
+    if (teach >= 1 && pop + experts >= 4 && !aiTryBuild(c, 12)) {
+        return;
+    }
+    if (pop < 6) {
+        mark();
+    }
+    const int musketPrice = bidPrice(nation, cargo::kMuskets);
+    if ((musketPrice + save_.difficulty / 2 >= 4 || save_.turn > 80) && pop >= 6 &&
+        (colony().stock[cargo::kTools] >= 40 || made(cargo::kTools) != 0) && !aiTryBuild(c, 3)) {
+        return;
+    }
+    if (!aiTryBuild(c, 36) || !aiTryBuild(c, 1)) {
+        return;
+    }
+    if (bidPrice(nation, cargo::kMuskets) >= 4 && pop >= 4 &&
+        (colony().stock[cargo::kOre] >= 40 || made(cargo::kOre) != 0) && !aiTryBuild(c, 40)) {
+        return;
+    }
+    if (colony().raw[149] < sixths && !aiTryBuild(c, 16)) {
+        return;
+    }
+    if (made(cargo::kBells) >= 4 && !aiTryBuild(c, 20)) {
+        return;
+    }
+    if (teach >= 2 && pop + experts >= 10 && !aiTryBuild(c, 13)) {
+        return;
+    }
+    if (pop < 8) {
+        mark();
+        return;
+    }
+    if (teach >= 3 && pop + experts >= 16 && !aiTryBuild(c, 14)) {
+        return;
+    }
+    if (!aiTryBuild(c, 37)) {
+        return;
+    }
+    if (pop >= 10 && !aiTryBuild(c, 2)) {
+        return;
+    }
+    bool craftAtTop = false;
+    for (const auto& craft : kCrafts) {
+        craftAtTop = craftAtTop || levelsFrom(colony(), craft.building) == 3;
+    }
+    const auto byType = [&](int type) {
+        return blockOk ? static_cast<int>(block[kByType + kTypesCounted * un + static_cast<std::size_t>(type)]) : 0;
+    };
+    const auto ships = [&]() {
+        // A shipyard builds galleons while the nation's holds fall short,
+        // else privateers and a frigate.
+        const int people = blockOk ? block[kPeople + un] : 0;
+        const int colonies = blockOk ? block[kColonyCount + un] : 0;
+        const int holds = blockOk ? block[kHoldsAll + un] : 0;
+        if ((people >> 1) + colonies >= holds) {
+            unitChoice(15);
+            return true;
+        }
+        if (!(byType(17) == 0 && armed != 0) && armed < 4) {
+            unitChoice(16);
+            return true;
+        }
+        if (byType(17) < 1) {
+            unitChoice(17);
+            return true;
+        }
+        return false;
+    };
+    if (craftAtTop && (colony().raw[kMarks] & 0x40) != 0) {
+        if (!aiTryBuild(c, 8)) {
+            return;
+        }
+        if (hasBuilding(colony(), 8) && ships()) {
+            return;
+        }
+    }
+    int artillery = 0;
+    for (const int i : unitsAt(colony().x, colony().y)) {
+        artillery += unit(i).type == 11 ? 1 : 0;
+    }
+    if (craftAtTop && (artillery == 0 || view.guards == 0)) {
+        if (colony().stock[cargo::kTools] != 0 && !aiTryBuild(c, 3)) {
+            return;
+        }
+        unitChoice(11);
+        return;
+    }
+    for (int k = static_cast<int>(kCrafts.size()) - 1; k >= 0; --k) {
+        const auto& craft = kCrafts[static_cast<std::size_t>(k)];
+        // A craft busy enough for the next level of its building.
+        const int level = levelsFrom(colony(), craft.building);
+        int need = 0;
+        if (made(craft.raw) >= 3) {
+            need = 2;
+        }
+        if (made(craft.raw) >= 8 || colony().stock[static_cast<std::size_t>(craft.raw)] >= 100) {
+            need = 3;
+        }
+        if (level < need && !aiTryBuild(c, topRow(craft.building))) {
+            return;
+        }
+    }
+    if (!aiTryBuild(c, 38)) {
+        return;
+    }
+    if (hasBuilding(colony(), 8)) {
+        if (byType(15) < std::min(armed, 8)) {
+            unitChoice(15);
+            return;
+        }
+        if (armed < 8) {
+            unitChoice(17);
+            return;
+        }
+    }
+    if (pop < 10) {
+        colony().raw[kMarks] |= 0x10;
+    }
+    if (artillery < 3) {
+        if (!aiTryBuild(c, 3)) {
+            return;
+        }
+        if (made(cargo::kMuskets) == 0) {
+            unitChoice(11);
+            return;
+        }
+        if (!aiTryBuild(c, 5)) {
+            return;
+        }
+        unitChoice(11);
+        return;
+    }
+    colony().construction = -1;
+    mark();
 }
 
 } // namespace viceroy

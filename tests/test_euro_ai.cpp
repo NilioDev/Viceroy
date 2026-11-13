@@ -492,3 +492,108 @@ VCR_TEST("european ai: a soldier on the square of a colony with too many guards 
     VCR_CHECK(c.population == 2);
     VCR_CHECK(c.stock[cargo::kMuskets] == 50);
 }
+
+namespace {
+
+// The rules with buildings: a stockade needs 3 colonists, the rest none.
+Ruleset buildRules() {
+    Ruleset r = aiRules();
+    r.buildings.resize(42);
+    r.buildings[0].minColonySize = 3;
+    return r;
+}
+
+} // namespace
+
+VCR_TEST("european ai: a colony the computer founds has its first buildings") {
+    SaveGame s = aiSave();
+    s.units.push_back(unitAt(4, 4, unit_type::kColonist, 1));
+    s.units.back().profession = 0x1C;
+    s.map.at(4, 4).seen = 0x05;
+    Game g(s, aiRules());
+    TextFile names;
+    names.sections.push_back({"FRENCH", {"Quebec,1608"}});
+    g.setColonyNames(names);
+    g.europeanTurn(1);
+    VCR_CHECK(g.state().colonies.size() == 1);
+    if (!g.state().colonies.empty()) {
+        const auto& c = g.state().colonies[0];
+        VCR_CHECK(buildingLevel(c, BuildingKind::TownHall) == 1);
+        VCR_CHECK(buildingLevel(c, BuildingKind::Carpenter) == 1);
+        VCR_CHECK(buildingLevel(c, BuildingKind::Blacksmith) == 1);
+        VCR_CHECK(buildingLevel(c, BuildingKind::Fortification) == 0);
+    }
+}
+
+VCR_TEST("european ai: a colony of four builds a stockade, then stables") {
+    SaveGame s = colonySave(4);
+    s.colonies[0].stock[cargo::kMuskets] = 100;
+    s.colonies[0].stock[cargo::kHorses] = 60;
+    Game g(s, buildRules());
+    g.europeanTurn(1);
+    VCR_CHECK(g.state().colonies[0].construction == 0);
+    setBuildingLevel(s.colonies[0], BuildingKind::Fortification, 1);
+    Game h(s, buildRules());
+    h.europeanTurn(1);
+    VCR_CHECK(h.state().colonies[0].construction == 17);
+}
+
+VCR_TEST("european ai: a small colony builds nothing yet") {
+    SaveGame s = colonySave(2);
+    s.colonies[0].construction = 0;
+    Game g(s, buildRules());
+    g.europeanTurn(1);
+    VCR_CHECK(g.state().colonies[0].construction == -1);
+}
+
+VCR_TEST("european ai: a colony plows the square its farmer works, with its own tools") {
+    SaveGame s = colonySave(1);
+    auto& c = s.colonies[0];
+    c.jobs[0] = 0;     // farmer
+    c.squares[0] = 0;  // on the square to the north
+    c.stock[cargo::kTools] = 20;
+    c.raw[0x8C] = 10;  // turns saved up
+    s.turn = 11;
+    Game g(s, buildRules());
+    g.europeanTurn(1);
+    VCR_CHECK((g.state().map.at(8, 3).flags & MapSquare::kPlowed) != 0);
+    VCR_CHECK(g.state().colonies[0].stock[cargo::kTools] == 0);
+    VCR_CHECK(g.state().colonies[0].raw[0x8C] == 0);
+}
+
+VCR_TEST("european ai: without the turns saved up the land waits") {
+    SaveGame s = colonySave(1);
+    auto& c = s.colonies[0];
+    c.jobs[0] = 0;
+    c.squares[0] = 0;
+    c.stock[cargo::kTools] = 20;
+    c.raw[0x8C] = 0;
+    s.turn = 11;
+    Game g(s, buildRules());
+    g.europeanTurn(1);
+    VCR_CHECK((g.state().map.at(8, 3).flags & MapSquare::kPlowed) == 0);
+    VCR_CHECK(g.state().colonies[0].stock[cargo::kTools] == 20);
+}
+
+VCR_TEST("european ai: every seventh turn a colony builds road towards its neighbour") {
+    SaveGame s = colonySave(1);
+    s.colonies[0].stock[cargo::kTools] = 20;
+    s.colonies[0].raw[0x8C] = 10;
+    SaveColony other = s.colonies[0];
+    other.y = 8;
+    other.stock[cargo::kTools] = 0;
+    s.colonies.push_back(other);
+    s.map.at(8, 4).flags |= MapSquare::kHasColony | MapSquare::kRoad;
+    s.map.at(8, 8).flags |= MapSquare::kHasColony | MapSquare::kRoad;
+    s.turn = 14;
+    Game g(s, buildRules());
+    g.europeanTurn(1);
+    int roads = 0;
+    for (int y = 5; y <= 7; ++y) {
+        for (int x = 7; x <= 9; ++x) {
+            roads += (g.state().map.at(x, y).flags & MapSquare::kRoad) != 0 ? 1 : 0;
+        }
+    }
+    VCR_CHECK(roads == 1);
+    VCR_CHECK(g.state().colonies[0].stock[cargo::kTools] == 0);
+}

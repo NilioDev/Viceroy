@@ -617,6 +617,20 @@ private:
     void aiColonyPlan(int colony);
     void aiTakeIntoColony(int unit, int colony);
     void aiSendOut(int colony, int colonist, int role);
+    bool aiRoadToColony(int colony);
+    bool aiImproveLand(int colony, int region);
+    // What a colony's construction choice weighs from the rest of its plans.
+    struct AiColonyView {
+        int region = -1;
+        int tribe = -1;    // the nearest tribe in its land
+        int guards = 0;    // guards it still wants
+        int adjacent = 0;  // enemy units right next to it
+        int squares = 8;   // squares it can work
+        int water = 0;     // of those, water or off the map
+    };
+    void aiChooseConstruction(int colony, const AiColonyView& view);
+    bool aiCanBuild(int colony, int row) const;
+    bool aiTryBuild(int colony, int row);
     void aiGoTo(int unit, char goal, int x, int y);
     void aiToEurope(int unit);
     void aiEndMoves(int unit);
