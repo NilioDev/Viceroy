@@ -445,8 +445,6 @@ int villageSkill(const SaveGame& save, int settlement) {
     return skill;
 }
 
-namespace {
-
 // The original's own sort, read with a debugger: ascending, carrying an
 // index along. It takes the first value smaller than the one before it
 // and moves it in front of the first value that is not smaller; equal
@@ -485,33 +483,43 @@ void originalSort(std::array<int, 16>& values, std::array<int, 16>& order) {
     }
 }
 
-} // namespace
 
-std::array<int, 3> villageWants(const SaveGame& save, int settlement) {
-    // Read from the original with a debugger and checked against what six
-    // chiefs asked for. The goods the village makes most of are not asked
-    // for, nor is food when it makes more food than trade goods, nor the two
-    // goods of the settlement's bytes 8 and 9.
-    const auto& s = save.settlements[static_cast<std::size_t>(settlement)];
+VillageMarket villageMarket(const SaveGame& save, int settlement) {
+    // Read from the original with a debugger: the goods the village makes
+    // most of are not wanted, nor food when it makes more food than trade
+    // goods.
     auto e = villageEconomy(save, settlement);
-    const int food = e.makes[kFood];
-    e.makes[kFood] = 0;
-    if (food > e.makes[kTradeGoods]) {
-        e.wants[kFood] = 0;
+    VillageMarket m;
+    m.wants = e.wants;
+    m.makes = e.makes;
+    const int food = m.makes[kFood];
+    m.makes[kFood] = 0;
+    if (food > m.makes[kTradeGoods]) {
+        m.wants[kFood] = 0;
     }
-    std::array<int, 16> order{};
-    originalSort(e.makes, order);
+    originalSort(m.makes, m.makesOrder);
     for (std::size_t k = 1; k <= 3; ++k) {
-        e.wants[static_cast<std::size_t>(order[16 - k])] = 0;
+        m.wants[static_cast<std::size_t>(m.makesOrder[16 - k])] = 0;
     }
+    return m;
+}
+
+std::array<int, 3> topWants(std::array<int, 16> wants, const SaveSettlement& s) {
+    // The goods of the settlement's bytes 8 and 9 are left out.
     for (const std::size_t byte : {std::size_t{8}, std::size_t{9}}) {
         const auto good = static_cast<std::int8_t>(s.raw[byte]);
         if (good >= 0 && good < 16) {
-            e.wants[static_cast<std::size_t>(good)] = 0;
+            wants[static_cast<std::size_t>(good)] = 0;
         }
     }
-    originalSort(e.wants, order);
+    std::array<int, 16> order{};
+    originalSort(wants, order);
     return {order[15], order[14], order[13]};
+}
+
+std::array<int, 3> villageWants(const SaveGame& save, int settlement) {
+    // Checked against what six chiefs asked for.
+    return topWants(villageMarket(save, settlement).wants, save.settlements[static_cast<std::size_t>(settlement)]);
 }
 
 namespace {

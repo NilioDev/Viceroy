@@ -245,6 +245,49 @@ public:
     // The missionary stays in the settlement (the unit is gone) and the
     // tribe's tension moves with how it takes the mission.
     MissionNews establishMission(int unit, int settlement);
+    // Trade with a settlement: a wagon train or a ship of a nation that has
+    // met the tribe. Read from the original; see docs/rules/natives.md.
+    bool canTradeWithVillage(int unit, int settlement) const;
+    struct VillageSale {
+        std::string refusal;        // BADCARGO or BADHAGGLE1; empty: an offer
+        std::array<int, 3> wants{}; // what the village asks for instead
+        int hold = -1;
+        int good = -1;
+        int amount = 0;
+        int price = 0;   // the offer
+        int ask = 0;     // the "fairer price" the player may ask
+        int quality = 0; // row of @VALUES: low quality ... excellent
+        int calm = 0;    // how far a sale calms the tribe
+        int haggles = 0; // 0: TRADE0, then TRADE1
+        int temper = 0;  // the tribe's tension step as the price weighs it
+    };
+    // The village's offer for the goods in one hold. The unit's turn is over.
+    VillageSale offerToVillage(int unit, int settlement, int hold);
+    void sellToVillage(int unit, int settlement, const VillageSale& sale);
+    // "A fairer price would be ...": true when the village raises its offer,
+    // false when it has had enough (it will not take the good again).
+    bool haggleSale(int unit, int settlement, VillageSale& sale);
+    void giveToVillage(int unit, int settlement, const VillageSale& sale);
+    // After a sale: room for goods, what the village still asks for, and
+    // whether it refuses to sell after haggling.
+    bool hasRoomToBuy(int unit) const;
+    bool refusesToSell(int settlement) const;
+    // The goods the village sells (up to three, rows of @CARGO).
+    std::vector<int> villageGoodsForSale(int settlement) const;
+    struct VillagePurchase {
+        int good = -1;
+        int amount = 0;
+        int price = 0;
+        int haggles = 0; // 0: BUY0, then BUY1
+    };
+    // `sold` is the amount of the last sale: a wagon train is filled with as
+    // much, a ship with a quarter.
+    VillagePurchase offerFromVillage(int unit, int settlement, int good, int sold);
+    // False when the treasury is too small (NOTENOUGH).
+    bool buyFromVillage(int unit, int settlement, const VillagePurchase& purchase);
+    // True when the price comes down; false when the village refuses to
+    // sell (BADHAGGLE2).
+    bool hagglePurchase(int unit, int settlement, VillagePurchase& purchase);
     // A scout may ask to speak with the chief of a tribe its nation has met.
     bool canSpeakWithChief(int unit, int settlement) const;
     enum class ChiefAnswer { Kill, Bored, Guides, Tales, Gift };

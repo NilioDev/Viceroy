@@ -184,6 +184,11 @@ void PlayScreen::moveActive(Step step) {
         const int tx = u.x + step.dx;
         const int ty = u.y + step.dy;
         const auto aboard = game_.passengers(index);
+        // A ship sailing into a coastal settlement trades with it.
+        if (const auto settlement = game_.settlementAt(tx, ty); settlement && game_.isShip(index)) {
+            enterVillage(index, *settlement);
+            break;
+        }
         if (game_.isShip(index) && !aboard.empty() && map.inside(tx, ty) && map.at(tx, ty).isLand()) {
             for (const int p : aboard) {
                 game_.setOrders(p, SaveUnit::kNoOrders);
@@ -202,8 +207,8 @@ void PlayScreen::moveActive(Step step) {
         const int defender = game_.canAttack(index) ? game_.defenderAt(tx, ty, index) : -1;
         const auto colony = game_.colonyAt(tx, ty);
         const auto settlement = game_.settlementAt(tx, ty);
-        if (settlement && !game_.isShip(index) &&
-            (!game_.canAttack(index) || game_.unit(index).type == unit_type::kScout)) {
+        if (settlement && (game_.isShip(index) || !game_.canAttack(index) ||
+                           game_.unit(index).type == unit_type::kScout)) {
             enterVillage(index, *settlement);
         } else if (defender >= 0 && !settlement) {
             startAttack(index, defender);
@@ -268,6 +273,11 @@ void PlayScreen::enterVillage(int unit, int settlement) {
     villageOptions_.clear();
     // The options read from the original's @ACTIONS: Live Among The Natives
     // (row 4) for colonists the tribe knows, and Cancel Action (row 9).
+    // Wagon trains and ships: Trade With Village (row 0).
+    if (game_.canTradeWithVillage(unit, settlement)) {
+        addOption(*dialog_, textLine(art_->names, "ACTIONS", 0, "Trade With Village"));
+        villageOptions_.push_back(kVillageTrade);
+    }
     if (game_.canLiveAmongNatives(unit, settlement)) {
         addOption(*dialog_, textLine(art_->names, "ACTIONS", 4, "Live Among The Natives"));
         villageOptions_.push_back(kVillageLive);
@@ -367,6 +377,140 @@ void PlayScreen::foundMission(int unit) {
         {save.year});
     if (dialog_) {
         placeReligiousDialog(*dialog_);
+    }
+    question_ = "LESSONDONE";
+}
+
+std::string PlayScreen::goodName(int good) const {
+    const auto& cargo = game_.rules().cargo;
+    return good >= 0 && static_cast<std::size_t>(good) < cargo.size() ? cargo[static_cast<std::size_t>(good)].name : "";
+}
+
+void PlayScreen::startTrade(int unit) {
+    trade_ = VillageTrade{};
+    trade_->unit = unit;
+    const auto& u = game_.unit(unit);
+    if (u.holds == 0) {
+        afterSale();
+    } else if (u.holds == 1) {
+        offerHold(0);
+    } else {
+        // "Which cargo shall we offer to trade, Your Excellency?"
+        ask("TRADEWHICH", unit);
+        if (!dialog_) {
+            return;
+        }
+        for (int k = 0; k < u.holds; ++k) {
+            addOption(*dialog_, std::to_string(holdAmount(u, k)) + " " + goodName(holdGood(u, k)));
+            trade_->holds.push_back(k);
+        }
+        addOption(*dialog_, textLine(art_->labelText, "MISC", 32, "Nothing"));
+        placeCentredDialog(*dialog_);
+    }
+}
+
+void PlayScreen::offerHold(int hold) {
+    trade_->sale = game_.offerToVillage(trade_->unit, village_, hold);
+    trade_->sold = trade_->sale.good;
+    trade_->amount = trade_->sale.amount;
+    const auto& sale = trade_->sale;
+    if (sale.refusal == "BADCARGO") {
+        endTrade(sale.refusal, {goodName(sale.good), goodName(sale.wants[0]), goodName(sale.wants[1]), goodName(sale.wants[2])});
+    } else if (!sale.refusal.empty()) {
+        endTrade(sale.refusal, {goodName(sale.good)});
+    } else {
+        showSale();
+    }
+}
+
+void PlayScreen::showSale() {
+    const auto& sale = trade_->sale;
+    const auto& save = game_.state();
+    ask(sale.haggles == 0 ? "TRADE0" : "TRADE1", trade_->unit,
+        {textLine(art_->names, "VALUES", sale.quality, ""), goodName(sale.good)}, -1, {sale.price, sale.ask});
+    if (dialog_) {
+        placeNativeDialog(*dialog_, tribeOf(save.settlements[static_cast<std::size_t>(village_)]));
+    }
+}
+
+void PlayScreen::afterSale() {
+    // The original then names what the village needs, unless the good
+    // offered was one of the two it wants most.
+    if (!game_.hasRoomToBuy(trade_->unit)) {
+        endTrade("", {});
+        return;
+    }
+    const auto& save = game_.state();
+    const auto& s = save.settlements[static_cast<std::size_t>(village_)];
+    const auto wants = topWants(villageMarket(save, village_).wants, s);
+    if (trade_->sold != wants[0] && trade_->sold != wants[1]) {
+        showLesson(trade_->unit, "BRING", {goodName(wants[0]), goodName(wants[1]), goodName(wants[2])});
+        return;
+    }
+    offerToBuy();
+}
+
+void PlayScreen::offerToBuy() {
+    if (game_.refusesToSell(village_)) {
+        endTrade("BADHAGGLE3", {});
+        return;
+    }
+    if (trade_->sold < 0) {
+        endTrade("DEFICIT", {});
+        return;
+    }
+    trade_->forSale = game_.villageGoodsForSale(village_);
+    std::vector<std::string> names;
+    for (const int g : trade_->forSale) {
+        names.push_back(goodName(g));
+    }
+    while (names.size() < 3) {
+        names.emplace_back();
+    }
+    showLesson(trade_->unit, "BUYWHICH", names);
+    if (dialog_ && dialog_->options.size() > trade_->forSale.size() + 1) {
+        // Fewer goods than the three lines of the question.
+        const auto keep = trade_->forSale.size();
+        const auto last = dialog_->options.size() - 1;
+        for (auto* list : {&dialog_->options, &dialog_->values}) {
+            if (list->size() > last) {
+                (*list)[keep] = (*list)[last];
+                list->resize(keep + 1);
+            }
+        }
+        dialog_->disabled.resize(keep + 1);
+        dialog_->selected = 0;
+    }
+}
+
+void PlayScreen::showPurchase() {
+    const auto& p = trade_->purchase;
+    const auto& save = game_.state();
+    const int nation = game_.unit(trade_->unit).nation;
+    // "your wagons" or "your holds" (LABELS.TXT).
+    const std::string carrier = game_.isShip(trade_->unit) ? textLine(art_->labelText, "MISC", 42, "holds")
+                                                           : textLine(art_->labelText, "MISC", 41, "wagons");
+    const std::string section = p.haggles == 0 ? "BUY0" : "BUY1";
+    dialog_ = makeDialog(*art_, section, {goodName(p.good), carrier},
+                         {p.price, std::max(10, p.price / 2), p.amount, save.nations[static_cast<std::size_t>(nation)].gold});
+    question_ = section;
+    questionUnit_ = trade_->unit;
+    choices_.clear();
+    placeNativeDialog(*dialog_, tribeOf(save.settlements[static_cast<std::size_t>(village_)]));
+}
+
+void PlayScreen::endTrade(const std::string& section, std::vector<std::string> strings, std::vector<int> numbers) {
+    const int unit = trade_ ? trade_->unit : -1;
+    trade_.reset();
+    if (section.empty()) {
+        village_ = -1;
+        advance();
+        return;
+    }
+    const auto& save = game_.state();
+    ask(section, unit, std::move(strings), -1, std::move(numbers));
+    if (dialog_) {
+        placeNativeDialog(*dialog_, tribeOf(save.settlements[static_cast<std::size_t>(village_)]));
     }
     question_ = "LESSONDONE";
 }
@@ -693,6 +837,8 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
             speakWithChief(unit);
         } else if (option == kVillageMission && village_ >= 0) {
             foundMission(unit);
+        } else if (option == kVillageTrade && village_ >= 0) {
+            startTrade(unit);
         }
     } else if (question == "LEARNSTAY") {
         // "Then I shall become a master ..." or "Not right now, thanks."
@@ -710,6 +856,62 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
             showLesson(unit, "LEARNLATER", {});
         }
         question_ = "LESSONDONE";
+    } else if (question == "TRADEWHICH") {
+        if (trade_ && choice >= 0 && choice < static_cast<int>(trade_->holds.size())) {
+            offerHold(trade_->holds[static_cast<std::size_t>(choice)]);
+        } else {
+            trade_.reset();
+            village_ = -1;
+            advance();
+        }
+    } else if (question == "TRADE0" || question == "TRADE1") {
+        // Accept, ask a fairer price, (TRADE0 only) give it, never mind.
+        const bool first = question == "TRADE0";
+        if (!trade_) {
+            advance();
+        } else if (choice == 0) {
+            game_.sellToVillage(trade_->unit, village_, trade_->sale);
+            afterSale();
+        } else if (choice == 1) {
+            if (game_.haggleSale(trade_->unit, village_, trade_->sale)) {
+                showSale();
+            } else {
+                endTrade("BADHAGGLE0", {"", goodName(trade_->sale.good)});
+            }
+        } else if (first && choice == 2) {
+            game_.giveToVillage(trade_->unit, village_, trade_->sale);
+            afterSale();
+        } else {
+            endTrade("", {});
+        }
+    } else if (question == "BRING") {
+        offerToBuy();
+    } else if (question == "BUYWHICH") {
+        if (trade_ && choice >= 0 && choice < static_cast<int>(trade_->forSale.size())) {
+            trade_->purchase = game_.offerFromVillage(trade_->unit, village_, trade_->forSale[static_cast<std::size_t>(choice)],
+                                                      trade_->amount);
+            showPurchase();
+        } else {
+            endTrade("", {});
+        }
+    } else if (question == "BUY0" || question == "BUY1") {
+        if (!trade_) {
+            advance();
+        } else if (choice == 0) {
+            if (game_.buyFromVillage(trade_->unit, village_, trade_->purchase)) {
+                endTrade("", {});
+            } else {
+                endTrade("NOTENOUGH", {}, {game_.state().nations[static_cast<std::size_t>(game_.unit(trade_->unit).nation)].gold});
+            }
+        } else if (choice == 1) {
+            if (game_.hagglePurchase(trade_->unit, village_, trade_->purchase)) {
+                showPurchase();
+            } else {
+                endTrade("BADHAGGLE2", {});
+            }
+        } else {
+            endTrade("", {});
+        }
     } else if (question == "CHIEFHOWDY") {
         showChiefAnswer();
     } else if (question == "LESSONDONE") {

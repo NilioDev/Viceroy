@@ -61,7 +61,22 @@ VillageEconomy villageEconomy(const SaveGame& save, int settlement);
 // teaches the same skill in a game.
 int villageSkill(const SaveGame& save, int settlement);
 
-// The three goods the chief asks for, most wanted first (rows of @CARGO).
+// The original's own sort: ascending, with each value's index in `order`.
+// Equal values can change places, which decides ties.
+void originalSort(std::array<int, 16>& values, std::array<int, 16>& order);
+
+// The settlement's economy as its trade sees it: what it wants (less what
+// it makes most of) and what it makes, sorted, with each good's row.
+struct VillageMarket {
+    std::array<int, 16> wants{};
+    std::array<int, 16> makes{};      // sorted, smallest first
+    std::array<int, 16> makesOrder{}; // the good of each place in `makes`
+};
+VillageMarket villageMarket(const SaveGame& save, int settlement);
+
+// The three goods most wanted, leaving out those in the settlement's bytes
+// 8 and 9 (rows of @CARGO, most wanted first).
+std::array<int, 3> topWants(std::array<int, 16> wants, const SaveSettlement& settlement);
 std::array<int, 3> villageWants(const SaveGame& save, int settlement);
 
 // Settlement flag: a scout has spoken with the chief.

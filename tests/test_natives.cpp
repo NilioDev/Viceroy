@@ -310,3 +310,85 @@ VCR_TEST("original files: a missionary founds a mission (measured)") {
     play.handle(Command::Confirm);
     VCR_CHECK(!play.dialog().has_value());
 }
+
+#include "viceroy/game/europe.hpp"
+
+VCR_TEST("original files: trading with a village (measured)") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
+    SaveGame save = readSaveGame(Bytes(std::istreambuf_iterator<char>(in), {}));
+    constexpr int kDutch = 3, kIroquois = 3, kVillage = 4, kCotton = 3, kFurs = 4, kCigars = 10, kCloth = 11;
+    constexpr int kTobacco = 2, kCoats = 12, kTradeGoods = 13;
+    save.nations[kDutch].raw[52 + 4 + kIroquois] = 0x60;
+    const auto& village = save.settlements[kVillage];
+    int wagon = -1;
+    for (std::size_t i = 0; i < save.units.size(); ++i) {
+        if (save.units[i].nation == kDutch && save.units[i].type == 0) {
+            wagon = static_cast<int>(i);
+            break;
+        }
+    }
+    auto& u = save.units[static_cast<std::size_t>(wagon)];
+    u.type = 12;
+    u.movesUsed = 0;
+    u.orders = SaveUnit::kNoOrders;
+    u.x = village.x - 1;
+    u.y = village.y;
+    u.holds = 1;
+    setHold(u, 0, kCigars, 100);
+
+    {
+        // Seen: 434, 511 for a hundred cigars and 283 for sixty; the
+        // offer moves with a roll of 1 to 5, 77 a step before halving.
+        Game game(save, art.rules);
+        const auto sale = game.offerToVillage(wagon, kVillage, 0);
+        VCR_CHECK(sale.refusal.empty());
+        const int luck = (2 * sale.price - 792 + 76) / 77;
+        VCR_CHECK(luck >= 1 && luck <= 5 && sale.price == (792 + 77 * luck) / 2);
+        VCR_CHECK(sale.ask == sale.price + 148 && sale.quality == 3);
+        VCR_CHECK(game.movesLeft(wagon) <= 0);
+    }
+    {
+        // Cloth: "We have enough Cloth ... We are in need of Tobacco and
+        // Coats. Even Cigars would be of some use."
+        SaveGame cloth = save;
+        setHold(cloth.units[static_cast<std::size_t>(wagon)], 0, kCloth, 100);
+        Game game(cloth, art.rules);
+        const auto sale = game.offerToVillage(wagon, kVillage, 0);
+        VCR_CHECK(sale.refusal == "BADCARGO");
+        VCR_CHECK((sale.wants == std::array<int, 3>{kTobacco, kCoats, kCigars}));
+    }
+
+    setHold(u, 0, kCigars, 60);
+    PlayScreen play(Game(save, art.rules), {});
+    play.setArt(&art);
+    const int goldBefore = save.nations[kDutch].gold;
+    play.game().setActiveUnit(wagon);
+    play.handle(Command::MoveE);
+    VCR_CHECK(play.dialog().has_value() && play.dialog()->options.size() == 2); // Trade With Village, Cancel
+    play.handle(Command::Confirm);
+    VCR_CHECK(play.dialog().has_value() && play.dialog()->options.size() == 4); // TRADE0
+    play.handle(Command::Confirm); // "We gratefully accept"
+    const auto& sold = play.game().state();
+    VCR_CHECK(sold.nations[kDutch].gold > goldBefore);
+    VCR_CHECK(play.game().unit(wagon).holds == 0);
+    // Seen next: "We are in need of Tobacco and Coats ... Even Trade Goods",
+    // as cigars were just sold.
+    VCR_CHECK((topWants(villageMarket(sold, kVillage).wants, sold.settlements[kVillage]) ==
+               std::array<int, 3>{kTobacco, kCoats, kTradeGoods}));
+    VCR_CHECK(play.dialog().has_value()); // BRING
+    play.handle(Command::Confirm);
+    // "We have Cotton, Furs, and Cloth available": four options.
+    VCR_CHECK((play.game().villageGoodsForSale(kVillage) == std::vector<int>{kCotton, kFurs, kCloth}));
+    VCR_CHECK(play.dialog().has_value() && play.dialog()->options.size() == 4);
+    play.handle(Command::Confirm); // Cotton
+    VCR_CHECK(play.dialog().has_value() && play.dialog()->options.size() == 3); // BUY0
+    play.handle(Command::Confirm); // pay
+    VCR_CHECK(!play.dialog().has_value());
+    const auto& w = play.game().unit(wagon);
+    VCR_CHECK(w.holds == 1 && holdGood(w, 0) == kCotton && holdAmount(w, 0) == 60);
+}

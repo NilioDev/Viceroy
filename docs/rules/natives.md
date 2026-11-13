@@ -122,6 +122,67 @@ nation's nearest colony ("Church of Curaçao mission founded in Autumn,
 shorter, a later colony winning a tie. The religious advisor shows it.
 Measured once: the Apache, at tension 51, went to 41 and were offended.
 
+## Trade
+
+A wagon train, or a ship sailing into a coastal settlement, of a nation
+that has met the tribe is offered **Trade With Village**. Trading uses up
+the unit's moves.
+
+**Selling.** With more than one hold the player picks the cargo
+(`@TRADEWHICH`). The village's wants are its economy's, less the three
+goods it makes most of and less food when it makes more food than trade
+goods. A good it does not want, or the good last sold to it (byte 8) or
+last bought from it (byte 9), is refused (`@BADCARGO`, naming the three
+goods it wants most). A good it refused after haggling (byte 7) gets
+`@BADHAGGLE1`. Otherwise it offers (`@TRADE0`):
+
+- a roll of 1 to 5 (*luck*); a *worth* of 6, or 7 for goods after horses,
+  less a roll of 0 to 7 for trade goods, plus 12 − the tribe's byte 7 for
+  muskets, 10 − its byte 8 for horses, and 1 for tools;
+- a *temper* of twice the tension step (0 for muskets and horses), halved
+  when the village wants the good 20 or more;
+- the price: (5 × luck + 2 × (worth − difficulty − temper + luck + 4) ×
+  want) × amount / 100, halved, at least 1;
+- the quality word (`@VALUES`): (want − temper + 4) / 10, at most 3;
+- the "fairer price": (want + 1) × 4 + the price;
+- a *calm* of a roll of 0 to 1 + (want − temper + 4) / 4.
+
+Measured: a hundred cigars at an Iroquois village with nothing between
+them brought 434, 511 (want 36, rolls 1 and 3), sixty brought 283.
+
+Accepting pays the price, adds the goods to the tribe's stock, lowers the
+tension by 2 × calm and the settlement's alarm by the amount (all of it
+for a hundred), and remembers the good in byte 8. (The original compares
+the unit's number, not the good, with muskets and horses there; that is
+kept.) Muskets and horses also arm and mount the tribe (its bytes 7 and 8
+and its horses).
+
+Asking a fairer price works while there is calm left and a roll of 1 to 8
+× calm beats the difficulty: calm drops by one and the offer rises by a
+roll of want / 2 + 1 to 2 × want + 1, times the amount / 100
+(`@TRADE1`). Otherwise the village will not take the good again
+(`@BADHAGGLE0`), the tension rises by temper / 2 + 1 and trading ends.
+
+Giving the goods away (only before haggling) lowers the tension by 4 ×
+(calm + 1) and the alarm by twice the amount.
+
+**Buying.** After a sale or a gift, with a hold free: unless the good
+offered was one of the two most wanted, the village names what it needs
+(`@BRING`). After a refusal to sell (byte 7 = 0xFE) it says so
+(`@BADHAGGLE3`); a unit that brought nothing hears `@DEFICIT`. Otherwise
+it offers the three goods it makes most of, leaving out muskets, food,
+tools and trade goods (`@BUYWHICH`). A wagon train is filled with as much
+as it sold, a ship with a quarter. The price (`@BUY0`): 200, or (8 −
+level) × 50 for horses and after; for silver and after plus the
+European bid × (2 × difficulty + 15); plus a roll of 0 to itself; less 4
+× what the village makes of it; plus 4 × tension; times the amount / 100;
+plus (difficulty + a roll of 0 to 2) × 10; at least 50. Buying without
+the gold (`@NOTENOUGH`) raises the tension by 1; buying lowers it by a
+roll of 0 to price / 25 + 1. Haggling (a roll of 0 to made / 25 + 8 above
+difficulty + 1, with the price above 10) takes a quarter off (`@BUY1`),
+sometimes raising the tension by 1; failing raises it by 2 and the
+village sells nothing more (`@BADHAGGLE2`).
+
 ## The skill a settlement teaches
 
 A settlement always teaches the same skill in a game. The original works
