@@ -395,6 +395,57 @@ void Game::runOutNotices(const ColonyTurn& turn, int c) {
     }
 }
 
+bool Game::starve(const ColonyTurn& turn, int c) {
+    auto& colony = save_.colonies[static_cast<std::size_t>(c)];
+    const bool ours = colony.nation == human();
+    // Seen in the original with a debugger: the other nations' colonies
+    // do not starve for less than 3 food.
+    const int missing = ours || turn.foodMissing >= 3 ? turn.foodMissing : 0;
+    // A colonist starves when the store was already empty as the turn
+    // began. On the two easiest levels nobody does before 1520, and after
+    // that only one time in three (Discoverer) or two (Explorer).
+    bool dies = turn.foodRanOut && missing > 0 && turn.foodBefore <= 0;
+    if (dies && save_.difficulty <= 1) {
+        if (save_.year < 1520 || nextRandom(3 - std::max(0, save_.difficulty)) != 0) {
+            dies = false;
+        }
+    }
+    if (!dies) {
+        if (ours) {
+            foodNotices(turn, c);
+        }
+        return false;
+    }
+    if (colony.population <= 1) {
+        if (ours) {
+            notices_.push_back(GameNotice{"VANISH", {colony.name}});
+        }
+        removeColony(c);
+        return true;
+    }
+    if (ours) {
+        const bool autumnNext = save_.year >= 1600 && save_.season == 0;
+        notices_.push_back(GameNotice{autumnNext ? "STARVE2" : "STARVE1", {colony.name}, -1, {}, c});
+    }
+    removeColonist(colony, nextRandom(colony.population));
+    return false;
+}
+
+void Game::removeColony(int c) {
+    const auto& colony = save_.colonies[static_cast<std::size_t>(c)];
+    auto& sq = save_.map.at(colony.x, colony.y);
+    sq.flags = static_cast<std::uint8_t>(sq.flags & ~MapSquare::kHasColony);
+    save_.colonies.erase(save_.colonies.begin() + c);
+    // Reports about the colonies after it now name them one lower.
+    for (auto& n : notices_) {
+        if (n.colony == c) {
+            n.colony = -1;
+        } else if (n.colony > c) {
+            --n.colony;
+        }
+    }
+}
+
 void Game::foodNotices(const ColonyTurn& turn, int c) {
     const auto& colony = save_.colonies[static_cast<std::size_t>(c)];
     const int food = colony.stock[cargo::kFood];
@@ -512,7 +563,9 @@ void Game::endTurn() {
         if (ours) {
             runOutNotices(turn, static_cast<int>(c));
             storageNotices(turn, static_cast<int>(c));
-            foodNotices(turn, static_cast<int>(c));
+        }
+        if (starve(turn, static_cast<int>(c))) {
+            continue;
         }
         if (turn.grew) {
             addColonist(colony.x, colony.y, colony.nation);

@@ -699,9 +699,33 @@ int constructionPrice(const SaveColony& colony, const Ruleset& rules, const Save
     return price;
 }
 
+void removeColonist(SaveColony& colony, int colonist) {
+    const int population = std::clamp(colony.population, 0, kMaxColonists);
+    if (colonist < 0 || colonist >= population) {
+        return;
+    }
+    for (int i = colonist; i + 1 < population; ++i) {
+        colony.jobs[static_cast<std::size_t>(i)] = colony.jobs[static_cast<std::size_t>(i + 1)];
+        colony.skills[static_cast<std::size_t>(i)] = colony.skills[static_cast<std::size_t>(i + 1)];
+    }
+    colony.jobs[static_cast<std::size_t>(population - 1)] = 0;
+    colony.skills[static_cast<std::size_t>(population - 1)] = 0;
+    // Measured: the squares of the starved are left to nobody and the
+    // others keep theirs under their new numbers.
+    for (auto& who : colony.squares) {
+        if (who == colonist) {
+            who = -1;
+        } else if (who > colonist) {
+            --who;
+        }
+    }
+    colony.population = population - 1;
+}
+
 ColonyTurn runColonyTurn(SaveColony& colony, const SaveMap& map, const Ruleset& rules, int difficulty) {
     ColonyTurn turn;
     const auto before = colony.stock;
+    turn.foodBefore = before[cargo::kFood];
     const auto p = colonyProduction(colony, map, rules, difficulty);
     std::array<int, cargo::kCount> made = p.produced;
 
@@ -755,8 +779,8 @@ ColonyTurn runColonyTurn(SaveColony& colony, const SaveMap& map, const Ruleset& 
         food -= 200;
         turn.grew = true;
     } else if (food < 0) {
+        turn.foodMissing = -food;
         food = 0;
-        // Measured: ten turns without food and nobody starved.
         turn.foodRanOut = true;
     }
 

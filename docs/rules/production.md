@@ -141,10 +141,8 @@ Every colony, the computer's too, stores what it made:
 - Workshops take their raw good from this turn's harvest first, then from
   the warehouse. What they can't get is not made.
 - Food left after eating goes into the warehouse. At 200 food, 200 are used
-  up and a free colonist appears on the colony's square. When the food runs
-  out the store stays at 0 and nobody starves: a colony of eight with 10
-  food short a turn kept all eight for ten turns. (`@STARVE1/2` exist, so
-  starving happens somewhere; when is not known yet.)
+  up and a free colonist appears on the colony's square. The store never
+  goes below 0. See *Starving* below for what happens when it runs out.
 - Hammers add up towards the building under way. It is finished when there
   are enough hammers and tools (`@BUILDING` lists both, the tools in tens).
   The tools are used up and the hammers go back to 0: what is left over is
@@ -184,7 +182,9 @@ Every colony, the computer's too, stores what it made:
   - food short and fewer than four turns of it left (10 short: 39 left
     warns, 49 does not): `@FOODLOW` with what is left;
   - food gone: `@FOOD1`, or `@FOOD2` ("Winter is coming") after a spring
-    turn from 1600 on.
+    turn from 1600 on; a colonist starving: `@STARVE1`, or `@STARVE2` where
+    `@FOOD2` would be; the last one starving: `@VANISH` (not yet seen on
+    screen: its box and advisor are a guess).
 - `@NEWCOLONIST` comes from the priest (`MSS4.SS`), placed as the
   immigration reports.
 
@@ -206,6 +206,28 @@ also not when the store passed a hundred once more, and never with the
 option off. The other tutorial hints (`@TUTORIAL15` came from the woman
 advisor when new colonists arrived) and their bits are still to be
 measured.
+
+## Starving
+
+Watched in the original with a debugger (observing only) and in test turns
+of a colony of eight, 10 food short a turn, its store emptied:
+
+- Nobody starves in the turn the food runs out: the store had food when
+  the turn began, and `@FOOD1`/`@FOOD2` say it is gone.
+- In a later turn, with the store empty from the start and the colony
+  eating more than it makes, one colonist starves, picked at random. The
+  squares it worked are free, and the colonists after it move up one.
+- On Discoverer and Explorer nobody starves before 1520. From 1520 a
+  colonist starves one turn in three (Discoverer) or two (Explorer); in the
+  other turns only `@FOOD1`/`@FOOD2` come. On the harder levels one
+  starves every such turn. This is why ten turns in 1494 cost nobody.
+- The other nations' colonies starve only when 3 or more food short.
+- When the last colonist starves, the colony is gone (`@VANISH`).
+
+In our test turns from 1601 (Discoverer) the original's draws often came
+out alike turn after turn: once a colony lost a colonist it lost one every
+turn after, and some colonies were spared for six turns in a row. Viceroy
+draws each turn anew.
 
 ## What a colony can build
 
