@@ -66,7 +66,8 @@ void Game::meetTribe(int nation, int tribe) {
 }
 
 bool Game::meetNeighbours(int index) {
-    const auto& u = unit(index);
+    // A copy: a visit can add units.
+    const SaveUnit u = unit(index);
     const auto& map = save_.map;
     if (!onMap(index) || !map.inside(u.x, u.y) || map.at(u.x, u.y).isWater()) {
         return false;
@@ -99,7 +100,6 @@ bool Game::meetNeighbours(int index) {
             seen[static_cast<std::size_t>(other)]) {
             continue;
         }
-        seen[static_cast<std::size_t>(other)] = true;
         // A European nation meeting a tribe (in either order); Europeans
         // meeting each other are not done yet.
         const bool europeanHere = u.nation < kEuropeanNations;
@@ -111,8 +111,14 @@ bool Game::meetNeighbours(int index) {
         const auto relation = save_.nations[static_cast<std::size_t>(nation)]
                                   .raw[kNationRelations + static_cast<std::size_t>(kEuropeanNations + tribe)];
         if ((relation & kMet) != 0) {
+            // Met before: a brave may visit. The nation is passed over for
+            // the other squares only once something happened.
+            if (!europeanHere && braveVisit(index, static_cast<int>(d), nation)) {
+                seen[static_cast<std::size_t>(other)] = true;
+            }
             continue;
         }
+        seen[static_cast<std::size_t>(other)] = true;
         meetTribe(nation, tribe);
         if (nation != human()) {
             // A computer nation always takes the treaty.

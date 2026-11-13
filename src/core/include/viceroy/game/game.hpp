@@ -374,6 +374,19 @@ public:
     // INDIANBURN to the human when there were any).
     void burnMissions(int tribe, int nation);
 
+    // A brave comes to stand next to a nation's colony, wagon train or unit
+    // (the square in `direction` from it) and visits: the tribe may beg for
+    // food, bring food or goods as gifts, send converts, demand goods or
+    // only speak (notices INDIANBEGFOOD, INDIANGIVEFOOD, INDIANGIVESTUFF,
+    // INDIANSCONVERT, INDIANCITY, INDIANWAGONS, INDIANCOMMENT). True when
+    // something happened; the brave's turn is then over. Read from the
+    // original; see docs/rules/natives.md ("Braves visit").
+    bool braveVisit(int brave, int direction, int nation);
+    // The player's answer to the oldest visit that waits on one (begging,
+    // or a demand for goods): true gives what was asked.
+    void answerVisit(bool give);
+    bool visitWaiting() const { return !visits_.empty(); }
+
     // A missionary incites a tribe against another European nation. The
     // price weighs the tribe's tension toward the missionary's nation, its
     // settlements, defence, muskets and horses; the French pay a third
@@ -460,6 +473,31 @@ private:
     Ruleset rules_;
     std::vector<std::string> lastTurnNews_;
     std::vector<GameNotice> notices_;
+    // A brave's visit, while it waits on the player's answer.
+    struct BraveVisitState {
+        int nation = -1;
+        int tribe = -1;
+        int home = -1;   // the brave's settlement
+        int colony = -1; // the colony it visits, if any
+        int wagon = -1;  // the wagon train it visits, if any
+        int brave = -1;
+        int kind = 0; // what waits on the answer: 0 begging, 1 a demand on the colony, 2 on the wagon train
+        int good = -1;
+        int amount = 0;
+        int score = 0;
+        bool friendly = false;
+        bool calm = false; // the roll for a friendly visit came out so
+        bool begged = false;
+        std::array<int, 16> wants{};
+        std::array<int, 16> makes{};
+    };
+    std::vector<BraveVisitState> visits_;
+    // The parts of a visit after the begging, and the demands.
+    void visitAfterBegging(BraveVisitState v, bool give);
+    bool visitOn(BraveVisitState v);
+    bool visitDemand(BraveVisitState v);
+    bool visitWagons(BraveVisitState v);
+    void answerDemand(const BraveVisitState& v, bool give);
     // The messages about a colony's warehouse after its turn.
     void storageNotices(const ColonyTurn& turn, int colony);
     void foodNotices(const ColonyTurn& turn, int colony);

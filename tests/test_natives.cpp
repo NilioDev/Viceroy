@@ -12,6 +12,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <tuple>
 
 using namespace viceroy;
 
@@ -1146,4 +1147,208 @@ VCR_TEST("original files: the natives attack units and colonies (read from the o
         }
     }
     VCR_CHECK(killed && raided && burned && ambushed);
+}
+
+VCR_TEST("original files: braves visit colonies and wagon trains (read from the original)") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
+    const SaveGame original = readSaveGame(Bytes(std::istreambuf_iterator<char>(in), {}));
+    // Brave 1 is of tribe 2 and village 0, which grows 10 food and wants
+    // 33; village 4 of tribe 3 grows far more than it wants. The Dutch play.
+    constexpr int kBrave = 1, kTribe = 2, kDutch = 3, kSpain = 2;
+    constexpr int kIsabella = 1, kCartajena = 15;
+    constexpr int kFood = 0;
+    struct Setup {
+        SaveGame save;
+        int direction = -1;
+    };
+    const auto braveBeside = [&](int turn, int colony, int tension) {
+        Setup s{original, -1};
+        s.save.turn = turn;
+        const auto& c = s.save.colonies[static_cast<std::size_t>(colony)];
+        Game probe(s.save, art.rules);
+        const auto [bx, by] = besideOnLand(probe, c.x, c.y);
+        auto& b = s.save.units[kBrave];
+        b.x = bx;
+        b.y = by;
+        b.movesUsed = 0;
+        for (std::size_t d = 0; d < kSteps.size(); ++d) {
+            if (bx + kSteps[d].dx == c.x && by + kSteps[d].dy == c.y) {
+                s.direction = static_cast<int>(d);
+            }
+        }
+        setTribeTension(s.save, kTribe, c.nation, tension);
+        s.save.settlements[0].raw[static_cast<std::size_t>(10 + 2 * c.nation)] = 0;
+        s.save.settlements[0].raw[static_cast<std::size_t>(11 + 2 * c.nation)] = 0;
+        return s;
+    };
+    const auto alarmOf = [](const SaveGame& save, int nation) {
+        const auto& s = save.settlements[0];
+        return s.raw[static_cast<std::size_t>(10 + 2 * nation)] | (s.raw[static_cast<std::size_t>(11 + 2 * nation)] << 8);
+    };
+    const auto sum = [](const SaveColony& c) {
+        int total = 0;
+        for (const int n : c.stock) {
+            total += n;
+        }
+        return total;
+    };
+
+    bool begged = false, gifts = false, food = false, converts = false, demanded = false, refused = false,
+         spoke = false, wagons = false, spain = false;
+    for (int turn = 200; turn < 500; ++turn) {
+        {
+            // A calm tribe short of food begs from a colony with 75 or more;
+            // given half of it, the village forgets its alarm. Otherwise it
+            // brings goods as a gift.
+            auto s = braveBeside(turn, kIsabella, 0);
+            s.save.colonies[kIsabella].stock[kFood] = 150;
+            Game game(s.save, art.rules);
+            const int before = sum(game.state().colonies[kIsabella]);
+            VCR_CHECK(game.braveVisit(kBrave, s.direction, kDutch));
+            VCR_CHECK(game.unit(kBrave).movesUsed == game.movementAllowance(kBrave));
+            const auto notices = game.takeNotices();
+            VCR_CHECK(notices.size() == 1);
+            if (notices[0].section == "INDIANBEGFOOD") {
+                begged = true;
+                VCR_CHECK(notices[0].numbers == std::vector<int>({75, 150}));
+                VCR_CHECK(notices[0].strings[1] == "Isabella");
+                VCR_CHECK(game.visitWaiting());
+                game.answerVisit(true);
+                VCR_CHECK(!game.visitWaiting());
+                VCR_CHECK(game.state().colonies[kIsabella].stock[kFood] <= 75); // and maybe a gift after
+                VCR_CHECK(alarmOf(game.state(), kDutch) == 0);
+            } else {
+                gifts = true;
+                VCR_CHECK(notices[0].section == "INDIANGIVESTUFF");
+                VCR_CHECK(sum(game.state().colonies[kIsabella]) == before + notices[0].numbers[0]);
+                VCR_CHECK(notices[0].numbers[0] >= 2 && notices[0].numbers[0] <= 100);
+            }
+        }
+        {
+            // A village with food to spare brings it to a colony that is
+            // short: up to 75.
+            auto s = braveBeside(turn, kIsabella, 0);
+            s.save.units[kBrave].raw[6] = 4;
+            s.save.colonies[kIsabella].stock[kFood] = 10;
+            for (std::size_t n = 10; n < 18; ++n) {
+                s.save.settlements[4].raw[n] = 0;
+            }
+            Game game(s.save, art.rules);
+            VCR_CHECK(game.braveVisit(kBrave, s.direction, kDutch));
+            const auto notices = game.takeNotices();
+            VCR_CHECK(notices.size() == 1 && notices[0].section == "INDIANGIVEFOOD");
+            VCR_CHECK(notices[0].numbers[0] == 65);
+            VCR_CHECK(game.state().colonies[kIsabella].stock[kFood] == 75);
+            food = true;
+        }
+        {
+            // The nation's own mission in the village sends converts now
+            // and then.
+            auto s = braveBeside(turn, kIsabella, 0);
+            s.save.settlements[0].raw[5] = kDutch;
+            s.save.colonies[kIsabella].stock[kFood] = 50;
+            Game game(s.save, art.rules);
+            const int units = game.unitCount();
+            VCR_CHECK(game.braveVisit(kBrave, s.direction, kDutch));
+            const auto notices = game.takeNotices();
+            if (notices.size() == 1 && notices[0].section == "INDIANSCONVERT") {
+                converts = true;
+                VCR_CHECK(game.unitCount() == units + 1);
+                const auto& u = game.unit(game.unitCount() - 1);
+                VCR_CHECK(u.profession == 0x1B && u.nation == kDutch && u.x == 43 && u.y == 29);
+            }
+        }
+        {
+            // A tense tribe demands goods from the stores, or, if it has
+            // met the nation this turn, only speaks its concern.
+            auto s = braveBeside(turn, kIsabella, 60);
+            s.save.colonies[kIsabella].stock[4] = 80; // furs
+            Game game(s.save, art.rules);
+            const bool happened = game.braveVisit(kBrave, s.direction, kDutch);
+            const auto notices = game.takeNotices();
+            VCR_CHECK(notices.size() == 1);
+            if (notices[0].section == "INDIANCITY") {
+                VCR_CHECK(happened);
+                VCR_CHECK(notices[0].strings[3] == "Isabella");
+                const int good = [&] {
+                    for (std::size_t g = 0; g < art.rules.cargo.size(); ++g) {
+                        if (art.rules.cargo[g].name == notices[0].strings[2]) {
+                            return static_cast<int>(g);
+                        }
+                    }
+                    return -1;
+                }();
+                VCR_CHECK(good >= 0);
+                const int stock = game.state().colonies[kIsabella].stock[static_cast<std::size_t>(good)];
+                if (turn % 2 == 0) {
+                    demanded = true;
+                    game.answerVisit(true);
+                    VCR_CHECK(game.state().colonies[kIsabella].stock[static_cast<std::size_t>(good)] ==
+                              stock - notices[0].numbers[0]);
+                    VCR_CHECK(tribeTension(game.state(), kTribe, kDutch) < 60);
+                } else {
+                    refused = true;
+                    game.answerVisit(false);
+                    VCR_CHECK(game.state().colonies[kIsabella].stock[static_cast<std::size_t>(good)] == stock);
+                    VCR_CHECK(alarmOf(game.state(), kDutch) == 0x80);
+                }
+            } else {
+                spoke = true;
+                VCR_CHECK(!happened);
+                VCR_CHECK(notices[0].section == "INDIANCOMMENT");
+            }
+        }
+        {
+            // A wagon train in the open: the tribe demands its first load.
+            auto s = braveBeside(turn, kIsabella, 60);
+            auto& b = s.save.units[kBrave];
+            b.x = original.units[kBrave].x;
+            b.y = original.units[kBrave].y;
+            SaveUnit w = b;
+            {
+                Game probe(s.save, art.rules);
+                std::tie(w.x, w.y) = besideOnLand(probe, b.x, b.y);
+            }
+            int direction = -1;
+            for (std::size_t d = 0; d < kSteps.size(); ++d) {
+                if (b.x + kSteps[d].dx == w.x && b.y + kSteps[d].dy == w.y) {
+                    direction = static_cast<int>(d);
+                }
+            }
+            w.type = unit_type::kWagonTrain;
+            w.nation = kDutch;
+            w.holds = 1;
+            w.raw[6] = 0xFF;
+            setHold(w, 0, 4, 100);
+            s.save.units.push_back(w);
+            Game game(s.save, art.rules);
+            const int wagon = game.unitCount() - 1;
+            if (game.braveVisit(kBrave, direction, kDutch)) {
+                const auto notices = game.takeNotices();
+                VCR_CHECK(notices.size() == 1 && notices[0].section == "INDIANWAGONS");
+                VCR_CHECK(notices[0].numbers[0] == 100);
+                game.answerVisit(true);
+                VCR_CHECK(game.unit(wagon).holds == 0);
+                wagons = true;
+            }
+        }
+        {
+            // Spain, a computer player, never gives food to beggars.
+            auto s = braveBeside(turn, kCartajena, 0);
+            s.save.colonies[kCartajena].stock[kFood] = 150;
+            Game game(s.save, art.rules);
+            VCR_CHECK(game.braveVisit(kBrave, s.direction, kSpain));
+            VCR_CHECK(game.takeNotices().empty());
+            VCR_CHECK(!game.visitWaiting());
+            VCR_CHECK(game.state().colonies[kCartajena].stock[kFood] == 150);
+            spain = true;
+        }
+    }
+    VCR_CHECK(begged && gifts && food && converts);
+    VCR_CHECK(demanded && refused && spoke && wagons && spain);
 }

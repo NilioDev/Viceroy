@@ -54,8 +54,11 @@ touch controls.
 > ambush units in the open and take their muskets and horses, kill the
 > people of an undefended colony or burn it with its last colonist, and a
 > raiding party that loses at a colony may still steal goods and gold,
-> burn a building or damage a ship in the harbour. Their visits, and the
-> other European nations, don't happen yet. Wagon trains and ships can trade with the
+> burn a building or damage a ship in the harbour. Braves also visit your
+> colonies and wagon trains: a hungry tribe begs for food, a friendly one
+> brings food, goods or converts from your mission, and an unfriendly one
+> demands goods as reparations, which you may hand over or refuse. The
+> other European nations don't play yet. Wagon trains and ships can trade with the
 > natives: sell, haggle, give and buy at the original's prices. Soldiers,
 > scouts and other armed units can demand tribute, which a village pays
 > in goods for your nearest colony when your forces nearby impress it, and
