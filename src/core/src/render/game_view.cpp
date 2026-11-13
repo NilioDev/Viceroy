@@ -253,6 +253,9 @@ bool forestShown(const MapSquare& sq) {
 
 namespace {
 
+// PHYS0.SS sprite of a lost city rumour, drawn over the resource.
+constexpr int kRumour = 103;
+
 // PHYS0.SS sprite of each resource (89 to 102), drawn last on its square.
 int resourceSprite(Resource r) {
     switch (r) {
@@ -337,6 +340,9 @@ void drawTerrain(Screen& screen, const Art& art, const Game& game, int x, int y,
         }
     }
     drawResource(screen, art, map, x, y, px, py);
+    if (rumourAt(map, x, y)) {
+        blitSprite(screen, art.phys, kRumour, px, py);
+    }
 }
 
 namespace {

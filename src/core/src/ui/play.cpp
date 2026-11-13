@@ -183,6 +183,15 @@ void PlayScreen::moveActive(Step step) {
         say("Aboard ship.");
         advance();
         break;
+    case MoveResult::Lost:
+        // "Your expedition has vanished without a trace!"
+        say("");
+        if (!notices_.empty()) {
+            showNotices();
+        } else {
+            advance();
+        }
+        break;
     case MoveResult::NoMovesLeft:
         advance();
         break;
@@ -823,6 +832,16 @@ void PlayScreen::showNotices() {
             notice.strings[static_cast<std::size_t>(string)] = adjective(nation);
         }
     }
+    for (const auto& [string, nation] : notice.countries) {
+        // "England", or "the Netherlands" (read from the original).
+        if (string >= 0) {
+            if (notice.strings.size() <= static_cast<std::size_t>(string)) {
+                notice.strings.resize(static_cast<std::size_t>(string) + 1);
+            }
+            const std::string country = textLine(art_->names, "COUNTRY", nation, "");
+            notice.strings[static_cast<std::size_t>(string)] = nation == 3 ? "the " + country : country;
+        }
+    }
     for (const auto& [string, row] : notice.labels) {
         if (string >= 0) {
             if (notice.strings.size() <= static_cast<std::size_t>(string)) {
@@ -854,6 +873,24 @@ void PlayScreen::showNotices() {
             const auto& u = game_.unit(notice.unit);
             centreOn(view_, game_, u.x, u.y);
         }
+    }
+    if (notice.section == "LOSTCITY0") {
+        // A Fountain of Youth: "Which of the following individuals shall
+        // we recruit?", one of the three on the docks, for free.
+        const auto& nation = game_.state().nations[static_cast<std::size_t>(game_.human())];
+        Dialog d = makeDialog(*art_, "LOSTCITY0");
+        choices_.clear();
+        for (std::size_t slot = 0; slot < nation.recruits.size(); ++slot) {
+            const auto job = static_cast<std::size_t>(professionJob(nation.recruits[slot]));
+            addOption(d, job < game_.rules().jobs.size() ? game_.rules().jobs[job].expertName : "?");
+            choices_.push_back(static_cast<int>(slot));
+        }
+        d.selected = 0;
+        placeFrontiersmanDialog(d);
+        dialog_ = d;
+        question_ = "LOSTCITY0";
+        questionUnit_ = -1;
+        return;
     }
     const bool visit = notice.section == "INDIANBEGFOOD" || notice.section == "INDIANCITY" ||
                        notice.section == "INDIANWAGONS" || notice.section == "INDIANCOMMENT" ||
@@ -1061,6 +1098,14 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
             demandTribute(unit);
         } else if (option == kVillageAttack && village_ >= 0) {
             attackVillage(unit);
+        }
+    } else if (question == "LOSTCITY0") {
+        game_.recruitFree(picked);
+    } else if (question == "LOSTCITY4") {
+        // "Let us search for treasure!" or "Stay clear of those!"
+        game_.answerBurial(yes);
+        for (auto& notice : game_.takeNotices()) {
+            notices_.push_back(std::move(notice));
         }
     } else if (question == "INDIANBEGFOOD" || question == "INDIANCITY" || question == "INDIANWAGONS") {
         // Begging: "I'm sorry ..." or "We offer you ...". A demand on a

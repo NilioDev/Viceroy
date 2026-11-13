@@ -213,7 +213,8 @@ arctic, where the high four bits of the path layer are 0xF (nobody has been
 there), on a pattern set by the resource seed s: the square (x, y) with
 (x mod 4) × 4 + (y mod 4) equal to (19 × ⌊y / 4⌋ + 17 × ⌊x / 4⌋ + s + 8)
 mod 32. That is about half of the resource pattern moved by (8, 8), as the
-36 rumours seen in two games showed. Viceroy does not draw rumours yet.
+36 rumours seen in two games showed. Viceroy draws the sprite over the
+resource; exploring a rumour is in [rumours](rumours.md).
 
 ## Water colour cycling
 

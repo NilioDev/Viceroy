@@ -65,3 +65,35 @@ VCR_TEST("crosses: nothing comes while the number needed is unknown") {
     VCR_CHECK(g.unitCount() == 0);
     VCR_CHECK(g.state().nations[3].crosses == 52);
 }
+
+VCR_TEST("docks: who comes next follows the original's draw") {
+    // Experts come from the shift register in byte 68 of the nation record;
+    // professions 1-4, 18, 19, 23 and 25 up are never drawn.
+    Game g = crossGame(0, 100);
+    auto& dutch = g.state().nations[3];
+    dutch.raw[68] = 0x13;
+    dutch.raw[69] = 5;
+    int experts = 0;
+    for (int i = 0; i < 300; ++i) {
+        dutch.gold = 100000;
+        dutch.recruitCount = 0;
+        const int before = dutch.raw[68];
+        VCR_CHECK(g.recruit(0) >= 0);
+        const int p = dutch.recruits[0];
+        const bool unskilled = p == 0x19 || p == 0x1A || p == 0x1C;
+        VCR_CHECK(unskilled || (p < 25 && p != 1 && p != 2 && p != 3 && p != 4 && p != 18 && p != 19 && p != 23));
+        if (!unskilled) {
+            ++experts;
+            VCR_CHECK(dutch.raw[68] != before);
+        }
+    }
+    VCR_CHECK(experts > 0);
+    // With William Brewster neither criminals nor servants come.
+    dutch.raw[7 + 20 / 8] |= 1U << (20 % 8);
+    for (int i = 0; i < 200; ++i) {
+        dutch.gold = 100000;
+        dutch.recruitCount = 0;
+        g.recruit(1);
+        VCR_CHECK(dutch.recruits[1] != 0x19 && dutch.recruits[1] != 0x1A);
+    }
+}

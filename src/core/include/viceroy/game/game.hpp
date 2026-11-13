@@ -51,6 +51,7 @@ enum class MoveResult {
     Blocked,     // the square cannot be entered (wrong terrain, no room)
     Occupied,    // a foreign unit, colony or settlement is there
     HighSeas,    // a ship moved onto the high seas: it may sail for Europe
+    Lost,        // the unit vanished exploring a lost city rumour
 };
 
 enum class WorkResult {
@@ -77,6 +78,8 @@ struct GameNotice {
     // %STRINGs that are a word of the MISC section of LABELS.TXT
     // ("Wilderness"): which string, and the row.
     std::vector<std::pair<int, int>> labels{};
+    // %STRINGs that are a nation's country ("England", "the Netherlands").
+    std::vector<std::pair<int, int>> countries{};
 };
 
 enum class FoundResult {
@@ -387,6 +390,18 @@ public:
     void answerVisit(bool give);
     bool visitWaiting() const { return !visits_.empty(); }
 
+    // A European unit that has come onto a lost city rumour explores it
+    // (notices LOSTCITY1 to LOSTCITY9; read from the original, see
+    // docs/rules/rumours.md). False when the unit vanished.
+    bool exploreRumour(int index);
+    // The player's answer to the burial mounds (LOSTCITY4): search them or
+    // stay clear (notices BURIAL1 to BURIAL3, SCREWED).
+    void answerBurial(bool search);
+    bool burialWaiting() const { return burial_.nation >= 0; }
+    // A Fountain of Youth's free recruit from the docks (LOSTCITY0, one of
+    // eight); the new unit, or -1.
+    int recruitFree(int slot);
+
     // A missionary incites a tribe against another European nation. The
     // price weighs the tribe's tension toward the missionary's nation, its
     // settlements, defence, muskets and horses; the French pay a third
@@ -448,7 +463,7 @@ private:
     void sailOn(); // ships between Europe and the New World move on a stage
     void chainPassengers(int ship, const std::vector<int>& passengers);
     void removeUnit(int index);
-    int addUnitInEurope(int type, int profession);
+    int addUnitInEurope(int type, int profession, int nation = -1);
     // The original holds at most 300 units and makes no more past that.
     static constexpr int kMaxUnits = 300;
     // A new unit of the tribe on (x, y); its index, or -1 if there is no
@@ -466,7 +481,7 @@ private:
     int stepToward(int index, int toX, int toY);
     // The nation's people as the original counts them for the natives.
     int nationPeople(int nation) const;
-    int randomRecruit();
+    int randomRecruit(int nation);
     void gatherCrosses(); // immigration at the end of the turn
 
     SaveGame save_;
@@ -492,6 +507,21 @@ private:
         std::array<int, 16> makes{};
     };
     std::vector<BraveVisitState> visits_;
+    // Burial mounds waiting on the player's answer.
+    struct Burial {
+        int nation = -1;
+        int x = 0;
+        int y = 0;
+        int scout = 0;   // 1 for a scout, 2 seasoned, one more with de Soto
+        int quality = 0; // the roll of the exploration
+    };
+    Burial burial_;
+    void searchBurial(const Burial& b);
+    // The original's counts since the game was started (not saved): the
+    // rumours explored and the cities of gold found.
+    int rumoursExplored_ = 0;
+    int citiesFound_ = 0;
+    int addFreeRecruit(int nation, int slot);
     // The parts of a visit after the begging, and the demands.
     void visitAfterBegging(BraveVisitState v, bool give);
     bool visitOn(BraveVisitState v);

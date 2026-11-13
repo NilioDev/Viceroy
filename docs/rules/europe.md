@@ -130,8 +130,20 @@ original then asks (43 readings).
   readings exactly and the rest within two gold; the exact rule is not
   known. After a recruit the count goes up by one and the crosses go back
   to 0 (the next price was the full one). The recruit's place is taken by
-  someone new; who comes is a guess weighted towards the unskilled, as the
-  original's odds are not known.
+  someone new (see below).
+- **Who comes next** (read from the original with a debugger). Let
+  c = ⌊(L + 3) / 2⌋, with L the difficulty level (0 to 4) for the player and 1
+  for a computer nation. A roll of 1 to 15 at most c brings a petty criminal,
+  else a roll of 1 to 10 at most c an indentured servant, else a roll of
+  1 to 8 at most c a free colonist; with William Brewster the criminal and
+  the servant are free colonists too. Otherwise an expert comes, unless all
+  three on the docks are experts already (then a free colonist). The expert
+  is drawn from a small shift register kept in byte 68 of the nation record:
+  the byte is shifted right one bit and, if the bit shifted out was 1, xored
+  with 0x14; the profession is (byte 68 + byte 69) mod 32, drawn again
+  while it is 25 or more. Professions 18 and 23 become 13, 19 becomes 22,
+  1 becomes 8, 2 becomes 5, 3 becomes 0 and 4 becomes 6. One already on the
+  docks is drawn again (from the check on the docks), up to 100 times.
 - **Purchase** lists Artillery for 500 + 100 × the artillery bought so far
   (byte 30), Caravel 1000, Merchantman 2000, Galleon 3000, Privateer 2000
   and Frigate 5000, then asks "Purchase <unit> for <price>$?" (`@REALLYBUY`).
