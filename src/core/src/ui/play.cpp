@@ -692,6 +692,13 @@ bool PlayScreen::handleDialog(Command command) {
     case Command::Skip:
         break;
     case Command::Cancel:
+        if (question_ == "SAILPORT" || question_ == "TRAVELPLACE") {
+            // Go To has no "None": Escape leaves the unit as it was.
+            dialog_.reset();
+            choices_.clear();
+            question_.clear();
+            return true;
+        }
         // The first choice of a list is "None"; elsewhere the last is "no".
         d.selected = list ? 0 : count - 1;
         break;
@@ -1050,6 +1057,94 @@ void PlayScreen::work(int orders) {
     }
 }
 
+namespace {
+
+constexpr int kGoToMore = -2;
+constexpr int kGoToEurope = -1;
+constexpr std::size_t kGoToPageSize = 10;
+
+} // namespace
+
+void PlayScreen::openGoTo(int page) {
+    // Seen in the original: "Select a port to sail to:" for a ship, with
+    // the home port first ("Amsterdam (Netherlands)"), or "Select a colony
+    // to travel to:", centred on the screen. Past ten entries a page ends
+    // with "(More)" and the next starts with it.
+    const int active = game_.activeUnit();
+    if (active < 0) {
+        return;
+    }
+    const bool ship = game_.isShip(active);
+    std::vector<int> entries;
+    if (ship) {
+        entries.push_back(kGoToEurope);
+    }
+    for (const int c : game_.goToColonies(active)) {
+        entries.push_back(c);
+    }
+    const std::size_t pages = std::max<std::size_t>(1, (entries.size() + kGoToPageSize - 1) / kGoToPageSize);
+    goToPage_ = static_cast<int>(static_cast<std::size_t>(page) % pages);
+    const std::size_t first = static_cast<std::size_t>(goToPage_) * kGoToPageSize;
+    const std::size_t last = std::min(entries.size(), first + kGoToPageSize);
+    const std::string section = ship ? "SAILPORT" : "TRAVELPLACE";
+    Dialog d = makeDialog(*art_, section);
+    choices_.clear();
+    if (goToPage_ > 0) {
+        addOption(d, "(More)");
+        choices_.push_back(kGoToMore);
+    }
+    for (std::size_t i = first; i < last; ++i) {
+        const int e = entries[i];
+        if (e == kGoToEurope) {
+            const int nation = game_.human();
+            addOption(d, textLine(art_->names, "HOMEPORT", nation, "") + " (" +
+                             textLine(art_->names, "COUNTRY", nation, "") + ")");
+        } else {
+            addOption(d, game_.state().colonies[static_cast<std::size_t>(e)].name);
+        }
+        choices_.push_back(e);
+    }
+    if (pages > 1 && goToPage_ == 0) {
+        addOption(d, "(More)");
+        choices_.push_back(kGoToMore);
+    }
+    // Measured: the entries stand 10 pixels in from the title, and the
+    // bar starts on the first line of every page.
+    d.optionLeft = 15;
+    d.selected = 0;
+    placeCentredDialog(d);
+    dialog_ = d;
+    question_ = section;
+    questionUnit_ = active;
+}
+
+void PlayScreen::goTo(int choice) {
+    const int active = game_.activeUnit();
+    if (active < 0 || choice < kGoToMore) {
+        return;
+    }
+    if (choice == kGoToMore) {
+        openGoTo(goToPage_ + 1);
+        return;
+    }
+    if (choice == kGoToEurope) {
+        if (!game_.goToEurope(active)) {
+            return;
+        }
+    } else {
+        const auto& c = game_.state().colonies[static_cast<std::size_t>(choice)];
+        game_.setGoTo(active, c.x, c.y);
+    }
+    // Seen: the unit sets off at once.
+    game_.moveGoToUnits();
+    for (auto& notice : game_.takeNotices()) {
+        notices_.push_back(std::move(notice));
+    }
+    if (!game_.needsOrders(active)) {
+        advance();
+    }
+}
+
 void PlayScreen::answer(const std::string& question, int unit, int choice) {
     const bool yes = choice == 0;
     const auto picked = [&]() {
@@ -1099,6 +1194,8 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
         } else if (option == kVillageAttack && village_ >= 0) {
             attackVillage(unit);
         }
+    } else if (question == "SAILPORT" || question == "TRAVELPLACE") {
+        goTo(picked);
     } else if (question == "LOSTCITY0") {
         game_.recruitFree(picked);
     } else if (question == "LOSTCITY4") {
@@ -1981,6 +2078,11 @@ bool PlayScreen::handle(Command command) {
             centreOn(view_, game_, game_.unit(active).x, game_.unit(active).y);
         }
         break;
+    case Command::GoTo:
+        if (active >= 0) {
+            openGoTo(0);
+        }
+        break;
     case Command::Purchase: // P
         work(SaveUnit::kPlow);
         break;
@@ -2487,6 +2589,9 @@ bool PlayScreen::pickMenuEntry(int entry) {
             return true;
         case kNoOrders:
             return handle(Command::Skip);
+        case kGoToPort:
+        case kGoToPlace:
+            return handle(Command::GoTo);
         case kReturnToEurope: {
             const int active = game_.activeUnit();
             if (active >= 0 && game_.sailToEurope(active)) {

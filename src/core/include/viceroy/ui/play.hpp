@@ -54,6 +54,7 @@ enum class Command {
     Purchase,
     Train,
     Menu, // F10: the menu bar
+    GoTo, // G: send the unit to a colony (a ship also to Europe)
 };
 
 // The main map screen while playing.
@@ -150,6 +151,9 @@ private:
     bool handleBuildList(Command command);
     void openBuildList();
     void openBuy();
+    // Go To: the list of colonies (and Europe for a ship), ten to a page.
+    void openGoTo(int page);
+    void goTo(int choice);
     bool handleEuropeScreen(Command command);
     bool handleDialog(Command command);
     void drawScreen(Screen& screen, const Art& art) const;
@@ -185,6 +189,7 @@ private:
     std::string question_; // the GAME.TXT section the dialog asks
     int questionUnit_ = -1;
     std::vector<int> choices_; // what each choice of a list stands for
+    int goToPage_ = 0;
     // The rows of @UNITOPTIONS a unit's options box offers, top to bottom.
     enum UnitOption { kUnitFront, kUnitClear, kUnitSentry, kUnitFortify, kUnitNoChange };
     std::vector<int> unitOptions_;

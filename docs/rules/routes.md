@@ -64,6 +64,30 @@ The tribes' units take whatever the flood gave, without the greedy step.
 - The block search leaves the mover counted as a caravel or a soldier for
   the rest of that search, as in the original.
 
+## Go To
+
+Seen in the original with `COLONY00.SAV`:
+
+- G (or Go to Place / Go to Port in the Orders menu) opens "Select a colony
+  to travel to:" (`@TRAVELPLACE`) for a land unit: the nation's colonies on
+  the same land (the same region number in the path layer), in the order
+  of the colony list. A ship gets "Select a port to sail to:"
+  (`@SAILPORT`): first its home port and country, "Amsterdam
+  (Netherlands)", then the colonies by the same sea. Viceroy takes a colony
+  as by the same sea when one of its neighbouring squares is water of the
+  ship's region (a guess: every Dutch colony was listed).
+- The box is centred on the screen, the entries 10 pixels in from the title.
+  Past ten entries the page ends with "(More)", and the next page starts with
+  it; the bar starts on the first line of every page.
+- The unit sets off at once: its orders become Go To (3) with the colony
+  as destination, and it walks while its moves last. The panel shows the
+  colony's name in place of the orders. At the start of each turn the units
+  under Go To walk on before anyone is asked for orders.
+- On arrival the orders end. With no way to go the orders are dropped.
+- Europe sends the ship to the nearest sea lane (seen once: of two at the
+  same distance it took the one on the upper row) and it sails for Europe
+  when it gets there.
+
 ## Moves
 
 A unit's moves used (byte 5) take the whole cost of each step, even past

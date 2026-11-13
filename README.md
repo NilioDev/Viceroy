@@ -13,7 +13,8 @@ touch controls.
 > **Status: first playable steps.** Start a new game on the map of America
 > (difficulty, nation and name, the king's audience and the departure, as
 > in the original) or load one of your savegames, move your
-> units over the original map, board ships and make landfall, plow fields,
+> units over the original map (or send them to a colony with Go To, along
+> the original's routes), board ships and make landfall, plow fields,
 > clear forests and build roads with your pioneers, found colonies, look inside your colonies, end turns and save. The colony screen
 > shows its buildings, people, what they produce and the warehouse; give
 > colonists other jobs with the jobs menu, and choose what the colony builds
@@ -122,6 +123,7 @@ saved in the first free slot, or over the savegame saved longest ago.
 | Sentry | S | B |
 | Fortify | F | Right stick click |
 | Build colony | B | X |
+| Go To: send the unit to one of your colonies (a ship also to Europe) | G, or the Orders menu | Start, then Orders |
 | Pioneer: plow or clear the forest, build a road | P, R, or the Orders menu | Start, then Orders |
 | Centre the map on the unit | C | Left stick click |
 | Look around the map (view mode), back to moving | V, M | Back, B |

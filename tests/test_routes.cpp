@@ -6,6 +6,7 @@
 #include "viceroy/game/natives.hpp"
 #include "viceroy/game_files.hpp"
 #include "viceroy/render/game_view.hpp"
+#include "viceroy/ui/play.hpp"
 
 #include <array>
 #include <cstdio>
@@ -127,5 +128,59 @@ VCR_TEST("original files: Go To steps as the original's (measured)") {
         VCR_CHECK(u.x == c.x && u.y == c.y);
         VCR_CHECK(u.raw[11] == c.last);
         VCR_CHECK(u.movesUsed == c.used);
+    }
+}
+
+VCR_TEST("original files: Go To lists the colonies and sets off at once (seen in the original)") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    Art art = loadArt(dir);
+    std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
+    const SaveGame save = readSaveGame(Bytes(std::istreambuf_iterator<char>(in), {}));
+    {
+        // A colonist on the main land: the Dutch colonies there, in order.
+        Game game(save, art.rules);
+        VCR_CHECK((game.goToColonies(61) == std::vector<int>{0, 3, 4, 5, 7, 9, 10, 12, 13, 14}));
+        // A ship: every Dutch colony by the same sea.
+        VCR_CHECK((game.goToColonies(53) == std::vector<int>{0, 1, 3, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14}));
+        // Sent to Jamestown, the colonist takes its first step east at once.
+        game.setGoTo(61, 50, 51);
+        game.moveGoToUnits();
+        const auto& u = game.unit(61);
+        VCR_CHECK(u.x == 27 && u.y == 44 && u.movesUsed == 9 && u.orders == Game::kGoToOrders);
+        // Sent to Europe, the privateer makes for the nearest sea lane and
+        // sails.
+        VCR_CHECK(game.goToEurope(53));
+        VCR_CHECK(game.unit(53).raw[9] == 39 && game.unit(53).raw[10] == 23);
+        game.moveGoToUnits();
+        VCR_CHECK(!game.onMap(53) && game.unit(53).orders == 0);
+    }
+    {
+        // The ship's list: the home port first, ten to a page.
+        Game game(save, art.rules);
+        game.setActiveUnit(53);
+        PlayScreen play(std::move(game), {});
+        play.setArt(&art);
+        VCR_CHECK(play.game().activeUnit() == 53);
+        play.handle(Command::GoTo);
+        VCR_CHECK(play.dialog().has_value());
+        const auto& d = *play.dialog();
+        VCR_CHECK(d.options.size() == 11);
+        VCR_CHECK(d.options[0] == "Amsterdam (Netherlands)");
+        VCR_CHECK(d.options[1] == "Jamestown" && d.options[10] == "(More)");
+        VCR_CHECK(d.selected == 0);
+        for (int i = 0; i < 10; ++i) {
+            play.handle(Command::Down);
+        }
+        play.handle(Command::Confirm);
+        VCR_CHECK(play.dialog().has_value());
+        VCR_CHECK(play.dialog()->options.size() == 5);
+        VCR_CHECK(play.dialog()->options[0] == "(More)" && play.dialog()->options[1] == "Guadeloupe");
+        VCR_CHECK(play.dialog()->selected == 0);
+        play.handle(Command::Cancel);
+        VCR_CHECK(!play.dialog().has_value());
+        VCR_CHECK(play.game().unit(53).orders == 0);
     }
 }
