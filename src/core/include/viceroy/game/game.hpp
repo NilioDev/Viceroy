@@ -345,6 +345,11 @@ public:
     // offers peace: a computer nation takes it at once; the player is asked
     // with an INDIANWELCOME notice. Returns whether the player is asked.
     bool meetNeighbours(int unit);
+    // The step a native unit chooses in its tribe's turn: a direction from
+    // north clockwise (0-7), 8 to stay (its moves are then used up), or -1
+    // when it had no home and is gone. Sets its orders, last step and visit
+    // marks as the original does. See docs/rules/natives.md.
+    int nativeUnitAI(int index);
     // The tribe's (or nation's) first meeting: both sides have met, and the
     // tribe's tension is at most 20.
     void meetTribe(int nation, int tribe);
@@ -435,6 +440,12 @@ private:
     void tribeTurn(int tribe);
     void settlementTurn(int settlement);
     void countTribe(int tribe);
+    // The tribe's units take their steps, one unit at a time.
+    void moveTribeUnits(int tribe);
+    void nativeUnitTurn(int index);
+    int stepToward(int index, int toX, int toY);
+    // The nation's people as the original counts them for the natives.
+    int nationPeople(int nation) const;
     int randomRecruit();
     void gatherCrosses(); // immigration at the end of the turn
 
@@ -456,6 +467,10 @@ private:
     bool loseBattle(int loser, int winner);
     CombatStrengths strengthsAgainst(int attacker, const SaveUnit& defender, bool defenderShip, bool defenderDamaged,
                                      int defenderExtra) const;
+    // The defender's part of it alone: its strength with the bonus of where
+    // it stands, before the human's bonus and the rest.
+    int defenceStrength(int attacker, const SaveUnit& defender, bool defenderShip, bool defenderDamaged,
+                        int defenderExtra) const;
     SaveUnit colonistAsUnit(int colony, int colonist) const;
     void captureColony(int colony, int attacker);
     void loseShip(int loser, int winner);

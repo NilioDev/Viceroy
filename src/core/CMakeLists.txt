@@ -20,6 +20,7 @@ add_library(vcr_core STATIC
     src/game/native_contact.cpp
     src/game/native_incite.cpp
     src/game/native_heresy.cpp
+    src/game/native_move.cpp
     src/game/native_turn.cpp
     src/game/colony.cpp
     src/game/europe.cpp

@@ -10,11 +10,13 @@ rule as a guess until it is checked against the original.
   in thirds: entering a square costs its terrain's movement value (from
   `NAMES.TXT`; mountains and hills use their own rows) times three.
 - Following a road (both squares have a road or a colony) or a river (both
-  squares have one) costs one third. *Guess:* the original may treat major
-  and minor rivers differently.
-- When a unit does not have enough moves left for a square, its turn is over
-  (manual, "Moving Units"). *Guess:* a unit that has not moved yet this turn
-  may always make one move.
+  squares have one, and the step is not corner to corner) costs one third;
+  entering a colony or settlement costs at most a move (read from the
+  original).
+- When a unit does not have enough moves left for a square, it gets there
+  with a chance of its moves left in the cost; otherwise its turn is over
+  (read from the original). A unit that has not moved yet this turn always
+  makes its move.
 - Land units stay on land, ships on water or in their own colonies. A land
   unit boards a ship by moving onto it if a hold is free, and is then on
   sentry. A ship steering onto land makes landfall: the units aboard wake up
@@ -29,8 +31,8 @@ rule as a guess until it is checked against the original.
 ## Turns
 
 Ending the turn gives every unit its moves back and moves the calendar on:
-one turn a year until 1599, then spring and autumn. The other nations do not
-move yet.
+one turn a year until 1599, then spring and autumn. The natives move (see
+[natives](natives.md)); the other European nations do not move yet.
 
 ## Colonies
 

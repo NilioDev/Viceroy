@@ -38,4 +38,9 @@ bool onResourcePattern(int x, int y, int seed);
 // The resource on a square of the map, or Resource::None.
 Resource resourceAt(const SaveMap& map, int x, int y);
 
+// Where the original keeps a lost city rumour: on a pattern of its own set by
+// the same seed, on land that is not arctic, where nobody stands. Natives
+// never step there.
+bool rumourAt(const SaveMap& map, int x, int y);
+
 } // namespace viceroy

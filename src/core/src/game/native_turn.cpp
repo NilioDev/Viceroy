@@ -135,7 +135,7 @@ void Game::tribeTurn(int tribe) {
         const int people = save_.tribesAndMore[kTribePeople + static_cast<std::size_t>(tribe)];
         setWord(breeder + kHorses, std::min(word(breeder + kHorses) + breeding, (people + 25) * 2));
     }
-    // Not done yet: the tribe's units move.
+    moveTribeUnits(tribe);
 }
 
 void Game::countTribe(int tribe) {

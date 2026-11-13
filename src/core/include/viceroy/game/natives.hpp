@@ -39,7 +39,8 @@ inline constexpr std::uint8_t kExpertMission = 0x10;
 
 // The nation's colony nearest to (x, y), measured the original's way (the
 // longer side plus half the shorter); a later colony wins a tie. With a
-// region, only colonies on land of that region count. -1 if there is none.
+// region, only colonies on land of that region count; a nation of -1
+// takes every nation's colonies. -1 if there is none.
 int nearestColony(const SaveGame& save, int x, int y, int nation, int region = -1);
 
 // The land region of a square (the low four bits of the path layer), or

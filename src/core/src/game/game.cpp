@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "viceroy/game/game.hpp"
+#include "viceroy/game/resource.hpp"
 
 #include "viceroy/game/colony.hpp"
 #include "viceroy/game/europe.hpp"
@@ -108,13 +109,15 @@ int Game::moveCost(int index, int fromX, int fromY, int toX, int toY) const {
     const auto& from = map.at(fromX, fromY);
     const bool roadFrom = (from.flags & (MapSquare::kRoad | MapSquare::kHasColony)) != 0;
     const bool roadTo = (to.flags & (MapSquare::kRoad | MapSquare::kHasColony)) != 0;
-    // Roads, and rivers followed from square to square, cost a third.
-    if ((roadFrom && roadTo) || (from.river() && to.river())) {
+    // Roads, and rivers followed straight (not corner to corner) from
+    // square to square, cost a third; a colony or settlement at most a
+    // move (read from the original).
+    if ((roadFrom && roadTo) || (from.river() && to.river() && (fromX == toX || fromY == toY))) {
         return 1;
     }
     const auto row = static_cast<std::size_t>(terrainRow(to));
-    const int cost = row < rules_.terrain.size() ? rules_.terrain[row].movementCost : 1;
-    return std::max(1, cost) * kThirds;
+    const int cost = std::max(1, row < rules_.terrain.size() ? rules_.terrain[row].movementCost : 1) * kThirds;
+    return (to.flags & MapSquare::kHasColony) != 0 ? std::min(cost, kThirds) : cost;
 }
 
 MoveResult Game::move(int index, Step step) {
@@ -176,9 +179,11 @@ MoveResult Game::move(int index, Step step) {
     }
 
     const int cost = moveCost(index, u.x, u.y, toX, toY);
-    if (cost > movesLeft(index) && u.movesUsed > 0) {
-        // Not enough moves for this square: the unit's turn is over. A unit
-        // that has not moved yet may always make one move.
+    if (cost > movesLeft(index) && u.movesUsed > 0 && 1 + nextRandom(cost) > movesLeft(index)) {
+        // Not enough moves for this square (read from the original): a unit
+        // that has moved already gets there with a chance of its moves left
+        // in the cost; otherwise its turn is over. A unit that has not moved
+        // yet may always make one move.
         u.movesUsed = movementAllowance(index);
         return MoveResult::NoMovesLeft;
     }
@@ -1045,14 +1050,30 @@ int Game::train(int jobRow) {
 }
 
 void Game::refreshUnitFlags() {
-    for (auto& sq : save_.map.squares) {
+    // Read from the original: a unit coming onto an empty square writes its
+    // nation into the high four bits of the path layer, which stay when it
+    // leaves (so they tell who was there last). A native unit leaves a lost
+    // city rumour's square as it is. Bit 0 of the mask marks the squares
+    // with units.
+    auto& map = save_.map;
+    std::vector<std::uint8_t> had(map.squares.size());
+    for (std::size_t i = 0; i < map.squares.size(); ++i) {
+        auto& sq = map.squares[i];
+        had[i] = sq.flags & MapSquare::kHasUnit;
         sq.flags = static_cast<std::uint8_t>(sq.flags & ~MapSquare::kHasUnit);
     }
     for (int i = 0; i < unitCount(); ++i) {
-        if (onMap(i)) {
-            auto& sq = save_.map.at(unit(i).x, unit(i).y);
-            sq.flags = static_cast<std::uint8_t>(sq.flags | MapSquare::kHasUnit);
+        if (!onMap(i)) {
+            continue;
         }
+        const auto& u = unit(i);
+        const auto at = static_cast<std::size_t>(u.y) * static_cast<std::size_t>(map.width) + static_cast<std::size_t>(u.x);
+        auto& sq = map.squares[at];
+        if (had[at] == 0 && (sq.flags & MapSquare::kHasUnit) == 0 && u.nation >= 0 && u.nation < 16 &&
+            (u.nation < kEuropeanNations || !rumourAt(map, u.x, u.y))) {
+            sq.region = static_cast<std::uint8_t>((sq.region & 0x0F) | (u.nation << 4));
+        }
+        sq.flags = static_cast<std::uint8_t>(sq.flags | MapSquare::kHasUnit);
     }
 }
 

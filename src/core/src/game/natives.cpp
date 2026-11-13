@@ -148,7 +148,7 @@ int nearestColony(const SaveGame& save, int x, int y, int nation, int region) {
     int bestDistance = 9999;
     for (std::size_t i = 0; i < save.colonies.size(); ++i) {
         const auto& c = save.colonies[i];
-        if (c.nation != nation || (region >= 0 && landRegion(save.map, c.x, c.y) != region)) {
+        if ((nation >= 0 && c.nation != nation) || (region >= 0 && landRegion(save.map, c.x, c.y) != region)) {
             continue;
         }
         const int dx = std::abs(c.x - x);

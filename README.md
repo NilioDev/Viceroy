@@ -48,8 +48,10 @@ touch controls.
 > go to war against another nation, or denounce another nation's mission
 > to take it over. A furious tribe with a treaty may burn your missions.
 > Native settlements grow, raise new braves, and calm down or grow angry
-> from missions and nearby colonies each turn, as in the original. The
-> braves and the other nations don't move yet. Wagon trains and ships can trade with the
+> from missions and nearby colonies each turn, as in the original. Their
+> braves roam, fortify, take up muskets and horses at home and head for
+> nearby colonies the way the original's do; their visits and attacks, and
+> the other European nations, don't happen yet. Wagon trains and ships can trade with the
 > natives: sell, haggle, give and buy at the original's prices. Soldiers,
 > scouts and other armed units can demand tribute, which a village pays
 > in goods for your nearest colony when your forces nearby impress it, and
