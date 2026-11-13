@@ -31,8 +31,11 @@ offered **Cancel Action**, which leaves the unit where it was. A scout of
 a nation that has met the tribe is offered **Ask to Speak With Chief**;
 the original also offers it Demand Tribute and Attack Village, which
 Viceroy does not have yet. Without contact with the tribe only Cancel
-Action is there. Missionaries and soldiers get other options, which
-Viceroy does not have yet either.
+Action is there. A missionary is offered **Establish Mission** at a
+settlement without a mission (the original also offers Incite Indians,
+and Denounce Heresy at another nation's mission, which Viceroy does not
+have yet). Soldiers get other options, which Viceroy does not have yet
+either.
 
 ## Learning a skill
 
@@ -95,6 +98,29 @@ nation by its own ("Dutch").
 
 Checked on six settlements of four tribes: the experts and the goods
 asked for match the original's greetings.
+
+## A missionary founds a mission
+
+The missionary stays in the settlement: the unit is gone and the
+settlement's byte 5 holds the nation (with bit 0x10 for a Jesuit
+missionary, or for any missionary of a nation with Jean de Brebeuf).
+
+How the tribe takes it depends on the missions the nation already has
+among the tribe. Their number is doubled with Juan de Sepulveda, halved
+with Bartolome de las Casas, halved with Pocahontas and halved for the
+French (each halving rounds down). The change in tension is that number
+× 8, less 25, 15, 10 or 5 for a tribe whose tension is below 25, 50, 75 or
+higher. At a capital the change moves 8 further from zero. The change is
+added to the tribe's tension toward the nation (not below 0).
+
+The message (`@MISSION0` to `@MISSION3`: curious, cautious, offended,
+hostile) starts from the tension's step (0 to 3); a change of −5 or more
+makes it at least cautious, a change above 0 at least offended, and 10 or
+more hostile. It names the mission by `@MISSION` in `NAMES.TXT` and the
+nation's nearest colony ("Church of Curaçao mission founded in Autumn,
+1653. Apache are offended."), measured as the longer side plus half the
+shorter, a later colony winning a tie. The religious advisor shows it.
+Measured once: the Apache, at tension 51, went to 41 and were offended.
 
 ## The skill a settlement teaches
 

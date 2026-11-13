@@ -236,6 +236,15 @@ public:
     NativeLesson liveAmongNatives(int unit, int settlement);
     // The answer "Then I shall become a master ...": the unit learns.
     void learnFromNatives(int unit, int settlement);
+    // A missionary may found a mission at a settlement without one.
+    bool canEstablishMission(int unit, int settlement) const;
+    struct MissionNews {
+        int reaction = 0; // 0 curious, 1 cautious, 2 offended, 3 hostile (MISSION0..3)
+        int colony = -1;  // the nation's nearest colony, which names the mission
+    };
+    // The missionary stays in the settlement (the unit is gone) and the
+    // tribe's tension moves with how it takes the mission.
+    MissionNews establishMission(int unit, int settlement);
     // A scout may ask to speak with the chief of a tribe its nation has met.
     bool canSpeakWithChief(int unit, int settlement) const;
     enum class ChiefAnswer { Kill, Bored, Guides, Tales, Gift };

@@ -255,3 +255,58 @@ VCR_TEST("original files: a scout speaks with the chief") {
     VCR_CHECK(!(gift && guides));
     VCR_CHECK((after.settlements[kVillage].raw[3] & kSettlementVisited) != 0 || (!gift && !guides));
 }
+
+VCR_TEST("original files: a missionary founds a mission (measured)") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
+    SaveGame save = readSaveGame(Bytes(std::istreambuf_iterator<char>(in), {}));
+    constexpr int kDutch = 3, kApache = 5, kVillage = 15;
+    save.nations[kDutch].raw[52 + 4 + kApache] = 0x60;
+    const auto& village = save.settlements[kVillage];
+    int missionary = -1;
+    for (std::size_t i = 0; i < save.units.size(); ++i) {
+        if (save.units[i].nation == kDutch && save.units[i].type == 0) {
+            missionary = static_cast<int>(i);
+            break;
+        }
+    }
+    auto& u = save.units[static_cast<std::size_t>(missionary)];
+    u.type = 3;
+    u.profession = 0x1C;
+    u.movesUsed = 0;
+    u.orders = SaveUnit::kNoOrders;
+    u.x = village.x - 1;
+    u.y = village.y;
+    VCR_CHECK(tribeTension(save, kApache, kDutch) == 51);
+
+    PlayScreen play(Game(save, art.rules), {});
+    play.setArt(&art);
+    const auto units = save.units.size();
+    play.game().setActiveUnit(missionary);
+    play.handle(Command::MoveE);
+    VCR_CHECK(play.dialog().has_value());
+    VCR_CHECK(play.dialog()->options.size() == 2); // Establish Mission, Cancel Action
+    play.handle(Command::Confirm);
+    // Seen in the original: "Church of Curacao mission founded in Autumn,
+    // 1653. Apache are offended.", and the tension went from 51 to 41.
+    VCR_CHECK(play.dialog().has_value());
+    VCR_CHECK(play.dialog()->y == 110);
+    const auto& after = play.game().state();
+    VCR_CHECK(missionOf(after.settlements[kVillage]) == kDutch);
+    VCR_CHECK(tribeTension(after, kApache, kDutch) == 41);
+    VCR_CHECK(after.units.size() == units - 1);
+    std::string text;
+    for (const auto& line : play.dialog()->lines) {
+        text += line + " ";
+    }
+    VCR_CHECK(text.find("offended") != std::string::npos);
+    VCR_CHECK(text.find("Church of " + after.colonies[static_cast<std::size_t>(nearestColony(after, village.x, village.y, kDutch))].name) !=
+              std::string::npos);
+    VCR_CHECK(after.colonies[static_cast<std::size_t>(nearestColony(after, village.x, village.y, kDutch))].name.rfind("Cura", 0) == 0);
+    play.handle(Command::Confirm);
+    VCR_CHECK(!play.dialog().has_value());
+}

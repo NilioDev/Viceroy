@@ -30,6 +30,18 @@ int tribeLevel(const SaveGame& save, int tribe);
 int tribeTension(const SaveGame& save, int tribe, int nation);
 int tensionLevel(int tension);
 
+void setTribeTension(SaveGame& save, int tribe, int nation, int tension);
+
+// The settlement's mission: the nation that runs it, or -1 (byte 5; bit
+// 0x10 marks a mission of a Jesuit or with Jean de Brebeuf).
+int missionOf(const SaveSettlement& settlement);
+inline constexpr std::uint8_t kExpertMission = 0x10;
+
+// The nation's colony nearest to (x, y), measured the original's way (the
+// longer side plus half the shorter); a later colony wins a tie. -1 if
+// the nation has none.
+int nearestColony(const SaveGame& save, int x, int y, int nation);
+
 // Whether the nation has met the tribe (bit 0x40 of its attitude byte).
 bool metTribe(const SaveGame& save, int nation, int tribe);
 
