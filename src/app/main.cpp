@@ -444,6 +444,8 @@ std::optional<Command> keyCommand(const SDL_KeyboardEvent& key) {
         return Command::Train;
     case SDLK_TAB:
         return (key.mod & SDL_KMOD_SHIFT) ? Command::PreviousUnit : Command::NextUnit;
+    case SDLK_F3:
+        return Command::CongressReport;
     case SDLK_F10:
         return Command::Menu;
     default:
@@ -587,7 +589,7 @@ void click(App& app, float wx, float wy) {
         }
         return;
     }
-    if (app.play->congressHallUp()) {
+    if (app.play->congressHallUp() || app.play->reportUp()) {
         send(app, Command::Confirm);
         return;
     }

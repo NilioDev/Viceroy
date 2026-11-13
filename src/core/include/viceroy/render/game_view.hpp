@@ -37,6 +37,7 @@ struct Art {
     std::vector<MenuDef> menus; // MENU.TXT: the menu bar
     std::vector<SpriteSheet> portraits; // advisors: MSS0.SS, ...
     Picture congressHall;               // CCBKGD.PIK
+    Picture congressReport;             // REPORT3.PIK
     std::vector<SpriteSheet> fathers;   // CC-00.SS to CC-24.SS, by row of @FATHERS
     Ruleset rules;
 };

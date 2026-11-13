@@ -5,6 +5,7 @@
 #include "viceroy/game/colony.hpp"
 #include "viceroy/game/europe.hpp"
 #include "viceroy/game/natives.hpp"
+#include "viceroy/render/report_view.hpp"
 #include "viceroy/data/text_table.hpp"
 #include "viceroy/game_files.hpp"
 
@@ -1964,6 +1965,11 @@ bool PlayScreen::handle(Command command) {
         showNotices();
         return true;
     }
+    if (congressReport_) {
+        // Any key closes the report.
+        congressReport_ = false;
+        return true;
+    }
     if (dialog_) {
         return handleDialog(command);
     }
@@ -1983,6 +1989,10 @@ bool PlayScreen::handle(Command command) {
     }
     if (command == Command::Europe) {
         openEurope();
+        return true;
+    }
+    if (command == Command::CongressReport) {
+        congressReport_ = true;
         return true;
     }
     if (command == Command::Menu) {
@@ -2229,6 +2239,10 @@ void PlayScreen::draw(Screen& screen, const Art& art) const {
         drawCongressHall(screen, art, fathers);
         return;
     }
+    if (congressReport_) {
+        drawCongressReport(screen, art, game_, game_.human());
+        return;
+    }
     drawScreen(screen, art);
     if (menu_ && !colonyScreen_ && !europeScreen_) {
         drawMenuBar(screen, art, art.menus, &*menu_);
@@ -2383,6 +2397,9 @@ constexpr int kMovePieces = 0;
 constexpr int kViewPieces = 1;
 constexpr int kCentre = 11;
 } // namespace view_menu
+namespace reports_menu {
+constexpr int kCongress = 2;
+} // namespace reports_menu
 namespace orders_menu {
 constexpr int kActivate = 0;
 constexpr int kWait = 1;
@@ -2630,6 +2647,15 @@ bool PlayScreen::pickMenuEntry(int entry) {
             return handle(Command::ViewMode);
         case view_menu::kCentre:
             return handle(Command::Centre);
+        default:
+            notYet();
+            return true;
+        }
+    }
+    if (section == "REPORTS") {
+        switch (entry) {
+        case reports_menu::kCongress:
+            return handle(Command::CongressReport);
         default:
             notYet();
             return true;
