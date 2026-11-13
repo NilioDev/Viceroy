@@ -74,6 +74,9 @@ struct GameNotice {
     // %STRINGs that are a nation's adjective ("French"): which string, and
     // the nation, for the screen to fill in.
     std::vector<std::pair<int, int>> adjectives{};
+    // %STRINGs that are a word of the MISC section of LABELS.TXT
+    // ("Wilderness"): which string, and the row.
+    std::vector<std::pair<int, int>> labels{};
 };
 
 enum class FoundResult {
@@ -350,6 +353,10 @@ public:
     // when it had no home and is gone. Sets its orders, last step and visit
     // marks as the original does. See docs/rules/natives.md.
     int nativeUnitAI(int index);
+    // A native unit attacks the square (x, y): the unit or colony there.
+    // The outcome as in the original: an ambush, a raid on the colony, a
+    // colonist killed or the colony burned. See docs/rules/natives.md.
+    CombatOutcome nativeAttack(int index, int x, int y);
     // The tribe's (or nation's) first meeting: both sides have met, and the
     // tribe's tension is at most 20.
     void meetTribe(int nation, int tribe);
@@ -480,6 +487,8 @@ private:
     void loseNative(int loser);
     void winAgainstVillage(int attacker, int settlement);
     void burnSettlement(int settlement);
+    // What a tribe's raiding party does to a colony after its fight there.
+    void raidColony(int nation, int colony, int home, bool always);
     int villageTreasure(int nation, int tribe, bool capital);
 };
 

@@ -276,6 +276,16 @@ CombatStrengths Game::strengthsAgainst(int attacker, const SaveUnit& du, bool de
 
     int d = defenceStrength(attacker, du, defenderShip, defenderDamaged, defenderExtra);
     int a = strength8(au, true, isDamagedArtillery(attacker), 0);
+    // The ambush, read from the original: a tribe attacking a European in
+    // the open who is not fortified has the square's defence bonus (in
+    // quarters) on its own side; the defender then gets none.
+    if (!attackerEuropean && defenderEuropean && !colony && !settlement && du.orders != SaveUnit::kFortified &&
+        save_.map.inside(du.x, du.y)) {
+        const int row = terrainRow(save_.map.at(du.x, du.y));
+        if (row >= 0 && row < static_cast<int>(rules_.terrain.size())) {
+            a = a * (4 + rules_.terrain[static_cast<std::size_t>(row)].defenseBonus) >> 2;
+        }
+    }
     a = a * 3 >> 1; // the attack bonus
     if (attackerHuman) {
         a += 4 - difficulty;
@@ -316,6 +326,25 @@ CombatStrengths Game::strengthsAgainst(int attacker, const SaveUnit& du, bool de
         }
         if (difficulty == 0 && attackerHuman) {
             a <<= 1;
+        }
+    }
+    if (colony && defenderEuropean) {
+        // Read from the original: a tribe never takes a nation's last
+        // colony, and the player's colonies that hold at least half of the
+        // player's colonists defend with 4 more per easier level.
+        int colonies = 0;
+        int people = 0;
+        for (const auto& c : save_.colonies) {
+            if (c.nation == du.nation) {
+                ++colonies;
+                people += c.population;
+            }
+        }
+        if (!attackerEuropean && colonies == 1) {
+            a = 0;
+        }
+        if (defenderHuman && (people >> 1) <= save_.colonies[static_cast<std::size_t>(*colony)].population) {
+            d += (4 - difficulty) * 4;
         }
     }
     return {std::max(0, a), std::max(0, d)};
@@ -474,10 +503,13 @@ void Game::loseShip(int loser, int winner) {
     // Read from the original and checked in six fights: the winner's guns
     // against the loser's hull decide between damaged and sunk, but a
     // nation's last ship of a kind is only damaged.
+    // Without a winner (a raid on the harbour) the original takes a
+    // privateer's guns.
     const auto& lt = rules_.units[static_cast<std::size_t>(unit(loser).type)];
-    const auto& wt = rules_.units[static_cast<std::size_t>(unit(winner).type)];
+    const auto& wt = rules_.units[static_cast<std::size_t>(winner >= 0 ? unit(winner).type : kPrivateer)];
     const int nation = unit(loser).nation;
-    const bool winnerShip = isShip(winner);
+    const int winnerNation = winner >= 0 ? unit(winner).nation : -1;
+    const bool winnerShip = winner < 0 || isShip(winner);
     bool damaged = true;
     if (wt.attack > 0 && wt.guns > 0) {
         damaged = 1 + nextRandom(wt.guns + lt.hull) <= lt.hull;
@@ -493,8 +525,10 @@ void Game::loseShip(int loser, int winner) {
     if (!damaged) {
         // "Dutch Frigate sunk by English Privateer!"
         GameNotice notice{"SHIPSUNK", {"", lt.name, "", wt.name}};
-        notice.adjectives = {{0, nation}, {2, unit(winner).nation}};
-        notices_.push_back(std::move(notice));
+        notice.adjectives = {{0, nation}, {2, winnerNation}};
+        if (winner >= 0 || nation == human()) {
+            notices_.push_back(std::move(notice));
+        }
         std::vector<int> gone = aboard;
         gone.push_back(loser);
         std::sort(gone.begin(), gone.end(), std::greater<>());
@@ -554,7 +588,9 @@ void Game::loseShip(int loser, int winner) {
         setEuropeStage(l, kPortStage);
         notice.value = nation; // the screen names the home port
     }
-    notices_.push_back(std::move(notice));
+    if (winner >= 0 || nation == human()) {
+        notices_.push_back(std::move(notice));
+    }
 }
 
 void Game::repairShips() {

@@ -29,6 +29,7 @@ The Combat Analysis box lists them in this order:
 | Side | Bonus | Value | When |
 |---|---|---|---|
 | Attacker | Veteran | +50% | a veteran soldier or dragoon |
+| Attacker | Ambush | the square's defence value × 25% | a tribe attacking a European in the open who is not fortified (the defender then gets no terrain) |
 | Attacker | Attack Bonus | +50% | always |
 | Attacker | Artillery In Open | −75% | artillery attacking outside a colony a unit that is not fortified |
 | Defender | Veteran | +50% | a veteran soldier or dragoon |
@@ -57,7 +58,9 @@ veteran soldier attacking a dragoon in forest on Discoverer: 80 against 36).
    + 1), so 2, 4, 6 or 8; outside one, the square's defence value when both
    sides are European. A fortified unit (not a ship) adds 2 more when `m` is
    below 5. Defence = strength × (4 + m) / 4.
-3. Attack × 3/2, the attack bonus.
+3. A tribe attacking a European in the open who is not fortified: attack ×
+   (4 + the square's defence value) / 4, the ambush. Then attack × 3/2, the
+   attack bonus.
 4. A human attacker adds 4 − difficulty to its attack, a human defender the
    same to its defence.
 5. With less than a full move left, the attack is cut to the thirds left.
@@ -69,12 +72,14 @@ veteran soldier attacking a dragoon in forest on Discoverer: 80 against 36).
    cut by a quarter (Discoverer) or a half (Explorer); a human defender is
    attacked at half strength before turn 80 or by natives; and on Discoverer
    a human attacker doubles its attack.
-9. A roll from 1 to attack + defence: the attacker wins at the attack or
+9. In a colony: a tribe's attack on a nation's last colony is 0, and a
+   colony of the player holding at least half the player's colonists in
+   colonies adds 4 × (4 − difficulty) to its defence.
+10. A roll from 1 to attack + defence: the attacker wins at the attack or
    below.
 
-All divisions round down. Not covered yet: natives' settlements and
-ambushes, ships, a colony's own garrison bonus, and the rules after
-independence.
+All divisions round down. See [natives](natives.md) for the natives' side.
+Not covered yet: ships, and the rules after independence.
 
 ## Hardening after a win
 

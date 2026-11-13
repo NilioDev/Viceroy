@@ -291,10 +291,102 @@ straight cost a third, a colony or settlement at most a move). Short of
 moves, and not on its first step, it gets there with a chance of its moves
 left in the cost; otherwise its turn is over.
 
-Not done yet: the attacks themselves and the brave's visit (its gifts and
-requests; first contact is done). The original's route finder for heading
+A step onto a square with a European unit or colony is an attack (see
+below), but only with a whole move (3 thirds) left; short of that the
+unit's turn ends. Not done yet: the brave's visit (its gifts and requests;
+first contact is done). The original's route finder for heading
 to a colony is not read yet: Viceroy takes the neighbouring square closest
 to the colony.
+
+## When the natives attack
+
+Read from the original's code. The fight is the one in
+[combat](combat.md), with these parts for a tribe:
+
+- **Who defends**: the best unit on the square (not ships), or in a colony
+  with nobody there one of its people at random, as against a European.
+- **The ambush**: against a European in the open who is not fortified, the
+  brave has the square's defence bonus (in quarters) on its own side, and
+  the defender gets none. A fortified defender gets only its +50%.
+- **A nation's last colony** is never taken: the brave's attack is 0.
+- **The player's big colonies**: a colony of the player that holds at least
+  half the player's colonists in colonies defends with 4 more per level
+  below the hardest (16 on the easiest). This holds against Europeans too.
+- A plain brave (no muskets, no horses) never beats the player's
+  artillery; the raid that follows ignores the colony's walls.
+- The fight ends the brave's turn.
+
+**When the brave wins**, the village it comes from (byte 6) forgets its
+alarm toward the defender's nation, and then:
+
+- Against a unit in a colony: the unit loses as against a European (see
+  [combat](combat.md)); the brave is marked so that its tribe gets its arms
+  back if it falls (bit `0x10` of byte 4).
+- Against a unit in the open: the loser loses as usual, and the brave takes
+  its arms. A brave or armed brave that beats a dragoon or scout gets
+  horses (two types on), its turn ends and the tribe's byte 8 goes up; a
+  brave or mounted brave that beats a soldier gets muskets (one type on).
+  `INDIANWIN0`, or `INDIANWIN1` for muskets and `INDIANWIN2` for horses
+  ("Sioux ambush Dutch Soldiers near Jamestown!"). The tension falls by 5,
+  less half the level when it is the player.
+- Against a colony of more than one with nobody under arms: the colonist
+  dies (`INDIANWINCOLONY`, naming the colonist's job); the tension falls by
+  10, less the level for the player.
+- Against a colony of one: the colony burns to the ground with its ships
+  (damaged or sunk as by a privateer; see [combat](combat.md)). The tribe's
+  byte 8 goes up when it had horses and byte 7 when it had muskets.
+  `INDIANBURNCOLONY`; the tension falls by 50.
+
+The tension change is skipped while the tribe is angry with the nation
+(bit `0x02` of its byte 58 + nation). The place in the messages is the
+nearest colony of anyone (by the distance the original uses, the larger
+step plus half the smaller), or *Wilderness* when there is none; ties go to
+the later colony. The messages go to the player only; what the original
+reports about other nations ("Spies report: ...") is not done yet.
+
+**When the brave loses**, its tribe may get its arms back (as when a
+European beats it), and the defender may be hardened. If the fight was at a
+colony the tribe's party raids it (below); otherwise the player is told
+`INDIANLOSE` ("Dutch Soldiers defeat Sioux near Jamestown!", *defeat* for
+the first seven rows of `@UNIT`, colonist to regular, and *defeats* for the
+others).
+
+### The raid
+
+1. **The walls**: a roll of 0 to 12, less 1 (and for the player plus the
+   level less 2), under 3 per level of fortification plus 1 means nothing
+   happens.
+2. **What it does**: a roll of 1 to 4: stores, buildings, a ship or gold.
+   Then, in this order: before turn 40 × (2 − level) on the two easiest
+   levels, no buildings or ships; buildings become stores when a roll of
+   0 to 8 is over the level plus 2 (1 plus 2 for a computer player) or the
+   colony has a fort; gold becomes stores with a stockade; a ship becomes
+   nothing with a fortress; stores become nothing with a stockade when a
+   roll of 0 to 8 is over the level.
+3. **Stores**: up to 100 tries of a good at random (0 to 15) until one with
+   at least 10; on the first try, if the tribe has no herds (byte 8) and the
+   good drawn has more than 52, half the time horses instead. The party
+   takes a roll between the smaller of half the stock and 10, and half the
+   stock (at least 1). Horses add one to byte 8 and 25 to the horses;
+   muskets add one to byte 7 (two from 50). `RAIDSTORES`; tension −4.
+4. **Buildings**: up to 100 tries of a row of `@BUILDING` (0 to 41) that the
+   colony has, not the fortifications, the town hall, the carpenter's
+   shop, the five craft houses (weaver, tobacconist, distiller, fur trader,
+   blacksmith) nor the kind being built; then the highest level of its kind
+   burns. The warehouse and the capitol keep their level in byte 149 and
+   150: that byte goes down and the building goes when it reaches 0. The
+   people working in a burned first level move to the carpenter's.
+   `RAIDBURN`; tension −12.
+5. **A ship**: the first ship in the colony is damaged or sunk as by a
+   privateer. `RAIDSHIP`; tension −16.
+6. **Gold**: a roll of 50 to the nation's gold × the colony's people /
+   (the nation's people + 1) + 10, at most 32767; none if the nation has
+   less. `RAIDGOLD`; tension −8.
+7. **Nothing**: `RAIDNOTHING` ("raiding party wiped out").
+
+Tension changes are skipped while the tribe is angry, as above. At the end
+the home village forgets its alarm toward the nation. The player's raids
+are reported with "Zoom to colony".
 
 ## Denouncing heresy
 

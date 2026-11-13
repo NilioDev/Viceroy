@@ -27,7 +27,8 @@ A new colony starts at R = 0, T = 200 and at once gathers its first bells
 the colony gathers again (1 of 199 became 2 of 299, 150 of 199 became 147
 of 299).
 
-**Not yet known:** what happens to T when a colonist leaves.
+A colonist who dies or leaves takes 100 from T (read from the original's
+code).
 
 ## The bonus
 

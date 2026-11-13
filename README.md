@@ -50,8 +50,12 @@ touch controls.
 > Native settlements grow, raise new braves, and calm down or grow angry
 > from missions and nearby colonies each turn, as in the original. Their
 > braves roam, fortify, take up muskets and horses at home and head for
-> nearby colonies the way the original's do; their visits and attacks, and
-> the other European nations, don't happen yet. Wagon trains and ships can trade with the
+> nearby colonies the way the original's do. Angry braves attack: they
+> ambush units in the open and take their muskets and horses, kill the
+> people of an undefended colony or burn it with its last colonist, and a
+> raiding party that loses at a colony may still steal goods and gold,
+> burn a building or damage a ship in the harbour. Their visits, and the
+> other European nations, don't happen yet. Wagon trains and ships can trade with the
 > natives: sell, haggle, give and buy at the original's prices. Soldiers,
 > scouts and other armed units can demand tribute, which a village pays
 > in goods for your nearest colony when your forces nearby impress it, and

@@ -773,12 +773,20 @@ void Game::nativeUnitTurn(int index) {
     const auto settlement = settlementAt(x, y);
     bool foreign = (colony && save_.colonies[static_cast<std::size_t>(*colony)].nation != u.nation) ||
                    (settlement && save_.settlements[static_cast<std::size_t>(*settlement)].nation != u.nation);
+    bool european = colony.has_value();
     for (const int other : unitsAt(x, y)) {
         foreign = foreign || unit(other).nation != u.nation;
+        european = european || unit(other).nation < kEuropeanNations;
     }
     if (foreign) {
-        // Not done yet: the attack. The brave waits.
-        u.movesUsed = movementAllowance(index);
+        // As the original: short of a whole move the brave's turn ends;
+        // otherwise it attacks.
+        constexpr int kWholeMove = 3;
+        if (!european || movementAllowance(index) - u.movesUsed < kWholeMove) {
+            u.movesUsed = movementAllowance(index);
+            return;
+        }
+        nativeAttack(index, x, y);
         return;
     }
     // As the original moves any unit: the cost is spent first. Short of
