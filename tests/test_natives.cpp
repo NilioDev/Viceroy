@@ -164,3 +164,94 @@ VCR_TEST("original files: a colonist lives among the natives and learns their sk
         VCR_CHECK(again.liveAmongNatives(colonist, kVillage).section == "LEARNALREADY");
     }
 }
+
+VCR_TEST("original files: the goods each chief asks for (measured)") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    const auto file = findFileNoCase(dir, "COLONY00.SAV");
+    if (!file) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    std::ifstream in(*file, std::ios::binary);
+    const SaveGame save = readSaveGame(Bytes(std::istreambuf_iterator<char>(in), {}));
+    // What the chiefs said in the original, most wanted first.
+    constexpr int kTobacco = 2, kHorses = 8, kRum = 9, kCigars = 10, kCloth = 11, kCoats = 12, kMuskets = 15;
+    const std::pair<int, std::array<int, 3>> seen[] = {
+        {2, {kTobacco, kCloth, kCoats}}, {4, {kTobacco, kCoats, kCigars}},  {15, {kRum, kCoats, kCloth}},
+        {16, {kTobacco, kRum, kCoats}},  {20, {kTobacco, kCloth, kMuskets}}, {21, {kCloth, kTobacco, kHorses}}};
+    for (const auto& [settlement, wants] : seen) {
+        VCR_CHECK(villageWants(save, settlement) == wants);
+    }
+}
+
+VCR_TEST("original files: a scout speaks with the chief") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
+    SaveGame save = readSaveGame(Bytes(std::istreambuf_iterator<char>(in), {}));
+    constexpr int kDutch = 3, kIroquois = 3, kCherokee = 4, kVillage = 4, kCherokeeVillage = 13;
+    save.nations[kDutch].raw[52 + 4 + kIroquois] = 0x60;
+    save.nations[kDutch].raw[52 + 4 + kCherokee] = 0x60;
+    save.tribesAndMore[kIroquois * 78 + 70 + 2 * kDutch] = 0;
+    save.tribesAndMore[kIroquois * 78 + 71 + 2 * kDutch] = 0;
+    const auto& village = save.settlements[kVillage];
+    int scout = -1;
+    for (std::size_t i = 0; i < save.units.size(); ++i) {
+        if (save.units[i].nation == kDutch && save.units[i].type == 0) {
+            scout = static_cast<int>(i);
+            break;
+        }
+    }
+    VCR_CHECK(scout >= 0);
+    auto& u = save.units[static_cast<std::size_t>(scout)];
+    u.type = 5;
+    u.profession = 0x1C;
+    u.movesUsed = 0;
+    u.orders = SaveUnit::kNoOrders;
+    u.x = village.x - 1;
+    u.y = village.y;
+    VCR_CHECK(save.map.at(u.x, u.y).isLand());
+
+    {
+        // The Cherokee are furious with the Dutch: the scout breaks a taboo.
+        Game game(save, art.rules);
+        VCR_CHECK(tribeTension(save, kCherokee, kDutch) >= 75);
+        const auto units = game.state().units.size();
+        const auto talk = game.speakWithChief(scout, kCherokeeVillage);
+        VCR_CHECK(talk.answer == Game::ChiefAnswer::Kill && !talk.welcome);
+        VCR_CHECK(game.state().units.size() == units - 1);
+    }
+    {
+        // A chief already spoken with only welcomes.
+        SaveGame visited = save;
+        visited.settlements[kVillage].raw[3] |= kSettlementVisited;
+        Game game(visited, art.rules);
+        const auto talk = game.speakWithChief(scout, kVillage);
+        VCR_CHECK(talk.welcome && talk.answer == Game::ChiefAnswer::Bored);
+        VCR_CHECK(talk.skill == 0); // Expert Farmers
+        VCR_CHECK(game.movesLeft(scout) <= 0);
+    }
+
+    PlayScreen play(Game(save, art.rules), {});
+    play.setArt(&art);
+    const int goldBefore = play.game().state().nations[kDutch].gold;
+    play.game().setActiveUnit(scout);
+    play.handle(Command::MoveE);
+    VCR_CHECK(play.dialog().has_value());
+    VCR_CHECK(play.dialog()->options.size() == 2); // Ask to Speak With Chief, Cancel Action
+    play.handle(Command::Confirm);
+    VCR_CHECK(play.dialog().has_value()); // the chief's greeting
+    VCR_CHECK(play.dialog()->portrait == kNativePortraits + kIroquois);
+    play.handle(Command::Confirm);
+    VCR_CHECK(play.dialog().has_value()); // what he says next
+    play.handle(Command::Confirm);
+    VCR_CHECK(!play.dialog().has_value());
+    const auto& after = play.game().state();
+    const auto& s = play.game().unit(scout);
+    const bool gift = after.nations[kDutch].gold > goldBefore;
+    const bool guides = s.profession == 22;
+    VCR_CHECK(!(gift && guides));
+    VCR_CHECK((after.settlements[kVillage].raw[3] & kSettlementVisited) != 0 || (!gift && !guides));
+}

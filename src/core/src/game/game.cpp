@@ -827,6 +827,33 @@ void Game::reveal(int x, int y, int radius, int nation) {
     }
 }
 
+void Game::revealLand(int x, int y, int radius, int nation) {
+    // Read from the original with a debugger: the edge of the map is left
+    // out, and beyond the next squares only land of the same region (the
+    // low four bits of the path layer) is shown.
+    const auto& map = save_.map;
+    const auto inner = [&](int px, int py) { return px >= 1 && py >= 1 && px < map.width - 1 && py < map.height - 1; };
+    if (isNative(nation) || nation < 0 || !inner(x, y)) {
+        return;
+    }
+    const int region = map.at(x, y).isLand() ? (map.at(x, y).region & 0x0F) : -1;
+    for (int dy = -radius; dy <= radius; ++dy) {
+        for (int dx = -radius; dx <= radius; ++dx) {
+            const int px = x + dx;
+            const int py = y + dy;
+            if (!inner(px, py)) {
+                continue;
+            }
+            auto& sq = save_.map.at(px, py);
+            const bool near = std::abs(dx) <= 1 && std::abs(dy) <= 1;
+            if (!near && (!sq.isLand() || (sq.region & 0x0F) != region)) {
+                continue;
+            }
+            sq.seen = static_cast<std::uint8_t>(sq.seen | (0x10u << nation));
+        }
+    }
+}
+
 int Game::sightRadius(int index) const {
     const int type = unit(index).type;
     return (type == unit_type::kScout || type == unit_type::kDragoon) ? 2 : 1;

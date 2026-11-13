@@ -37,17 +37,23 @@ bool metTribe(const SaveGame& save, int nation, int tribe);
 // VILLAGEHAPPY, VILLAGESAVAGE, VILLAGEMEDIUM, VILLAGEBAD or VILLAGEWAR.
 std::string villageGreeting(const SaveGame& save, int settlement, int nation);
 
-// The 16 goods weighed for the settlement: what its land offers and what
-// its people want, worked out from the squares around it.
+// The 16 goods weighed for the settlement: what its people want and what
+// its land gives, worked out from the squares around it.
 struct VillageEconomy {
-    std::array<int, 16> supply{};
-    std::array<int, 16> demand{};
+    std::array<int, 16> wants{};
+    std::array<int, 16> makes{};
 };
 VillageEconomy villageEconomy(const SaveGame& save, int settlement);
 
 // The skill the settlement teaches (a row of @JOB). The same village always
 // teaches the same skill in a game.
 int villageSkill(const SaveGame& save, int settlement);
+
+// The three goods the chief asks for, most wanted first (rows of @CARGO).
+std::array<int, 3> villageWants(const SaveGame& save, int settlement);
+
+// Settlement flag: a scout has spoken with the chief.
+inline constexpr std::uint8_t kSettlementVisited = 0x08;
 
 // The random numbers of the original's C library: the same seed gives the
 // same numbers.
