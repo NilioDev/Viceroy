@@ -103,6 +103,12 @@ public:
     const SaveUnit& unit(int index) const { return save_.units[static_cast<std::size_t>(index)]; }
     int unitCount() const { return static_cast<int>(save_.units.size()); }
     bool isShip(int index) const;
+    // The original's route finder (docs/rules/routes.md): the direction
+    // the unit steps next towards its destination (bytes 9 and 10 of its
+    // record), -1 for none. `nation` keeps the route off others' units and
+    // towns (-1: anyone's). Its working state lives on between calls, as in
+    // the original.
+    int routeStep(int index, int nation);
     bool onMap(int index) const;
     // A land unit on a water square is aboard the ship there.
     bool isAboard(int index) const;
@@ -479,6 +485,29 @@ private:
     void moveTribeUnits(int tribe);
     void nativeUnitTurn(int index);
     int stepToward(int index, int toX, int toY);
+    struct RouteState {
+        std::array<std::uint8_t, 256> grid{}; // costs over the 16 x 16 squares around the key
+        int keyX = -1;                        // the goal the grid was made for
+        int keyY = -1;
+        int best = 0; // the start's cost after a flood
+        int targetX = 0;
+        int targetY = 0;
+        int startBlockX = 0; // the mover's block from the last block search
+        int startBlockY = 0;
+        int type = 0;    // the mover's type as the finder sees it
+        int nation = -1; // whose units and towns are not in the way
+        bool roads = false; // every step counts as a road
+    };
+    RouteState route_;
+    int routeFlood(int sx, int sy, int limit);
+    bool routeCoarse(int x0, int y0, int x1, int y1);
+    bool routeBlock(int x, int y, bool ship);
+    bool routeBlockSquare(int x0, int y0, bool ship, int& x, int& y) const;
+    int routeReach(int fromX, int fromY, int toX, int toY, bool ship, int limit);
+    std::uint8_t routeBlockLinks(bool ship, int bx, int by) const;
+    int routeEnemyLand(int x, int y, int nation) const;
+    int routeTerrainCost(int x, int y) const;
+    bool routeOneMove() const;
     // The nation's people as the original counts them for the natives.
     int nationPeople(int nation) const;
     int randomRecruit(int nation);

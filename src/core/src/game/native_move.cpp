@@ -743,37 +743,12 @@ int Game::nativeUnitAI(int index) {
 }
 
 int Game::stepToward(int index, int toX, int toY) {
-    // Not the original's route finder yet (the one Go To uses): the
-    // neighbour on the same land that comes closest, the first of equals.
+    // The tribes use the route finder as Go To does, with nobody's units
+    // or towns kept out of the way.
     auto& u = save_.units[static_cast<std::size_t>(index)];
-    const auto& map = save_.map;
-    const int region = landRegion(map, u.x, u.y);
-    int bestDir = -1;
-    int bestDistance = distance(toX - u.x, toY - u.y);
-    if (bestDistance == 0) {
-        return -1;
-    }
-    for (int d = 0; d < 8; ++d) {
-        const int x = u.x + kDx[static_cast<std::size_t>(d)];
-        const int y = u.y + kDy[static_cast<std::size_t>(d)];
-        if (!map.inside(x, y) || map.at(x, y).isWater()) {
-            continue;
-        }
-        const bool there = x == toX && y == toY;
-        if (!there && landRegion(map, x, y) != region) {
-            continue;
-        }
-        const int dist = distance(toX - x, toY - y);
-        if (dist < bestDistance) {
-            bestDistance = dist;
-            bestDir = d;
-        }
-    }
-    u.raw[kLastStep] = static_cast<std::uint8_t>(bestDir);
-    if (bestDir < 0) {
-        u.movesUsed = movementAllowance(index);
-    }
-    return bestDir;
+    u.raw[kDestX] = static_cast<std::uint8_t>(toX);
+    u.raw[kDestY] = static_cast<std::uint8_t>(toY);
+    return routeStep(index, -1);
 }
 
 void Game::nativeUnitTurn(int index) {

@@ -202,7 +202,9 @@ MoveResult Game::move(int index, Step step) {
     }
     u.x = toX;
     u.y = toY;
-    u.movesUsed = std::min(movementAllowance(index), u.movesUsed + cost);
+    // The original keeps the whole cost, even past the unit's allowance
+    // (a colonist entering a forest has used 6 thirds).
+    u.movesUsed += cost;
     if (boarding) {
         u.orders = SaveUnit::kSentry;
         u.movesUsed = movementAllowance(index);
