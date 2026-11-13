@@ -54,7 +54,9 @@ touch controls.
 > Drake's privateers fight harder, Bolivar raises the Sons of Liberty,
 > Adam Smith and Peter Stuyvesant open factories and the custom house to
 > your build lists, and with Paul Revere your colonists take up muskets to
-> defend a colony. The other nations elect their own
+> defend a colony. The Continental Congress report (F3) shows the next
+> session, the bells toward it, the rebels and tories, the King's forces
+> and the fathers in congress. The other nations elect their own
 > fathers as the original's do. A tribe you meet for the first time
 > offers you peace; refusing it angers the tribe. Missionaries can found missions,
 > which the tribe takes well or badly as in the original, pay a tribe to
@@ -170,6 +172,7 @@ saved in the first free slot, or over the savegame saved longest ago.
 | Close the Europe screen | Esc, or click Exit | B |
 | Answer a question | Up / Down and Enter | D-pad and A |
 | Open the menu bar (Game, View, Orders, Reports, Trade, Colonizopedia) | Click a title, F10, or Alt and the title's gold letter; then the arrow keys and Enter, or a gold letter | Start, then the D-pad and A |
+| The Continental Congress report | F3, or Reports, Continental Congress; any key or click closes it | Start, then Reports |
 | Save the game | Ctrl+S, or Game, Save Game | Start, then Save Game |
 | Back to the load menu | Esc | Guide |
 

@@ -492,6 +492,10 @@ public:
     int bellsForNextFather(int nation) const;
     int fatherInElection(int nation) const; // -1 for none
     int fatherCount(int nation) const;
+    // The nation's people as the original counts them: everyone in its
+    // colonies and every unit that is a colonist under arms, tools or a
+    // habit, at most 255.
+    int nationPeople(int nation) const;
     bool independenceDeclared() const;
     // The player picks the next father (notice WHICHFREEDOM): one
     // candidate per category, -1 where there is none.
@@ -552,8 +556,6 @@ private:
     int routeEnemyLand(int x, int y, int nation) const;
     int routeTerrainCost(int x, int y) const;
     bool routeOneMove() const;
-    // The nation's people as the original counts them for the natives.
-    int nationPeople(int nation) const;
     int randomRecruit(int nation);
     void gatherCrosses(); // immigration at the end of the turn
     // What the computer's nations plan with, kept in memory only, as the

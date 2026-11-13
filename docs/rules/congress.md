@@ -114,13 +114,44 @@ The build list also offers the drydock only to a colony on the coast (byte
 28 of the colony, bit 0x40) and a wagon train only while the nation has
 fewer wagon trains than colonies.
 
+## The report (F3)
+
+Reports, Continental Congress (F3) shows, on `REPORT3.PIK`, as the original
+does:
+
+- The title, `CONTINENTAL CONGRESS ACTIVITIES`, centred at the top.
+- "Next Continental Congress Session: (Adam Smith)", the father up for
+  election in brackets, and under it a bar of bells: the bells the next
+  father needs, spread to fill 300 pixels (packed a pixel apart and the
+  count halved until they fit, the spare pixels handed out along the row),
+  of which only those the nation has are drawn, with their number on a
+  black box when they are packed tight.
+- "Rebel Sentiment: 10%   Tory Sentiment: 90%" (header word 96) and a row
+  of flags and crowns for the rebels and tories among the nation's people.
+  The people are those in its colonies and every unit that carries a
+  colonist (colonist, soldier, pioneer, missionary, dragoon, scout,
+  continental army and cavalry), wherever it is, at most 255; the rebels
+  are that times the share, rounded down.
+- When the King has one, "Dutch Expeditionary Force:" with his regulars,
+  dragoons, artillery and men-of-war (header words 106, 108, 112 and
+  110), each group with its number.
+- "Founding Fathers:" and the fathers in congress, four to a line, 78
+  pixels apart.
+- An OK box in the lower right corner. Any key or click closes the report.
+
+The groups of icons share the 300 pixels the same way in every report:
+first the 4-pixel gaps between groups shrink, then the icons overlap, until
+every group has a pixel for each icon after its first; each group then
+spaces its icons evenly, at most one pixel more than an icon apart.
+
 ## Not done yet
 
 - After the original's `@FREEDOM` and the hall it opens the
   Colonizopedia page of the new father; the Colonizopedia is not built
   yet.
 - What the bells do after the declaration of independence.
-- The Continental Congress report.
+- The report's lines after the declaration of independence (the
+  intervention force) and its line for the cheat mode.
 - Peter Minuit (the natives' land for nothing), Benjamin Franklin (the
   wars in Europe) and Jan de Witt (foreign colonies and the foreign
   affairs report) wait for the parts of the game they change: buying land

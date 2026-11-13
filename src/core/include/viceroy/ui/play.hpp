@@ -55,6 +55,7 @@ enum class Command {
     Train,
     Menu, // F10: the menu bar
     GoTo, // G: send the unit to a colony (a ship also to Europe)
+    CongressReport, // F3
 };
 
 // The main map screen while playing.
@@ -102,6 +103,7 @@ public:
     bool combatAnalysisUp() const { return analysisUp_; }
     // The hall of the Continental Congress with a new father in it.
     bool congressHallUp() const { return congressHall_ >= 0; }
+    bool reportUp() const { return congressReport_; }
     // Set by the app after loading Art: needed for message boxes.
     void setArt(const Art* art) { art_ = art; }
     // The colony opened last, or -1.
@@ -217,6 +219,7 @@ private:
     int village_ = -1;
     int welcomeTribe_ = -1; // the tribe whose welcome is up
     int congressHall_ = -1; // the father just come into the hall, shown until a key
+    bool congressReport_ = false; // F3, shown until a key or a click
     int inciteTarget_ = -1; // the nation a missionary would have the tribe attack
     void startIncite(int unit);
     void endIncite(int unit);

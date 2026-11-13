@@ -41,6 +41,7 @@ add_library(vcr_core STATIC
     src/render/europe_view.cpp
     src/render/dialog.cpp
     src/render/menu_bar.cpp
+    src/render/report_view.cpp
     src/ui/play.cpp
     src/ui/title.cpp
     src/ui/new_game_flow.cpp

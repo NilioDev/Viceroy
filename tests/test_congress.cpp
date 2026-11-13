@@ -281,3 +281,60 @@ VCR_TEST("congress: Magellan's ships and Bolivar's rebels") {
     c.rebelDividend = 2;
     VCR_CHECK(sonsOfLibertyPercent(c, 20) == 100);
 }
+
+#include "viceroy/data/reader.hpp"
+#include "viceroy/game_files.hpp"
+#include "viceroy/render/report_view.hpp"
+#include "viceroy/ui/play.hpp"
+
+#include <filesystem>
+#include <fstream>
+#include <iterator>
+
+VCR_TEST("congress: the bell bar spreads the spare pixels along the row") {
+    Art art;
+    Sprite s;
+    s.image.width = 3;
+    s.image.height = 1;
+    s.image.pixels.assign(3, 5);
+    art.icons.sprites.push_back(s);
+    Screen screen;
+    // Four icons 3 wide in 30 pixels: 4 apart, and the 15 pixels left over
+    // handed out a quarter at a time.
+    drawIconBar(screen, art, 0, 4, 4, 0, 10, 30);
+    for (const int x : {0, 7, 15, 23}) {
+        VCR_CHECK(screen.at(x, 11) == 5 && screen.at(x + 2, 11) == 5);
+    }
+    VCR_CHECK(screen.at(5, 11) == 0 && screen.at(26, 11) == 0);
+    // Only those the nation has are drawn.
+    Screen half;
+    drawIconBar(half, art, 0, 4, 2, 0, 10, 30);
+    VCR_CHECK(half.at(7, 11) == 5 && half.at(15, 11) == 0);
+}
+
+VCR_TEST("original files: F3 shows the Continental Congress report until a key") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
+    const Bytes bytes(std::istreambuf_iterator<char>(in), {});
+    PlayScreen play(Game(readSaveGame(bytes), art.rules), {});
+    play.setArt(&art);
+    play.handle(Command::CongressReport);
+    VCR_CHECK(play.reportUp());
+    Screen screen;
+    play.draw(screen, art);
+    VCR_CHECK(screen.at(286, 184) == 0x77); // the OK box
+    play.handle(Command::Confirm);
+    VCR_CHECK(!play.reportUp());
+    // Reports, Continental Congress opens it too.
+    VCR_CHECK(play.clickMenu(120, 3) && play.menu()->menu == 3);
+    for (int i = 0; i < 5 && play.menu()->selected != 2; ++i) {
+        play.handle(Command::MoveS);
+    }
+    VCR_CHECK(play.menu()->selected == 2);
+    play.handle(Command::Confirm);
+    VCR_CHECK(play.reportUp());
+}

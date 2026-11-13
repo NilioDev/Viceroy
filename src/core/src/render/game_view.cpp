@@ -737,6 +737,7 @@ Art loadArt(const std::filesystem::path& folder) {
     art.menus = readMenus(parseTextFile(readFile(folder, "MENU.TXT")));
     placeMenus(art, art.menus);
     art.congressHall = readPicture(readFile(folder, "CCBKGD.PIK"));
+    art.congressReport = readPicture(readFile(folder, "REPORT3.PIK"));
     for (int f = 0; f < 25; ++f) {
         art.fathers.push_back(readSpriteSheet(readFile(folder, (f < 10 ? "CC-0" : "CC-") + std::to_string(f) + ".SS")));
     }
