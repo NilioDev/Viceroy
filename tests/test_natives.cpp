@@ -924,7 +924,14 @@ VCR_TEST("original files: the natives' turn (measured)") {
     save.tribesAndMore[kApache * kTribeRecordSize + 8] = 5;
     save.tribesAndMore[kCherokee * kTribeRecordSize + 8] = 3;
     save.tribesAndMore[kCherokee * kTribeRecordSize + 10] = 10;
-    const int units = static_cast<int>(save.units.size());
+    const auto bravesOf = [](const SaveGame& s) {
+        int n = 0;
+        for (const auto& u : s.units) {
+            n += u.nation == 4 + kTribe ? 1 : 0;
+        }
+        return n;
+    };
+    const int bravesBefore = bravesOf(save);
     Game game(save, art.rules);
     game.endTurn();
     const auto& after = game.state();
@@ -932,13 +939,16 @@ VCR_TEST("original files: the natives' turn (measured)") {
     // byte 6: it raises a new brave and starts again from 0.
     const auto& capital = after.settlements[12];
     VCR_CHECK(capital.raw[3] == 6 && capital.raw[6] == 0);
+    // (Units elsewhere may come and go in the European turns, so the new
+    // brave is found by its home rather than by its place in the list.)
+    VCR_CHECK(bravesOf(after) == bravesBefore + 1);
     int braves = 0;
-    for (int i = units; i < game.unitCount(); ++i) {
+    for (int i = 0; i < game.unitCount(); ++i) {
         const auto& u = game.unit(i);
-        if (u.nation == 4 + kTribe) {
+        if (u.nation == 4 + kTribe && u.raw[6] == 12) {
             ++braves;
             // Then it takes its first step (measured: to (25, 19)).
-            VCR_CHECK(u.type == 19 && std::abs(u.x - 26) <= 1 && std::abs(u.y - 18) <= 1 && u.raw[6] == 12);
+            VCR_CHECK(u.type == 19 && std::abs(u.x - 26) <= 1 && std::abs(u.y - 18) <= 1);
         }
     }
     VCR_CHECK(braves == 1);

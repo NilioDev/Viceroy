@@ -280,7 +280,6 @@ VCR_TEST("original files: a colony stores what it makes at the end of the turn")
 
     // Plenty of food makes a new colonist.
     isabella.stock[cargo::kFood] = 199;
-    const int units = game.unitCount();
     const auto dutch = [&] {
         int n = 0;
         for (int i = 0; i < game.unitCount(); ++i) {
@@ -291,7 +290,14 @@ VCR_TEST("original files: a colony stores what it makes at the end of the turn")
     const int before = dutch();
     game.endTurn();
     VCR_CHECK(dutch() == before + 1);
-    VCR_CHECK(game.unit(units).x == isabella.x && game.unit(units).nation == 3);
+    // (The colony's own plans may then move units about, so it is looked
+    // for on the square rather than by its place in the list.)
+    bool onSquare = false;
+    for (int i = 0; i < game.unitCount(); ++i) {
+        const auto& u = game.unit(i);
+        onSquare = onSquare || (u.nation == 3 && u.x == isabella.x && u.y == isabella.y);
+    }
+    VCR_CHECK(onSquare);
     VCR_CHECK(!game.lastTurnNews().empty());
 }
 
