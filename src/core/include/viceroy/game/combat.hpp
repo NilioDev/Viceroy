@@ -21,6 +21,7 @@ inline constexpr int kColony = 80;
 inline constexpr int kFortified = 81;
 inline constexpr int kSpainBonus = 82;
 inline constexpr int kArtilleryInOpen = 84;
+inline constexpr int kDrakeBonus = 90; // "Drake"
 } // namespace combat_label
 
 struct CombatBonus {

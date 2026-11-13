@@ -55,7 +55,16 @@ int Game::movementAllowance(int index) const {
     if (type < 0 || type >= static_cast<int>(rules_.units.size())) {
         return 0;
     }
-    return rules_.units[static_cast<std::size_t>(type)].movement * kThirds;
+    int moves = rules_.units[static_cast<std::size_t>(type)].movement * kThirds;
+    // Read from the original: Ferdinand Magellan gives the nation's ships
+    // one move more.
+    constexpr int kMagellan = 5;
+    constexpr int kCaravel = 13; // the ships are rows 13 to 18 of @UNIT
+    constexpr int kManOWar = 18;
+    if (type >= kCaravel && type <= kManOWar && hasFather(unit(index).nation, kMagellan)) {
+        moves += kThirds;
+    }
+    return moves;
 }
 
 int Game::movesLeft(int index) const {
@@ -624,7 +633,8 @@ void Game::endTurn() {
             const bool up = turn.libertyAfter > turn.libertyBefore;
             const char* section = up ? (turn.libertyAfter == 2 ? "REBELUNANIMOUS" : "REBELMAJORITY")
                                      : (turn.libertyAfter == 1 ? "TORYMINORITY" : "TORYMAJORITY");
-            GameNotice notice{section, {colony.name}, -1, {sonsOfLibertyPercent(colony)}, static_cast<int>(c)};
+            const int percent = sonsOfLibertyPercent(colony, nationEffects(save_, colony.nation).libertyExtra(true));
+            GameNotice notice{section, {colony.name}, -1, {percent}, static_cast<int>(c)};
             notices_.push_back(std::move(notice));
         }
         if (ours) {

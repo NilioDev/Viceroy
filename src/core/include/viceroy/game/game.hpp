@@ -248,6 +248,8 @@ public:
     bool colonyUndefended(int colony) const;
     int pickColonyDefender(int colony);
     CombatAnalysis analyseColonyAttack(int attacker, int colony, int colonist) const;
+    // With 50 muskets and Paul Revere a colony's colonist defends armed.
+    bool colonistTakesUpArms(int colony) const;
     CombatStrengths colonyStrengths(int attacker, int colony, int colonist, bool beforeLevels = false) const;
     // Fights the colonist; when the attacker wins it marches in and takes
     // the colony with its share of the owner's gold.

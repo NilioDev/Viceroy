@@ -28,6 +28,8 @@ constexpr int kIndenturedServant = 0x19;
 constexpr int kPettyCriminal = 0x1A;
 constexpr int kIndianConvert = 0x1B;
 constexpr int kGeorgeWashington = 11;
+constexpr int kDrake = 13;
+constexpr int kPrivateer = 16;
 constexpr int kFathers = 7; // nation record: the founding fathers, one bit each
 constexpr int kRegulars = 6;
 constexpr int kContinentalCavalry = 7;
@@ -160,6 +162,9 @@ CombatAnalysis Game::analyseAttack(int attacker, int defender) const {
     if (armed(au.type) && au.profession == kVeteranSoldier) {
         a.attacker.bonuses.push_back({kVeteran, 50});
     }
+    if (au.type == kPrivateer && hasFather(au.nation, kDrake)) {
+        a.attacker.bonuses.push_back({kDrakeBonus, 50});
+    }
     a.attacker.bonuses.push_back({kAttackBonus, 50});
     // Measured: no penalty against a fortified unit (the manual: artillery
     // is good at attacking fortified units).
@@ -176,6 +181,9 @@ CombatAnalysis Game::analyseAttack(int attacker, int defender) const {
     }
     if (armed(du.type) && du.profession == kVeteranSoldier) {
         a.defender.bonuses.push_back({kVeteran, 50});
+    }
+    if (du.type == kPrivateer && hasFather(du.nation, kDrake)) {
+        a.defender.bonuses.push_back({kDrakeBonus, 50});
     }
     if (!defenderInColony) {
         const auto& square = save_.map.at(du.x, du.y);
@@ -227,6 +235,9 @@ int Game::defenceStrength(int attacker, const SaveUnit& du, bool defenderShip, b
     if ((du.type == unit_type::kSoldier || du.type == unit_type::kDragoon) && du.profession == kVeteranSoldier) {
         v += v >> 1;
     }
+    if (du.type == kPrivateer && hasFather(du.nation, kDrake)) {
+        v += v >> 1;
+    }
     // The defender's bonus, in quarters.
     int m = 0;
     if (colony) {
@@ -262,6 +273,11 @@ CombatStrengths Game::strengthsAgainst(int attacker, const SaveUnit& du, bool de
         }
         v = std::max(0, v) * 8;
         if ((u.type == unit_type::kSoldier || u.type == unit_type::kDragoon) && u.profession == kVeteranSoldier) {
+            v += v >> 1;
+        }
+        // Read from the original: Francis Drake's privateers, attacking or
+        // not.
+        if (u.type == kPrivateer && hasFather(u.nation, kDrake)) {
             v += v >> 1;
         }
         return v;
@@ -384,7 +400,15 @@ SaveUnit Game::colonistAsUnit(int colony, int colonist) const {
 namespace {
 constexpr int kMuskets = 15;      // row of @CARGO
 constexpr int kArmingMuskets = 50; // measured: 49 give nothing, 50 give +1
+constexpr int kRevere = 12;        // row of @FATHERS
 } // namespace
+
+bool Game::colonistTakesUpArms(int colony) const {
+    // Read from the original: only with Paul Revere does the colonist take
+    // up the colony's muskets.
+    const auto& c = save_.colonies[static_cast<std::size_t>(colony)];
+    return c.stock[kMuskets] >= kArmingMuskets && hasFather(c.nation, kRevere);
+}
 
 CombatAnalysis Game::analyseColonyAttack(int attacker, int colony, int colonist) const {
     // The attacker's side is the same as against a unit.
@@ -401,12 +425,11 @@ CombatAnalysis Game::analyseColonyAttack(int attacker, int colony, int colonist)
     a.attacker.bonuses.push_back({combat_label::kAttackBonus, 50});
 
     // Seen: the colonist by their skill ("Ore Miner 1"), "Muskets +1" when
-    // the colony has 50, then the colony.
-    const auto& c = save_.colonies[static_cast<std::size_t>(colony)];
+    // the colony has 50 and its nation Paul Revere, then the colony.
     a.defender.colony = colony;
     a.defender.colonist = colonist;
     a.defender.base = rules_.units.size() > unit_type::kColonist ? rules_.units[unit_type::kColonist].combat : 1;
-    a.defender.armed = c.stock[kMuskets] >= kArmingMuskets;
+    a.defender.armed = colonistTakesUpArms(colony);
     if (a.defender.armed) {
         CombatBonus muskets{0, 0};
         muskets.points = 1;
@@ -418,8 +441,7 @@ CombatAnalysis Game::analyseColonyAttack(int attacker, int colony, int colonist)
 }
 
 CombatStrengths Game::colonyStrengths(int attacker, int colony, int colonist, bool beforeLevels) const {
-    const auto& c = save_.colonies[static_cast<std::size_t>(colony)];
-    const int extra = c.stock[kMuskets] >= kArmingMuskets ? 1 : 0;
+    const int extra = colonistTakesUpArms(colony) ? 1 : 0;
     return strengthsAgainst(attacker, colonistAsUnit(colony, colonist), false, false, extra, beforeLevels);
 }
 
@@ -482,7 +504,6 @@ bool Game::isDamagedShip(int index) const {
 
 namespace {
 constexpr int kGalleon = 15;
-constexpr int kPrivateer = 16;
 constexpr int kFrigate = 17;
 constexpr int kManOWar = 18;
 } // namespace

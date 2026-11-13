@@ -50,7 +50,11 @@ touch controls.
 > from John Paul Jones, stockades from La Salle, calm tribes from
 > Pocahontas and so on), and Jefferson, Paine, Penn and Hudson make your
 > colonies ring more bells, preach more and trap more furs from then on, as
-> printing presses and newspapers do. The other nations elect their own
+> printing presses and newspapers do. Magellan's ships sail further,
+> Drake's privateers fight harder, Bolivar raises the Sons of Liberty,
+> Adam Smith and Peter Stuyvesant open factories and the custom house to
+> your build lists, and with Paul Revere your colonists take up muskets to
+> defend a colony. The other nations elect their own
 > fathers as the original's do. A tribe you meet for the first time
 > offers you peace; refusing it angers the tribe. Missionaries can found missions,
 > which the tribe takes well or badly as in the original, pay a tribe to

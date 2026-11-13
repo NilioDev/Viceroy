@@ -91,6 +91,29 @@ Read from the original's production of a colony:
   in a computer nation's colony only, adds (people + 3) / 5; a printing
   press adds half, a newspaper doubles them instead.
 
+## Fathers elsewhere
+
+Read from the original:
+
+- Ferdinand Magellan: the nation's ships (caravel to man-o'-war) have one
+  move more.
+- Francis Drake: a privateer's strength gets half again, in attack and in
+  defence (after the veteran's bonus); the Combat Analysis shows it on its
+  own line, "Drake +50%".
+- Simon Bolivar: for the player, every colony counts 20 points more Sons of
+  Liberty than its bells make (at most 100%), for the rebels, the tories'
+  penalty and the bonus alike.
+- Adam Smith: without him the factory level of the craft shops (textile
+  mill, cigar, rum and fur factory, iron works) and the arsenal are not
+  offered in a colony's build list.
+- Peter Stuyvesant: without him the custom house is not offered.
+- Paul Revere: only with him does a colonist defending a colony without
+  soldiers take up 50 of its muskets (+1).
+
+The build list also offers the drydock only to a colony on the coast (byte
+28 of the colony, bit 0x40) and a wagon train only while the nation has
+fewer wagon trains than colonies.
+
 ## Not done yet
 
 - After the original's `@FREEDOM` and the hall it opens the
@@ -98,6 +121,9 @@ Read from the original's production of a colony:
   yet.
 - What the bells do after the declaration of independence.
 - The Continental Congress report.
-- Fathers whose effect lasts outside the colonies' work (Adam Smith,
-  Peter Stuyvesant and Peter Minuit for the player, Magellan, Drake,
-  Revere, Franklin, de Witt and others) where it is not yet in our rules.
+- Peter Minuit (the natives' land for nothing), Benjamin Franklin (the
+  wars in Europe) and Jan de Witt (foreign colonies and the foreign
+  affairs report) wait for the parts of the game they change: buying land
+  from the natives, the diplomacy between the European nations and the
+  reports.
+- The ship's penalty for its cargo in combat.

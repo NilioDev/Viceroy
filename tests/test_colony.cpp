@@ -536,6 +536,20 @@ VCR_TEST("build list: the next level of each building, then units (measured)") {
     for (int ship = 44; ship <= kFrigateConstruction; ++ship) {
         VCR_CHECK(has(options, ship));
     }
+    VCR_CHECK(!has(options, 7));  // no drydock off the coast
+    VCR_CHECK(!has(options, 18)); // no custom house without Stuyvesant
+    VCR_CHECK(!has(options, 5));  // no arsenal without Smith
+    c.raw[28] |= 0x40;            // on the coast
+    setBuildingLevel(c, BuildingKind::Armory, 2);
+    setBuildingLevel(c, BuildingKind::Docks, 1);
+    BuildLimits limits;
+    limits.smith = true;
+    limits.stuyvesant = true;
+    options = buildOptions(c, map, r, limits);
+    VCR_CHECK(has(options, 7) && has(options, 18) && has(options, 5));
+    // One wagon train for each colony.
+    limits.wagonTrains = 1;
+    VCR_CHECK(!has(buildOptions(c, map, r, limits), 43));
 }
 
 VCR_TEST("original files: choosing what a colony builds") {
@@ -552,7 +566,8 @@ VCR_TEST("original files: choosing what a colony builds") {
     play.setArt(&art);
     play.openColony(1);
     const auto& colony = play.game().state().colonies[1];
-    const auto options = buildOptions(colony, play.game().state().map, play.game().rules());
+    const auto options = buildOptions(colony, play.game().state().map, play.game().rules(),
+                                      buildLimits(play.game().state(), colony.nation));
     VCR_CHECK(options.size() >= 2);
 
     // B opens the list on the Make panel, on what is being built now.
