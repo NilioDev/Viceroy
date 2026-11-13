@@ -218,6 +218,12 @@ public:
     // The attacker wins with a roll of 1 to attack + defense at or below
     // attack.
     static bool attackerWins(int attack, int defense, int roll);
+    // The winner of a fight may harden: a free colonist soldier or dragoon
+    // becomes a veteran, a servant or criminal moves up one rank. `own`
+    // and `opponent` are the two numbers the fight was rolled on.
+    void promote(int unit, int own, int opponent);
+    // A founding father in the nation's congress (row of @FATHERS).
+    bool hasFather(int nation, int father) const;
 
     // --- Map -----------------------------------------------------------------
     void reveal(int x, int y, int radius, int nation);

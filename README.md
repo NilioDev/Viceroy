@@ -35,8 +35,9 @@ touch controls.
 > artillery can attack the other nations' units on the map: you are asked
 > before breaking a peace treaty, the Combat Analysis option shows the
 > odds, the fight is rolled the way the original rolls it (with its help
-> on the easy levels), and the loser is demoted, damaged or captured. The other nations don't
-> move yet, and meeting the natives is still to come. Fish,
+> on the easy levels), the loser is demoted, damaged or captured, and a
+> winning soldier can harden to a veteran. The other nations don't move
+> yet, and meeting the natives is still to come. Fish,
 > ore and the other resources show on the map where the original puts them
 > and add to what your colonists make there;
 > lost city rumours are not drawn yet.

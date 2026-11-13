@@ -20,6 +20,11 @@ int CombatSide::strength() const {
 namespace {
 
 constexpr int kVeteranSoldier = 0x15; // the expert soldier's skill
+constexpr int kIndenturedServant = 0x19;
+constexpr int kPettyCriminal = 0x1A;
+constexpr int kIndianConvert = 0x1B;
+constexpr int kGeorgeWashington = 11;
+constexpr int kFathers = 7; // nation record: the founding fathers, one bit each
 constexpr int kRegulars = 6;
 constexpr int kContinentalCavalry = 7;
 constexpr int kCavalry = 8;
@@ -271,11 +276,76 @@ CombatOutcome Game::attack(int attacker, int defender) {
     a.movesUsed = movementAllowance(attacker);
     if (won) {
         loseBattle(defender, attacker);
+        promote(attacker, s.attack, s.defense);
     } else {
         loseBattle(attacker, defender);
+        promote(defender, s.defense, s.attack);
     }
     refreshUnitFlags();
     return won ? CombatOutcome::AttackerWon : CombatOutcome::DefenderWon;
+}
+
+bool Game::hasFather(int nation, int father) const {
+    if (nation < 0 || nation >= kEuropeanNations || father < 0 || father >= 32) {
+        return false;
+    }
+    const auto& raw = save_.nations[static_cast<std::size_t>(nation)].raw;
+    return (raw[static_cast<std::size_t>(kFathers + father / 8)] & (1U << (father % 8))) != 0;
+}
+
+void Game::promote(int index, int own, int opponent) {
+    // Observed in the original with a debugger.
+    auto& u = save_.units[static_cast<std::size_t>(index)];
+    if (u.type != unit_type::kSoldier && u.type != unit_type::kDragoon) {
+        return;
+    }
+    // Veterans only go further after independence, and experts never.
+    const int from = u.profession;
+    if (from != kIndenturedServant && from != kPettyCriminal && from != kIndianConvert && from != kFreeColonist) {
+        return;
+    }
+    // The chance is the opponent's share of the fight: an unlikely win
+    // hardens more often. The human player's units are a little less
+    // lucky on the harder levels, the others a little more.
+    int total = own + opponent;
+    const bool human = u.nation == this->human();
+    total += human ? save_.difficulty : -save_.difficulty;
+    if (from == kPettyCriminal) {
+        total -= 10;
+    } else if (from == kIndenturedServant) {
+        total -= 5;
+    }
+    // With George Washington in congress every win counts.
+    if (!hasFather(u.nation, kGeorgeWashington) && 1 + nextRandom(std::max(1, total)) > opponent) {
+        return;
+    }
+    const int to = from == kPettyCriminal       ? kIndenturedServant
+                   : from == kIndenturedServant ? kFreeColonist
+                   : from == kIndianConvert     ? kIndianConvert
+                                                : kVeteranSoldier;
+    if (to == from) {
+        return;
+    }
+    u.profession = to;
+    if (!human) {
+        return;
+    }
+    const auto typeName = u.type < static_cast<int>(rules_.units.size())
+                              ? rules_.units[static_cast<std::size_t>(u.type)].name
+                              : std::string();
+    if (to == kVeteranSoldier) {
+        // "Our Dragoons have hardened to Veteran status, Your Excellency!"
+        notices_.push_back({"VETERAN", {typeName}});
+        return;
+    }
+    // "... our Soldiers soldiers have been promoted from Indentured
+    // Servants to Free Colonists status."
+    const auto expertName = [&](int profession) {
+        const int job = professionJob(profession);
+        return job >= 0 && job < static_cast<int>(rules_.jobs.size()) ? rules_.jobs[static_cast<std::size_t>(job)].expertName
+                                                                       : std::string();
+    };
+    notices_.push_back({"VALOR", {typeName, expertName(from), expertName(to)}});
 }
 
 void Game::loseBattle(int loser, int winner) {
