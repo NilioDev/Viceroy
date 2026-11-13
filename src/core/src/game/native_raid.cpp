@@ -128,18 +128,9 @@ CombatOutcome Game::nativeAttack(int index, int x, int y) {
 
     // The nearest colony names the place ("near Jamestown"); the fight was
     // at it when it is no squares away.
-    int nearest = -1;
-    int nearestDistance = 0;
-    for (std::size_t c = 0; c < save_.colonies.size(); ++c) {
-        const auto& col = save_.colonies[c];
-        const int dx = std::abs(col.x - x);
-        const int dy = std::abs(col.y - y);
-        const int d = std::max(dx, dy) + std::min(dx, dy) / 2;
-        if (nearest < 0 || d <= nearestDistance) {
-            nearest = static_cast<int>(c);
-            nearestDistance = d;
-        }
-    }
+    const int nearest = nearestColony(save_, x, y, -1);
+    const bool atColony = nearest >= 0 && save_.colonies[static_cast<std::size_t>(nearest)].x == x &&
+                          save_.colonies[static_cast<std::size_t>(nearest)].y == y;
     const auto& tribes = rules_.tribes;
     const std::string tribeName =
         static_cast<std::size_t>(tribe) < tribes.size() ? tribes[static_cast<std::size_t>(tribe)].name : "";
@@ -172,7 +163,7 @@ CombatOutcome Game::nativeAttack(int index, int x, int y) {
         if (dIndex >= 0) {
             promote(dIndex, s.defense, s.attack);
         }
-        if (nearest >= 0 && nearestDistance == 0) {
+        if (atColony) {
             raidColony(nation, nearest, home, againstArtillery);
         } else if (human) {
             // "Dutch Soldiers defeat Sioux near Jamestown!"

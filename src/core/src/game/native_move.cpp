@@ -684,6 +684,21 @@ int Game::nativeUnitAI(int index) {
     if ((bestFlags & (kTaken | kAttack)) != 0 && movementAllowance(index) - u.movesUsed < 3) {
         return stay(); // an attack needs a full move
     }
+    if ((bestFlags & kAttack) != 0) {
+        // An attack on the player is announced: "Sioux make surprise raid
+        // near Jamestown! ... Sioux chief denies involvement."
+        const int x = u.x + kDx[static_cast<std::size_t>(bestDir)];
+        const int y = u.y + kDy[static_cast<std::size_t>(bestDir)];
+        const int target = occupant(x, y);
+        const int near = target == human() ? nearestColony(save_, x, y, target) : -1;
+        const auto tribeIndex = static_cast<std::size_t>(tribe);
+        if (near >= 0 && tribeIndex < rules_.tribes.size()) {
+            notices_.push_back(GameNotice{"INDIANSURPRISE",
+                                          {rules_.tribes[tribeIndex].name,
+                                           save_.colonies[static_cast<std::size_t>(near)].name,
+                                           rules_.tribes[tribeIndex].adjective}});
+        }
+    }
     if ((bestFlags & (kTaken | kAttack)) != 0 || warStep) {
         u.raw[kUnitFlags] = static_cast<std::uint8_t>(u.raw[kUnitFlags] & ~kVisitDue);
         bestFlags &= ~kVisiting;
