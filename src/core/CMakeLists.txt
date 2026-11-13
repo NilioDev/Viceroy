@@ -17,6 +17,7 @@ add_library(vcr_core STATIC
     src/game/native_trade.cpp
     src/game/native_tribute.cpp
     src/game/native_attack.cpp
+    src/game/native_contact.cpp
     src/game/colony.cpp
     src/game/europe.cpp
     src/game/resource.cpp

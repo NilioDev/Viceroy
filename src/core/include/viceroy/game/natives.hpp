@@ -46,7 +46,8 @@ int nearestColony(const SaveGame& save, int x, int y, int nation, int region = -
 // -1 for water and the map's border.
 int landRegion(const SaveMap& map, int x, int y);
 
-// Whether the nation has met the tribe (bit 0x40 of its attitude byte).
+// Whether the nation has a treaty with the tribe (bit 0x40 of its relation
+// byte; 0x20 alone means they have met but have no treaty).
 bool metTribe(const SaveGame& save, int nation, int tribe);
 
 // The GAME.TXT section that greets the nation's unit at the settlement:

@@ -618,3 +618,74 @@ VCR_TEST("original files: attacking a village (measured)") {
     }
     VCR_CHECK(sawWin && sawBurn && sawLoss);
 }
+
+VCR_TEST("original files: first contact with a tribe (measured)") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
+    const SaveGame original = readSaveGame(Bytes(std::istreambuf_iterator<char>(in), {}));
+    // As measured: the Dutch have not met the Iroquois; their unit 47 steps
+    // from (16, 14) next to the Iroquois village at (18, 14).
+    constexpr int kDutch = 3, kIroquois = 3, kUnit = 47;
+    constexpr std::size_t kRelation = 52 + 4 + kIroquois;
+    const std::size_t tribe = static_cast<std::size_t>(kIroquois) * 78;
+    const auto start = [&]() {
+        SaveGame save = original;
+        auto& u = save.units[kUnit];
+        u.x = 16;
+        u.y = 14;
+        u.movesUsed = 0;
+        u.orders = SaveUnit::kNoOrders;
+        return save;
+    };
+    const auto lines = [](const Dialog& d) {
+        std::string all;
+        for (const auto& l : d.lines) {
+            all += l + " ";
+        }
+        return all;
+    };
+    for (const bool accept : {true, false}) {
+        PlayScreen play(Game(start(), art.rules), {});
+        play.setArt(&art);
+        play.game().setActiveUnit(kUnit);
+        VCR_CHECK(play.game().state().nations[kDutch].raw[kRelation] == 0);
+        play.handle(Command::MoveE);
+        // "The Iroquois tribe welcomes you. We are a glorious nation of 11
+        // Villages." Yes or No.
+        VCR_CHECK(play.dialog().has_value() && play.dialog()->options.size() == 2);
+        VCR_CHECK(lines(*play.dialog()).find("Iroquois") != std::string::npos);
+        VCR_CHECK(lines(*play.dialog()).find("11 Villages") != std::string::npos);
+        const auto& met = play.game().state();
+        VCR_CHECK(met.nations[kDutch].raw[kRelation] == 0x20);
+        VCR_CHECK(met.tribesAndMore[tribe + 58 + kDutch] == 0x20);
+        VCR_CHECK(met.tribesAndMore[tribe + 46 + 2 * kDutch] == 2);
+        if (!accept) {
+            play.handle(Command::Down);
+        }
+        play.handle(Command::Confirm);
+        const auto& after = play.game().state();
+        if (accept) {
+            // Peace, then the invitation to visit and trade.
+            VCR_CHECK(after.nations[kDutch].raw[kRelation] == 0x60);
+            VCR_CHECK(after.tribesAndMore[tribe + 58 + kDutch] == 0x60);
+            VCR_CHECK(tribeTension(after, kIroquois, kDutch) == 2);
+            VCR_CHECK(play.dialog().has_value() && lines(*play.dialog()).find("brothers") != std::string::npos);
+            VCR_CHECK(lines(*play.dialog()).find("Dutch") != std::string::npos);
+            play.handle(Command::Confirm);
+            VCR_CHECK(play.dialog().has_value() && lines(*play.dialog()).find("wagon") != std::string::npos);
+        } else {
+            // No treaty, and the tribe at 100 tension.
+            VCR_CHECK(after.nations[kDutch].raw[kRelation] == 0x20);
+            VCR_CHECK(tribeTension(after, kIroquois, kDutch) == 100);
+            VCR_CHECK(play.dialog().has_value() && lines(*play.dialog()).find("WAR") != std::string::npos);
+        }
+        play.handle(Command::Confirm);
+        VCR_CHECK(!play.dialog().has_value());
+        // Met once: the next step brings no welcome.
+        VCR_CHECK(!play.game().meetNeighbours(kUnit));
+    }
+}

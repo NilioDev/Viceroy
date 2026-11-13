@@ -142,6 +142,14 @@ void PlayScreen::moveActive(Step step) {
         return;
     }
     const auto result = game_.move(index, step);
+    // First contact: the tribe's welcome comes once the unit has moved
+    // (seen: the next unit is up after it).
+    if (auto met = game_.takeNotices(); !met.empty()) {
+        for (auto& notice : met) {
+            notices_.push_back(std::move(notice));
+        }
+        advanceAfterNotices_ = true;
+    }
     if (animations_ && (result == MoveResult::Moved || result == MoveResult::Boarded || result == MoveResult::HighSeas)) {
         slide_ = Slide{index, step.dx, step.dy, 0,
                        result == MoveResult::Boarded || (result == MoveResult::Moved && game_.movesLeft(index) <= 0)};
@@ -163,7 +171,9 @@ void PlayScreen::moveActive(Step step) {
     switch (result) {
     case MoveResult::Moved:
         say("");
-        if (game_.movesLeft(index) <= 0) {
+        if (!notices_.empty()) {
+            showNotices(); // a tribe's welcome
+        } else if (game_.movesLeft(index) <= 0) {
             advance();
         } else {
             activate(index);
@@ -773,6 +783,30 @@ void PlayScreen::showNotices() {
             notice.strings[2] = fields.size() > 1 ? fields[1] : "";
         }
     }
+    if (notice.section == "INDIANWELCOME" && notice.strings.size() >= 2) {
+        // "a glorious nation of 11 Villages": the third column of @LEVELS
+        // by the tribe's level.
+        if (const auto* levels = art_->names.find("LEVELS")) {
+            const auto row = static_cast<std::size_t>(tribeLevel(game_.state(), notice.value));
+            const auto fields = row < levels->lines.size() ? splitFields(levels->lines[row]) : std::vector<std::string>{};
+            notice.strings[1] = fields.size() > 2 ? fields[2] : "";
+        }
+        welcomeTribe_ = notice.value;
+        // Read from the original: the map centres on the unit first.
+        if (notice.unit >= 0 && notice.unit < game_.unitCount()) {
+            const auto& u = game_.unit(notice.unit);
+            centreOn(view_, game_, u.x, u.y);
+        }
+    }
+    if (notice.section == "INDIANWELCOME" || notice.section == "INDIANPEACE" || notice.section == "INDIANCOME" ||
+        notice.section == "INDIANSHUN") {
+        // Seen: the chief speaks, in the mood of the tribe's tension.
+        ask(notice.section, -1, notice.strings, -1, notice.numbers);
+        if (dialog_) {
+            placeNative(notice.value);
+        }
+        return;
+    }
     if (notice.section == "INDIANBOW") {
         // Read from the original: the chief speaks it.
         ask(notice.section, -1, notice.strings);
@@ -935,6 +969,12 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
             demandTribute(unit);
         } else if (option == kVillageAttack && village_ >= 0) {
             attackVillage(unit);
+        }
+    } else if (question == "INDIANWELCOME") {
+        // "Will you accept our treaty ...?" Yes or No.
+        game_.answerWelcome(std::exchange(welcomeTribe_, -1), yes);
+        for (auto& notice : game_.takeNotices()) {
+            notices_.push_back(std::move(notice));
         }
     } else if (question == "LEARNSTAY") {
         // "Then I shall become a master ..." or "Not right now, thanks."
@@ -1843,6 +1883,10 @@ void PlayScreen::finishSlide() {
     view_.slideY = 0;
     if (dialog_) {
         return; // the high seas question is up; it decides what comes next
+    }
+    if (!notices_.empty()) {
+        showNotices(); // a tribe's welcome
+        return;
     }
     if (done.advanceAfter) {
         advance();
