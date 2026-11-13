@@ -178,6 +178,9 @@ MoveResult Game::move(int index, Step step) {
         boarding = true;
     }
 
+    // Read from the original: whether a lost city rumour lies there is
+    // looked at before the unit comes onto the square.
+    const bool rumour = !ship && u.nation < kEuropeanNations && rumourAt(map, toX, toY);
     const int cost = moveCost(index, u.x, u.y, toX, toY);
     if (cost > movesLeft(index) && u.movesUsed > 0 && 1 + nextRandom(cost) > movesLeft(index)) {
         // Not enough moves for this square (read from the original): a unit
@@ -214,6 +217,9 @@ MoveResult Game::move(int index, Step step) {
     }
     reveal(toX, toY, sightRadius(index), u.nation);
     refreshUnitFlags();
+    if (rumour && !exploreRumour(index)) {
+        return MoveResult::Lost;
+    }
     meetNeighbours(index);
     if (ship && target.terrain == kSeaLane && !isNative(u.nation)) {
         return MoveResult::HighSeas;
@@ -915,47 +921,84 @@ void Game::addBuiltUnit(int x, int y, int nation, int type) {
     refreshUnitFlags();
 }
 
-int Game::addUnitInEurope(int type, int profession) {
+int Game::addUnitInEurope(int type, int profession, int nation) {
     SaveUnit u;
     static constexpr std::array<std::uint8_t, 28> kTemplate{0, 0, 0, 0, 0, 0, 0xFF, 0x58, 0, 0, 0, 0, 0, 0,
                                                             0, 0, 0, 0, 0xFF, 0, 0, 0, 0, 0, 0xFF, 0xFF, 0xFF, 0xFF};
     u.raw = kTemplate;
     u.type = type;
-    u.nation = human();
+    u.nation = nation < 0 ? human() : nation;
     u.profession = profession;
     setEuropeStage(u, kPortStage);
     save_.units.push_back(u);
     return unitCount() - 1;
 }
 
-int Game::randomRecruit() {
-    // Who turns up on the docks next. The original's odds are not known;
-    // these favour the unskilled as it seems to. See docs/rules/europe.md.
-    struct Odds {
-        int profession;
-        int weight;
-    };
-    static constexpr Odds kOdds[] = {
-        {kFreeColonist, 20}, {0x19, 10}, {0x1A, 8}, {0x00, 2}, {0x04, 2}, {0x05, 2}, {0x06, 2}, {0x07, 2},
-        {0x08, 2},           {0x09, 2},  {0x0A, 2}, {0x0B, 2}, {0x0C, 2}, {0x0D, 2}, {0x0E, 2}, {0x0F, 2},
-        {0x10, 1},           {0x11, 1},  {0x14, 2}, {0x15, 2}, {0x16, 2}, {0x18, 1},
-    };
-    int total = 0;
-    for (const auto& o : kOdds) {
-        total += o.weight;
+int Game::randomRecruit(int nation) {
+    // Who turns up on the docks next, read from the original: first three
+    // draws for a criminal, a servant or a free colonist (likelier at a
+    // harder level, William Brewster turns the first two into free
+    // colonists), otherwise an expert from the nation's own little
+    // shift-register sequence that is not already waiting on the docks.
+    // See docs/rules/europe.md.
+    constexpr int kBrewster = 20;
+    constexpr int kServant = 0x19;
+    constexpr int kCriminal = 0x1A;
+    auto& n = save_.nations[static_cast<std::size_t>(nation)];
+    const bool brewster = hasFather(nation, kBrewster);
+    const int level = (nation == human() ? save_.difficulty : 1) + 1;
+    const int cut = (level + 2) >> 1;
+    if (1 + nextRandom(15) <= cut) {
+        return brewster ? kFreeColonist : kCriminal;
     }
-    if (random_ == 0) {
-        random_ = static_cast<std::uint32_t>(save_.year * 4 + save_.season + save_.turn * 7919) | 1U;
+    if (1 + nextRandom(10) <= cut) {
+        return brewster ? kFreeColonist : kServant;
     }
-    random_ = random_ * 1103515245U + 12345U;
-    int pick = static_cast<int>((random_ >> 16) % static_cast<std::uint32_t>(total));
-    for (const auto& o : kOdds) {
-        if (pick < o.weight) {
-            return o.profession;
+    if (1 + nextRandom(8) <= cut) {
+        return kFreeColonist;
+    }
+    const auto expert = [](int p) {
+        return p != kFreeColonist && p != 0x13 && p != kServant && p != kCriminal && p != 0x1B;
+    };
+    int tries = 0;
+    for (;;) {
+        if (std::all_of(n.recruits.begin(), n.recruits.end(), [&](int p) { return expert(p); })) {
+            return kFreeColonist;
         }
-        pick -= o.weight;
+        int v = 0;
+        do {
+            int s = n.raw[68];
+            s = (s & 1) != 0 ? (s >> 1) ^ 0x14 : s >> 1;
+            n.raw[68] = static_cast<std::uint8_t>(s);
+            v = (n.raw[68] + n.raw[69]) & 31;
+        } while (v >= 25);
+        switch (v) {
+        case 18:
+        case 23:
+            v = 13;
+            break;
+        case 19:
+            v = 22;
+            break;
+        case 1:
+            v = 8;
+            break;
+        case 2:
+            v = 5;
+            break;
+        case 3:
+            v = 0;
+            break;
+        case 4:
+            v = 6;
+            break;
+        default:
+            break;
+        }
+        if (++tries > 100 || std::find(n.recruits.begin(), n.recruits.end(), v) == n.recruits.end()) {
+            return v;
+        }
     }
-    return kFreeColonist;
 }
 
 void Game::gatherCrosses() {
@@ -981,7 +1024,7 @@ void Game::gatherCrosses() {
     const auto slot = static_cast<std::size_t>((random_ >> 16) % 3U);
     const int profession = nation.recruits[slot];
     addUnitInEurope(professionUnitType(profession), profession);
-    nation.recruits[slot] = randomRecruit();
+    nation.recruits[slot] = randomRecruit(human());
     notices_.push_back({"UNREST", {}, profession});
 }
 
@@ -999,7 +1042,7 @@ int Game::recruit(int slot) {
     const int made = addUnitInEurope(professionUnitType(profession), profession);
     ++nation.recruitCount;
     nation.crosses = 0;
-    nation.recruits[static_cast<std::size_t>(slot)] = randomRecruit();
+    nation.recruits[static_cast<std::size_t>(slot)] = randomRecruit(human());
     return made;
 }
 

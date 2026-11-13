@@ -65,8 +65,11 @@ touch controls.
 > the chief's face shows how angry the tribe is. They can also attack a
 > village and burn it, for treasure, converts and the tribe's anger. Fish,
 > ore and the other resources show on the map where the original puts them
-> and add to what your colonists make there;
-> lost city rumours are not drawn yet.
+> and add to what your colonists make there. Lost city rumours show on the
+> map too, and exploring one brings what it brings in the original: a
+> Fountain of Youth, a city of gold, ruins, burial mounds, a friendly
+> tribe's gift, survivors of a lost colony, angry shrines, nothing, or an
+> expedition that vanishes. Scouts and Hernando de Soto do better.
 
 Viceroy is not affiliated with or endorsed by the makers of the original
 game. It contains none of the original game's files: you need your own copy.
