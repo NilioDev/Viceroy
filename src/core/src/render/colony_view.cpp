@@ -268,10 +268,10 @@ void drawArea(Screen& screen, const Art& art, const Game& game, const SaveColony
 }
 
 void drawPeople(Screen& screen, const Art& art, const SaveColony& colony, const ColonyProduction& production,
-                int selected) {
+                int selected, int libertyExtra) {
     const TextColours white{kWhite, kWhite, kWhite};
-    const int sol = sonsOfLibertyPercent(colony);
-    const int rebels = rebelCount(colony);
+    const int sol = sonsOfLibertyPercent(colony, libertyExtra);
+    const int rebels = rebelCount(colony, libertyExtra);
     blitSprite(screen, art.icons, kRebelFlag, 2, 132);
     screen.text(art.tiny, 15, 133, std::to_string(sol) + "% (" + std::to_string(rebels) + ")", white);
     const std::string tory =
@@ -613,7 +613,7 @@ void drawJobsMenu(Screen& screen, const Art& art, const Game& game, const SaveCo
 void drawBuildList(Screen& screen, const Art& art, const Game& game, const SaveColony& colony, int highlighted) {
     const auto& save = game.state();
     const auto& rules = game.rules();
-    const auto options = buildOptions(colony, save.map, rules);
+    const auto options = buildOptions(colony, save.map, rules, buildLimits(save, colony.nation));
     const auto b = buildListBox(static_cast<int>(options.size()));
     drawWoodBox(screen, art, {b.x, b.y, b.w, b.h});
     const TextColours green{kGreen, kNoColour, kNoColour};
@@ -691,7 +691,8 @@ void drawColonyScreen(Screen& screen, const Art& art, const ColonyArt& colonyArt
     drawArea(screen, art, game, colony, production, view.selectedColonist);
     screen.blit(colonyArt.background, 0, kLowerTop);
     screen.fill({0, kLowerTop, Screen::kWidth, 1}, kBlack);
-    drawPeople(screen, art, colony, production, view.selectedColonist);
+    drawPeople(screen, art, colony, production, view.selectedColonist,
+               nationEffects(save, colony.nation).libertyExtra(colony.nation == save.humanNation));
     drawHarbour(screen, art);
     if (view.panel == ColonyPanel::Make) {
         drawMakePanel(screen, art, game, colony);

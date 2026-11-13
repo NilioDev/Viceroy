@@ -34,7 +34,7 @@ The Combat Analysis box lists them in this order:
 | Attacker | Artillery In Open | −75% | artillery attacking outside a colony a unit that is not fortified |
 | Defender | Veteran | +50% | a veteran soldier or dragoon |
 | Defender | Terrain | the square's defence value × 25% | outside a colony; shown with the square's picture |
-| Defender | Muskets | +1 to the base | a colony's colonist, when the colony has 50 muskets (49 give nothing) |
+| Defender | Muskets | +1 to the base | a colony's colonist, when the colony has 50 muskets (49 give nothing) and its nation Paul Revere |
 | Defender | Colony | +50%, +100%, +150%, +200% | in a colony; named after its stockade, fort or fortress when it has one, shown with the colony's picture |
 | Defender | Fortified | +50% | orders "fortified", where the colony gives less than +125% |
 | Defender | Artillery In Open | −75% | artillery outside a colony |

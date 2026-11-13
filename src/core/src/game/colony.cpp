@@ -89,13 +89,13 @@ NationEffects nationEffects(const SaveGame& save, int nation) {
     return e;
 }
 
-WorkModifier workModifier(const SaveColony& colony, int difficulty, bool tories) {
+WorkModifier workModifier(const SaveColony& colony, int difficulty, bool tories, int libertyExtra) {
     WorkModifier m;
     m.bonus = std::clamp(colony.libertyBonus, 0, 2);
     if (!tories) {
         return m;
     }
-    const int toryCount = std::max(0, colony.population - rebelCount(colony));
+    const int toryCount = std::max(0, colony.population - rebelCount(colony, libertyExtra));
     m.penalty = toryCount / std::max(1, 10 - std::clamp(difficulty, 0, 4));
     return m;
 }
@@ -349,7 +349,7 @@ int centreFoodYield(const Ruleset& rules, const MapSquare& square, int difficult
 ColonyProduction colonyProduction(const SaveColony& colony, const SaveMap& map, const Ruleset& rules,
                                   int difficulty, bool tories, const NationEffects& nation) {
     ColonyProduction p;
-    WorkModifier modifier = workModifier(colony, difficulty, tories);
+    WorkModifier modifier = workModifier(colony, difficulty, tories, nation.libertyExtra(tories));
     modifier.hudson = nation.has(kHudson);
     // The colony's own square gets the bonus but not the penalty.
     const WorkModifier centreModifier{modifier.bonus, 0};
@@ -663,7 +663,25 @@ std::string constructionName(const Ruleset& rules, int construction) {
     return rules.buildings[static_cast<std::size_t>(construction)].name;
 }
 
-std::vector<BuildOption> buildOptions(const SaveColony& colony, const SaveMap& map, const Ruleset& rules) {
+BuildLimits buildLimits(const SaveGame& save, int nation) {
+    BuildLimits limits;
+    const NationEffects e = nationEffects(save, nation);
+    constexpr int kSmith = 0, kStuyvesant = 3; // rows of @FATHERS
+    limits.smith = e.has(kSmith);
+    limits.stuyvesant = e.has(kStuyvesant);
+    limits.colonies = 0;
+    for (const auto& c : save.colonies) {
+        limits.colonies += c.nation == nation ? 1 : 0;
+    }
+    constexpr int kWagonTrainType = 12;
+    for (const auto& u : save.units) {
+        limits.wagonTrains += u.nation == nation && u.type == kWagonTrainType ? 1 : 0;
+    }
+    return limits;
+}
+
+std::vector<BuildOption> buildOptions(const SaveColony& colony, const SaveMap& map, const Ruleset& rules,
+                                      const BuildLimits& limits) {
     std::vector<BuildOption> options;
     const int population = colony.population;
     auto bigEnough = [&](int row) {
@@ -679,11 +697,14 @@ std::vector<BuildOption> buildOptions(const SaveColony& colony, const SaveMap& m
             }
         }
     }
-    // Measured: the next level of each kind of building. Never the town
-    // hall's upper levels or the capitol; the factory level of the craft
-    // shops and the arsenal need Adam Smith in the original, so not yet.
+    // Measured, and read from the original: the next level of each kind of
+    // building. Never the town hall's upper levels or the capitol; the
+    // factory level of the craft shops and the arsenal need Adam Smith, the
+    // custom house Peter Stuyvesant, the drydock a colony on the coast.
     constexpr int kArsenal = 5;
     constexpr int kWarehouseRow = 15;
+    constexpr std::size_t kColonyFlags = 28;
+    constexpr std::uint8_t kCoastal = 0x40;
     auto offered = [&](int row) {
         switch (row) {
         case kArsenal:
@@ -692,6 +713,11 @@ std::vector<BuildOption> buildOptions(const SaveColony& colony, const SaveMap& m
         case 29: // rum factory
         case 34: // fur factory
         case 41: // iron works
+            return limits.smith;
+        case 18: // custom house
+            return limits.stuyvesant;
+        case 7: // drydock
+            return (colony.raw[kColonyFlags] & kCoastal) != 0;
         case 10:
         case 11: // town hall upper levels
         case 30:
@@ -721,13 +747,15 @@ std::vector<BuildOption> buildOptions(const SaveColony& colony, const SaveMap& m
             options.push_back({row, false});
         }
     }
-    // Units: artillery with an armory, a wagon train anywhere, ships with a
-    // shipyard (the frigate too, though it never gets built).
+    // Units: artillery with an armory, a wagon train while the nation has
+    // fewer of them than colonies, ships with a shipyard (the frigate too,
+    // though it never gets built).
     const bool armory = buildingLevel(colony, BuildingKind::Armory) > 0;
     const bool shipyard = buildingLevel(colony, BuildingKind::Docks) >= 3;
     for (int value = kFirstUnitConstruction; value < kFirstUnitConstruction + kUnitConstructionRows; ++value) {
         const int unit = constructionUnit(value);
-        if ((unit == 11 && armory) || unit == 12 || (unit >= 13 && shipyard)) {
+        const bool wagons = unit == 12 && limits.wagonTrains < limits.colonies;
+        if ((unit == 11 && armory) || wagons || (unit >= 13 && shipyard)) {
             options.push_back({value, false});
         }
     }
@@ -895,21 +923,21 @@ ColonyTurn runColonyTurn(SaveColony& colony, const SaveMap& map, const Ruleset& 
     turn.libertyBefore = colony.libertyBonus;
     turn.bells = p.produced[cargo::kBells];
     gatherBells(colony, p.produced[cargo::kBells]);
-    updateLibertyBonus(colony);
+    updateLibertyBonus(colony, nation.libertyExtra(tories));
     turn.libertyAfter = colony.libertyBonus;
     return turn;
 }
 
-int sonsOfLibertyPercent(const SaveColony& colony) {
-    if (colony.rebelDivisor <= 0) {
-        return 0;
-    }
-    return std::clamp(static_cast<int>(100LL * colony.rebelDividend / colony.rebelDivisor), 0, 100);
+int sonsOfLibertyPercent(const SaveColony& colony, int extra) {
+    const int percent = colony.rebelDivisor <= 0
+                            ? 0
+                            : std::clamp(static_cast<int>(100LL * colony.rebelDividend / colony.rebelDivisor), 0, 100);
+    return std::clamp(percent + extra, 0, 100);
 }
 
-int rebelCount(const SaveColony& colony) {
+int rebelCount(const SaveColony& colony, int extra) {
     // Measured: 5% of 10 is no rebel, 36% of 2 is one; halves round down.
-    return (colony.population * sonsOfLibertyPercent(colony) + 49) / 100;
+    return (colony.population * sonsOfLibertyPercent(colony, extra) + 49) / 100;
 }
 
 void gatherBells(SaveColony& colony, int bells) {
@@ -923,8 +951,8 @@ void gatherBells(SaveColony& colony, int bells) {
     colony.rebelDividend = static_cast<int>(newRebels);
 }
 
-void updateLibertyBonus(SaveColony& colony) {
-    const int percent = sonsOfLibertyPercent(colony);
+void updateLibertyBonus(SaveColony& colony, int extra) {
+    const int percent = sonsOfLibertyPercent(colony, extra);
     const int target = percent >= 100 ? 2 : percent >= 50 ? 1 : 0;
     if (colony.libertyBonus < target) {
         ++colony.libertyBonus;

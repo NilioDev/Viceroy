@@ -174,10 +174,13 @@ struct NationEffects {
     std::uint32_t fathers = 0;
     int tax = 0;
     bool has(int father) const { return father >= 0 && father < 32 && ((fathers >> father) & 1U) != 0; }
+    // Read from the original: with Simon Bolivar the player's colonies
+    // count 20 points more Sons of Liberty than their bells make.
+    int libertyExtra(bool human) const { return human && has(18) ? 20 : 0; }
 };
 // From the nation's record in the save; none for a tribe.
 NationEffects nationEffects(const SaveGame& save, int nation);
-WorkModifier workModifier(const SaveColony& colony, int difficulty, bool tories = true);
+WorkModifier workModifier(const SaveColony& colony, int difficulty, bool tories = true, int libertyExtra = 0);
 
 // What a colonist of this skill makes doing this job on a square. Fishing
 // gives 1 more than the yield where the water has land on at least 3 of its
@@ -277,7 +280,18 @@ struct BuildOption {
 };
 // What the colony may build, in the original's order (buildings by row,
 // then units), measured on its colony screen; see docs/rules/colony-screen.md.
-std::vector<BuildOption> buildOptions(const SaveColony& colony, const SaveMap& map, const Ruleset& rules);
+// What the colony's nation brings to the list: Adam Smith's factories and
+// Peter Stuyvesant's custom house, and wagon trains only while the nation
+// has fewer of them than colonies.
+struct BuildLimits {
+    bool smith = false;
+    bool stuyvesant = false;
+    int wagonTrains = 0;
+    int colonies = 1;
+};
+BuildLimits buildLimits(const SaveGame& save, int nation);
+std::vector<BuildOption> buildOptions(const SaveColony& colony, const SaveMap& map, const Ruleset& rules,
+                                      const BuildLimits& limits = {});
 
 // What BUY on the Make panel asks to finish the construction now, or 0 when
 // there is nothing to buy. See docs/rules/production.md.
@@ -302,15 +316,15 @@ ColonyTurn runColonyTurn(SaveColony& colony, const SaveMap& map, const Ruleset& 
 // --- Sons of Liberty -----------------------------------------------------
 
 // The share of the colony in the Sons of Liberty, 0-100.
-int sonsOfLibertyPercent(const SaveColony& colony);
+int sonsOfLibertyPercent(const SaveColony& colony, int extra = 0);
 // How many of the colonists are rebels (the rest are tories).
-int rebelCount(const SaveColony& colony);
+int rebelCount(const SaveColony& colony, int extra = 0);
 // One turn's change of membership: the bells come in, both sides of the
 // fraction wear away by a 64th, and the rebels by a fifth of their share.
 void gatherBells(SaveColony& colony, int bells);
 // The production bonus moves one step a turn towards what membership
 // allows (1 at 50%, 2 at 100%).
-void updateLibertyBonus(SaveColony& colony);
+void updateLibertyBonus(SaveColony& colony, int extra = 0);
 // A new colony starts at 0 of 200 and gathers its first bells at once.
 void startLiberty(SaveColony& colony, const SaveMap& map, const Ruleset& rules, int difficulty);
 // A colonist joining adds 100 to the total and the colony gathers again.

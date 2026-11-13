@@ -256,3 +256,28 @@ VCR_TEST("congress: Penn's preachers and Hudson's furs") {
     VCR_CHECK(furs({}) == 2);
     VCR_CHECK(furs(with({8})) == 4);
 }
+
+VCR_TEST("congress: Magellan's ships and Bolivar's rebels") {
+    SaveGame s = congressSave();
+    SaveUnit ship;
+    ship.nation = kHuman;
+    ship.type = 17;
+    s.units.push_back(ship);
+    Game g(s, congressRules());
+    const int plain = g.movementAllowance(0);
+    VCR_CHECK(plain == 6 * 3);
+    g.state().nations[kHuman].raw[7] |= 1U << 5; // Magellan
+    VCR_CHECK(g.movementAllowance(0) == plain + 3);
+
+    NationEffects bolivar = with({18});
+    VCR_CHECK(bolivar.libertyExtra(true) == 20);
+    VCR_CHECK(bolivar.libertyExtra(false) == 0);
+    SaveColony c;
+    c.population = 4;
+    c.rebelDividend = 1;
+    c.rebelDivisor = 2;
+    VCR_CHECK(sonsOfLibertyPercent(c, 20) == 70);
+    VCR_CHECK(rebelCount(c, 20) == 3);
+    c.rebelDividend = 2;
+    VCR_CHECK(sonsOfLibertyPercent(c, 20) == 100);
+}

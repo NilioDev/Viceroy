@@ -1671,7 +1671,7 @@ void PlayScreen::openBuildList() {
     auto& state = *colonyScreen_;
     const auto& save = game_.state();
     const auto& colony = save.colonies[static_cast<std::size_t>(state.colony)];
-    const auto options = buildOptions(colony, save.map, game_.rules());
+    const auto options = buildOptions(colony, save.map, game_.rules(), buildLimits(save, colony.nation));
     state.panel = ColonyPanel::Make;
     state.buildList = 0;
     for (std::size_t i = 0; i < options.size(); ++i) {
@@ -1735,7 +1735,7 @@ bool PlayScreen::handleBuildList(Command command) {
     auto& state = *colonyScreen_;
     auto& save = game_.state();
     auto& colony = save.colonies[static_cast<std::size_t>(state.colony)];
-    const auto options = buildOptions(colony, save.map, game_.rules());
+    const auto options = buildOptions(colony, save.map, game_.rules(), buildLimits(save, colony.nation));
     const int lines = static_cast<int>(options.size()) + 1; // the first line is "(No Production)"
     switch (command) {
     case Command::MoveN:
@@ -1776,7 +1776,8 @@ bool PlayScreen::clickColonyScreen(int x, int y) {
     if (state.buildList >= 0) {
         const auto& save = game_.state();
         const auto& colony = save.colonies[static_cast<std::size_t>(state.colony)];
-        const int items = static_cast<int>(buildOptions(colony, save.map, game_.rules()).size());
+        const auto limits = buildLimits(save, colony.nation);
+        const int items = static_cast<int>(buildOptions(colony, save.map, game_.rules(), limits).size());
         const auto box = buildListBox(items);
         if (!inside(box)) {
             state.buildList = -1;

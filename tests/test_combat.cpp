@@ -289,8 +289,11 @@ VCR_TEST("combat: a colony with nobody on its square is defended by a colonist (
     VCR_CHECK(s.defense == 6);
 }
 
-VCR_TEST("combat: 50 muskets arm the colony's defender with +1 (measured)") {
-    Game g = colonyBattle(1, 49);
+VCR_TEST("combat: with Paul Revere 50 muskets arm the colony's defender with +1 (measured)") {
+    Game g = colonyBattle(1, 50);
+    VCR_CHECK(!g.analyseColonyAttack(0, 0, 0).defender.armed); // no Revere
+    g.state().nations[kFrench].raw[8] |= 1U << 4;               // Paul Revere
+    g.state().colonies[0].stock[15] = 49;
     VCR_CHECK(!g.analyseColonyAttack(0, 0, 0).defender.armed);
     g.state().colonies[0].stock[15] = 50;
     const auto a = g.analyseColonyAttack(0, 0, 0);
