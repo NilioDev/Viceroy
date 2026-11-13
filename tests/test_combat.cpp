@@ -189,3 +189,49 @@ VCR_TEST("combat: the roll wins at or below the attack") {
     VCR_CHECK(!Game::attackerWins(80, 36, 81));
     VCR_CHECK(!Game::attackerWins(0, 36, 1));
 }
+
+VCR_TEST("combat: with George Washington every win hardens a soldier (observed)") {
+    Game g = battle(unit_type::kDragoon, unit_type::kSoldier);
+    g.state().nations[kDutch].raw[8] = 0x08; // father 11
+    g.promote(0, 80, 24);
+    VCR_CHECK(g.unit(0).profession == 0x15);
+    const auto notices = g.takeNotices();
+    VCR_CHECK(notices.size() == 1 && notices[0].section == "VETERAN");
+    VCR_CHECK(notices[0].strings == std::vector<std::string>{"Dragoons"});
+    // A veteran goes no further before independence.
+    g.promote(0, 80, 24);
+    VCR_CHECK(g.unit(0).profession == 0x15);
+    VCR_CHECK(g.takeNotices().empty());
+}
+
+VCR_TEST("combat: servants and criminals move up one rank, experts never") {
+    Game g = battle(unit_type::kSoldier, unit_type::kSoldier);
+    g.state().nations[kDutch].raw[8] = 0x08;
+    g.state().units[0].profession = 0x1A;
+    g.promote(0, 80, 24);
+    VCR_CHECK(g.unit(0).profession == 0x19);
+    g.promote(0, 80, 24);
+    VCR_CHECK(g.unit(0).profession == 0x1C);
+    g.state().units[0].profession = 0; // an expert farmer
+    g.promote(0, 80, 24);
+    VCR_CHECK(g.unit(0).profession == 0);
+    g.state().units[0].type = unit_type::kColonist;
+    g.state().units[0].profession = 0x1C;
+    g.promote(0, 80, 24);
+    VCR_CHECK(g.unit(0).profession == 0x1C);
+}
+
+VCR_TEST("combat: without Washington the opponent's share is the chance to harden") {
+    Game g = battle(unit_type::kSoldier, unit_type::kSoldier);
+    int hardened = 0;
+    for (int i = 0; i < 2000; ++i) {
+        g.state().units[0].profession = 0x1C;
+        g.promote(0, 75, 25); // 25 in 100
+        hardened += g.unit(0).profession == 0x15 ? 1 : 0;
+    }
+    VCR_CHECK(hardened > 400 && hardened < 600);
+    // Against nothing there is nothing to gain.
+    g.state().units[0].profession = 0x1C;
+    g.promote(0, 80, 0);
+    VCR_CHECK(g.unit(0).profession == 0x1C);
+}

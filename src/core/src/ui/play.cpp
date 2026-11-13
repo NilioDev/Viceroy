@@ -439,7 +439,7 @@ void PlayScreen::showNotices() {
         // Measured: battles are told by the colonial advisor, the work of
         // pioneers by the frontiersman.
         constexpr std::string_view kBattles[] = {"DEMOTE", "COLONISTCAPTURE", "COLONISTCAPTURE2", "WAGONCAPTURE",
-                                                 "LOOTCAPTURE", "ARTILLERY", "ARTILLERY2"};
+                                                 "LOOTCAPTURE", "ARTILLERY", "ARTILLERY2", "VETERAN", "VALOR"};
         if (std::find(std::begin(kBattles), std::end(kBattles), notice.section) != std::end(kBattles)) {
             placeMapDialog(*dialog_);
         } else {

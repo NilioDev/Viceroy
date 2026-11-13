@@ -71,6 +71,24 @@ All divisions round down. Not covered yet: natives' settlements and
 ambushes, ships, a colony's own garrison bonus, and the rules after
 independence.
 
+## Hardening after a win
+
+Watched in the original with a debugger. After every fight the winner, if it
+is a soldier or dragoon, may move up:
+
+- A free colonist becomes a veteran, an indentured servant a free colonist,
+  and a petty criminal an indentured servant. Indian converts stay converts.
+  Experts and veterans don't move (veterans can become Continental Army
+  after independence, which is not covered yet).
+- With George Washington in the nation's congress it always happens.
+- Otherwise the original rolls 1 to (own + opponent's number), using the two
+  numbers the fight was rolled on. The human player's units add the
+  difficulty level to that range, other nations subtract it, and a criminal
+  takes off 10 and a servant 5. The unit moves up when the roll is at or
+  below the opponent's number. So an unlikely win hardens more often.
+- The human player is told: `@VETERAN` for a new veteran, `@VALOR` for a
+  servant or criminal moving up, both by the colonial advisor.
+
 ## What the loser loses
 
 All told by the colonial advisor, box at x 54 centred on row 139:
