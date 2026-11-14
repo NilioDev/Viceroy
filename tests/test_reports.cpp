@@ -6,6 +6,7 @@
 #include "viceroy/render/report_view.hpp"
 #include "viceroy/ui/play.hpp"
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -38,7 +39,7 @@ bool rowsDiffer(const Screen& a, const Screen& b, int y0, int y1) {
 
 } // namespace
 
-VCR_TEST("original files: F2, F7 and F8 open their reports until a key") {
+VCR_TEST("original files: F2 and F4 to F9 open their reports until a key") {
     const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
     if (!isGameFolder(dir)) {
         VCR_SKIP("no game files in gamedata/");
@@ -48,14 +49,16 @@ VCR_TEST("original files: F2, F7 and F8 open their reports until a key") {
     VCR_CHECK(save.has_value());
     PlayScreen play(Game(*save, art.rules), {});
     play.setArt(&art);
-    for (const auto& [command, report] : {std::pair{Command::ReligionReport, 2}, std::pair{Command::NavalReport, 7},
-                                          std::pair{Command::ForeignReport, 8}}) {
+    for (const auto& [command, report] : {std::pair{Command::ReligionReport, 2}, std::pair{Command::LaborReport, 4},
+                                          std::pair{Command::EconomyReport, 5}, std::pair{Command::ColonyAdviser, 6},
+                                          std::pair{Command::NavalReport, 7}, std::pair{Command::ForeignReport, 8},
+                                          std::pair{Command::NativeReport, 9}}) {
         play.handle(command);
         VCR_CHECK(play.report() == report);
         Screen screen;
         play.draw(screen, art);
         VCR_CHECK(screen.at(286, 184) == 0x77); // the OK box
-        for (int i = 0; i < 10 && play.reportUp(); ++i) {
+        for (int i = 0; i < 40 && play.reportUp(); ++i) {
             play.handle(Command::Confirm);
         }
         VCR_CHECK(!play.reportUp());
@@ -143,4 +146,94 @@ VCR_TEST("original files: the Naval Adviser has seven units to a page") {
     Screen empty;
     drawNavalReport(empty, art, many, human, 2);
     VCR_CHECK(!rowsDiffer(second, empty, 83, 98));
+}
+
+VCR_TEST("labor report: the grid's places, as the original lays them out") {
+    // Three columns of 8, 9 and 9 from (2, 25), 105 by 18 each.
+    VCR_CHECK(laborReportHit(3, 26) == 0);             // Expert Farmers
+    VCR_CHECK(laborReportHit(3, 25 + 7 * 18) == 7);    // Expert Silver Miners
+    VCR_CHECK(laborReportHit(108, 26) == 8);           // Expert Fishermen
+    VCR_CHECK(laborReportHit(213, 26) == 17);          // Elder Statesmen
+    VCR_CHECK(laborReportHit(213, 25 + 18) == 20);     // Hardy Pioneers: teachers and units' colonists left out
+    VCR_CHECK(laborReportHit(213, 25 + 8 * 18) == 19); // Free Colonists, last
+    VCR_CHECK(laborReportHit(300, 190) == -1);         // the OK box
+    VCR_CHECK(laborReportHit(3, 5) == -1);
+}
+
+VCR_TEST("original files: a click on a profession zooms, a key goes back, a click elsewhere closes") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    auto save = firstSave(dir);
+    VCR_CHECK(save.has_value());
+    PlayScreen play(Game(*save, art.rules), {});
+    play.setArt(&art);
+    play.handle(Command::LaborReport);
+    VCR_CHECK(play.report() == 4 && play.reportPage() == 0);
+    play.clickReport(220, 25 + 8 * 18 + 4);
+    VCR_CHECK(play.reportPage() == 20);
+    Screen screen;
+    play.draw(screen, art);
+    VCR_CHECK(screen.at(286, 184) == 0x77);
+    play.handle(Command::Confirm);
+    VCR_CHECK(play.report() == 4 && play.reportPage() == 0);
+    play.clickReport(5, 5);
+    VCR_CHECK(!play.reportUp());
+}
+
+VCR_TEST("original files: the Economic and Colony Advisers turn their pages") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    auto save = firstSave(dir);
+    VCR_CHECK(save.has_value());
+    const Game game(*save, art.rules);
+    const int human = game.human();
+    int colonies = 0;
+    for (const auto& c : game.state().colonies) {
+        colonies += c.nation == human ? 1 : 0;
+    }
+    // European trade, then 17 colonies to a page of cargo.
+    VCR_CHECK(economyReportPages(game, human) == 1 + (colonies + 16) / 17);
+    // Garrisons, then the Sons of Liberty, nine colonies to a page each.
+    VCR_CHECK(colonyAdviserPages(game, human) == 2 * std::max(1, (colonies + 8) / 9));
+    Screen first;
+    Screen last;
+    drawColonyAdviser(first, art, game, human, 0);
+    drawColonyAdviser(last, art, game, human, colonyAdviserPages(game, human) - 1);
+    VCR_CHECK(rowsDiffer(first, last, 0, 20)); // the subtitles differ
+}
+
+VCR_TEST("original files: the Indian Adviser lists only the tribes met") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    auto save = firstSave(dir);
+    VCR_CHECK(save.has_value());
+    const int human = Game(*save, art.rules).human();
+    auto& relations = save->nations[static_cast<std::size_t>(human)].raw;
+    for (int t = 0; t < 8; ++t) {
+        relations[static_cast<std::size_t>(56 + t)] &= static_cast<std::uint8_t>(~0x20);
+        save->tribesAndMore[static_cast<std::size_t>(t * 78 + 3)] &= 0x7F;
+    }
+    Screen none;
+    drawIndianReport(none, art, Game(*save, art.rules), human);
+    relations[56] |= 0x20; // the Incas met
+    Screen one;
+    drawIndianReport(one, art, Game(*save, art.rules), human);
+    // A row of 21 pixels from y 25.
+    VCR_CHECK(rowsDiffer(none, one, 25, 46));
+    VCR_CHECK(!rowsDiffer(none, one, 46, 180));
+    // A tribe gone is listed even unmet.
+    save->tribesAndMore[3] |= 0x80;
+    relations[56] &= static_cast<std::uint8_t>(~0x20);
+    Screen gone;
+    drawIndianReport(gone, art, Game(*save, art.rules), human);
+    VCR_CHECK(rowsDiffer(none, gone, 25, 46));
 }

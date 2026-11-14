@@ -163,8 +163,9 @@ void drawUnitInColonyList(Screen& screen, const Art& art, const Game& game, int 
 // A unit standing small on the horizon of the Units Present panel, centred on
 // px; nothing is drawn from x `right` on.
 void drawSmallUnit(Screen& screen, const Art& art, const Game& game, int index, int px, int py, int right);
-// A unit as the map draws it, on the square at (px, py).
-void drawUnitAt(Screen& screen, const Art& art, const Game& game, int index, int px, int py);
+// A unit as the map draws it, on the square at (px, py); with `listInk` its
+// orders letter is inked as in the colony's list of units.
+void drawUnitAt(Screen& screen, const Art& art, const Game& game, int index, int px, int py, bool listInk = false);
 // The first field of a row of a section of a text file, or `fallback`.
 std::string textLine(const TextFile& file, const char* section, int row, const char* fallback);
 
