@@ -732,6 +732,54 @@ VCR_TEST("original files: BUY finishes the construction for gold") {
     VCR_CHECK(play.game().state().nations[static_cast<std::size_t>(play.game().human())].gold == 1000 - 130);
 }
 
+VCR_TEST("original files: (CLEAR SPECIALTY) makes an expert a free colonist") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    const ColonyArt colonyArt = loadColonyArt(dir);
+    std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
+    auto save = readSaveGame(Bytes(std::istreambuf_iterator<char>(in), {}));
+    save.colonies[1].skills[0] = 1; // a master sugar planter
+    save.colonies[1].skills[1] = skill::kFreeColonist;
+    PlayScreen play(Game(std::move(save), art.rules), dir / "unused.sav");
+    play.setColonyArt(&colonyArt);
+    play.setArt(&art);
+    play.openColony(1);
+    VCR_CHECK(jobsMenuClearLine(play.game().state().colonies[1], 0) == 1);
+    VCR_CHECK(jobsMenuClearLine(play.game().state().colonies[1], 1) == 0);
+    play.handle(Command::Down); // the first colonist
+    play.handle(Command::Confirm);
+    // The menu opens on the present job, below the clear line.
+    VCR_CHECK(play.colonyScreen()->jobsMenu >= 1);
+    while (play.colonyScreen()->jobsMenu > 0) {
+        play.handle(Command::Up);
+    }
+    play.handle(Command::Confirm);
+    VCR_CHECK(play.dialog().has_value() && play.dialog()->options.size() == 2);
+    bool named = false;
+    for (const auto& line : play.dialog()->lines) {
+        named = named || line.find("({Master Sugar Planters})") != std::string::npos;
+    }
+    VCR_CHECK(named);
+    play.handle(Command::Confirm); // "Yes"
+    VCR_CHECK(play.game().state().colonies[1].skills[0] == skill::kFreeColonist);
+}
+
+VCR_TEST("original files: dialogs measure the text file's spaces when wrapping") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    // Both measured in the original, with the box 190 wide.
+    auto lines = wrapMarkedText(art.labels, "Your Excellency.  Our fur traders\ncannot continue", 185);
+    VCR_CHECK(lines.size() == 2 && lines[0] == "Your Excellency. Our fur traders");
+    lines = wrapMarkedText(art.labels, "specialty\n({Master Gunsmiths}) and make him", 185);
+    VCR_CHECK(lines.size() == 2 && lines[0] == "specialty ({Master Gunsmiths}) and make");
+}
+
 VCR_TEST("original files: the custom house sells all but 50 (measured on Curacao)") {
     const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
     if (!isGameFolder(dir)) {

@@ -87,6 +87,17 @@ on the left and below). All text is `FONTTINY.FF`:
 - "(More)" as the last line, and "(F1 for Help)" in gold (0x95)
   right-aligned to x 256 at y 171.
 
+A title too wide for 186 pixels goes on to a second line 6 pixels lower,
+and the box grows to hold every line: 24 + 8 pixels a line high, plus 6 for
+each extra title line, centred on the screen. The job lines then start 16
+(plus the extra) below the box's top and the help text sits 9 above its
+bottom.
+
+For an expert the first line is "(CLEAR SPECIALTY)" (`@MISC` row 44).
+Choosing it asks `@LOBOTOMIZE`, naming the expert plural, from the buying
+advisor placed as for BUY; "Yes" makes the colonist a free colonist (skill
+0x1C). Measured on Curacao with a master gunsmith working as a blacksmith.
+
 The menu opens on the colonist's present job. Teaching is offered only
 where a school stands and only to an expert it can take (see below).
 

@@ -204,9 +204,12 @@ In our test turns the Sons of Liberty report came first. The order of the
 other reports among themselves is not measured; Viceroy gives run-outs,
 then cargo and waste, then food.
 
-A line break in `GAME.TXT` counts as two spaces when the original wraps a
-report (it is drawn as one): "Your Excellency. Our fur traders" leaves
-"cannot" for the next line although one space would just fit.
+When the original wraps a dialog it measures the spaces as `GAME.TXT` has
+them, a line break counting as one, and draws one space between words:
+"Your Excellency.  Our fur traders" (two spaces after the full stop in the
+file) leaves "cannot" for the next line although one space would just fit,
+while "specialty" + line break + "(Master Gunsmiths) and make" stays on one
+line at 183 of 185 pixels.
 
 With the Tutorial Hints option on (header byte 18, bit 7), the first cargo
 report of the game is followed by `@TUTORIAL6` ("there are 100 Cotton in

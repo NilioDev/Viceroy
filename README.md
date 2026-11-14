@@ -18,7 +18,8 @@ touch controls.
 > clear forests (lumber for a colony nearby) and build roads with your pioneers, found colonies (your
 > advisors warn of a poor site and you type the name), look inside your colonies, end turns and save. The colony screen
 > shows its buildings, people, what they produce and the warehouse; give
-> colonists other jobs with the jobs menu or by clicking a colonist and then
+> colonists other jobs with the jobs menu (where an expert can also be made
+> an ordinary free colonist) or by clicking a colonist and then
 > a building or field, send them out of the colony as colonists, pioneers,
 > soldiers, scouts or dragoons (with the warehouse's tools, muskets and
 > horses) and take units standing outside back in; your advisors object as

@@ -683,6 +683,13 @@ void Game::storageNotices(const ColonyTurn& turn, int c) {
     }
 }
 
+void Game::clearSpecialty(int c, int colonist) {
+    auto& colony = save_.colonies[static_cast<std::size_t>(c)];
+    if (colonist >= 0 && colonist < colony.population) {
+        colony.skills[static_cast<std::size_t>(colonist)] = skill::kFreeColonist;
+    }
+}
+
 void Game::setExport(int c, int good, bool on) {
     setExportTicked(save_.colonies[static_cast<std::size_t>(c)], good, on);
 }

@@ -341,6 +341,8 @@ public:
     void renameColony(int colony, const std::string& name) {
         save_.colonies[static_cast<std::size_t>(colony)].name = name.substr(0, 23);
     }
+    // "(CLEAR SPECIALTY)" in the jobs menu: the expert becomes a free colonist.
+    void clearSpecialty(int colony, int colonist);
     // Mines that wear out: silver deposits and minerals (DEPLETION).
     void wearMines(int colony);
 

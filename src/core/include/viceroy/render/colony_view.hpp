@@ -63,6 +63,9 @@ struct OutsideMenuBox {
     int firstLine; // y of the first line
 };
 OutsideMenuBox outsideMenuBox(int lines);
+// The jobs menu of a colonist: its first line is "(CLEAR SPECIALTY)" for an
+// expert (read from the original), then the jobs, then "(More)".
+int jobsMenuClearLine(const SaveColony& colony, int colonist);
 
 // Where the panel's parts are, for clicks.
 struct PanelButton {
