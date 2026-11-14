@@ -199,6 +199,7 @@ private:
     void continueAttack();
     void resolveAttack();
     std::string adjective(int nation) const; // "French"
+    std::string people(int nation) const;    // "French", or "Rebels" in the war
 
     Game game_;
     ViewState view_;
