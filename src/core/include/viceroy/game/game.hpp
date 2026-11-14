@@ -87,6 +87,9 @@ struct GameNotice {
     // %STRINGs that are a nation's adjective ("French"): which string, and
     // the nation, for the screen to fill in.
     std::vector<std::pair<int, int>> adjectives{};
+    // The same where the original names the people: "Rebels" and "Tories"
+    // instead of "Rebel" and "Tory" during the war.
+    std::vector<std::pair<int, int>> peoples{};
     // %STRINGs that are a word of the MISC section of LABELS.TXT
     // ("Wilderness"): which string, and the row.
     std::vector<std::pair<int, int>> labels{};

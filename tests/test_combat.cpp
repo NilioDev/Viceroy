@@ -321,7 +321,7 @@ VCR_TEST("combat: taking a colony plunders its share of the owner's gold (measur
     VCR_CHECK(notices.size() == 1 && notices[0].section == "CAPTURED");
     VCR_CHECK(notices[0].strings.at(2) == "Martinique");
     VCR_CHECK(notices[0].numbers == std::vector<int>{62});
-    VCR_CHECK(notices[0].adjectives == (std::vector<std::pair<int, int>>{{0, kDutch}}));
+    VCR_CHECK(notices[0].peoples == (std::vector<std::pair<int, int>>{{0, kDutch}}));
     const auto cues = g.takeMusicCues();
     VCR_CHECK(cues.size() == 2 && cues[1] == (MusicCue{MusicCue::Kind::Sound, 0x4B}));
 }

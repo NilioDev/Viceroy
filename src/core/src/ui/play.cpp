@@ -829,6 +829,16 @@ bool PlayScreen::handleDialog(Command command) {
 }
 
 std::string PlayScreen::adjective(int nation) const {
+    // Read from the original: during the war of independence the player's
+    // side is "Rebel" and the Crown's "Tory" (LABELS.TXT).
+    if (art_ != nullptr && (game_.state().header[18] & 0x01) != 0 && nation >= 0) {
+        if (nation == game_.human()) {
+            return textLine(art_->labelText, "MISC", 69, "Rebel");
+        }
+        if (nation == game_.crownNation()) {
+            return textLine(art_->labelText, "MISC", 70, "Tory");
+        }
+    }
     if (art_ != nullptr) {
         if (const auto* s = art_->names.find("NATIONALITY")) {
             if (nation >= 0 && static_cast<std::size_t>(nation) < s->lines.size()) {
@@ -837,6 +847,20 @@ std::string PlayScreen::adjective(int nation) const {
         }
     }
     return "";
+}
+
+std::string PlayScreen::people(int nation) const {
+    // The same, but "Rebels" and "Tories" during the war (read from the
+    // original).
+    if (art_ != nullptr && (game_.state().header[18] & 0x01) != 0 && nation >= 0) {
+        if (nation == game_.human()) {
+            return textLine(art_->labelText, "MISC", 86, "Rebels");
+        }
+        if (nation == game_.crownNation()) {
+            return textLine(art_->labelText, "MISC", 87, "Tories");
+        }
+    }
+    return adjective(nation);
 }
 
 int PlayScreen::defenderNation(const PendingAttack& a) const {
@@ -959,6 +983,14 @@ void PlayScreen::showNotices() {
                 notice.strings.resize(static_cast<std::size_t>(string) + 1);
             }
             notice.strings[static_cast<std::size_t>(string)] = adjective(nation);
+        }
+    }
+    for (const auto& [string, nation] : notice.peoples) {
+        if (string >= 0) {
+            if (notice.strings.size() <= static_cast<std::size_t>(string)) {
+                notice.strings.resize(static_cast<std::size_t>(string) + 1);
+            }
+            notice.strings[static_cast<std::size_t>(string)] = people(nation);
         }
     }
     for (const auto& [string, nation] : notice.countries) {

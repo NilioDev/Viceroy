@@ -561,7 +561,7 @@ void Game::captureColony(int colony, int attacker) {
     coloniesChangeHands(colony);
     // "Dutch march into Martinique! 62 plundered!"
     GameNotice notice{"CAPTURED", {"", "", c.name}};
-    notice.adjectives = {{0, a.nation}};
+    notice.peoples = {{0, a.nation}};
     notice.numbers = {plunder};
     notices_.push_back(std::move(notice));
 }
