@@ -42,6 +42,7 @@ inline constexpr int kScout = 5;
 inline constexpr int kTreasure = 10;
 inline constexpr int kWagonTrain = 12;
 inline constexpr int kCaravel = 13;
+inline constexpr int kManOWar = 18;
 inline constexpr int kFirstNative = 19;
 } // namespace unit_type
 
@@ -642,6 +643,9 @@ public:
     // The nation whose slot the Crown's side takes in the war (header word
     // 98: the nation gone after the succession), -1 for none yet.
     int crownNation() const;
+    // During the war the Crown's units neither attack nor meet the other
+    // European nations' units and colonies (x, y: the square stepped on).
+    bool crownLeavesAlone(int unit, int x, int y) const;
     // What the Game menu's "DECLARE INDEPENDENCE" asks or says first:
     // ALREADYREVOLUTION, TOOTORY (too few rebels), MULTIREV (a game of
     // several human players) or DECLARE (the question itself).

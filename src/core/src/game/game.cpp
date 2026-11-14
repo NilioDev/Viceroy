@@ -791,6 +791,11 @@ bool Game::sailToEurope(int ship) {
         return false;
     }
     auto& u = save_.units[static_cast<std::size_t>(ship)];
+    if (independenceDeclared() && (u.nation != crownNation() || u.type != unit_type::kManOWar)) {
+        // Read from the original: during the war only the Crown's
+        // men-of-war sail for Europe.
+        return false;
+    }
     const auto aboard = passengers(ship);
     if (u.nation >= 0 && u.nation < kEuropeanNations) {
         auto& raw = save_.nations[static_cast<std::size_t>(u.nation)].raw;
