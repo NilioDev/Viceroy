@@ -6,6 +6,7 @@
 #include "viceroy/game_files.hpp"
 #include "viceroy/render/game_view.hpp"
 #include "viceroy/render/menu_bar.hpp"
+#include "viceroy/render/pedia_view.hpp"
 
 #include <cstdlib>
 #include <filesystem>
@@ -488,6 +489,65 @@ VCR_TEST("original files: the VIEW menu zooms out to the whole map and back (see
         white = white || screen.at(x, 24) == 0x0F; // white
     }
     VCR_CHECK(white);
+}
+
+VCR_TEST("original files: the Colonizopedia's index and pages (seen in the original)") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    // The index lists each part alphabetically, without the rows the
+    // original leaves out.
+    const std::size_t counts[pedia::kParts] = {16, 23, 21, 27, 38, 25};
+    for (int part = 0; part < pedia::kParts; ++part) {
+        const auto entries = pediaEntries(art, part);
+        VCR_CHECK(entries.size() == counts[part]);
+        for (std::size_t i = 1; i < entries.size(); ++i) {
+            VCR_CHECK(entries[i - 1].name < entries[i].name);
+        }
+    }
+    VCR_CHECK(pediaEntries(art, pedia::kCargo).front().name == "Cigars");
+    VCR_CHECK(pediaEntries(art, pedia::kTerrain).front().name == "Arctic");
+    VCR_CHECK(pediaEntries(art, pedia::kTerrain)[1].name == "Boreal Forest");
+    VCR_CHECK(pediaEntries(art, pedia::kSkill).front().name == "Blacksmith");
+    VCR_CHECK(pediaEntries(art, pedia::kFather).front().name == "Adam Smith");
+
+    std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
+    const Bytes bytes(std::istreambuf_iterator<char>(in), {});
+    PlayScreen play(Game(readSaveGame(bytes), art.rules), {});
+    play.setArt(&art);
+    // Colonizopedia, Terrain Types: the index, Arctic picked.
+    play.openMenu(5, true);
+    for (int i = 0; i < 2; ++i) {
+        play.handle(Command::MoveS);
+    }
+    play.handle(Command::Confirm);
+    VCR_CHECK(play.pedia().has_value() && play.pedia()->part == pedia::kTerrain && play.pedia()->page < 0);
+    play.handle(Command::MoveS);
+    play.handle(Command::MoveS);
+    play.handle(Command::MoveE); // one column only: nothing
+    VCR_CHECK(play.pedia()->selected == 2);
+    play.handle(Command::Confirm);
+    VCR_CHECK(play.pedia()->page == 11); // Broadleaf Forest
+    // Any key goes back to the index, Escape closes it.
+    play.handle(Command::Cancel);
+    VCR_CHECK(play.pedia().has_value() && play.pedia()->page < 0 && play.pedia()->selected == 2);
+    play.handle(Command::Cancel);
+    VCR_CHECK(!play.pedia().has_value());
+    // F1: the page of the active unit's square, and a key back to the map.
+    const int active = play.game().activeUnit();
+    VCR_CHECK(active >= 0);
+    play.handle(Command::TerrainHelp);
+    VCR_CHECK(play.pedia().has_value());
+    const auto& u = play.game().unit(active);
+    VCR_CHECK(play.pedia()->page == pediaTerrainOf(play.game().state().map.at(u.x, u.y)));
+    play.handle(Command::Confirm);
+    VCR_CHECK(!play.pedia().has_value());
+    // A click on (Exit) closes the index.
+    play.openPedia(pedia::kFather);
+    play.clickPedia(300, 7);
+    VCR_CHECK(!play.pedia().has_value());
 }
 
 VCR_TEST("original files: Pick Music plays the tune picked") {

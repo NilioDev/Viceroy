@@ -108,3 +108,31 @@ Seen in the original:
   "New Netherlands") above it in white. The small map's frame is cut to
   the small map, and a window taller than the small map keeps the small
   map at its top.
+
+## The Colonizopedia
+
+Seen in the original (PEDIA.TXT holds the pages, `@PEDIA` the parts):
+
+- Each of the six entries opens an index on WOODPANL.PIK: "ENCYCLOPEDIA OF
+  COLONIZATION" (LABELS.TXT `@MISC` row 108) in white centred at y 5,
+  "(Exit)" (row 110) in green ending 6 pixels from the right, and the names
+  in green, alphabetical, from (7, 26), 7 rows apart, 24 to a column and
+  columns 100 apart. The name picked is gold on a dark bar from one pixel
+  above and left of it, as wide as the name plus 2 and 7 high.
+- Left out of the index: hammers, crosses, bells and flags; the Teacher;
+  the second and third Town Hall rows; the Capitol and its expansion.
+  Terrain names are those of `@UNFORESTED` and `@OTHER`, and the
+  `@FORESTED` ones followed by "Forest"; their pages are numbered by the
+  terrain (0-15, then 24 Arctic to 28 Hills).
+- Arrows move the bar, Enter (or a click on a name) opens the page, Escape
+  or "(Exit)" closes the index. On a page any key or click goes back to
+  the index, with the same name picked.
+- A page: the title in gold, "(Name: Part)" in gold centred at y 13, then
+  the text of `@CARGOn`, `@UNITn`, `@TERRAINn`, `@JOBn`, `@BUILDINGn` or
+  `@FATHERn` from x 10, 300 wide, 7 rows a line: its first line (the name)
+  alone, the rest wrapped, a line with only `^` leaving an empty line,
+  braces in gold. The text starts at y 83 for goods, 69 for units, 85 for
+  terrain, 119 for skills, 67 for buildings and 33 for founding fathers,
+  below the pictures of the page.
+- F1 on the map opens the page of the active unit's square (its mountains
+  or hills, else its forest or ground); a key goes back to the map.

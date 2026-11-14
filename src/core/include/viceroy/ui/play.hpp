@@ -12,6 +12,7 @@
 #include "viceroy/render/europe_view.hpp"
 #include "viceroy/render/game_view.hpp"
 #include "viceroy/render/menu_bar.hpp"
+#include "viceroy/render/pedia_view.hpp"
 
 #include <cstdint>
 #include <filesystem>
@@ -70,6 +71,7 @@ enum class Command {
     ScoreReport,    // F10: the Colonization Score
     Disband,        // Shift+D: Disband Unit
     Dump,           // O: Dump Cargo Overboard
+    TerrainHelp,    // F1: the Colonizopedia's page of the terrain
     ZoomIn,         // Z
     ZoomOut,        // X
 };
@@ -143,6 +145,13 @@ public:
     int reportPage() const { return reportPage_; }
     // A click on the report up (game pixels).
     void clickReport(int x, int y);
+    // The Colonizopedia, when it is up.
+    const std::optional<PediaState>& pedia() const { return pedia_; }
+    void openPedia(int part);
+    // F1: the page of the terrain under the active unit (or the view
+    // cursor); a key goes back to the map.
+    void openTerrainPage();
+    void clickPedia(int x, int y);
     // The leader signing the declaration of independence.
     bool signingUp() const { return signing_.has_value(); }
     // Set by the app after loading Art: needed for message boxes.
@@ -392,6 +401,9 @@ private:
     int scoutColony_ = -1;  // the colony a scout has reached (SCOUTCOLONY)
     int foreignTradeColony_ = -1; // the foreign colony a wagon train or ship trades with
     int congressHall_ = -1; // the father just come into the hall, shown until a key
+    std::optional<PediaState> pedia_;
+    bool pediaFromMap_ = false; // opened with F1: leaving the page closes it
+    bool handlePedia(Command command);
     int report_ = 0;        // the report up, by its function key; shown until a key or a click
     int reportPage_ = 0;    // its page, for those with more than one
     void openReport(int report);
