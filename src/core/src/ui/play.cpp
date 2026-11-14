@@ -2291,6 +2291,8 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
                 loadPath_ = slots[static_cast<std::size_t>(choice)].path;
             }
         }
+    } else if (question == "DOS") {
+        quit_ = choice == 0;
     } else if (question == "RETIRE") {
         // "Yes" or "No".
         if (choice == 0) {
@@ -4813,7 +4815,8 @@ bool PlayScreen::pickMenuEntry(int entry) {
             ask("RETIRE", -1);
             return true;
         case game_menu::kExit:
-            quit_ = true;
+            // Seen: "Exit to DOS?", the bar on No.
+            ask("DOS", -1);
             return true;
         default:
             notYet();

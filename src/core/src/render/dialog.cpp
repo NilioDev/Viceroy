@@ -182,6 +182,9 @@ Dialog makeDialog(const Art& art, std::string_view section, const std::vector<st
     if (found == nullptr) {
         return d;
     }
+    // Seen: a section without @width ("Exit to DOS?", "Do you really want
+    // to quit?") is 80 wide.
+    d.width = 80;
     std::vector<std::string> paragraphs; // a line starting with ^ starts a new one
     bool inOptions = false;
     bool seenText = false;

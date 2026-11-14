@@ -268,6 +268,7 @@ saved in the first free slot, or over the savegame saved longest ago.
 | Game Options (End of Turn, Autosave, Combat Analysis, Tutorial Hints, ...) | Game, Game Options; Space or the gold letter ticks an option, Enter keeps them | Start, then Game Options |
 | Save the game in one of eight slots | Ctrl+S, or Game, Save Game | Start, then Save Game |
 | Load another savegame while playing | Game, Load Game | Start, then Load Game |
+| Quit (asks first, as the original) | Game, Exit to DOS | Start, then Exit to DOS |
 | Back to the load menu | Esc | Guide |
 
 The mouse pointer is the game's own arrow, drawn in the picture as the
