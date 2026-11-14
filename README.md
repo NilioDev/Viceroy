@@ -14,7 +14,8 @@ touch controls.
 > (difficulty, nation and name, the king's audience and the departure, as
 > in the original) or load one of your savegames, move your
 > units over the original map (or send them to a colony with Go To, along
-> the original's routes), board ships and make landfall, plow fields,
+> the original's routes), board ships and make landfall (ships keep off
+> inland lakes, and enemy warships can hold up a passing ship), plow fields,
 > clear forests (lumber for a colony nearby) and build roads with your pioneers, found colonies (your
 > advisors warn of a poor site and you type the name), look inside your colonies, end turns and save. The colony screen
 > shows its buildings (laid out differently in every colony, as in the

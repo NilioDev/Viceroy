@@ -161,6 +161,11 @@ MoveResult Game::move(int index, Step step) {
         if (!target.isWater() && !colony) {
             return MoveResult::Blocked;
         }
+        // Read from the original: not onto an inland lake (water outside the
+        // main body of water).
+        if (target.isWater() && (target.region & 0x0F) != 1) {
+            return MoveResult::Blocked;
+        }
     } else if (target.isWater()) {
         // A land unit may only step onto water by boarding a ship there
         // with a free hold.
@@ -228,6 +233,9 @@ MoveResult Game::move(int index, Step step) {
     }
     reveal(toX, toY, sightRadius(index), u.nation);
     refreshUnitFlags();
+    if (ship && target.isWater()) {
+        slowByWarships(index);
+    }
     if (rumour && !exploreRumour(index)) {
         return MoveResult::Lost;
     }

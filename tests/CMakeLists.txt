@@ -28,6 +28,7 @@ add_executable(vcr_tests
     test_game_end.cpp
     test_rumours.cpp
     test_routes.cpp
+    test_ships.cpp
     test_menu.cpp
     test_title.cpp
     test_sound.cpp
