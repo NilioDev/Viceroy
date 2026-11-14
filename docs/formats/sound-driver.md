@@ -139,8 +139,28 @@ stream rests and then ends the voice.
 With a card that plays samples, the drum voice plays recorded drums from
 `COLDIG.BIN` instead of FM notes. Louder notes pick one of five stronger hits,
 samples 0–4. Sample commands play other recordings from that file.
-`COLDIG.BIN` is raw 8-bit sound with no header. The table of sample offsets
-and lengths is in the driver.
+`COLDIG.BIN` is raw unsigned 8-bit sound (128 is silence) with no header.
+
+The driver lists the recordings in a table of offset and length pairs, which
+the routine after the text "FINDWV" walks; there are 35, one after another,
+filling the file. The five drum hits play at 19050 samples a second, the
+rest at 11025 (the rates the driver gives the card).
+
+Recordings wait in a queue of 32 and play one after another. Queuing fails
+when the queue is full.
+
+## Sound effects
+
+Each effect command (40h–5Dh) first tries a recording: when the card plays
+samples and no piece is using digitised drums, it queues that recording and
+is done. Otherwise, or when the queue is full, it starts one or more streams
+on a free effect voice: voice 7, 8 or 6 if one is silent, else 6, 7 or 8 if
+one is fading. With none free the stream is not played. Some effects have
+only the recording, some only streams.
+
+In DOSBox (Sound Blaster settings as the game sets them) the chip plays as
+loud as Viceroy's emulated chip, and a step of an 8-bit recording comes out
+as 42 on the 16-bit scale.
 
 ## Pieces that follow one another
 
