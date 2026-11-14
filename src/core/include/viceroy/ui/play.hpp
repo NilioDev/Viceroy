@@ -170,6 +170,7 @@ private:
     void notYet();
     bool handleCheckboxes(Command command);
     void showSoundOptions();
+    void showColonyReportOptions();
     void showPickMusic();
     void pickTune(int tune);
     void playMusic(const std::vector<MusicCue>& cues);

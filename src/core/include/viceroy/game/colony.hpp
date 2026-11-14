@@ -105,6 +105,10 @@ inline constexpr int kCount = 19;
 // Jobs by their row in @JOB.
 namespace job {
 inline constexpr int kFarmer = 0;
+inline constexpr int kSugarPlanter = 1;
+inline constexpr int kTobaccoPlanter = 2;
+inline constexpr int kCottonPlanter = 3;
+inline constexpr int kFurTrapper = 4;
 inline constexpr int kFisherman = 8;
 inline constexpr int kDistiller = 9;
 inline constexpr int kCarpenter = 13;
@@ -224,6 +228,12 @@ std::vector<JobChoice> jobChoices(const SaveColony& colony, const SaveMap& map, 
 // changes nothing) when there is no place for it.
 bool assignJob(SaveColony& colony, const SaveMap& map, const Ruleset& rules,
                const std::vector<SaveColony>& colonies, int colonist, int jobRow);
+
+// The turns a colonist has been at their job, 0-15, which a teacher needs
+// to finish a lesson: half a byte each from colony byte 96 (read from the
+// original). A new job starts again from 0.
+int jobTurns(const SaveColony& colony, int colonist);
+void setJobTurns(SaveColony& colony, int colonist, int turns);
 
 // Puts a colonist to work on the land at square 0-7, which must be free or
 // theirs already.

@@ -23,7 +23,9 @@ touch controls.
 > soldiers, scouts or dragoons (with the warehouse's tools, muskets and
 > horses) and take units standing outside back in; your advisors object as
 > in the original (a stockade keeps three, three to a building, who may
-> teach, a siege, abandoning the colony), and choose what the colony builds
+> teach, a siege, abandoning the colony), while teachers in a school train
+> criminals, servants and free colonists, and planters and fur trappers
+> may learn their job by doing it; choose what the colony builds
 > on its Make panel or pay to finish it there; the musket button lists the
 > units in the colony; click one to move it to the front, clear its orders,
 > sentry or fortify it. At the end of the turn colonies
@@ -149,7 +151,9 @@ touch controls.
 > a lost city). Fights, raids, sinking ships and new missions have the
 > original's sound effects. Sound Options in the Game menu turn background
 > music, event music and sound effects on or off. Pick Music chooses the
-> next tune yourself.
+> next tune yourself. Colony Report Options in the Game menu turn the
+> colony reports (trained colonists, shortages, tools, new cargos, Sons of
+> Liberty, rebel majorities) on or off.
 
 Viceroy is not affiliated with or endorsed by the makers of the original
 game. It contains none of the original game's files: you need your own copy.

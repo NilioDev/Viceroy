@@ -26,6 +26,8 @@ constexpr int kPaine = 17;
 constexpr int kBolivar = 18;
 constexpr int kPenn = 21;
 
+constexpr std::size_t kJobTurnsAt = 96;
+
 bool isExpert(int skill, int jobRow) {
     return skill == jobRow && jobRow < job::kTeacher;
 }
@@ -612,8 +614,28 @@ bool assignJob(SaveColony& colony, const SaveMap& map, const Ruleset& rules,
     if (onLand) {
         colony.squares[static_cast<std::size_t>(choice.square)] = colonist;
     }
+    if (colony.jobs[static_cast<std::size_t>(colonist)] != jobRow) {
+        setJobTurns(colony, colonist, 0);
+    }
     colony.jobs[static_cast<std::size_t>(colonist)] = static_cast<std::uint8_t>(jobRow);
     return true;
+}
+
+int jobTurns(const SaveColony& colony, int colonist) {
+    if (colonist < 0 || colonist >= kMaxColonists) {
+        return 0;
+    }
+    const int b = colony.raw[kJobTurnsAt + static_cast<std::size_t>(colonist / 2)];
+    return (colonist % 2 == 0 ? b : b >> 4) & 0x0F;
+}
+
+void setJobTurns(SaveColony& colony, int colonist, int turns) {
+    if (colonist < 0 || colonist >= kMaxColonists) {
+        return;
+    }
+    auto& b = colony.raw[kJobTurnsAt + static_cast<std::size_t>(colonist / 2)];
+    const int v = std::clamp(turns, 0, 15);
+    b = static_cast<std::uint8_t>(colonist % 2 == 0 ? (b & 0xF0) | v : (b & 0x0F) | (v << 4));
 }
 
 bool assignJobAt(SaveColony& colony, const SaveMap& map, const std::vector<SaveColony>& colonies, int colonist,
@@ -630,6 +652,9 @@ bool assignJobAt(SaveColony& colony, const SaveMap& map, const std::vector<SaveC
         colony.squares[static_cast<std::size_t>(here)] = -1;
     }
     colony.squares[static_cast<std::size_t>(square)] = colonist;
+    if (colony.jobs[static_cast<std::size_t>(colonist)] != jobRow) {
+        setJobTurns(colony, colonist, 0);
+    }
     colony.jobs[static_cast<std::size_t>(colonist)] = static_cast<std::uint8_t>(jobRow);
     return true;
 }
@@ -821,7 +846,9 @@ void removeColonist(SaveColony& colony, int colonist) {
     for (int i = colonist; i + 1 < population; ++i) {
         colony.jobs[static_cast<std::size_t>(i)] = colony.jobs[static_cast<std::size_t>(i + 1)];
         colony.skills[static_cast<std::size_t>(i)] = colony.skills[static_cast<std::size_t>(i + 1)];
+        setJobTurns(colony, i, jobTurns(colony, i + 1));
     }
+    setJobTurns(colony, population - 1, 0);
     colony.jobs[static_cast<std::size_t>(population - 1)] = 0;
     colony.skills[static_cast<std::size_t>(population - 1)] = 0;
     // Measured: the squares of the starved are left to nobody and the

@@ -503,6 +503,11 @@ void Game::runOutNotices(const ColonyTurn& turn, int c) {
         {cargo::kSugar, "CANESUGAR"}, {cargo::kTobacco, "TOBACCO"}, {cargo::kCotton, "COTTON"}, {cargo::kFurs, "FURS"},
         {cargo::kLumber, "LUMBER"},   {cargo::kOre, "ORE"},         {cargo::kTools, "TOOLS"},
     };
+    // Read from the original: the colony report option for raw materials
+    // turns all of these off.
+    if (!colonyReportOn(colony_report::kRawMaterials)) {
+        return;
+    }
     for (const auto& [good, section] : kSections) {
         if (turn.ranOut[static_cast<std::size_t>(good)]) {
             notices_.push_back(GameNotice{section, {save_.colonies[static_cast<std::size_t>(c)].name}, -1, {}, c});
@@ -576,7 +581,9 @@ void Game::foodNotices(const ColonyTurn& turn, int c) {
         GameNotice notice{autumnNext ? "FOOD2" : "FOOD1", {colony.name}, -1, {}, c};
         notice.music = {{MusicCue::Kind::MoodEvent, 1}};
         notices_.push_back(std::move(notice));
-    } else if (turn.foodShort > 0 && food < 4 * turn.foodShort) {
+    } else if (turn.foodShort > 0 && food < 4 * turn.foodShort && colonyReportOn(colony_report::kFood)) {
+        // The food report option turns off this warning only (read from
+        // the original).
         GameNotice notice{"FOODLOW", {colony.name}, -1, {food}, c};
         notice.music = {{MusicCue::Kind::SetMood, 1}};
         notices_.push_back(std::move(notice));
@@ -598,7 +605,10 @@ void Game::storageNotices(const ColonyTurn& turn, int c) {
     int spoiledKinds = 0;
     for (int good = 1; good < kGoodsKinds; ++good) {
         const auto g = static_cast<std::size_t>(good);
-        if (turn.cargoReady[g]) {
+        if (turn.cargoReady[g] && colonyReportOn(colony_report::kNewCargo)) {
+            // The option for new cargos turns this report (and the hint
+            // with it) off; what was thrown away is still told (read from
+            // the original).
             const bool full = colony.stock[g] >= limit;
             const char* section = !full ? "CARGOREADY0" : canExpand ? "CARGOREADY1" : "CARGOREADY2";
             GameNotice notice{section, {colony.name, goodName(good)}, -1, {limit}, c};
@@ -719,13 +729,17 @@ void Game::endTurn() {
         addCongressBells(colony.nation, turn.bells);
         const bool ours = colony.nation == human();
         if (ours && turn.libertyAfter != turn.libertyBefore) {
+            // Read from the original: the option for rebel majorities
+            // keeps these quiet, and then the Sons of Liberty are not
+            // told either.
             const bool up = turn.libertyAfter > turn.libertyBefore;
             const char* section = up ? (turn.libertyAfter == 2 ? "REBELUNANIMOUS" : "REBELMAJORITY")
                                      : (turn.libertyAfter == 1 ? "TORYMINORITY" : "TORYMAJORITY");
             const int percent = sonsOfLibertyPercent(colony, nationEffects(save_, colony.nation).libertyExtra(true));
-            GameNotice notice{section, {colony.name}, -1, {percent}, static_cast<int>(c)};
-            notices_.push_back(std::move(notice));
-        } else if (ours && (save_.header[21] & 0x01) == 0) {
+            if (colonyReportOn(colony_report::kRebels)) {
+                notices_.push_back(GameNotice{section, {colony.name}, -1, {percent}, static_cast<int>(c)});
+            }
+        } else if (ours && colonyReportOn(colony_report::kSonsOfLiberty)) {
             // Read from the original: membership passing a ten up, or
             // falling below one by more than 4, unless the colony report
             // option for the Sons of Liberty is off.
@@ -740,6 +754,8 @@ void Game::endTurn() {
             runOutNotices(turn, static_cast<int>(c));
             storageNotices(turn, static_cast<int>(c));
         }
+        teach(static_cast<int>(c));
+        learnByDoing(static_cast<int>(c));
         if (starve(turn, static_cast<int>(c))) {
             continue;
         }
@@ -766,7 +782,7 @@ void Game::endTurn() {
             notice.music = {{MusicCue::Kind::MoodEvent, rousing ? 3 : 2}};
             notices_.push_back(std::move(notice));
         }
-        if (ours && turn.toolsNeeded > 0) {
+        if (ours && turn.toolsNeeded > 0 && colonyReportOn(colony_report::kTools)) {
             const int have = std::max(0, colony.stock[cargo::kTools]);
             notices_.push_back(GameNotice{have > 0 ? "NEEDTOOLS" : "NEEDTOOLS0",
                                           {colony.name, constructionName(rules_, colony.construction)},

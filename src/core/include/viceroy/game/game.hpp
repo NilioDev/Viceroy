@@ -193,6 +193,23 @@ struct OutsideChoice {
     int tools = 0; // the tools a pioneer would take
 };
 
+// Bits of Game::colonyReportBits, in the order of the options in the
+// box (read from the original).
+namespace colony_report {
+inline constexpr int kBuildingLabels = 0x02;
+inline constexpr int kCargoLabels = 0x01;
+inline constexpr int kTraining = 0x80;
+inline constexpr int kFood = 0x40;
+inline constexpr int kRawMaterials = 0x20;
+inline constexpr int kTools = 0x10;
+inline constexpr int kInefficient = 0x08;
+inline constexpr int kNewCargo = 0x04;
+inline constexpr int kSonsOfLiberty = 0x100;
+inline constexpr int kRebels = 0x200;
+inline constexpr int kOrder[10] = {kBuildingLabels, kCargoLabels, kTraining, kFood,          kRawMaterials,
+                                   kTools,          kInefficient, kNewCargo, kSonsOfLiberty, kRebels};
+} // namespace colony_report
+
 class Game {
 public:
     Game(SaveGame save, Ruleset rules);
@@ -314,6 +331,11 @@ public:
     // land goes to `square` (0-7), or the best free square when it is -1.
     // Returns the unit for someone who is outside afterwards, else -1.
     int moveColonist(int colony, ColonyMover who, int job, int square = -1);
+    // The colony's teachers at the end of a turn (TRAIN*).
+    void teach(int colony);
+    // Planters and trappers who learn their job by doing it (in the colony
+    // turn, after the lessons).
+    void learnByDoing(int colony);
 
     // --- Turns -------------------------------------------------------------
     // Ends the human's turn: everyone gets their moves back, and the
@@ -401,6 +423,14 @@ public:
     void answerForeignTrade(int choice);
     // The Sound Options as the save keeps them (header byte 22).
     std::uint8_t soundOptionBits() const { return save_.header[22]; }
+    // The Colony Report Options (header bytes 20 and 21, read from the
+    // original): a set bit turns that report or label off.
+    int colonyReportBits() const { return save_.header[20] | (save_.header[21] << 8); }
+    void setColonyReportBits(int bits) {
+        save_.header[20] = static_cast<std::uint8_t>(bits & 0xFF);
+        save_.header[21] = static_cast<std::uint8_t>((bits >> 8) & 0xFF);
+    }
+    bool colonyReportOn(int bit) const { return (colonyReportBits() & bit) == 0; }
     void setSoundOptionBits(std::uint8_t bits) { save_.header[22] = bits; }
     // The game option "Combat Analysis" (header byte 19, bit 1).
     bool combatAnalysisShown() const;

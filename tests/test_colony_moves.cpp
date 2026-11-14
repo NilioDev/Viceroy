@@ -190,3 +190,81 @@ VCR_TEST("colony moves: going out takes muskets, horses and tools; coming in giv
     VCR_CHECK(g.state().colonies[0].jobs[3] == job::kCarpenter);
     VCR_CHECK(g.state().colonies[0].stock[cargo::kMuskets] == 60);
 }
+
+VCR_TEST("colony moves: teachers finish a lesson after 4, 6 or 8 turns (read from the original)") {
+    auto s = moveSave(3);
+    auto& c = s.colonies[0];
+    setBuildingLevel(c, BuildingKind::Schoolhouse, 1);
+    c.skills[0] = static_cast<std::uint8_t>(job::kFarmer); // an expert farmer, level 1
+    c.skills[1] = static_cast<std::uint8_t>(skill::kCriminal);
+    c.skills[2] = static_cast<std::uint8_t>(skill::kCriminal);
+    Game g(s, moveRules());
+    g.moveColonist(0, {0, -1}, job::kTeacher);
+    VCR_CHECK(jobTurns(g.state().colonies[0], 0) == 0);
+    for (int turn = 0; turn < 3; ++turn) {
+        g.teach(0);
+    }
+    VCR_CHECK(g.takeNotices().empty());
+    VCR_CHECK(jobTurns(g.state().colonies[0], 0) == 3);
+    g.teach(0);
+    auto notices = g.takeNotices();
+    VCR_CHECK(notices.size() == 1 && notices[0].section == "TRAINCRIMINAL");
+    VCR_CHECK(jobTurns(g.state().colonies[0], 0) == 0);
+    const auto& col = g.state().colonies[0];
+    VCR_CHECK((col.skills[1] == skill::kServant) != (col.skills[2] == skill::kServant));
+    // Four more lessons, to whoever is drawn: criminal to servant to free
+    // colonist to farmer takes three each, so one of them is a farmer now.
+    for (int lesson = 0; lesson < 4; ++lesson) {
+        for (int turn = 0; turn < 4; ++turn) {
+            g.teach(0);
+        }
+    }
+    notices = g.takeNotices();
+    VCR_CHECK(notices.size() == 4);
+    bool learned = false;
+    for (const auto& n : notices) {
+        learned = learned || (n.section == "TRAINPROFESSION" && n.strings.size() == 2 && n.strings[1] == "Job0");
+    }
+    VCR_CHECK(learned);
+    VCR_CHECK(col.skills[1] == job::kFarmer || col.skills[2] == job::kFarmer);
+    // A colony of experts has nobody left to teach.
+    g.state().colonies[0].skills[1] = static_cast<std::uint8_t>(job::kFarmer);
+    g.state().colonies[0].skills[2] = static_cast<std::uint8_t>(job::kFarmer);
+    for (int turn = 0; turn < 4; ++turn) {
+        g.teach(0);
+    }
+    notices = g.takeNotices();
+    VCR_CHECK(notices.size() == 1 && notices[0].section == "TRAINFAIL");
+}
+
+VCR_TEST("colony moves: planters learn by doing while the nation has no expert (read from the original)") {
+    auto s = moveSave(2);
+    auto& c = s.colonies[0];
+    c.jobs[0] = static_cast<std::uint8_t>(job::kSugarPlanter);
+    c.jobs[1] = static_cast<std::uint8_t>(job::kTobaccoPlanter);
+    c.skills[1] = static_cast<std::uint8_t>(skill::kConvert); // converts never learn
+    SaveUnit expert;
+    expert.x = 1;
+    expert.y = 1;
+    expert.nation = kDutch;
+    expert.type = unit_type::kPioneer;
+    expert.profession = job::kTobaccoPlanter;
+    s.units.push_back(expert);
+    Game g(s, moveRules());
+    // A free colonist learns at 1 in 100 a turn: in 3000 turns surely.
+    for (int turn = 0; turn < 3000 && g.state().colonies[0].skills[0] == skill::kFreeColonist; ++turn) {
+        g.learnByDoing(0);
+    }
+    const auto& col = g.state().colonies[0];
+    VCR_CHECK(col.skills[0] == job::kSugarPlanter);
+    VCR_CHECK(col.skills[1] == skill::kConvert);
+    auto notices = g.takeNotices();
+    VCR_CHECK(notices.size() == 1 && notices[0].section == "TRAINPROFESSION" && notices[0].strings[1] == "Job1");
+    // With an expert tobacco planter in the nation, a free colonist never
+    // learns that job.
+    g.state().colonies[0].skills[1] = static_cast<std::uint8_t>(skill::kFreeColonist);
+    for (int turn = 0; turn < 3000; ++turn) {
+        g.learnByDoing(0);
+    }
+    VCR_CHECK(g.state().colonies[0].skills[1] == skill::kFreeColonist);
+}
