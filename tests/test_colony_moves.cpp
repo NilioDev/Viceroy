@@ -3,6 +3,7 @@
 
 #include "viceroy/game/colony.hpp"
 #include "viceroy/game/game.hpp"
+#include "viceroy/game/resource.hpp"
 
 using namespace viceroy;
 
@@ -267,4 +268,43 @@ VCR_TEST("colony moves: planters learn by doing while the nation has no expert (
         g.learnByDoing(0);
     }
     VCR_CHECK(g.state().colonies[0].skills[1] == skill::kFreeColonist);
+}
+
+VCR_TEST("colony moves: silver mines wear out after 50 (read from the original)") {
+    auto s = moveSave(1);
+    s.map.resourceSeed = 1;
+    // A mountain on the resource pattern next to the colony.
+    int square = -1;
+    for (int seed = 1; square < 0 && seed < 64; ++seed) {
+        s.map.resourceSeed = static_cast<std::uint8_t>(seed);
+        for (int k = 0; k < 8 && square < 0; ++k) {
+            const int x = 4 + kColonySquares[static_cast<std::size_t>(k)].dx;
+            const int y = 4 + kColonySquares[static_cast<std::size_t>(k)].dy;
+            s.map.at(x, y).relief = 5;
+            if (resourceAt(s.map, x, y) == Resource::Silver) {
+                square = k;
+            } else {
+                s.map.at(x, y).relief = 0;
+            }
+        }
+    }
+    VCR_CHECK(square >= 0);
+    auto& c = s.colonies[0];
+    c.jobs[0] = 7; // silver miner
+    c.squares[static_cast<std::size_t>(square)] = 0;
+    c.raw[151] = 0;
+    Game g(s, moveRules());
+    const int x = 4 + kColonySquares[static_cast<std::size_t>(square)].dx;
+    const int y = 4 + kColonySquares[static_cast<std::size_t>(square)].dy;
+    int turns = 0;
+    while (resourceAt(g.state().map, x, y) == Resource::Silver && turns < 1000) {
+        g.wearMines(0);
+        ++turns;
+    }
+    // One step a turn, but now and then none: 50 steps take more turns.
+    VCR_CHECK(turns >= 50 && turns < 1000);
+    VCR_CHECK(resourceAt(g.state().map, x, y) == Resource::DepletedSilver);
+    VCR_CHECK(g.state().colonies[0].raw[151] == 0);
+    const auto notices = g.takeNotices();
+    VCR_CHECK(notices.size() == 1 && notices[0].section == "DEPLETION");
 }

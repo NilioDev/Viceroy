@@ -57,6 +57,11 @@ Resource resourceAt(const SaveMap& map, int x, int y) {
     if (sq.mountains()) {
         return onResourcePattern(x, y, map.resourceSeed) ? (marked ? Resource::DepletedSilver : Resource::Silver) : Resource::None;
     }
+    if (marked) {
+        // Read from the original: a used-up resource (minerals that were
+        // mined out) is gone; only silver leaves something behind.
+        return Resource::None;
+    }
     if (sq.hills()) {
         return onResourcePattern(x, y, map.resourceSeed) ? Resource::HillsOre : Resource::None;
     }

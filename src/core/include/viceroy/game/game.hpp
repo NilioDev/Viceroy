@@ -336,6 +336,8 @@ public:
     // Planters and trappers who learn their job by doing it (in the colony
     // turn, after the lessons).
     void learnByDoing(int colony);
+    // Mines that wear out: silver deposits and minerals (DEPLETION).
+    void wearMines(int colony);
 
     // --- Turns -------------------------------------------------------------
     // Ends the human's turn: everyone gets their moves back, and the

@@ -64,6 +64,16 @@ ore miner gets nothing from it). A silver miner makes 3 on a deposit (an
 expert 6), 1 on a mountain whose mask has bit 2 (with or without the
 pattern: a worked-out deposit), and nothing on other mountains.
 
+Mines wear out (read from the original). In each colony's turn every miner
+on a resource counts: an ore miner on minerals 1, a silver miner on
+minerals 2, a silver miner on a silver deposit 1. For each count the
+colony's wear (byte 151) goes up by one, except one time in (difficulty +
+2) when it stays. When it reaches 50 it goes back by 50 and every minerals
+or silver square the colony's miners work then gets mask bit 2, with
+`DEPLETION` for the player: the minerals are gone (a resource square with
+that bit has none, as in the original), the silver is left as a worked-out
+deposit.
+
 **Not yet known:** whether the colony's own square uses a resource under
 it.
 
@@ -248,6 +258,22 @@ added and taken away):
   merchantman, galleon, privateer and frigate with a shipyard (docks
   level 3).
 
+Read from the original, when the hammers and tools are there: the tools
+are taken first, and then a wagon train is refused while the nation has as
+many wagon trains as colonies (`NOMOREWAGONS`, with the number of
+colonies), and a second warehouse expansion always (`NOMOREWAREHOUSE`).
+The hammers stay, so it is tried again each turn, and the tools are lost
+each time.
+
+## Inefficient government
+
+Read from the original, in every colony's turn: when the colony's tories
+(its colonists times the share that are not Sons of Liberty, rounded down)
+reach 10 less the difficulty level, the player hears `INEFFICIENT` once
+(colony byte 28, bit 3, remembers it), and `EFFICIENT` when they fall below
+it again. The production penalty itself is the one in "In buildings". The
+colony report option for inefficient government keeps both quiet.
+
 ## Buying the construction
 
 BUY on the Make panel asks `@BUYME1` ("Cost to complete …", "Never mind." /
@@ -334,6 +360,5 @@ first; thrown-away goods are still told), Sons of Liberty membership (byte
 21, bit 0, `SONSUP`/`SONSDOWN`) and rebel majorities (byte 21, bit 1, the
 four `REBEL*`/`TORY*` reports; while one of them is due the Sons of Liberty
 news stays quiet too). On OK the ten bits are set anew and the others
-kept. The two label options and inefficient government are kept but not yet
-used by Viceroy.
+kept. The two label options are kept but not yet used by Viceroy.
 

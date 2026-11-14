@@ -469,6 +469,29 @@ VCR_TEST("construction: colonies build wagons, artillery and ships (measured)") 
     VCR_CHECK(turn.builtUnit == 12);
     VCR_CHECK(c.hammers == 0);
     VCR_CHECK(c.construction == 43); // it goes on building wagons
+    // Read from the original: no more wagon trains than colonies; the
+    // hammers stay for the next turn.
+    NationEffects full;
+    full.colonies = 1;
+    full.wagonsFull = true;
+    c.hammers = 40;
+    turn = runColonyTurn(c, map, r, 0, true, full);
+    VCR_CHECK(turn.builtUnit == -1 && turn.noMoreWagons && c.hammers == 40);
+    // Nor a second warehouse expansion; its tools are lost all the same.
+    c.construction = 16;
+    c.raw[149] = 2;
+    c.stock[cargo::kTools] = 20;
+    c.hammers = 999;
+    r.buildings.resize(40);
+    for (auto& b : r.buildings) {
+        b.hammers = 80;
+        b.tools = 20;
+    }
+    turn = runColonyTurn(c, map, r);
+    VCR_CHECK(turn.noMoreWarehouse && turn.built == -1 && c.stock[cargo::kTools] == 0 && c.hammers > 0);
+    c.raw[149] = 0;
+    c.construction = 43;
+    c.hammers = 0;
 
     c.construction = 44;
     c.hammers = 128;

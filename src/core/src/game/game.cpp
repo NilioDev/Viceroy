@@ -638,6 +638,67 @@ void Game::storageNotices(const ColonyTurn& turn, int c) {
     }
 }
 
+void Game::wearMines(int c) {
+    // Read from the original. Each turn every miner on a resource adds to
+    // a count: an ore miner on minerals 1, a silver miner on minerals 2, a
+    // silver miner on a silver deposit 1. For each of those the colony's
+    // wear (byte 151) goes up by one, except one time in (difficulty + 2).
+    // At 50 it starts again from 0, and every such resource the colony
+    // works then is used up (mask bit 2): minerals are gone, silver is
+    // left as a poor deposit.
+    constexpr int kOreMiner = 6, kSilverMiner = 7;
+    constexpr std::size_t kWear = 151;
+    constexpr int kWornOut = 50;
+    constexpr std::uint8_t kUsedUp = 0x04;
+    auto& colony = save_.colonies[static_cast<std::size_t>(c)];
+    const auto worked = [&](std::size_t s, int& x, int& y) {
+        const int who = colony.squares[s];
+        if (who < 0 || who >= colony.population) {
+            return -1;
+        }
+        x = colony.x + kColonySquares[s].dx;
+        y = colony.y + kColonySquares[s].dy;
+        return save_.map.inside(x, y) ? static_cast<int>(colony.jobs[static_cast<std::size_t>(who)]) : -1;
+    };
+    int count = 0;
+    for (std::size_t s = 0; s < colony.squares.size(); ++s) {
+        int x = 0, y = 0;
+        const int job = worked(s, x, y);
+        const Resource r = job < 0 ? Resource::None : resourceAt(save_.map, x, y);
+        if (r == Resource::Minerals) {
+            count += job == kOreMiner ? 1 : job == kSilverMiner ? 2 : 0;
+        } else if (r == Resource::Silver) {
+            count += job == kSilverMiner ? 1 : 0;
+        }
+    }
+    for (int i = 0; i < count; ++i) {
+        if (nextRandom(save_.difficulty + 2) == 0) {
+            continue;
+        }
+        colony.raw[kWear] = static_cast<std::uint8_t>(colony.raw[kWear] + 1);
+        if (colony.raw[kWear] < kWornOut) {
+            continue;
+        }
+        colony.raw[kWear] = static_cast<std::uint8_t>(colony.raw[kWear] - kWornOut);
+        for (std::size_t s = 0; s < colony.squares.size(); ++s) {
+            int x = 0, y = 0;
+            const int job = worked(s, x, y);
+            if (job != kOreMiner && job != kSilverMiner) {
+                continue;
+            }
+            const Resource r = resourceAt(save_.map, x, y);
+            if (r != Resource::Minerals && r != Resource::Silver) {
+                continue;
+            }
+            auto& sq = save_.map.at(x, y);
+            sq.flags = static_cast<std::uint8_t>(sq.flags | kUsedUp);
+            if (colony.nation == human()) {
+                notices_.push_back(GameNotice{"DEPLETION", {colony.name}, -1, {}, c});
+            }
+        }
+    }
+}
+
 // Game options: header byte 18, bit 7 (seen in the Game Options box with
 // the savegame edited).
 bool Game::tutorialHints() const {
@@ -750,10 +811,36 @@ void Game::endTurn() {
                 notices_.push_back(GameNotice{"SONSDOWN", {colony.name}, -1, {sons}, static_cast<int>(c)});
             }
         }
+        {
+            // Read from the original: when the colony's tories reach 10 less
+            // the difficulty level (the level where they hold back
+            // production), the player hears of inefficient government once,
+            // and of efficient government again when they fall below it
+            // (colony byte 28, bit 3, remembers which). The report option
+            // only keeps these quiet.
+            const int sons = sonsOfLibertyPercent(colony, nationEffects(save_, colony.nation).libertyExtra(true));
+            const int limit = 10 - save_.difficulty;
+            const int toryCount = colony.population * (100 - sons) / 100;
+            constexpr std::uint8_t kInefficient = 0x08;
+            const bool was = (colony.raw[28] & kInefficient) != 0;
+            const bool told = ours && colonyReportOn(colony_report::kInefficient);
+            if (toryCount >= limit) {
+                if (!was && told) {
+                    notices_.push_back(GameNotice{"INEFFICIENT", {colony.name}, -1, {limit}, static_cast<int>(c)});
+                }
+                colony.raw[28] = static_cast<std::uint8_t>(colony.raw[28] | kInefficient);
+            } else {
+                if (was && told) {
+                    notices_.push_back(GameNotice{"EFFICIENT", {colony.name}, -1, {}, static_cast<int>(c)});
+                }
+                colony.raw[28] = static_cast<std::uint8_t>(colony.raw[28] & ~kInefficient);
+            }
+        }
         if (ours) {
             runOutNotices(turn, static_cast<int>(c));
             storageNotices(turn, static_cast<int>(c));
         }
+        wearMines(static_cast<int>(c));
         teach(static_cast<int>(c));
         learnByDoing(static_cast<int>(c));
         if (starve(turn, static_cast<int>(c))) {
@@ -781,6 +868,13 @@ void Game::endTurn() {
             const bool rousing = b == kArmory || b == kMagazine || b == kPress || b == kNewspaper;
             notice.music = {{MusicCue::Kind::MoodEvent, rousing ? 3 : 2}};
             notices_.push_back(std::move(notice));
+        }
+        if (ours && turn.noMoreWagons) {
+            const int colonies = nationEffects(save_, colony.nation).colonies;
+            notices_.push_back(GameNotice{"NOMOREWAGONS", {colony.name}, -1, {colonies}, static_cast<int>(c)});
+        }
+        if (ours && turn.noMoreWarehouse) {
+            notices_.push_back(GameNotice{"NOMOREWAREHOUSE", {colony.name}, -1, {}, static_cast<int>(c)});
         }
         if (ours && turn.toolsNeeded > 0 && colonyReportOn(colony_report::kTools)) {
             const int have = std::max(0, colony.stock[cargo::kTools]);

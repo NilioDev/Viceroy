@@ -88,6 +88,14 @@ NationEffects nationEffects(const SaveGame& save, int nation) {
         e.fathers |= static_cast<std::uint32_t>(n.raw[kFatherBits + i]) << (8 * i);
     }
     e.tax = n.taxRate;
+    int wagons = 0;
+    for (const auto& u : save.units) {
+        wagons += u.nation == nation && u.type == 12 ? 1 : 0; // wagon trains
+    }
+    for (const auto& c : save.colonies) {
+        e.colonies += c.nation == nation ? 1 : 0;
+    }
+    e.wagonsFull = wagons >= e.colonies;
     return e;
 }
 
@@ -935,8 +943,20 @@ ColonyTurn runColonyTurn(SaveColony& colony, const SaveMap& map, const Ruleset& 
     const int needHammers = constructionHammers(rules, colony.construction);
     if (needHammers > 0 && colony.hammers >= needHammers && colony.construction != kFrigateConstruction) {
         const int tools = constructionTools(rules, colony.construction);
+        // Read from the original: the tools are taken before it checks
+        // whether the thing may be built at all; a wagon train over the
+        // limit, or a second warehouse expansion, keeps its hammers (and
+        // loses those tools) and is tried again the next turn.
+        constexpr int kWagonTrainUnit = 12;
+        constexpr int kExpansionRow = 16;
         if (colony.stock[cargo::kTools] < tools) {
             turn.toolsNeeded = tools;
+        } else if (constructionUnit(colony.construction) == kWagonTrainUnit && nation.wagonsFull) {
+            colony.stock[cargo::kTools] -= tools;
+            turn.noMoreWagons = true;
+        } else if (colony.construction == kExpansionRow && colony.raw[149] >= 2) {
+            colony.stock[cargo::kTools] -= tools;
+            turn.noMoreWarehouse = true;
         } else if (const int unit = constructionUnit(colony.construction); unit >= 0) {
             colony.hammers = 0;
             colony.stock[cargo::kTools] -= tools;
