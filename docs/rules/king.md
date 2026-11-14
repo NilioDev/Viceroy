@@ -77,6 +77,42 @@ fund reaches 1800 the King buys a unit and says so (`KINGBUY`):
 
 The Continental Congress report shows the army (see [congress.md](congress.md)).
 
+## Mercenaries
+
+At the start of the player's turn, before independence, one turn in 21
+a European king offers mercenaries (`MERCENARIES`). The king is picked from
+the four nations at random; another nation's king only offers once the
+player has met that nation. The force is 1 to 3 dragoons, then a coin: one
+more dragoon, or 1 or 2 artillery. Each dragoon costs (0 to 6 + 2 ×
+(difficulty + 4)) × 100, the same for all of them, and a gun twice that.
+The offer only comes when the player has the gold.
+
+Paying takes the gold at once. The mercenaries, veteran soldiers by
+profession, come by ship to one of the player's first ten coastal colonies,
+picked by their people, and walk in (`MERCS`). Without a coastal colony the
+gold is gone and nobody comes.
+
+## Treasure
+
+When the player's treasure walks into a colony by the sea, the King offers
+to carry it home (sound 3Eh) if the player has no galleon
+(`KINGGALLEON2`), or always once Hernan Cortes is in congress
+(`KINGGALLEON3`, "for no extra charge"). He asks again each time the
+treasure enters such a colony; refusing leaves it there.
+
+The Crown's share is the tax rate with Cortes. Without him it is twice the
+tax rate, but at least 50% (5% more for each difficulty level above
+Discoverer), and never more than 90%. The share goes into the Crown's army
+fund, the rest into the treasury, and the treasure is gone (`LOOTCASH`,
+told by the trade adviser). The original also adds the player's part to a
+32-bit total at byte 38 of the nation record.
+
+During the war of independence the treasure is sold to foreign agents at
+once for its full value (`CASHTREASURE`).
+
+The treasure's value is kept in hundreds in byte 23 of the unit, where a
+colonist keeps its profession.
+
 ## Rebel sentiment
 
 After the colonies' turn the nation's rebel share is worked out: each
@@ -97,8 +133,7 @@ vertically. His arm (`KING2.SS`, eight frames over him at the same corner)
 stays still for about four seconds, then rises through frames 1 to 7 at
 about a sixth of a second each and stays up.
 
-**Not yet done:** mercenaries (`MERCS`), the audience at the start (the King
-lowering or raising the tax on request), treasure transport
-(`KINGGALLEON*`, `CASHTREASURE`), the War of the Spanish Succession and the
+**Not yet done:** the mercenaries offered during the war of independence, the audience at the start (the King
+lowering or raising the tax on request), the War of the Spanish Succession and the
 King's wars between nations (see the European notes), and everything about
 independence.

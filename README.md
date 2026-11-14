@@ -58,8 +58,10 @@ touch controls.
 > session, the bells toward it, the rebels and tories, the King's forces
 > and the fathers in congress. The King raises your taxes as he does in the
 > original; you may refuse a rise with a party that boycotts the good in
-> Europe until you pay the back taxes. He builds up his army, and he tells
-> you when your colonists' rebel sentiment rises or falls. The other nations elect their own
+> Europe until you pay the back taxes. He builds up his army, tells you
+> when your colonists' rebel sentiment rises or falls, offers to carry your
+> treasure home for the Crown's share, and now and then a European king
+> offers you mercenaries. The other nations elect their own
 > fathers as the original's do. A tribe you meet for the first time
 > offers you peace; refusing it angers the tribe. Missionaries can found missions,
 > which the tribe takes well or badly as in the original, pay a tribe to

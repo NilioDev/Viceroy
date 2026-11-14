@@ -29,6 +29,7 @@ Ruleset kingRules() {
     for (std::size_t i = 0; i < 19; ++i) {
         r.units[i].name = names[i];
     }
+    r.units[10].movement = 1;
     r.cargo.resize(16);
     r.cargo[kSugar].name = "Sugar";
     r.cargo[kCoats].name = "Coats";
@@ -249,6 +250,142 @@ VCR_TEST("king: the King speaks every so many turns") {
     }));
 }
 
+VCR_TEST("king: mercenaries are offered now and then and land in a colony") {
+    SaveGame s = kingSave();
+    s.turn = 201; // not a turn of the King's
+    s.nations[kHuman].gold = 100000;
+    s.colonies[0].population = 3;
+    Game g(std::move(s), kingRules());
+    GameNotice offer;
+    for (int turn = 0; turn < 400 && offer.section.empty(); ++turn) {
+        g.endTurn();
+        for (const auto& n : g.takeNotices()) {
+            if (n.section == "MERCENARIES") {
+                offer = n;
+            }
+        }
+    }
+    VCR_CHECK(offer.section == "MERCENARIES");
+    VCR_CHECK(g.mercenariesWaiting());
+    VCR_CHECK(offer.value == Game::kMercenaryQuestion);
+    VCR_CHECK(offer.countries.size() == 1 && offer.countries[0] == std::make_pair(0, kHuman));
+    // Discoverer: 800 to 1400 a dragoon, a gun twice that.
+    const auto& force = offer.strings[1];
+    const int dragoons = force[0] - '0';
+    const auto comma = force.find(", ");
+    const int guns = comma == std::string::npos ? 0 : (force[comma + 2] == 'A' ? 1 : force[comma + 2] - '0');
+    VCR_CHECK(dragoons >= 1 && dragoons <= 4 && guns <= 2);
+    VCR_CHECK((guns == 0) == (force.find("Artillery") == std::string::npos));
+    const int units = dragoons + 2 * guns;
+    VCR_CHECK(offer.numbers[0] % (100 * units) == 0);
+    VCR_CHECK(offer.numbers[0] / units >= 800 && offer.numbers[0] / units <= 1400);
+    const int gold = g.state().nations[kHuman].gold;
+    const int before = g.unitCount();
+    g.answerMercenaries(true);
+    VCR_CHECK(!g.mercenariesWaiting());
+    VCR_CHECK(g.state().nations[kHuman].gold == gold - offer.numbers[0]);
+    VCR_CHECK(g.unitCount() == before + dragoons + guns);
+    for (int i = before; i < g.unitCount(); ++i) {
+        const auto& u = g.unit(i);
+        VCR_CHECK(u.x == 2 && u.y == 2 && u.nation == kHuman && u.profession == 0x15);
+        VCR_CHECK(u.type == (i - before < dragoons ? 4 : 11));
+    }
+    const auto news = g.takeNotices();
+    VCR_CHECK(news.size() == 1 && news[0].section == "MERCS" && news[0].strings[0] == "Fort Orange");
+}
+
+VCR_TEST("king: no mercenaries for those who can't pay or refuse") {
+    SaveGame s = kingSave();
+    s.turn = 201;
+    s.nations[kHuman].gold = 700;
+    Game g(std::move(s), kingRules());
+    for (int turn = 0; turn < 300; ++turn) {
+        g.endTurn();
+        for (const auto& n : g.takeNotices()) {
+            VCR_CHECK(n.section != "MERCENARIES");
+        }
+    }
+}
+
+namespace {
+
+// A treasure of 5000 next to the colony, walked in.
+Game treasureGame(SaveGame s, bool galleon) {
+    SaveUnit t;
+    t.x = 1;
+    t.y = 2;
+    t.type = unit_type::kTreasure;
+    t.nation = kHuman;
+    t.profession = 50; // in hundreds
+    s.units.push_back(t);
+    if (galleon) {
+        SaveUnit g;
+        g.type = 15;
+        g.nation = kHuman;
+        s.units.push_back(g);
+    }
+    s.nations[kHuman].taxRate = 30;
+    s.nations[kHuman].gold = 1000;
+    return Game(std::move(s), kingRules());
+}
+
+} // namespace
+
+VCR_TEST("king: the King offers to carry treasure home for a share") {
+    Game g = treasureGame(kingSave(), false);
+    VCR_CHECK(g.move(0, {1, 0}) == MoveResult::Moved);
+    auto notices = g.takeNotices();
+    VCR_CHECK(notices.size() == 1 && notices[0].section == "KINGGALLEON2");
+    VCR_CHECK(g.treasureWaiting());
+    VCR_CHECK(!notices.empty() && notices[0].value == Game::kTreasureQuestion);
+    g.answerTreasure(true);
+    // Discoverer: twice the tax (60%) beats 50%.
+    VCR_CHECK(g.unitCount() == 0);
+    VCR_CHECK(g.state().nations[kHuman].gold == 1000 + 2000);
+    notices = g.takeNotices();
+    VCR_CHECK(notices.size() == 1 && notices[0].section == "LOOTCASH");
+    VCR_CHECK(!notices.empty() && notices[0].numbers == std::vector<int>({5000, 60, 2000}));
+    const auto& raw = g.state().nations[kHuman].raw;
+    VCR_CHECK((raw[0x22] | (raw[0x23] << 8)) == 3000);
+}
+
+VCR_TEST("king: treasure stays when refused, or when the player has a galleon") {
+    {
+        Game g = treasureGame(kingSave(), false);
+        g.move(0, {1, 0});
+        g.takeNotices();
+        g.answerTreasure(false);
+        VCR_CHECK(g.unitCount() == 1 && g.state().nations[kHuman].gold == 1000);
+    }
+    {
+        Game g = treasureGame(kingSave(), true);
+        g.move(0, {1, 0});
+        VCR_CHECK(g.takeNotices().empty() && !g.treasureWaiting());
+    }
+}
+
+VCR_TEST("king: with Cortes the Crown takes only the tax; after independence it is sold") {
+    {
+        SaveGame s = kingSave();
+        s.nations[kHuman].raw[8] |= 0x04; // Cortes (father 10)
+        Game g = treasureGame(std::move(s), true);
+        g.move(0, {1, 0});
+        const auto notices = g.takeNotices();
+        VCR_CHECK(notices.size() == 1 && notices[0].section == "KINGGALLEON3");
+        g.answerTreasure(true);
+        VCR_CHECK(g.state().nations[kHuman].gold == 1000 + 3500);
+    }
+    {
+        SaveGame s = kingSave();
+        s.header[18] |= 0x01;
+        Game g = treasureGame(std::move(s), false);
+        g.move(0, {1, 0});
+        const auto notices = g.takeNotices();
+        VCR_CHECK(notices.size() == 1 && notices[0].section == "CASHTREASURE");
+        VCR_CHECK(g.unitCount() == 0 && g.state().nations[kHuman].gold == 6000);
+    }
+}
+
 #include "viceroy/data/reader.hpp"
 #include "viceroy/game_files.hpp"
 #include "viceroy/render/dialog.hpp"
@@ -310,6 +447,9 @@ VCR_TEST("original files: the King raises the tax and the player may hold a part
     VCR_CHECK(art.portraits[kKingArm].sprites.size() == 8);
     VCR_CHECK(d.options.size() == 2);
     VCR_CHECK(!d.lines.empty() && d.lines[0].rfind("\"Discoverer ", 0) == 0);
+    VCR_CHECK(makeDialog(art, "MERCENARIES", {"France", "3 Dragoons"}, {3300}).options.size() == 2);
+    VCR_CHECK(makeDialog(art, "KINGGALLEON2", {"Discoverer", "Peter Minuit", "the Netherlands"}).options.size() == 2);
+    VCR_CHECK(makeDialog(art, "KINGGALLEON3", {"Discoverer", "Peter Minuit", "the Netherlands"}, {30}).options.size() == 2);
     Screen screen;
     play.draw(screen, art);
     dumpScreen(screen, art, "VICEROY_DUMP_KING");
