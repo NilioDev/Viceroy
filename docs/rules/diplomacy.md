@@ -39,6 +39,26 @@ since this leader last talked to the player (which also forgets an
 insult), or when the talk is forced (a scout's visit). A leader who talks
 remembers the turn. Each leader has a tune of its own.
 
+## A scout at a foreign colony
+
+A scout of the player's that moves into another European nation's colony
+is asked what to do (`SCOUTCOLONY`, told by the frontiersman):
+
+- **Meet With Mayor**: the leader comes to talk at once, however recently
+  they talked. Not during the war of independence (`NOMAYORSDURINGREV`).
+- **Infiltrate Colony**: the scout is caught when a roll from 1 to 36 is
+  at most (6 + the colony's walls: 1 stockade, 2 fort, 3 fortress) × 2,
+  halved for a seasoned scout, plus the difficulty minus 2 (so less on the
+  two easiest levels). Caught, the scout is gone and the colony gets 100
+  horses (`LOSTOURSCOUTS`). Otherwise the player looks round the colony
+  screen, without a say in it.
+- **Attack Colony**: as any attack.
+- **Nothing**.
+
+Except for an attack, the scout's turn is over. A computer scout always
+attacks, so the text for the player catching a foreign scout
+(`LOSTTHEIRSCOUTS`) never shows.
+
 ## What the leader weighs
 
 Before talking, the leader looks at the map through the turn's census:

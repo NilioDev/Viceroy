@@ -134,3 +134,70 @@ VCR_TEST("diplomacy: two computer nations make peace early in the game") {
     // At peace, the timer of the side met is set as after a talk.
     VCR_CHECK(g.state().nations[kEnglish].raw[64 + kFrench] == 12);
 }
+
+namespace {
+
+SaveGame scoutSave() {
+    SaveGame s = diplomacySave();
+    SaveColony quebec;
+    quebec.x = 5;
+    quebec.y = 3;
+    quebec.name = "Quebec";
+    quebec.nation = kFrench;
+    quebec.population = 1;
+    s.colonies.push_back(quebec);
+    SaveUnit scout;
+    scout.x = 4;
+    scout.y = 3;
+    scout.type = unit_type::kScout;
+    scout.nation = kHuman;
+    s.units.push_back(scout);
+    // Met and talked this turn: only a forced talk brings the leader.
+    s.nations[kHuman].raw[52 + kFrench] = 0x20;
+    s.nations[kFrench].raw[52 + kHuman] = 0x20;
+    s.header[88 + 2 * kFrench] = 10;
+    s.header[89 + 2 * kFrench] = 0;
+    return s;
+}
+
+} // namespace
+
+VCR_TEST("diplomacy: a scout meets the mayor, except in the war of independence") {
+    {
+        Game g(scoutSave(), diplomacyRules());
+        g.scoutMeetMayor(1, 0);
+        const auto notices = g.takeNotices();
+        VCR_CHECK(!notices.empty() && notices[0].section == "HELLOMEEK" && notices[0].leader == kFrench);
+        VCR_CHECK(g.movesLeft(1) <= 0);
+    }
+    SaveGame s = scoutSave();
+    s.header[18] = 1;
+    Game g(std::move(s), diplomacyRules());
+    g.scoutMeetMayor(1, 0);
+    const auto notices = g.takeNotices();
+    VCR_CHECK(sections(notices) == std::vector<std::string>{"NOMAYORSDURINGREV"});
+}
+
+VCR_TEST("diplomacy: the odds of a scout caught infiltrating a colony") {
+    SaveGame s = scoutSave();
+    s.difficulty = 4;
+    Game g(std::move(s), diplomacyRules());
+    VCR_CHECK(g.infiltrationRisk(1, 0) == 14); // 12, and 2 for Viceroy
+    SaveGame seasoned = scoutSave();
+    seasoned.units[1].profession = 0x16;
+    Game h(std::move(seasoned), diplomacyRules());
+    VCR_CHECK(h.infiltrationRisk(1, 0) == 4); // 6, and -2 for Discoverer
+    // Caught or not, the scout's turn is over; caught, it is gone and the
+    // colony has its horses.
+    const bool caught = h.infiltrateColony(1, 0);
+    const auto notices = h.takeNotices();
+    if (caught) {
+        VCR_CHECK(h.unitCount() == 1);
+        VCR_CHECK(h.state().colonies[0].stock[8] == 100);
+        VCR_CHECK(sections(notices) == std::vector<std::string>{"LOSTOURSCOUTS"});
+        VCR_CHECK(notices[0].strings[1] == "Quebec");
+    } else {
+        VCR_CHECK(notices.empty());
+        VCR_CHECK(h.movesLeft(1) <= 0);
+    }
+}
