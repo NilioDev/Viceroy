@@ -52,13 +52,15 @@ enum class Command {
     Europe,   // E: the home port
     Left,     // menus and screens that list things side by side
     Right,
-    Recruit,  // R, P, T: the buttons in Europe; on the map R builds a road
-              // and P plows or clears the forest
+    Recruit, // R, P, T: the buttons in Europe; on the map R builds a road
+             // and P plows or clears the forest
     Purchase,
     Train,
-    Menu, // F10: the menu bar
-    GoTo, // G: send the unit to a colony (a ship also to Europe)
+    Menu,           // F10: the menu bar
+    GoTo,           // G: send the unit to a colony (a ship also to Europe)
     CongressReport, // F3
+    Disband,        // Shift+D: Disband Unit
+    Dump,           // O: Dump Cargo Overboard
 };
 
 // The main map screen while playing.
@@ -264,6 +266,21 @@ private:
     // The rows of @UNITOPTIONS a unit's options box offers, top to bottom.
     enum UnitOption { kUnitFront, kUnitClear, kUnitSentry, kUnitFortify, kUnitNoChange };
     enum ShipOption { kShipFront, kShipClear, kShipSentry, kShipAnchor, kShipUnloadAll, kShipNoChange };
+    enum EuropeShipOption { kEuroShipFront, kEuroShipSail, kEuroShipUnloadAll, kEuroShipNoChange };
+    enum DockOption {
+        kDockStayOff,
+        kDockBoard,
+        kDockFront,
+        kDockArm,
+        kDockSellMuskets,
+        kDockTools,
+        kDockSellTools,
+        kDockHorses,
+        kDockSellHorses,
+        kDockBless,
+        kDockUnbless,
+        kDockNoChange
+    };
     std::vector<int> unitOptions_;
     // Goods being dragged on the colony screen, from the warehouse or from
     // a hold of the chosen ship.
@@ -289,6 +306,11 @@ private:
     void finishUnload(int carrier, int good, int amount);
     void continueUnloadAll();
     void openShipOptions(int carrier, bool first);
+    void disbandActive();
+    void openEuropeShipOptions(int ship);
+    void openDockOptions(int unit, bool first);
+    void unloadAllInEurope(int ship);
+    void dumpCargo();
     void openUnitOptions(int unit, bool first);
     // A unit at a native settlement: what each option of the greeting does.
     enum VillageOption {

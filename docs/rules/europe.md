@@ -164,6 +164,34 @@ original then asks (43 readings).
 
 The boxes themselves are in [dialogs](dialogs.md).
 
+## Ship and dock options
+
+Read from the original:
+
+- Clicking a ship in port (Enter on it here) opens "European harbor options
+  for Frigate:" (EUROPESHIPCLICK with @EUROPESHIPOPTIONS): "Move to front.",
+  "Set sail for the New World." (left out for a damaged ship; it asks
+  SAILAWAY), "Unload all cargo." (left out when nothing is aboard; it sells
+  the holds, the last first, leaving boycotted goods aboard) and "No
+  changes.". Measured: "Move to front." is offered even for the only ship.
+- Clicking a unit on the docks opens "European dock options:" (EUROPEARM
+  with @ARMOPTIONS). "Don't get on next ship." for a unit waiting to board,
+  "Board next ship." otherwise, "Move to front of dock." for all but the
+  first. Then, never for Indian converts and never for a boycotted good:
+  - "Arm with Muskets" for colonists (they become soldiers) and scouts
+    (dragoons); "Sell Muskets" for soldiers (colonists) and dragoons
+    (scouts).
+  - "Equip with Tools" for colonists (pioneers with 100 tools); "Sell
+    Tools" for pioneers (colonists).
+  - "Equip with Horses" for colonists (scouts) and soldiers (dragoons);
+    "Sell Horses" for scouts (colonists) and dragoons (soldiers).
+  - "Bless as Missionaries" for colonists; "Cancel Missionary Status" for
+    missionaries who are not Jesuits.
+  The prices are 50 muskets, 100 tools or 50 horses at the asking price, or
+  the same at the bidding price when selling, with no tax; the market moves
+  as for any trade of that size. An offer the treasury cannot pay is greyed.
+  Arming plays sound 0x58, horses 0x5C, blessing 0x8024.
+
 ## The screen
 
 Everything below was compared pixel by pixel with the original.
