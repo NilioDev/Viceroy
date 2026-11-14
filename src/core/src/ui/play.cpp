@@ -3739,6 +3739,7 @@ bool PlayScreen::handle(Command command) {
         const int season = game_.state().season;
         game_.endTurn();
         waiting_.clear();
+        autosave();
         {
             std::string news;
             for (const auto& line : game_.lastTurnNews()) {
@@ -3899,6 +3900,23 @@ Dialog loadMessage(const Art& art, const std::filesystem::path& path, bool good)
 
 } // namespace
 
+void PlayScreen::autosave() {
+    // Read from the original: with the game option on, each new turn is
+    // saved in COLONY09.SAV, and from the third turn on the spring of a
+    // year ending in 0 in COLONY08.SAV. The slot played stays the same.
+    if (!game_.gameOption(game_option::kAutosave) || savePath_.empty()) {
+        return;
+    }
+    const auto& state = game_.state();
+    const bool decade = state.season == 0 && state.year % 10 == 0 && state.turn > 2;
+    const std::string name = decade ? "COLONY08.SAV" : "COLONY09.SAV";
+    const auto folder = savePath_.parent_path();
+    const auto found = findFileNoCase(folder, name);
+    const auto playing = savePath_;
+    saveTo(found ? *found : folder / name);
+    savePath_ = playing;
+}
+
 void PlayScreen::showSaveSlots() {
     // Seen: the first eight slots (the last two are the autosaves), the bar
     // on the first.
@@ -3968,15 +3986,29 @@ void PlayScreen::tick(std::uint64_t milliseconds) {
         }
     }
     if (slide_) {
+        // Fast Piece Slide: twice as fast (by eye).
+        const std::uint64_t slideMs = game_.gameOption(game_option::kFastSlide) ? kSlideMs / 2 : kSlideMs;
         slide_->elapsed += milliseconds;
-        const auto t = std::min(slide_->elapsed, kSlideMs);
-        const int left = static_cast<int>((kSlideMs - t) * kSquare / kSlideMs);
+        const auto t = std::min(slide_->elapsed, slideMs);
+        const int left = static_cast<int>((slideMs - t) * kSquare / slideMs);
         view_.slideX = -slide_->dx * left;
         view_.slideY = -slide_->dy * left;
         view_.blinkOn = true;
-        if (slide_->elapsed >= kSlideMs + (slide_->advanceAfter ? kPauseMs : 0)) {
+        if (slide_->elapsed >= slideMs + (slide_->advanceAfter ? kPauseMs : 0)) {
             finishSlide();
         }
+    }
+    // Read from the original: with the game option End of Turn off, the
+    // turn ends by itself once no unit waits for orders and nothing else
+    // is on the screen. A short pause first, so the last move is seen.
+    const bool idle = game_.activeUnit() < 0 && !game_.gameOption(game_option::kEndOfTurn) && !dialog_ &&
+                      notices_.empty() && !menu_ && !colonyScreen_ && !europeScreen_ && !reportUp() &&
+                      routeScreen_ < 0 && !congressHallUp() && !signing_ && !slide_ && !attack_ && !viewMode_ &&
+                      !game_.gameOver();
+    idleMs_ = idle ? idleMs_ + milliseconds : 0;
+    if (idle && idleMs_ >= kPauseMs) {
+        idleMs_ = 0;
+        handle(Command::EndTurn);
     }
 }
 
@@ -4227,6 +4259,7 @@ namespace {
 
 // Rows of the menus in MENU.TXT that Viceroy acts on.
 namespace game_menu {
+constexpr int kGameOptions = 0;
 constexpr int kColonyReport = 1;
 constexpr int kSoundOptions = 2;
 constexpr int kPickMusic = 3;
@@ -4511,6 +4544,18 @@ bool PlayScreen::handleCheckboxes(Command command) {
                 const auto g = static_cast<std::size_t>(good);
                 game_.setExport(colonyScreen_->colony, good, g < d.checked.size() && d.checked[g]);
             }
+        } else if (question_ == "GAMEOPTIONS") {
+            // Read from the original: the eight options are set anew, the
+            // other bits of the two bytes kept.
+            int bits = game_.gameOptionBits() & game_option::kKept;
+            for (std::size_t i = 0; i < std::size(game_option::kOrder); ++i) {
+                const bool on = i < d.checked.size() && d.checked[i];
+                const int bit = game_option::kOrder[i];
+                if (on != (bit == game_option::kNoWaterCycling)) {
+                    bits |= bit;
+                }
+            }
+            game_.setGameOptionBits(bits);
         } else if (question_ == "COLONYOPTIONS") {
             // Read from the original: the ten options are set anew, the
             // other bits of the two bytes kept.
@@ -4571,6 +4616,18 @@ void PlayScreen::showSoundOptions() {
     const auto options = sound::SoundOptions::fromSave(game_.soundOptionBits());
     dialog_->checked = {options.background, options.events, options.effects};
     dialog_->checked.resize(dialog_->options.size());
+}
+
+void PlayScreen::showGameOptions() {
+    ask("GAMEOPTIONS", -1);
+    if (!dialog_) {
+        return;
+    }
+    dialog_->checked.assign(dialog_->options.size(), false);
+    for (std::size_t i = 0; i < dialog_->checked.size() && i < std::size(game_option::kOrder); ++i) {
+        const int bit = game_option::kOrder[i];
+        dialog_->checked[i] = game_.gameOption(bit) != (bit == game_option::kNoWaterCycling);
+    }
 }
 
 void PlayScreen::showColonyReportOptions() {
@@ -4731,6 +4788,9 @@ bool PlayScreen::pickMenuEntry(int entry) {
     menu_.reset();
     if (section == "GAME") {
         switch (entry) {
+        case game_menu::kGameOptions:
+            showGameOptions();
+            return true;
         case game_menu::kColonyReport:
             showColonyReportOptions();
             return true;

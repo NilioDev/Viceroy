@@ -265,6 +265,7 @@ saved in the first free slot, or over the savegame saved longest ago.
 | Open the menu bar (Game, View, Orders, Reports, Trade, Colonizopedia) | Click a title, or Alt and the title's gold letter; then the arrow keys and Enter, or a gold letter | Start, then the D-pad and A |
 | The Continental Congress report | F3, or Reports, Continental Congress; any key or click closes it | Start, then Reports |
 | The advisers' reports and the Colonization Score | F2 and F4 to F10, or the Reports menu; a key or click turns the page or closes it (in the Labor Adviser a click on a profession zooms on it) | Start, then Reports |
+| Game Options (End of Turn, Autosave, Combat Analysis, Tutorial Hints, ...) | Game, Game Options; Space or the gold letter ticks an option, Enter keeps them | Start, then Game Options |
 | Save the game in one of eight slots | Ctrl+S, or Game, Save Game | Start, then Save Game |
 | Load another savegame while playing | Game, Load Game | Start, then Load Game |
 | Back to the load menu | Esc | Guide |

@@ -61,3 +61,25 @@ and carry cargo); these are still to be checked against the original. The
 encyclopedia shows six of its eight entries.
 
 Entries Viceroy cannot do yet say so in the panel.
+
+## Game Options
+
+Read from the original and compared pixel by pixel. The box (`GAMEOPTIONS`)
+stands at (62, 41). Its eight options are kept in header bytes 18 and 19 of
+the savegame:
+
+| Option | Bit | Viceroy |
+| --- | --- | --- |
+| Show Indian Moves | byte 19, 0x80 | kept; the other players' moves are not shown yet |
+| Show Foreign Moves | byte 19, 0x40 | kept, as above |
+| Fast Piece Slide | byte 19, 0x10 | units glide twice as fast (by eye) |
+| End of Turn | byte 19, 0x08 | off: the turn ends by itself once no unit waits for orders |
+| Autosave | byte 19, 0x04 | each new turn is saved in `COLONY09.SAV`; from the third turn on, the spring of a year ending in 0 goes to `COLONY08.SAV` instead |
+| Combat Analysis | byte 19, 0x02 | the analysis before a fight |
+| Water Color Cycling | byte 19, 0x01, set when off | kept; the water does not cycle yet |
+| Tutorial Hints | byte 18, 0x80 | the hints given so far |
+
+OK sets the eight bits anew and keeps the others of the two bytes (the
+original masks the word with 0x207F). Every savegame of the original we have
+seen has byte 19 at 0xC6, so a new game starts with it. The gold letter of
+an option turns it over.

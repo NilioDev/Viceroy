@@ -216,6 +216,8 @@ private:
     void showSoundOptions();
     void showColonyReportOptions();
     void showPickMusic();
+    void showGameOptions();
+    void autosave();
     void pickTune(int tune);
     void playMusic(const std::vector<MusicCue>& cues);
     void moveActive(Step step);
@@ -465,6 +467,7 @@ private:
     std::optional<OpenMenu> menu_;
     bool quit_ = false;
     std::filesystem::path loadPath_;
+    std::uint64_t idleMs_ = 0; // nothing to do: the turn ends by itself without End of Turn
     struct PendingAttack {
         int attacker = -1;
         int defender = -1;

@@ -210,6 +210,27 @@ inline constexpr int kOrder[10] = {kBuildingLabels, kCargoLabels, kTraining, kFo
                                    kTools,          kInefficient, kNewCargo, kSonsOfLiberty, kRebels};
 } // namespace colony_report
 
+// Bits of Game::gameOptionBits (header bytes 18 and 19), in the order of
+// the options in the Game Options box (read from the original). Water
+// Color Cycling is on while its bit is clear.
+namespace game_option {
+inline constexpr int kIndianMoves = 0x8000;
+inline constexpr int kForeignMoves = 0x4000;
+inline constexpr int kFastSlide = 0x1000;
+inline constexpr int kEndOfTurn = 0x0800;
+inline constexpr int kAutosave = 0x0400;
+inline constexpr int kCombatAnalysis = 0x0200;
+inline constexpr int kNoWaterCycling = 0x0100;
+inline constexpr int kTutorialHints = 0x0080;
+inline constexpr int kOrder[8] = {kIndianMoves, kForeignMoves,   kFastSlide,      kEndOfTurn,
+                                  kAutosave,    kCombatAnalysis, kNoWaterCycling, kTutorialHints};
+// The bits the box sets; the others are kept (read from the original).
+inline constexpr int kKept = 0x207F;
+// What a new game starts with: the two Show Moves, Autosave and Combat
+// Analysis (as in the original's savegames).
+inline constexpr int kNewGame = 0xC600;
+} // namespace game_option
+
 class Game {
 public:
     Game(SaveGame save, Ruleset rules);
@@ -520,6 +541,13 @@ public:
     }
     bool colonyReportOn(int bit) const { return (colonyReportBits() & bit) == 0; }
     void setSoundOptionBits(std::uint8_t bits) { save_.header[22] = bits; }
+    // The Game Options as one word (header bytes 18 and 19).
+    int gameOptionBits() const { return save_.header[18] | (save_.header[19] << 8); }
+    void setGameOptionBits(int bits) {
+        save_.header[18] = static_cast<std::uint8_t>(bits & 0xFF);
+        save_.header[19] = static_cast<std::uint8_t>((bits >> 8) & 0xFF);
+    }
+    bool gameOption(int bit) const { return (gameOptionBits() & bit) != 0; }
     // The game option "Combat Analysis" (header byte 19, bit 1).
     bool combatAnalysisShown() const;
     CombatAnalysis analyseAttack(int attacker, int defender) const;
