@@ -204,6 +204,13 @@ VCR_TEST("original files: the OPL3 driver's effects and recordings") {
     VCR_CHECK(fm != nullptr && fm->sample == -1 && fm->effectStreams.size() == 1);
     const Piece* digital = driver->piece(0x4D);
     VCR_CHECK(digital != nullptr && digital->sample == 0x0A && digital->effectStreams.empty());
+    // The pieces from 8020h: four voices that wait for the last to end, or
+    // three that start at once.
+    const Piece* special = driver->piece(0x8020);
+    VCR_CHECK(special != nullptr && special->starts.size() == 4 && special->onlyIfIdle);
+    const Piece* church = driver->piece(0x8024);
+    VCR_CHECK(church != nullptr && church->starts.size() == 3 && !church->onlyIfIdle);
+    VCR_CHECK(driver->piece(0x5E) == nullptr && driver->piece(0x8027) == nullptr);
 
     // Without samples the FM version plays on an effect voice.
     MusicPlayer fmPlayer(*driver);

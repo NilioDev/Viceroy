@@ -134,6 +134,9 @@ VCR_TEST("combat: a beaten colonist is captured (measured)") {
     VCR_CHECK(g.unit(1).orders == SaveUnit::kNoOrders);
     const auto notices = g.takeNotices();
     VCR_CHECK(notices.size() == 1 && notices[0].section == "COLONISTCAPTURE");
+    // Read from the original: muskets, then the win in the open.
+    VCR_CHECK(g.takeMusicCues() ==
+              (std::vector<MusicCue>{{MusicCue::Kind::Sound, 0x41}, {MusicCue::Kind::Sound, 0x40}}));
 }
 
 VCR_TEST("combat: breaking a treaty ends the peace on both sides (measured)") {
@@ -319,6 +322,8 @@ VCR_TEST("combat: taking a colony plunders its share of the owner's gold (measur
     VCR_CHECK(notices[0].strings.at(2) == "Martinique");
     VCR_CHECK(notices[0].numbers == std::vector<int>{62});
     VCR_CHECK(notices[0].adjectives == (std::vector<std::pair<int, int>>{{0, kDutch}}));
+    const auto cues = g.takeMusicCues();
+    VCR_CHECK(cues.size() == 2 && cues[1] == (MusicCue{MusicCue::Kind::Sound, 0x4B}));
 }
 
 VCR_TEST("combat: Quebec's share of 16 colonists is 11 (measured: 687 of 1000)") {
@@ -461,8 +466,14 @@ VCR_TEST("combat: a sunk ship takes its passengers down") {
             VCR_CHECK(notices.size() == 1 && notices[0].section == "SHIPSUNK");
             // Read from the original: the loser's tune is sad, the winner's
             // military.
-            VCR_CHECK(notices[0].music.size() == 1 && notices[0].music[0].kind == MusicCue::Kind::MoodEvent);
-            VCR_CHECK(notices[0].music[0].value == 1 || notices[0].music[0].value == 4);
+            // The sinking sounds first.
+            VCR_CHECK(notices[0].music.size() == 2 && notices[0].music[1].kind == MusicCue::Kind::MoodEvent);
+            VCR_CHECK(notices[0].music[0] == (MusicCue{MusicCue::Kind::Sound, 0x57}));
+            VCR_CHECK(notices[0].music[1].value == 1 || notices[0].music[1].value == 4);
+            // The fight: cannon, a hit, a beaten ship.
+            const std::vector<MusicCue> fight = {{MusicCue::Kind::Sound, 0x42}, {MusicCue::Kind::Sound, 0x43},
+                                                 {MusicCue::Kind::Sound, 0x4D}};
+            VCR_CHECK(g.takeMusicCues() == fight);
             VCR_CHECK(g.unit(1).x == 0 && g.unit(1).y == 2);
         } else {
             VCR_CHECK(g.unitCount() == 3); // damaged: the passenger is lost

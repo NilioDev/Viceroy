@@ -46,6 +46,9 @@ public:
     void moodAfter(int mood);    // the mood of the tune after next
     void changeMood(int mood);   // a new mood now: the tune fades if the mood differs
     void moodEvent(int mood);    // changeMood with Event Music only, setMood otherwise
+    // A driver command the game sends at once (a sound effect), if the
+    // options allow it.
+    void sound(int command) { out_.push_back(command); }
 
     // Call every frame with the player's busy(). Returns the driver
     // commands to send, in order (1 fades every voice out).

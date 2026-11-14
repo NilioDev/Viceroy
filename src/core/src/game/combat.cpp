@@ -4,6 +4,7 @@
 #include "viceroy/game/colony.hpp"
 #include "viceroy/game/europe.hpp"
 #include "viceroy/game/game.hpp"
+#include "viceroy/game/sounds.hpp"
 
 #include <algorithm>
 #include <cstdlib>
@@ -451,7 +452,12 @@ CombatOutcome Game::attackColony(int attacker, int colony, int colonist) {
     const bool won = s.attack + s.defense > 0 && attackerWins(s.attack, s.defense, roll);
     auto& a = save_.units[static_cast<std::size_t>(attacker)];
     a.movesUsed = movementAllowance(attacker);
+    const int owner = save_.colonies[static_cast<std::size_t>(colony)].nation;
+    fightStartSound(a.nation, a.type, owner, colonistAsUnit(colony, colonist).type);
     if (won) {
+        if (a.nation == human() || owner == human()) {
+            sound(sounds::kColonyTaken);
+        }
         captureColony(colony, attacker);
         promote(attacker, s.attack, s.defense);
     } else {
@@ -552,6 +558,9 @@ void Game::loseShip(int loser, int winner) {
         // "Dutch Frigate sunk by English Privateer!"
         GameNotice notice{"SHIPSUNK", {"", lt.name, "", wt.name}};
         notice.adjectives = {{0, nation}, {2, winnerNation}};
+        if (nation == human() || winnerNation == human()) {
+            notice.music.push_back({MusicCue::Kind::Sound, sounds::kShipSunk});
+        }
         // Read from the original: a sad tune for the loser, a military one
         // for the winner.
         if (nation == human()) {
@@ -657,6 +666,51 @@ void Game::repairShips() {
     }
 }
 
+namespace {
+constexpr int kLastShipType = 18;
+
+bool mounted(int type) {
+    return type == unit_type::kDragoon || type == unit_type::kScout || type == 7 || type == 8;
+}
+} // namespace
+
+void Game::fightStartSound(int attackerNation, int attackerType, int defenderNation, int defenderType) {
+    if (attackerNation != human() && defenderNation != human()) {
+        return;
+    }
+    // Braves that fall on the player's men cry out first.
+    if (attackerNation >= kEuropeanNations && defenderNation == human()) {
+        sound(sounds::kWarCry + attackerType);
+    }
+    const auto attackOf = [&](int type) {
+        return type >= 0 && type < static_cast<int>(rules_.units.size())
+                   ? rules_.units[static_cast<std::size_t>(type)].attack
+                   : 0;
+    };
+    const bool ship = attackerType >= unit_type::kCaravel && attackerType <= kLastShipType;
+    if (ship || attackerType == kArtillery || defenderType == kArtillery) {
+        sound(sounds::kCannon);
+    } else if (mounted(attackerType)) {
+        sound(sounds::kHorses);
+    } else if (attackOf(attackerType) > 1 || attackOf(defenderType) > 1) {
+        sound(sounds::kMuskets);
+    } else {
+        sound(sounds::kScuffle);
+    }
+}
+
+void Game::fightWonSound(int attacker, int x, int y) {
+    const auto& a = unit(attacker);
+    const bool ship = a.type >= unit_type::kCaravel && a.type <= kLastShipType;
+    if (ship || a.type == kArtillery) {
+        sound(sounds::kCannonHit);
+    } else if (colonyAt(x, y) || settlementAt(x, y)) {
+        sound(sounds::kAtHome);
+    } else {
+        sound(sounds::kScuffle);
+    }
+}
+
 bool Game::attackerWins(int attack, int defense, int roll) {
     (void)defense;
     return roll <= attack;
@@ -676,6 +730,8 @@ CombatOutcome Game::attack(int attacker, int defender) {
     const bool won = s.attack + s.defense > 0 && attackerWins(s.attack, s.defense, roll);
     auto& a = save_.units[static_cast<std::size_t>(attacker)];
     a.movesUsed = movementAllowance(attacker);
+    const bool shown = a.nation == human() || unit(defender).nation == human();
+    fightStartSound(a.nation, a.type, unit(defender).nation, unit(defender).type);
     if (isShip(attacker) && isShip(defender)) {
         // Observed: after the roll, whoever won, a ship with less attack than
         // its attacker may get away; the odds are its share of the two
@@ -694,6 +750,12 @@ CombatOutcome Game::attack(int attacker, int defender) {
                 return CombatOutcome::Evaded;
             }
         }
+        if (shown) {
+            if (won) {
+                fightWonSound(attacker, unit(defender).x, unit(defender).y);
+            }
+            sound(sounds::kShipBeaten);
+        }
         if (won) {
             loseShip(defender, attacker);
         } else {
@@ -703,6 +765,9 @@ CombatOutcome Game::attack(int attacker, int defender) {
         return won ? CombatOutcome::AttackerWon : CombatOutcome::DefenderWon;
     }
     if (won) {
+        if (shown) {
+            fightWonSound(attacker, unit(defender).x, unit(defender).y);
+        }
         const bool gone = loseBattle(defender, attacker);
         promote(gone && defender < attacker ? attacker - 1 : attacker, s.attack, s.defense);
     } else {
