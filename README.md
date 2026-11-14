@@ -15,7 +15,7 @@ touch controls.
 > in the original) or load one of your savegames, move your
 > units over the original map (or send them to a colony with Go To, along
 > the original's routes), board ships and make landfall, plow fields,
-> clear forests and build roads with your pioneers, found colonies (your
+> clear forests (lumber for a colony nearby) and build roads with your pioneers, found colonies (your
 > advisors warn of a poor site and you type the name), look inside your colonies, end turns and save. The colony screen
 > shows its buildings, people, what they produce and the warehouse; give
 > colonists other jobs with the jobs menu or by clicking a colonist and then
@@ -220,6 +220,7 @@ saved in the first free slot, or over the savegame saved longest ago.
 | Choose what the colony builds | B, then the arrow keys and Enter; or click the hammer button, then CHANGE and a line | X, then the D-pad and A |
 | Pay to finish what the colony builds (BUY) | P, or click BUY on the Make panel | Y |
 | Show what the colony produces again | Click the house button | |
+| Rename the colony | Click its name on the top line, type and Enter | |
 | Close the colony screen | Esc, or Enter with nobody picked, or click Exit | B |
 | Open the home port in Europe | E | Share / Capture button |
 | In Europe: move between the market, the ships, the docks and the buttons | Up / Down | D-pad up / down |

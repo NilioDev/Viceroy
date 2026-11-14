@@ -1922,6 +1922,11 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
         } else {
             founding_.reset();
         }
+    } else if (question == "RENAMECOLONY") {
+        // An empty name keeps the old one (read from the original).
+        if (choice == 0 && !typed_.empty() && colonyScreen_) {
+            game_.renameColony(colonyScreen_->colony, typed_);
+        }
     } else if (question == "COLONY") {
         if (choice == 0 && founding_) {
             foundNamedColony(founding_->unit, typed_);
@@ -2666,6 +2671,15 @@ bool PlayScreen::clickColonyScreen(int x, int y) {
     }
     if (state.foreign) {
         return !(x >= 300 && y >= 178); // only the exit button
+    }
+    if (y < 7) {
+        // Read from the original: a click on the line at the top asks for
+        // a new name (up to 23 letters, the old one offered).
+        ask("RENAMECOLONY", -1);
+        if (dialog_ && art_ != nullptr) {
+            makeInput(*art_, *dialog_, game_.state().colonies[static_cast<std::size_t>(state.colony)].name, 23);
+        }
+        return true;
     }
     {
         // Read from the original: a click picks a colonist (or a unit

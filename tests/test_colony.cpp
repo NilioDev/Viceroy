@@ -201,6 +201,37 @@ VCR_TEST("original files: a unit's options in Units Present") {
     VCR_CHECK(play.game().unit(after[0]).orders == SaveUnit::kFortify);
 }
 
+VCR_TEST("original files: a click on the top line renames the colony (read from the original)") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    const ColonyArt colonyArt = loadColonyArt(dir);
+    std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
+    Game game(readSaveGame(Bytes(std::istreambuf_iterator<char>(in), {})), art.rules);
+    PlayScreen play(std::move(game), dir / "unused.sav");
+    play.setArt(&art);
+    play.setColonyArt(&colonyArt);
+    play.openColony(13);
+    VCR_CHECK(play.clickColonyScreen(160, 3));
+    VCR_CHECK(play.typing() && play.dialog()->inputText == "Curacao");
+    for (const char ch : std::string("Nieuw")) {
+        play.type(ch);
+    }
+    play.handle(Command::Confirm);
+    VCR_CHECK(!play.dialog().has_value());
+    VCR_CHECK(play.game().state().colonies[13].name == "Nieuw");
+    // Nothing typed keeps the name.
+    VCR_CHECK(play.clickColonyScreen(160, 3));
+    for (int i = 0; i < 5; ++i) {
+        play.eraseTyped();
+    }
+    VCR_CHECK(play.dialog()->inputText.empty());
+    play.handle(Command::Confirm);
+    VCR_CHECK(play.game().state().colonies[13].name == "Nieuw");
+}
+
 #include "viceroy/ui/debug_menu.hpp"
 
 VCR_TEST("original files: the debug menu changes the game only when asked") {

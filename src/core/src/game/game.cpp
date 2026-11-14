@@ -350,6 +350,7 @@ void Game::finishWork(int index) {
         sq.flags = static_cast<std::uint8_t>(sq.flags | MapSquare::kRoad);
         landGrudge(index, true);
     } else if (sq.isForest()) {
+        clearCutLumber(index);
         sq.terrain = static_cast<std::uint8_t>(sq.terrain - 8);
         landGrudge(index, false);
     } else {
@@ -364,6 +365,50 @@ void Game::finishWork(int index) {
             notices_.push_back({"USEDUPTOOLS", {}});
         }
     }
+}
+
+void Game::clearCutLumber(int index) {
+    // Read from the original: a forest cleared within 3 squares (the
+    // longer side plus half the shorter) of one of the nation's colonies,
+    // the nearest (the last one listed of those as near), gives it lumber:
+    // 20 for each point of the forest's lumber yield plus one, or just 20
+    // without a lumber mill; twice that for a hardy pioneer; as much as
+    // the warehouse still holds. The player hears CLEARCUT.
+    const auto& u = save_.units[static_cast<std::size_t>(index)];
+    int nearest = -1;
+    int best = 9999;
+    for (std::size_t c = 0; c < save_.colonies.size(); ++c) {
+        const auto& colony = save_.colonies[c];
+        if (colony.nation != u.nation) {
+            continue;
+        }
+        const int dx = std::abs(colony.x - u.x);
+        const int dy = std::abs(colony.y - u.y);
+        const int d = std::max(dx, dy) + std::min(dx, dy) / 2;
+        if (d <= best) {
+            best = d;
+            nearest = static_cast<int>(c);
+        }
+    }
+    if (nearest < 0 || best > 3) {
+        return;
+    }
+    auto& colony = save_.colonies[static_cast<std::size_t>(nearest)];
+    const int terrain = save_.map.at(u.x, u.y).terrain;
+    constexpr int kLumberjack = 5;
+    int per = terrain >= 0 && static_cast<std::size_t>(terrain) < rules_.terrain.size()
+                  ? rules_.terrain[static_cast<std::size_t>(terrain)].yield[kLumberjack] + 1
+                  : 1;
+    if (buildingLevel(colony, BuildingKind::Carpenter) < 2) { // no lumber mill
+        per = 1;
+    }
+    const int most = per * 20 * (u.profession == kHardyPioneer ? 2 : 1);
+    auto& lumber = colony.stock[cargo::kLumber];
+    const int amount = std::max(0, std::min(storageLimit(colony) - lumber, most));
+    if (amount > 0 && colony.nation == human()) {
+        notices_.push_back(GameNotice{"CLEARCUT", {colony.name}, -1, {amount}, nearest});
+    }
+    lumber += amount;
 }
 
 // --- Colonies --------------------------------------------------------------

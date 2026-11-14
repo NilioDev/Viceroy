@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "test.hpp"
 
+#include "viceroy/game/colony.hpp"
 #include "viceroy/game/game.hpp"
 
 using namespace viceroy;
@@ -158,4 +159,37 @@ VCR_TEST("pioneers: out of tools, a pioneer is a colonist again") {
     const auto notices = g.takeNotices();
     VCR_CHECK(notices.size() == 1 && notices.front().section == "USEDUPTOOLS");
     VCR_CHECK(g.takeNotices().empty());
+}
+
+VCR_TEST("pioneers: a forest cleared near a colony gives it lumber (read from the original)") {
+    const auto clear = [](int profession, bool mill, int stock, int colonyX) {
+        Game g = pioneerOn(10, profession);
+        SaveColony c;
+        c.x = colonyX;
+        c.y = 1;
+        c.nation = 3;
+        c.name = "Fort Oranje";
+        c.population = 1;
+        c.stock[cargo::kLumber] = stock;
+        if (mill) {
+            setBuildingLevel(c, BuildingKind::Carpenter, 2);
+        }
+        g.state().colonies.push_back(c);
+        g.state().map.at(colonyX, 1).flags |= MapSquare::kHasColony;
+        turnsToFinish(g, SaveUnit::kPlow);
+        return std::pair{g.state().colonies[0].stock[cargo::kLumber], g.takeNotices()};
+    };
+    auto [lumber, notices] = clear(kFreeColonist, false, 0, 0);
+    VCR_CHECK(lumber == 20);
+    bool told = false;
+    for (const auto& n : notices) {
+        told = told || (n.section == "CLEARCUT" && n.numbers.size() == 1 && n.numbers[0] == 20);
+    }
+    VCR_CHECK(told);
+    VCR_CHECK(clear(kHardyPioneer, false, 0, 0).first == 40);
+    // With a lumber mill: the forest's lumber yield (0 in these rules)
+    // plus one, 20 each.
+    VCR_CHECK(clear(kFreeColonist, true, 0, 0).first == 20);
+    // No more than the warehouse holds.
+    VCR_CHECK(clear(kFreeColonist, false, 90, 0).first == 100);
 }
