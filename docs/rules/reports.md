@@ -1,6 +1,6 @@
 # The advisers' reports
 
-The REPORTS menu and the function keys F2 to F9 open the advisers'
+The REPORTS menu and the function keys F2 to F10 open the advisers'
 reports. Each is drawn on its own picture (`REPORT1.PIK` to `REPORT9.PIK`)
 with its title centred at the top, and closes on a key or a click. Read
 from the original with a debugger and checked pixel by pixel against it
@@ -114,3 +114,35 @@ from y 25.
   villages or cities; the nation's missions there; its muskets (what it
   holds plus its armed braves, 50 each); its horse herds. The last three
   only when not zero (the herds can show negative, as in the original).
+
+## F10: the Colonization Score
+
+Drawn on `WOODPANL.PIK` (its colours from 16 on), the title in colour 0x95
+at y 5 and under it the difficulty, the leader, "of the", the nation and
+the date. The rest is in colour 0x44 from x 16. Read from the original:
+
+- **Citizens**: every person in the nation's colonies, and every
+  colonist, soldier, pioneer, missionary, dragoon, scout and Continental
+  unit, each drawn as a small figure 8 pixels apart in rows from (24, 32).
+  A citizen is worth 4 points, a free colonist working in a colony 2, an
+  indentured servant, petty criminal or Indian convert 1. A unit drawn with
+  its own picture (an expert, a colonist, a Continental) is worth what the
+  citizen counted before it was: the original keeps the last profession it
+  read. The line "Dutch Citizens: +n" stands at y 24.
+- **Continental Congress**: 5 points for each founding father, the line 20
+  pixels under the last row of figures and the fathers' names under it,
+  four to a line, 72 pixels apart.
+- From y 150, one line each, items side by side 20 pixels apart:
+  - Gold, a point for each thousand (from 1000 on), and the villages
+    burned, each costing one point more than the difficulty level.
+  - The rebel sentiment (header word 96), and once independence is won an
+    early revolution bonus of twice the years before 1780 (the year is
+    header bytes 55 and 56, century and the rest).
+  - With bit 0x02 of header byte 18, the Liberty Bells (nation word 12) in
+    hundreds, at most 100; once independence is won, Independence Achieved:
+    +100%, halved for each other nation already free.
+- The total in colour 0x95, then a bar at (35, 186), 250 × 7 in colour
+  0x8A, filled in colour 0x44 to a quarter of the score.
+
+Once scoring is complete (bit 0x10 of header byte 18) it shows only
+"SCORING COMPLETE" at y 97, and the score is 0.

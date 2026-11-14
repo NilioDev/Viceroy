@@ -874,6 +874,7 @@ Art loadArt(const std::filesystem::path& folder) {
         art.reports.push_back(readPicture(readFile(folder, "REPORT" + std::to_string(n) + ".PIK")));
     }
     art.declaration = readPicture(readFile(folder, "DECOIND.PIK"));
+    art.woodPanel = readPicture(readFile(folder, "WOODPANL.PIK"));
     for (char c = 'A'; c <= 'Z'; ++c) {
         art.penCapitals.push_back(readSpriteSheet(readFile(folder, std::string("DEC-UPP") + c + ".SS")));
         art.penLetters.push_back(readSpriteSheet(readFile(folder, std::string("DEC-LOW") + c + ".SS")));

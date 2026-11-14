@@ -3623,6 +3623,9 @@ bool PlayScreen::handle(Command command) {
     case Command::NativeReport:
         openReport(9);
         return true;
+    case Command::ScoreReport:
+        openReport(10);
+        return true;
     default:
         break;
     }
@@ -4075,6 +4078,7 @@ constexpr int kColony = 5;
 constexpr int kNaval = 6;
 constexpr int kForeign = 7;
 constexpr int kIndian = 8;
+constexpr int kScore = 9;
 } // namespace reports_menu
 namespace orders_menu {
 constexpr int kActivate = 0;
@@ -4539,6 +4543,8 @@ bool PlayScreen::pickMenuEntry(int entry) {
             return handle(Command::ForeignReport);
         case reports_menu::kIndian:
             return handle(Command::NativeReport);
+        case reports_menu::kScore:
+            return handle(Command::ScoreReport);
         default:
             notYet();
             return true;

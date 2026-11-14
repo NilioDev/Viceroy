@@ -474,7 +474,7 @@ std::optional<Command> keyCommand(const SDL_KeyboardEvent& key) {
     case SDLK_F9:
         return Command::NativeReport;
     case SDLK_F10:
-        return Command::Menu;
+        return Command::ScoreReport;
     default:
         return std::nullopt;
     }

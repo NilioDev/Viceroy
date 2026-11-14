@@ -1100,6 +1100,248 @@ void drawIndianReport(Screen& screen, const Art& art, const Game& game, int nati
     drawOk(screen, art);
 }
 
+namespace {
+
+// The Colonization Score, read from the original: worked out, and drawn
+// when there is a screen.
+int scoreReport(Screen* screen, const Art* art, const Game& game, int nation) {
+    const auto& save = game.state();
+    const auto& header = save.header;
+    const auto word = [&](std::size_t at) {
+        return static_cast<int>(static_cast<std::int16_t>(header[at] | (header[at + 1] << 8)));
+    };
+    constexpr std::size_t kState = 18;
+    constexpr std::uint8_t kDeclared = 0x01;
+    constexpr std::uint8_t kBellsCount = 0x02;
+    constexpr std::uint8_t kWon = 0x08;
+    constexpr std::uint8_t kScored = 0x10;
+    const std::uint8_t state = header[kState];
+    const bool declared = (state & kDeclared) != 0;
+    const int royal = word(98);
+    // A year kept as its century and the rest (header bytes 55 and 56).
+    const int revolutionYear = 100 * static_cast<std::int8_t>(header[55]) + static_cast<std::int8_t>(header[56]);
+    int otherFree = 0;
+    for (int n = 0; n < kEuropeanNations; ++n) {
+        if (n != save.humanNation && (save.nations[static_cast<std::size_t>(n)].raw[0] & 0x04) != 0) {
+            ++otherFree;
+        }
+    }
+    const bool draw = screen != nullptr && art != nullptr;
+    constexpr std::uint8_t kTitleInk = 0x95;
+    constexpr std::uint8_t kInk = 0x44;
+    const auto text = [&](int x, int y, const std::string& line, std::uint8_t ink) {
+        say(*screen, *art, x, y, line, ink);
+        return x + Screen::textWidth(art->tiny, line);
+    };
+    const auto lbl = [&](int row, const char* fallback) { return label(*art, row, fallback); };
+    const auto adjectiveOf = [&](int n) {
+        if (declared && n == save.humanNation) {
+            return lbl(69, "Rebel");
+        }
+        if (declared && n == royal) {
+            return lbl(70, "Tory");
+        }
+        return textLine(art->names, "NATIONALITY", n, "");
+    };
+    const int line = draw ? art->tiny.height + 1 : 0;
+    if (draw) {
+        if (art->woodPanel.palette) {
+            screen->setColours(*art->woodPanel.palette, 16, 255);
+        }
+        screen->blit(art->woodPanel.image, 0, 0);
+        sayCentred(*screen, *art, 0, Screen::kWidth, 5, lbl(114, "COLONIZATION SCORE"), kTitleInk);
+        if ((state & kScored) != 0) {
+            sayCentred(*screen, *art, 0, Screen::kWidth, 97, lbl(126, "SCORING COMPLETE"), kInk);
+            return 0;
+        }
+        const auto& player = save.players[static_cast<std::size_t>(nation)];
+        const std::string who = textLine(art->names, "DIFFICULTY", save.difficulty, "") + " " + player.name + " " +
+                                lbl(19, "of the") + " " + adjectiveOf(nation) + ": " + seasonName(*art, save.season) +
+                                " " + std::to_string(save.year);
+        sayCentred(*screen, *art, 0, Screen::kWidth, 5 + line, who, kTitleInk);
+    } else if ((state & kScored) != 0) {
+        return 0;
+    }
+    // The citizens, each drawn as a small figure in rows from (24, 32).
+    int iconX = 16;
+    int iconY = 32;
+    const auto figure = [&](int icon) {
+        iconX += 8;
+        if (iconX >= 292) {
+            iconY += 8;
+            iconX = 16 + ((iconX & 8) >> 1);
+        }
+        if (draw && iconY < 144) {
+            drawIcon(*screen, *art, icon, iconX, iconY);
+        }
+    };
+    // Read from the original: four points for a citizen, two for a free
+    // colonist in a colony, one for a servant, criminal or convert. A
+    // unit drawn as itself (not as its profession) counts as the citizen
+    // before it.
+    int citizens = 0;
+    int last = 0;
+    const auto count = [&]() {
+        if (last == 28) {
+            citizens += 2;
+        } else if (last >= 25 && last <= 27) {
+            citizens += 1;
+        } else {
+            citizens += 4;
+        }
+    };
+    for (const auto& c : save.colonies) {
+        if (c.nation != nation && !(declared && c.nation == royal)) {
+            continue;
+        }
+        for (int k = 0; k < c.population && k < kMaxColonists; ++k) {
+            last = static_cast<std::int8_t>(c.skills[static_cast<std::size_t>(k)]);
+            figure(colonistIcon(last));
+            count();
+        }
+    }
+    // The people among the units: colonists, soldiers, pioneers,
+    // missionaries, dragoons, scouts and the Continental Army.
+    static constexpr std::array<bool, 10> kPerson = {true, true, true, true, true, true, false, true, false, true};
+    for (int i = 0; i < game.unitCount(); ++i) {
+        const auto& u = game.unit(i);
+        if (u.type < 0 || u.type >= static_cast<int>(kPerson.size()) || !kPerson[static_cast<std::size_t>(u.type)]) {
+            continue;
+        }
+        if (u.nation != nation && !(declared && u.nation == royal)) {
+            continue;
+        }
+        int icon = unitIcon(game, i);
+        // The plain soldier, pioneer, scout, dragoon and missionary.
+        if (icon >= 0x49 && icon <= 0x4D) {
+            last = u.profession;
+            icon = colonistIcon(last);
+        }
+        figure(icon);
+        count();
+    }
+    int y = 24;
+    if (draw) {
+        text(16, y, adjectiveOf(nation) + " " + lbl(115, "Citizens") + ":  +" + std::to_string(citizens), kInk);
+    }
+    // The founding fathers, five points each, their names four to a line.
+    int fathers = 0;
+    y = iconY + 20;
+    int fx = 16;
+    int fy = y + line;
+    const auto& fatherRules = game.rules().fathers;
+    for (int f = 0; f < 25; ++f) {
+        if (!game.hasFather(nation, f)) {
+            continue;
+        }
+        fathers += 5;
+        if (!draw) {
+            continue;
+        }
+        if (fy <= 144) {
+            say(*screen, *art, fx, fy,
+                static_cast<std::size_t>(f) < fatherRules.size() ? fatherRules[static_cast<std::size_t>(f)].name : "",
+                kInk);
+        }
+        fx += 72;
+        if (fx > 300) {
+            fx = 16;
+            fy += line;
+        }
+    }
+    if (draw) {
+        text(16, y, adjectiveOf(nation) + " " + lbl(134, "Continental Congress") + ": +" + std::to_string(fathers),
+             kInk);
+    }
+    y = y <= 144 ? 150 : y + line;
+    const auto& record = save.nations[static_cast<std::size_t>(nation)];
+    int x = 16;
+    // Gold: a point for each thousand.
+    int gold = 0;
+    if (record.gold >= 1000) {
+        gold = record.gold / 1000;
+        if (draw) {
+            x = text(16, y, lbl(59, "Gold") + ": (" + std::to_string(record.gold) + "$) +" + std::to_string(gold),
+                     kInk) +
+                20;
+        }
+    }
+    // Villages burned: one point less than the difficulty each.
+    int burned = 0;
+    if (record.raw[24] != 0) {
+        burned = record.raw[24] * (-1 - save.difficulty);
+        if (draw) {
+            x = text(x, y,
+                     std::to_string(record.raw[24]) + " " + lbl(117, "Villages Burned") + ":  " +
+                         std::to_string(burned),
+                     kInk) +
+                20;
+        }
+    }
+    y += line;
+    x = 16;
+    const int sentiment = word(96);
+    if (sentiment != 0 && draw) {
+        x = text(x, y, lbl(69, "Rebel") + " " + lbl(71, "Sentiment") + ":  +" + std::to_string(sentiment), kInk) + 20;
+    }
+    int early = 0;
+    if ((state & kWon) != 0 && revolutionYear < 1780) {
+        early = (1780 - revolutionYear) * 2;
+        if (draw) {
+            x = text(x, y,
+                     lbl(142, "Early Revolution") + " (" + seasonName(*art, save.season) + " " +
+                         std::to_string(save.year) + "):  +" + std::to_string(early),
+                     kInk) +
+                20;
+        }
+    }
+    if (sentiment != 0 || ((state & kWon) != 0 && revolutionYear < 1780)) {
+        y += line;
+    }
+    x = 16;
+    int bells = 0;
+    const int bellWord = static_cast<std::int16_t>(record.raw[12] | (record.raw[13] << 8));
+    if ((state & kBellsCount) != 0 && bellWord >= 100) {
+        bells = std::min(bellWord / 100, 100);
+        if (draw) {
+            x = text(x, y, cargoName(game, cargo::kBells) + ": +" + std::to_string(bells), kInk) + 20;
+        }
+    }
+    int independence = 0;
+    if ((state & kWon) != 0) {
+        independence = 100 >> otherFree;
+        if (draw) {
+            std::string t = lbl(116, "Independence") + " " + lbl(119, "Achieved");
+            if (otherFree != 0) {
+                t += " (" + std::to_string(otherFree) + " " + lbl(143, "prior nations") + ")";
+            }
+            text(x, y, t + ": +" + std::to_string(independence) + "%", kInk);
+        }
+    }
+    if ((state & (kBellsCount | kWon)) != 0) {
+        y += line;
+    }
+    int total = early + fathers + burned + bells + sentiment + gold + citizens;
+    if (independence != 0) {
+        total = static_cast<int>(static_cast<long>(total) * ((8 >> otherFree) + 8) / 8);
+    }
+    if (draw) {
+        text(16, y, lbl(121, "Total Score") + ": " + std::to_string(total), kTitleInk);
+        constexpr std::uint8_t kBarGround = 0x8A;
+        screen->fill({35, 186, 250, 7}, kBarGround);
+        screen->fill({35, 186, std::clamp(total / 4, 0, 250), 7}, kInk);
+    }
+    return total;
+}
+
+} // namespace
+
+int colonizationScore(const Game& game, int nation) { return scoreReport(nullptr, nullptr, game, nation); }
+
+void drawScoreReport(Screen& screen, const Art& art, const Game& game, int nation) {
+    scoreReport(&screen, &art, game, nation);
+}
+
 void drawReport(Screen& screen, const Art& art, const Game& game, int nation, int report, int page) {
     switch (report) {
     case 2:
@@ -1125,6 +1367,9 @@ void drawReport(Screen& screen, const Art& art, const Game& game, int nation, in
         break;
     case 9:
         drawIndianReport(screen, art, game, nation);
+        break;
+    case 10:
+        drawScoreReport(screen, art, game, nation);
         break;
     default:
         break;

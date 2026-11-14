@@ -39,7 +39,7 @@ bool rowsDiffer(const Screen& a, const Screen& b, int y0, int y1) {
 
 } // namespace
 
-VCR_TEST("original files: F2 and F4 to F9 open their reports until a key") {
+VCR_TEST("original files: F2 and F4 to F10 open their reports until a key") {
     const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
     if (!isGameFolder(dir)) {
         VCR_SKIP("no game files in gamedata/");
@@ -52,12 +52,12 @@ VCR_TEST("original files: F2 and F4 to F9 open their reports until a key") {
     for (const auto& [command, report] : {std::pair{Command::ReligionReport, 2}, std::pair{Command::LaborReport, 4},
                                           std::pair{Command::EconomyReport, 5}, std::pair{Command::ColonyAdviser, 6},
                                           std::pair{Command::NavalReport, 7}, std::pair{Command::ForeignReport, 8},
-                                          std::pair{Command::NativeReport, 9}}) {
+                                          std::pair{Command::NativeReport, 9}, std::pair{Command::ScoreReport, 10}}) {
         play.handle(command);
         VCR_CHECK(play.report() == report);
         Screen screen;
         play.draw(screen, art);
-        VCR_CHECK(screen.at(286, 184) == 0x77); // the OK box
+        VCR_CHECK(report == 10 || screen.at(286, 184) == 0x77); // the OK box (none on the score)
         for (int i = 0; i < 40 && play.reportUp(); ++i) {
             play.handle(Command::Confirm);
         }
@@ -236,4 +236,49 @@ VCR_TEST("original files: the Indian Adviser lists only the tribes met") {
     Screen gone;
     drawIndianReport(gone, art, Game(*save, art.rules), human);
     VCR_CHECK(rowsDiffer(none, gone, 25, 46));
+}
+
+VCR_TEST("original files: the Colonization Score's parts") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    auto save = firstSave(dir);
+    VCR_CHECK(save.has_value());
+    const int human = Game(*save, art.rules).human();
+    auto& nation = save->nations[static_cast<std::size_t>(human)];
+    nation.gold = 0;
+    nation.raw[24] = 0;
+    for (int i = 7; i <= 10; ++i) {
+        nation.raw[static_cast<std::size_t>(i)] = 0;
+    }
+    save->header[18] = 0;
+    save->header[96] = 0;
+    save->header[97] = 0;
+    const int base = colonizationScore(Game(*save, art.rules), human);
+    VCR_CHECK(base > 0);
+    // A point for each thousand in gold.
+    nation.gold = 12345;
+    VCR_CHECK(colonizationScore(Game(*save, art.rules), human) == base + 12);
+    nation.gold = 0;
+    // Five for each founding father.
+    nation.raw[7] = 0x03;
+    VCR_CHECK(colonizationScore(Game(*save, art.rules), human) == base + 10);
+    nation.raw[7] = 0;
+    // Each village burned costs one point more than the difficulty.
+    nation.raw[24] = 2;
+    VCR_CHECK(colonizationScore(Game(*save, art.rules), human) == base - 2 * (1 + save->difficulty));
+    nation.raw[24] = 0;
+    // Independence first doubles the score, and the earlier the more.
+    for (int n = 0; n < kEuropeanNations; ++n) {
+        save->nations[static_cast<std::size_t>(n)].raw[0] &= static_cast<std::uint8_t>(~0x04);
+    }
+    save->header[18] = 0x08;
+    save->header[55] = 17;
+    save->header[56] = 75;
+    VCR_CHECK(colonizationScore(Game(*save, art.rules), human) == 2 * (base + 10));
+    // Once scoring is complete there is no score.
+    save->header[18] = 0x10;
+    VCR_CHECK(colonizationScore(Game(*save, art.rules), human) == 0);
 }
