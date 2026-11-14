@@ -694,6 +694,10 @@ public:
     // A ship's odds in getting away from a stronger one: its share of the
     // two ships' values decides.
     int evasion(int ship) const;
+    // Read from the original: a ship ending a move next to the warships of
+    // a nation it is not at peace with (any nation for a privateer) may be
+    // held up by each of them (SHIPSLOW) or slip past (SHIPRUN).
+    void slowByWarships(int ship);
     // The attacker wins with a roll of 1 to attack + defense at or below
     // attack.
     static bool attackerWins(int attack, int defense, int roll);

@@ -216,15 +216,31 @@ void PlayScreen::moveActive(Step step) {
             enterVillage(index, *settlement);
             break;
         }
-        if (game_.isShip(index) && !aboard.empty() && map.inside(tx, ty) && map.at(tx, ty).isLand()) {
+        if (game_.isShip(index) && map.inside(tx, ty) && map.at(tx, ty).isLand()) {
+            // Read from the original: the last unit aboard with moves left
+            // may go ashore; the question names a river when there is one
+            // ("Our ships cannot navigate up this river").
+            int lander = -1;
             for (const int p : aboard) {
-                game_.setOrders(p, SaveUnit::kNoOrders);
+                if (game_.movesLeft(p) > 0) {
+                    lander = p;
+                }
             }
-            say("Landfall!");
-            activate(aboard.front());
+            if (lander >= 0) {
+                landfall_ = Landfall{lander, step};
+                ask(map.at(tx, ty).river() ? "LANDFALL2" : "LANDFALL", index);
+                break;
+            }
+            say("");
             break;
         }
-        say(game_.isShip(index) ? "Ships can't go on land." : "Can't go there.");
+        if (game_.isShip(index) && map.inside(tx, ty) && map.at(tx, ty).isWater() &&
+            (map.at(tx, ty).region & 0x0F) != 1 && !game_.isDamagedShip(index)) {
+            // "Ship units cannot enter inland lake squares."
+            tell({"SHIPLAKE", {}});
+            break;
+        }
+        say("Can't go there.");
         break;
     }
     case MoveResult::Occupied: {
@@ -236,7 +252,15 @@ void PlayScreen::moveActive(Step step) {
         const auto settlement = game_.settlementAt(tx, ty);
         const bool foreignColony =
             colony && game_.state().colonies[static_cast<std::size_t>(*colony)].nation < kEuropeanNations;
-        if (settlement) {
+        const auto& from = game_.state().map.at(u.x, u.y);
+        if (!game_.isShip(index) && from.isWater()) {
+            // Read from the original: "Land units cannot enter an enemy
+            // occupied square from on board a ship."
+            tell({"LANDFIRST", {}});
+        } else if (game_.isShip(index) && !game_.canAttack(index) && game_.state().map.at(tx, ty).isWater()) {
+            // "Only Privateers and Frigates can attack enemy ships."
+            tell({"SHIPCOMBAT", {}});
+        } else if (settlement) {
             enterVillage(index, *settlement);
         } else if (colony && game_.unit(index).type == unit_type::kScout &&
                    game_.state().colonies[static_cast<std::size_t>(*colony)].nation < kEuropeanNations) {
@@ -968,9 +992,10 @@ bool PlayScreen::handleDialog(Command command) {
             // father is chosen.
             return true;
         }
-        if (question_ == "TAXOPTIONS" || question_ == "KISSUP" || question_ == "MERCENARIES") {
+        if (question_ == "TAXOPTIONS" || question_ == "KISSUP" || question_ == "MERCENARIES" ||
+            question_.rfind("LANDFALL", 0) == 0) {
             // Escape kisses the ring, or refuses to pay: only the second
-            // choice holds a party or pays.
+            // choice holds a party or pays (or makes landfall).
             d.selected = 0;
             break;
         }
@@ -2017,6 +2042,17 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
         } else {
             attack_.reset();
         }
+    } else if (question == "LANDFALL" || question == "LANDFALL2") {
+        // "Make Landfall": everyone aboard wakes up and one goes ashore.
+        if (choice == 1 && landfall_) {
+            const auto landing = *landfall_;
+            for (const int p : game_.passengers(unit)) {
+                game_.setOrders(p, SaveUnit::kNoOrders);
+            }
+            game_.setActiveUnit(landing.unit);
+            moveActive(landing.step);
+        }
+        landfall_.reset();
     } else if (question == "SAILHOME") {
         if (yes && game_.sailToEurope(unit)) {
             say(game_.unitName(unit) + " sails for Europe.");

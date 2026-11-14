@@ -19,8 +19,29 @@ rule as a guess until it is checked against the original.
   makes its move.
 - Land units stay on land, ships on water or in their own colonies. A land
   unit boards a ship by moving onto it if a hold is free, and is then on
-  sentry. A ship steering onto land makes landfall: the units aboard wake up
-  to go ashore.
+  sentry.
+- Read from the original: a ship steering onto land with a unit aboard that
+  still has moves asks `@LANDFALL` ("Shall we make landfall ... and leave the
+  ships behind?"), or `@LANDFALL2` when the square has a river ("Our ships
+  cannot navigate up this river"). "Stay With Ships" is the default and what
+  Escape picks. "Make Landfall" wakes everyone aboard, and the last unit
+  aboard with moves left steps ashore. With nobody able to go, nothing
+  happens.
+- Ships do not enter inland lakes (water that is not part of the main body
+  of water, the low half of the path layer being 1): `@SHIPLAKE`.
+- A ship without guns (not a privateer, frigate or man-o-war) moving onto
+  foreign ships is told `@SHIPCOMBAT`; a land unit at sea moving onto a
+  square with foreign units, a foreign colony or a settlement is told
+  `@LANDFIRST`.
+- Read from the original: a ship that ends a move on water next to the
+  warships of a nation it is not at peace with (any nation, for a privateer)
+  meets each of them in turn while it has moves left. A privateer would
+  cost it 4 thirds of a move, a frigate 6 and a man-o-war 8. A roll from 1
+  to its evasion plus the warship's evasion plus 2 (the evasion as for
+  combat) below its own evasion lets it slip past (`@SHIPRUN`, "Dutch
+  Merchantman slips past French Privateer!", when either side is the
+  player); equal to it, the ship loses half; otherwise all of it
+  (`@SHIPSLOW` for the player's ship).
 - Foreign units, colonies and settlements block the square (no combat or
   meetings yet).
 - Moving reveals the squares around the unit (read from the original and

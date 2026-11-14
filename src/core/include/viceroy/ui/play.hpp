@@ -228,6 +228,12 @@ private:
     const TextFile* colonyNames_ = nullptr;
     const ColonyArt* colonyArt_ = nullptr;
     std::optional<ColonyViewState> colonyScreen_;
+    // A ship asked to make landfall: who goes ashore, and which way.
+    struct Landfall {
+        int unit = -1;
+        Step step{};
+    };
+    std::optional<Landfall> landfall_;
     std::optional<EuropeViewState> europeScreen_;
     std::optional<Dialog> dialog_;
     sound::BackgroundMusic* music_ = nullptr;
