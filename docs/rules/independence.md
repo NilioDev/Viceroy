@@ -166,10 +166,9 @@ colony may rise later.
 ## Not yet done
 
 - The signing screen.
-- How the Crown's units fight and move once landed (for now they move as
-  any computer nation's). The end of the war is in
-  [the-end.md](the-end.md).
-- Veterans that harden to Continental Army in battle (`CONTINENTAL`).
+- How the Crown's units move once landed (for now they move as any
+  computer nation's). How they fight is in [combat.md](combat.md), the end
+  of the war in [the-end.md](the-end.md).
 - The Foreign Affairs report's `FOREIGNNOTAVAIL`, with the reports.
 - Where the boxes of the war stand on the screen is not measured; they
   stand where the battle news does.
