@@ -592,6 +592,12 @@ VCR_TEST("original files: attacking a village (measured)") {
                 VCR_CHECK(!game.settlementAt(4, 18).has_value());
                 VCR_CHECK(st.nations[kDutch].raw[24] == burned + 1);
                 VCR_CHECK(st.tribesAndMore[8 * 78 + 581 + kApache] == original.tribesAndMore[8 * 78 + 581 + kApache] - 1);
+                // It takes its share of the tribe's horses with it.
+                const int left = st.tribesAndMore[8 * 78 + 581 + kApache];
+                const auto horsesOf = [](const SaveGame& g) {
+                    return g.tribesAndMore[kApache * 78 + 10] | (g.tribesAndMore[kApache * 78 + 11] << 8);
+                };
+                VCR_CHECK(horsesOf(st) == horsesOf(original) - horsesOf(original) / (left + 1));
                 bool brave = false, missionary = false;
                 int treasure = 0;
                 for (const auto& u : st.units) {

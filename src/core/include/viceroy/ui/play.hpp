@@ -292,6 +292,7 @@ private:
         int amount = 0;            // and how much
     };
     std::optional<VillageTrade> trade_;
+    void tradeWithVillage(int unit);
     void startTrade(int unit);
     void offerHold(int hold);
     void showSale();

@@ -307,6 +307,17 @@ void PlayScreen::enterVillage(int unit, int settlement) {
         const auto fields = row < levels->lines.size() ? splitFields(levels->lines[row]) : std::vector<std::string>{};
         place = fields.size() > 1 ? fields[1] : "";
     }
+    // Read from the original: a ship is sent away before the menu by a
+    // tribe that has not met the nation on land, or that is mad at it.
+    if (const auto refusal = game_.shipTradeRefusal(unit, settlement); !refusal.empty()) {
+        village_ = settlement;
+        ask(refusal, unit, {adjective(kEuropeanNations + tribe)});
+        if (dialog_ && refusal == "MADATSHIPS") {
+            placeNative(tribe);
+        }
+        question_ = "LESSONDONE";
+        return;
+    }
     const auto& tribes = game_.rules().tribes;
     const std::string people =
         static_cast<std::size_t>(tribe) < tribes.size() ? tribes[static_cast<std::size_t>(tribe)].name : "";
@@ -604,6 +615,33 @@ void PlayScreen::endIncite(int unit) {
 std::string PlayScreen::goodName(int good) const {
     const auto& cargo = game_.rules().cargo;
     return good >= 0 && static_cast<std::size_t>(good) < cargo.size() ? cargo[static_cast<std::size_t>(good)].name : "";
+}
+
+void PlayScreen::tradeWithVillage(int unit) {
+    // Read from the original: a tense tribe may take the wagon train, send
+    // it away or trade with it grudgingly.
+    const int tribe = tribeOf(game_.state().settlements[static_cast<std::size_t>(village_)]);
+    const auto welcome = game_.wagonTradeWelcome(unit, village_);
+    if (welcome.empty()) {
+        startTrade(unit);
+        return;
+    }
+    const bool gone = welcome == "KILLWAGONS";
+    ask(welcome, gone ? -1 : unit, {adjective(kEuropeanNations + tribe)});
+    if (!dialog_) {
+        if (welcome == "GRUDGEWAGONS") {
+            startTrade(unit);
+        }
+        return;
+    }
+    if (!gone) {
+        placeNative(tribe);
+    }
+    if (welcome == "GRUDGEWAGONS") {
+        questionUnit_ = unit;
+    } else {
+        question_ = "LESSONDONE";
+    }
 }
 
 void PlayScreen::startTrade(int unit) {
@@ -1594,7 +1632,7 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
         } else if (option == kVillageMission && village_ >= 0) {
             foundMission(unit);
         } else if (option == kVillageTrade && village_ >= 0) {
-            startTrade(unit);
+            tradeWithVillage(unit);
         } else if (option == kVillageDenounce && village_ >= 0) {
             game_.denounceHeresy(unit, village_);
             village_ = -1;
@@ -1745,6 +1783,8 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
         }
     } else if (question == "CHIEFHOWDY") {
         showChiefAnswer();
+    } else if (question == "GRUDGEWAGONS") {
+        startTrade(unit);
     } else if (question == "LESSONDONE") {
         village_ = -1;
         advance();

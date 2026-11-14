@@ -378,10 +378,30 @@ void Game::burnSettlement(int settlement) {
         }
     }
     const auto at = kSettlementCounts + static_cast<std::size_t>(tribe);
-    if (tribe >= 0 && tribe < kTribes && at < save_.tribesAndMore.size() && save_.tribesAndMore[at] > 0) {
-        --save_.tribesAndMore[at];
-    }
     save_.settlements.erase(save_.settlements.begin() + settlement);
+    if (tribe < 0 || tribe >= kTribes || at >= save_.tribesAndMore.size() || save_.tribesAndMore[at] == 0) {
+        return;
+    }
+    const int left = --save_.tribesAndMore[at];
+    auto* record = save_.tribesAndMore.data() + static_cast<std::size_t>(tribe) * kTribeRecordSize;
+    if (left == 0) {
+        // Read from the original: the tribe is gone (bit 0x80 of byte 3),
+        // and everyone hears it.
+        record[3] = static_cast<std::uint8_t>(record[3] | 0x80);
+        GameNotice notice{"EXTINCT", {""}};
+        notice.adjectives = {{0, kEuropeanNations + tribe}};
+        notices_.push_back(std::move(notice));
+        return;
+    }
+    // Read from the original: the settlement takes its share of the
+    // tribe's breeding (byte 8) and horses (word 10) with it.
+    const int share = left + 1;
+    const auto breeding = static_cast<std::int8_t>(record[8]);
+    record[8] = static_cast<std::uint8_t>(breeding - breeding / share);
+    const auto horses = static_cast<std::int16_t>(record[10] | (record[11] << 8));
+    const auto rest = static_cast<std::uint16_t>(horses - horses / share);
+    record[10] = static_cast<std::uint8_t>(rest & 0xFF);
+    record[11] = static_cast<std::uint8_t>(rest >> 8);
 }
 
 int Game::villageTreasure(int nation, int tribe, bool capital) {

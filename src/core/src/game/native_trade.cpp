@@ -28,6 +28,12 @@ constexpr std::size_t kLastSold = 8;
 constexpr std::size_t kLastBought = 9;
 constexpr std::uint8_t kNoGood = 0xFF;
 constexpr std::uint8_t kRefusesToSell = 0xFE;
+// Tribe record: from byte 58 one relation byte per European nation, 0x20
+// once its men have met the tribe on land.
+constexpr std::size_t kTribeRelations = 58;
+constexpr std::uint8_t kTribeMet = 0x20;
+constexpr int kTenseTrade = 75;   // tension from which a tribe refuses trade
+constexpr int kAlarmedShips = 64; // a settlement's alarm that sends ships away
 
 int alarmOf(const SaveSettlement& s, int nation) {
     const auto at = 10 + 2 * static_cast<std::size_t>(nation);
@@ -68,6 +74,50 @@ bool Game::canTradeWithVillage(int index, int settlement) const {
     const auto& s = save_.settlements[static_cast<std::size_t>(settlement)];
     return (u.type == unit_type::kWagonTrain || isShip(index)) && u.nation < kEuropeanNations &&
            metTribe(save_, u.nation, tribeOf(s));
+}
+
+std::string Game::shipTradeRefusal(int index, int settlement) const {
+    // Read from the original: a ship that comes to a village of a tribe
+    // that has not met the nation's men on land is sent away; so is one
+    // when the tribe's tension is 75 or more or the settlement's alarm 64.
+    const auto& u = unit(index);
+    if (!isShip(index) || u.nation < 0 || u.nation >= kEuropeanNations) {
+        return {};
+    }
+    const auto& s = save_.settlements[static_cast<std::size_t>(settlement)];
+    const int tribe = tribeOf(s);
+    const auto at =
+        static_cast<std::size_t>(tribe) * kTribeRecordSize + kTribeRelations + static_cast<std::size_t>(u.nation);
+    const int relation = at < save_.tribesAndMore.size() ? save_.tribesAndMore[at] : 0;
+    if ((relation & kTribeMet) == 0) {
+        return "DONTKNOWSHIPS";
+    }
+    if (tribeTension(save_, tribe, u.nation) >= kTenseTrade || alarmOf(s, u.nation) >= kAlarmedShips) {
+        return "MADATSHIPS";
+    }
+    return {};
+}
+
+std::string Game::wagonTradeWelcome(int index, int settlement) {
+    // Read from the original: a tribe whose tension is 75 or more rolls
+    // 0..500 against it: at or under the tension the wagon train vanishes,
+    // under twice the tension the tribe will not trade, and above that it
+    // trades grudgingly.
+    const auto& u = unit(index);
+    if (u.type != unit_type::kWagonTrain || u.nation < 0 || u.nation >= kEuropeanNations) {
+        return {};
+    }
+    const int tribe = tribeOf(save_.settlements[static_cast<std::size_t>(settlement)]);
+    const int tension = tribeTension(save_, tribe, u.nation);
+    if (tension < kTenseTrade) {
+        return {};
+    }
+    const int r = nextRandom(501);
+    if (r <= tension) {
+        removeUnit(index);
+        return "KILLWAGONS";
+    }
+    return 2 * tension >= r ? "MADATWAGONS" : "GRUDGEWAGONS";
 }
 
 Game::VillageSale Game::offerToVillage(int index, int settlement, int hold) {
