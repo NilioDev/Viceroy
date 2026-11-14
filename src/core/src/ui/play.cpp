@@ -3553,8 +3553,18 @@ bool PlayScreen::handle(Command command) {
     }
     if (report_ != 0) {
         // Any key turns the page, and closes the report after the last.
-        if (report_ == 7 && reportPage_ + 1 < navalReportPages(game_, game_.human())) {
+        const int pages = report_ == 7   ? navalReportPages(game_, game_.human())
+                          : report_ == 5 ? economyReportPages(game_, game_.human())
+                          : report_ == 6 ? colonyAdviserPages(game_, game_.human())
+                                         : 1;
+        if (reportPage_ + 1 < pages) {
             ++reportPage_;
+            return true;
+        }
+        if (report_ == 4 && reportPage_ > 0) {
+            // Read from the original: a zoomed profession goes back to the
+            // grid.
+            reportPage_ = 0;
             return true;
         }
         report_ = 0;
@@ -3602,10 +3612,16 @@ bool PlayScreen::handle(Command command) {
         openReport(8);
         return true;
     case Command::LaborReport:
+        openReport(4);
+        return true;
     case Command::EconomyReport:
+        openReport(5);
+        return true;
     case Command::ColonyAdviser:
+        openReport(6);
+        return true;
     case Command::NativeReport:
-        notYet();
+        openReport(9);
         return true;
     default:
         break;
@@ -4053,8 +4069,12 @@ constexpr int kCentre = 11;
 namespace reports_menu {
 constexpr int kReligion = 1;
 constexpr int kCongress = 2;
+constexpr int kLabor = 3;
+constexpr int kEconomy = 4;
+constexpr int kColony = 5;
 constexpr int kNaval = 6;
 constexpr int kForeign = 7;
+constexpr int kIndian = 8;
 } // namespace reports_menu
 namespace orders_menu {
 constexpr int kActivate = 0;
@@ -4433,6 +4453,21 @@ void PlayScreen::openReport(int report) {
     reportPage_ = 0;
 }
 
+void PlayScreen::clickReport(int x, int y) {
+    if (report_ == 4 && reportPage_ == 0) {
+        // Read from the original: a click on a profession zooms on it; one
+        // anywhere else closes the report.
+        const int hit = laborReportHit(x, y);
+        if (hit >= 0) {
+            reportPage_ = hit + 1;
+        } else {
+            report_ = 0;
+        }
+        return;
+    }
+    handle(Command::Confirm);
+}
+
 void PlayScreen::notYet() {
     say("Not in Viceroy yet.");
 }
@@ -4492,10 +4527,18 @@ bool PlayScreen::pickMenuEntry(int entry) {
             return handle(Command::ReligionReport);
         case reports_menu::kCongress:
             return handle(Command::CongressReport);
+        case reports_menu::kLabor:
+            return handle(Command::LaborReport);
+        case reports_menu::kEconomy:
+            return handle(Command::EconomyReport);
+        case reports_menu::kColony:
+            return handle(Command::ColonyAdviser);
         case reports_menu::kNaval:
             return handle(Command::NavalReport);
         case reports_menu::kForeign:
             return handle(Command::ForeignReport);
+        case reports_menu::kIndian:
+            return handle(Command::NativeReport);
         default:
             notYet();
             return true;

@@ -32,6 +32,21 @@ void drawCongressReport(Screen& screen, const Art& art, const Game& game, int na
 // F2: the Religious Adviser report.
 void drawReligionReport(Screen& screen, const Art& art, const Game& game, int nation);
 
+// F4: the Labor Adviser report: the grid of professions (zoom -1), or one
+// profession zoomed. A click on the grid points at a profession, or -1.
+int laborReportHit(int x, int y);
+void drawLaborReport(Screen& screen, const Art& art, const Game& game, int nation, int zoom);
+
+// F5: the Economic Adviser report: European trade, then the cargo in port
+// in the colonies, 17 to a page.
+int economyReportPages(const Game& game, int nation);
+void drawEconomyReport(Screen& screen, const Art& art, const Game& game, int nation, int page);
+
+// F6: the Colony Adviser report: the military garrisons, then the Sons of
+// Liberty, nine colonies to a page.
+int colonyAdviserPages(const Game& game, int nation);
+void drawColonyAdviser(Screen& screen, const Art& art, const Game& game, int nation, int page);
+
 // F7: the Naval Adviser report, seven units to a page.
 int navalReportPages(const Game& game, int nation);
 void drawNavalReport(Screen& screen, const Art& art, const Game& game, int nation, int page);
@@ -39,8 +54,13 @@ void drawNavalReport(Screen& screen, const Art& art, const Game& game, int natio
 // F8: the Foreign Affairs report (with Jan de Witt, each nation's figures).
 void drawForeignReport(Screen& screen, const Art& art, const Game& game, int nation);
 
+// F9: the Indian Adviser report: the tribes the nation has met, with their
+// mood, settlements, missions, muskets and horses.
+void drawIndianReport(Screen& screen, const Art& art, const Game& game, int nation);
+
 // The report of the REPORTS menu with this function key (2 to 9), at the
-// page given for those with more than one.
+// page given for those with more than one (for F4, the profession
+// zoomed + 1, or 0).
 void drawReport(Screen& screen, const Art& art, const Game& game, int nation, int report, int page);
 
 } // namespace viceroy

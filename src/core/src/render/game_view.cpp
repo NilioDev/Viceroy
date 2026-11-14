@@ -684,8 +684,19 @@ void drawUnitInColonyList(Screen& screen, const Art& art, const Game& game, int 
                   orders, true);
 }
 
-void drawUnitAt(Screen& screen, const Art& art, const Game& game, int index, int px, int py) {
-    drawUnitOnSquare(screen, art, game, index, px, py);
+void drawUnitAt(Screen& screen, const Art& art, const Game& game, int index, int px, int py, bool listInk) {
+    if (!listInk) {
+        drawUnitOnSquare(screen, art, game, index, px, py);
+        return;
+    }
+    const int icon = unitIcon(game, index);
+    const auto* image = sprite(art.icons, icon);
+    if (image == nullptr || image->width <= 0) {
+        return;
+    }
+    const auto place = unitPlacement(game, index, icon, image->width);
+    drawUnitParts(screen, art, game, index, *image, px + place.spriteX, py, {px + place.boxX, py + place.boxY, 7, 9},
+                  game.unit(index).orders, true);
 }
 
 std::string textLine(const TextFile& file, const char* section, int row, const char* fallback) {

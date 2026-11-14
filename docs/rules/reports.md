@@ -20,6 +20,37 @@ The crosses toward the next immigrant: one cross icon for each, in a bar
 300 pixels wide at (10, 25), drawn as the Congress report's bell bar (only
 the crosses gathered are drawn, out of those needed).
 
+## F4: the Labor Adviser
+
+- A grid of the professions in three columns of 8, 9 and 9, 105 pixels
+  apart from x 2, rows 18 pixels high from y 25. Each shows its icon with a
+  black copy two pixels to its left, the plural name in colour 0x92 and the
+  count of the nation's people in that profession (colonists in colonies
+  by their skill, people on the map by their profession) in colour 0x61.
+  Teachers and veteran dragoons are left out; Free Colonists come last.
+- A click on a profession zooms on it: its name under the title, and the
+  colonies where such people work, three to a line. A key goes back to
+  the grid; a click elsewhere closes the report.
+
+## F5: the Economic Adviser
+
+- First European trade: for each good the tons bought and sold, the gold
+  made or lost (gains in colour 0x0A, losses in 0x0C), and the current
+  bid and ask prices. From 10000 on figures are shown in thousands with a K.
+- Then the cargo in port: an icon for each good across the top and a row
+  for each colony, 17 to a page; 1000 and more are shown as "n K" in
+  colour 0x0E.
+
+## F6: the Colony Adviser
+
+Nine colonies to a page, each with its picture, size and name.
+
+- First the military garrisons: the armed land units in each colony,
+  spread over 210 pixels from x 110 (at most 18 apart).
+- Then the Sons of Liberty: the rebel percentage, the printing press or
+  newspaper, the bells made each turn and the colonists working as
+  statesmen.
+
 ## F7: the Naval Adviser
 
 - Four columns 80 pixels wide from x 2 (the last 76): Ship, Cargo,
@@ -67,3 +98,19 @@ After the declaration of independence it says FOREIGNNOTAVAIL instead.
 - The nation that has withdrawn from the New World (header word 98) shows
   "(Withdrawn from New World)" instead and is left out of the others'
   lines.
+
+## F9: the Indian Adviser
+
+The tribes the nation has met, and those gone, one row of 21 pixels each
+from y 25.
+
+- A face at x 10 for the tribe's tension toward the nation (below 25,
+  50, 75, and above; the angriest for a tribe gone).
+- From x 30: the tribe's name and ": " in its colour (the Sioux in a
+  brighter red, colour 0x0C), with a black edge one pixel right and below;
+  "Extinct" after it for a tribe gone. The tribe's level (Semi-Nomadic to
+  Civilized) ends at x 310.
+- A second line in black, from x 40 in columns 56 pixels apart: its camps,
+  villages or cities; the nation's missions there; its muskets (what it
+  holds plus its armed braves, 50 each); its horse herds. The last three
+  only when not zero (the herds can show negative, as in the original).

@@ -134,6 +134,9 @@ public:
     bool reportUp() const { return report_ != 0; }
     // The report up (its function key, 2 to 9), or 0.
     int report() const { return report_; }
+    int reportPage() const { return reportPage_; }
+    // A click on the report up (game pixels).
+    void clickReport(int x, int y);
     // The leader signing the declaration of independence.
     bool signingUp() const { return signing_.has_value(); }
     // Set by the app after loading Art: needed for message boxes.

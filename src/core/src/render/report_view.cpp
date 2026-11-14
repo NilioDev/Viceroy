@@ -1,10 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "viceroy/render/report_view.hpp"
 
+#include "viceroy/game/colony.hpp"
 #include "viceroy/game/europe.hpp"
 #include "viceroy/game/game.hpp"
+#include "viceroy/game/natives.hpp"
+
+#include "viceroy/data/text_table.hpp"
 
 #include <algorithm>
+#include <cstdlib>
 #include <string>
 
 namespace viceroy {
@@ -40,6 +45,24 @@ void drawIcon(Screen& screen, const Art& art, int index, int x, int y) {
     if (const auto* img = icon(art, index)) {
         screen.blit(*img, x, y);
     }
+}
+
+// An icon with a black shadow two pixels to its left (read from the
+// original).
+void drawShadowedIcon(Screen& screen, const Art& art, int index, int x, int y) {
+    const auto* img = icon(art, index);
+    if (img == nullptr) {
+        return;
+    }
+    constexpr int kShadowDx = 2;
+    for (int j = 0; j < img->height; ++j) {
+        for (int i = 0; i < img->width; ++i) {
+            if (img->pixels[static_cast<std::size_t>(j * img->width + i)] != kTransparent) {
+                screen.pixel(x - kShadowDx + i, y + j, kBlack);
+            }
+        }
+    }
+    screen.blit(*img, x, y);
 }
 
 void say(Screen& screen, const Art& art, int x, int y, const std::string& text, std::uint8_t colour) {
@@ -548,6 +571,535 @@ void drawForeignReport(Screen& screen, const Art& art, const Game& game, int nat
     drawOk(screen, art);
 }
 
+namespace {
+
+constexpr int kProfessions = 29; // the expert list; 28 is a colony's free colonist
+constexpr int kLaborLeft = 2;
+constexpr int kLaborTop = 25;
+constexpr int kLaborColumn = 105;
+constexpr int kLaborRow = 18;
+
+// A profession's name in the plural (the second field of @JOB).
+std::string pluralName(const Art& art, int profession) {
+    if (const auto* section = art.names.find("JOB")) {
+        if (profession >= 0 && static_cast<std::size_t>(profession) < section->lines.size()) {
+            const auto fields = splitFields(section->lines[static_cast<std::size_t>(profession)]);
+            if (fields.size() > 1) {
+                return fields[1];
+            }
+        }
+    }
+    return "";
+}
+
+// The picture of a profession in this report (measured): as a colonist in
+// a colony, but Jesuit missionaries show the missionary unit's picture and
+// Indian converts their own.
+int laborIcon(int profession) {
+    constexpr int kJesuitIcon = 105;
+    constexpr int kConvertIcon = 66;
+    if (profession == 24) {
+        return kJesuitIcon;
+    }
+    return profession == 27 ? kConvertIcon : colonistIcon(profession);
+}
+
+bool personUnit(int type) { return type >= 0 && type <= 5; }
+
+// Read from the original: the people of each profession, in the colonies
+// (by their skill) and outside them; a colony's free colonists (28) count
+// with the units' (19).
+std::array<int, kProfessions> laborCounts(const Game& game, int nation) {
+    std::array<int, kProfessions> counts{};
+    for (const auto& c : game.state().colonies) {
+        if (c.nation != nation) {
+            continue;
+        }
+        for (int k = 0; k < c.population && k < kMaxColonists; ++k) {
+            const int skill = static_cast<std::int8_t>(c.skills[static_cast<std::size_t>(k)]);
+            if (skill >= 0 && skill < kProfessions) {
+                ++counts[static_cast<std::size_t>(skill)];
+            }
+        }
+    }
+    for (int i = 0; i < game.unitCount(); ++i) {
+        const auto& u = game.unit(i);
+        if (u.nation == nation && personUnit(u.type) && u.profession >= 0 && u.profession < kProfessions) {
+            ++counts[static_cast<std::size_t>(u.profession)];
+        }
+    }
+    counts[19] += counts[28];
+    return counts;
+}
+
+// Where each profession stands in the grid: three columns of 8, 9 and the
+// rest; teachers (18), units' free colonists (19) and veteran dragoons (23)
+// are left out, and a colony's free colonists (28) stand for 19.
+struct LaborPlace {
+    int profession;
+    int x;
+    int y;
+};
+std::vector<LaborPlace> laborPlaces() {
+    std::vector<LaborPlace> out;
+    int x = kLaborLeft;
+    int y = kLaborTop;
+    int column = 0;
+    int row = 0;
+    for (int p = 0; p < kProfessions; ++p) {
+        if (p == 18 || p == 19 || p == 23) {
+            continue;
+        }
+        out.push_back({p == 28 ? 19 : p, x, y});
+        y += kLaborRow;
+        if (++row >= (column == 0 ? 8 : 9) && column < 2) {
+            row = 0;
+            ++column;
+            y = kLaborTop;
+            x += kLaborColumn;
+        }
+    }
+    return out;
+}
+
+} // namespace
+
+int laborReportHit(int x, int y) {
+    // Read from the original: the OK box's corner closes the report.
+    if (x >= 286 && y >= 184) {
+        return -1;
+    }
+    int hit = -1;
+    for (const auto& place : laborPlaces()) {
+        if (x >= place.x && x < place.x + kLaborColumn && y >= place.y && y < place.y + kLaborRow) {
+            hit = place.profession;
+        }
+    }
+    return hit;
+}
+
+void drawLaborReport(Screen& screen, const Art& art, const Game& game, int nation, int zoom) {
+    drawReportGround(screen, art, 4, label(art, 49, "LABOR ADVISER REPORT"));
+    const int sub = art.tiny.height + 6;
+    const auto counts = laborCounts(game, nation);
+    if (zoom < 0) {
+        sayCentred(screen, art, 0, Screen::kWidth, sub, label(art, 56, "(Click on item to zoom)"), 0x91);
+        for (const auto& place : laborPlaces()) {
+            drawShadowedIcon(screen, art, laborIcon(place.profession), place.x + 2, place.y - 1);
+            say(screen, art, place.x + 12, place.y + 1, pluralName(art, place.profession), kHeadingColour);
+            say(screen, art, place.x + 39, place.y + art.tiny.height + 2,
+                std::to_string(counts[static_cast<std::size_t>(place.profession)]), kNameColour);
+        }
+        drawOk(screen, art);
+        return;
+    }
+    // One profession: where its people are, and how many in each colony.
+    const int match = zoom == 19 ? 28 : zoom;
+    const auto& save = game.state();
+    std::vector<int> inColony(save.colonies.size());
+    int colonies = 0;
+    int onMap = 0;
+    int europe = 0;
+    for (std::size_t c = 0; c < save.colonies.size(); ++c) {
+        const auto& colony = save.colonies[c];
+        if (colony.nation != nation) {
+            continue;
+        }
+        for (int k = 0; k < colony.population && k < kMaxColonists; ++k) {
+            if (static_cast<std::int8_t>(colony.skills[static_cast<std::size_t>(k)]) == match) {
+                ++colonies;
+                ++inColony[c];
+            }
+        }
+    }
+    for (int i = 0; i < game.unitCount(); ++i) {
+        const auto& u = game.unit(i);
+        if (u.nation != nation || !personUnit(u.type) || u.profession != match) {
+            continue;
+        }
+        if (!save.map.inside(u.x, u.y)) {
+            ++europe;
+        } else if (const auto colony = game.colonyAt(u.x, u.y)) {
+            ++colonies;
+            ++inColony[static_cast<std::size_t>(*colony)];
+        } else {
+            ++onMap;
+        }
+    }
+    const std::string name = pluralName(art, zoom);
+    sayCentred(screen, art, 0, Screen::kWidth, sub, "(" + name + ")", 0x91);
+    drawShadowedIcon(screen, art, laborIcon(zoom), 4, 24);
+    say(screen, art, 14, 30, name + ": " + std::to_string(counts[static_cast<std::size_t>(zoom)]), kHeadingColour);
+    int y = kLaborTop;
+    const int figures[3] = {europe, onMap, colonies};
+    for (int i = 0; i < 3; ++i) {
+        say(screen, art, 160, y, label(art, 53 + i, "") + ": ", kHeadingColour);
+        say(screen, art, 255, y, std::to_string(figures[i]), kHeadingColour);
+        y += art.tiny.height + 1;
+    }
+    // The colonies with any, three to a line, at most ten lines.
+    y = kLaborTop + 40;
+    int x = kLaborLeft;
+    int column = 0;
+    int lines = 0;
+    for (std::size_t c = 0; c < save.colonies.size() && lines < 10; ++c) {
+        if (inColony[c] == 0) {
+            continue;
+        }
+        say(screen, art, x, y, save.colonies[c].name + ": " + std::to_string(inColony[c]), kNameColour);
+        x += kLaborColumn;
+        if (++column == 3) {
+            column = 0;
+            y += 9;
+            x = kLaborLeft;
+            ++lines;
+        }
+    }
+    drawOk(screen, art);
+}
+
+namespace {
+
+constexpr int kEconomyRows = 17; // colonies to a page of cargo in port
+
+std::vector<int> nationColonies(const Game& game, int nation) {
+    std::vector<int> out;
+    const auto& colonies = game.state().colonies;
+    for (std::size_t c = 0; c < colonies.size(); ++c) {
+        if (colonies[c].nation == nation) {
+            out.push_back(static_cast<int>(c));
+        }
+    }
+    return out;
+}
+
+std::string cargoName(const Game& game, int good) {
+    const auto& cargo = game.rules().cargo;
+    return static_cast<std::size_t>(good) < cargo.size() ? cargo[static_cast<std::size_t>(good)].name : "";
+}
+
+// A trade figure as the original writes it: from 10000 on in thousands
+// with a K.
+std::string bigFigure(const Art& art, int value) {
+    if (value >= 10000) {
+        return std::to_string(value / 1000) + label(art, 57, "K");
+    }
+    return std::to_string(value);
+}
+
+void drawEuropeanTrade(Screen& screen, const Art& art, const Game& game, int nation) {
+    drawReportGround(screen, art, 5, label(art, 50, "ECONOMIC ADVISER REPORT"));
+    sayCentred(screen, art, 0, Screen::kWidth, art.tiny.height + 6, label(art, 206, "European Trade"), 0x91);
+    constexpr std::uint8_t kLine = 0x77;
+    constexpr std::uint8_t kGain = 0x0A;
+    constexpr std::uint8_t kLoss = 0x0C;
+    screen.fill({67, 25, 1, 137}, kLine);
+    const auto rightAt = [&](int end, int y, const std::string& text, std::uint8_t colour) {
+        say(screen, art, end - (Screen::textWidth(art.tiny, text) - 1), y, text, colour);
+    };
+    say(screen, art, 76, 25, label(art, 58, "Tons"), kHeadingColour);
+    rightAt(144, 25, label(art, 59, "Gold"), kHeadingColour);
+    say(screen, art, 170, 25, label(art, 203, "Bid Price"), kHeadingColour);
+    say(screen, art, 220, 25, label(art, 204, "Ask Price"), kHeadingColour);
+    for (int i = 0; i < 17; ++i) {
+        screen.fill({2, 33 + 8 * i, 311, 1}, kLine);
+    }
+    const auto& n = game.state().nations[static_cast<std::size_t>(nation)];
+    for (int g = 0; g < kGoodsKinds; ++g) {
+        const int y = 33 + 8 * g + 2;
+        const auto ug = static_cast<std::size_t>(g);
+        say(screen, art, 2, y, cargoName(game, g), kHeadingColour);
+        const int tons = n.tonsTraded[ug];
+        rightAt(91, y, bigFigure(art, std::abs(tons)), tons < 0 ? kLoss : kGain);
+        const int gold = n.tradeGold[ug];
+        rightAt(144, y, bigFigure(art, std::abs(gold)) + "$", gold < 0 ? kLoss : kGain);
+        rightAt(199, y, std::to_string(bidPrice(n, g)) + "$", kNameColour);
+        rightAt(250, y, std::to_string(askPrice(game.rules(), n, g)) + "$", kNameColour);
+    }
+    drawOk(screen, art);
+}
+
+void drawCargoInPort(Screen& screen, const Art& art, const Game& game, int nation, int page) {
+    drawReportGround(screen, art, 5, label(art, 50, "ECONOMIC ADVISER REPORT"));
+    sayCentred(screen, art, 0, Screen::kWidth, art.tiny.height + 6, label(art, 207, "Cargo in Port"), 0x91);
+    constexpr std::uint8_t kLine = 0x77;
+    screen.fill({87, 25, 1, 154}, kLine);
+    for (int g = 0; g < kGoodsKinds; ++g) {
+        drawIcon(screen, art, 0x16 + g, 90 + 14 * g, 27);
+        screen.fill({101 + 14 * g, 25, 1, 154}, kLine);
+    }
+    for (int i = 0; i < 18; ++i) {
+        screen.fill({2, 42 + 8 * i, 310, 1}, kLine);
+    }
+    const auto colonies = nationColonies(game, nation);
+    for (int row = 0; row < kEconomyRows; ++row) {
+        const std::size_t at = static_cast<std::size_t>(page * kEconomyRows + row);
+        if (at >= colonies.size()) {
+            break;
+        }
+        const auto& colony = game.state().colonies[static_cast<std::size_t>(colonies[at])];
+        const int y = 42 + 8 * row + 2;
+        say(screen, art, 2, y, colony.name, kHeadingColour);
+        for (int g = 0; g < kGoodsKinds; ++g) {
+            // Read from the original: the figures stand right, 4 pixels a
+            // digit; from 1000 on in thousands with a K, in yellow.
+            const int amount = colony.stock[static_cast<std::size_t>(g)];
+            std::uint8_t colour = amount >= 100 ? kHeadingColour : amount > 0 ? kNameColour : kBlack;
+            int x = 85 + 14 * g;
+            std::string text = std::to_string(amount);
+            if (amount < 1000) {
+                x += 4;
+            }
+            if (amount < 100) {
+                x += 4;
+            }
+            if (amount < 10) {
+                x += 4;
+            }
+            if (amount >= 1000) {
+                text = std::to_string(amount / 1000) + " " + label(art, 57, "K");
+                colour = 0x0E;
+                x += 4;
+            }
+            say(screen, art, x, y, text, colour);
+        }
+    }
+    drawOk(screen, art);
+}
+
+} // namespace
+
+int economyReportPages(const Game& game, int nation) {
+    const int n = static_cast<int>(nationColonies(game, nation).size());
+    return 1 + (n + kEconomyRows - 1) / kEconomyRows;
+}
+
+void drawEconomyReport(Screen& screen, const Art& art, const Game& game, int nation, int page) {
+    if (page == 0) {
+        drawEuropeanTrade(screen, art, game, nation);
+    } else {
+        drawCargoInPort(screen, art, game, nation, page - 1);
+    }
+}
+
+namespace {
+
+constexpr int kColonyRows = 9; // colonies to a page of the Colony Adviser
+
+void drawColonyAdviserGround(Screen& screen, const Art& art, int subtitleRow, const char* subtitle) {
+    drawReportGround(screen, art, 6, label(art, 51, "COLONY ADVISER REPORT"));
+    sayCentred(screen, art, 0, Screen::kWidth, art.tiny.height + 6, label(art, subtitleRow, subtitle), 0x91);
+}
+
+// The colony's picture and name at the start of its row.
+void drawColonyRowHead(Screen& screen, const Art& art, const SaveColony& colony, int y) {
+    drawColonyPicture(screen, art, colony, 4, y);
+    // The colony's size on it, as on the map.
+    const std::string size = std::to_string(colony.population);
+    screen.text(art.tiny, 13 - Screen::textWidth(art.tiny, size) / 2, y + 7, size, {kWhite, kBlack, kBlack});
+    say(screen, art, 25, y + 7, colony.name, kHeadingColour);
+}
+
+void drawGarrisons(Screen& screen, const Art& art, const Game& game, int nation, int page) {
+    drawColonyAdviserGround(screen, art, 208, "Military Garrisons");
+    const auto colonies = nationColonies(game, nation);
+    const auto& rules = game.rules();
+    for (int row = 0; row < kColonyRows; ++row) {
+        const std::size_t at = static_cast<std::size_t>(page * kColonyRows + row);
+        if (at >= colonies.size()) {
+            break;
+        }
+        const auto& colony = game.state().colonies[static_cast<std::size_t>(colonies[at])];
+        const int y = 20 + 17 * row;
+        drawColonyRowHead(screen, art, colony, y);
+        // Read from the original: the armed land units there, spread over
+        // 210 pixels from x 110 (at most 18 apart), none past x 300.
+        std::vector<int> armed;
+        for (const int i : game.unitsAt(colony.x, colony.y)) {
+            const int type = game.unit(i).type;
+            if (type >= 0 && static_cast<std::size_t>(type) < rules.units.size() &&
+                rules.units[static_cast<std::size_t>(type)].attack >= 1 &&
+                !(type >= unit_type::kCaravel && type <= unit_type::kManOWar)) {
+                armed.push_back(i);
+            }
+        }
+        const int step = std::clamp(210 / std::max<int>(1, static_cast<int>(armed.size())), 1, 18);
+        int x = 110;
+        for (const int i : armed) {
+            if (x > 300) {
+                break;
+            }
+            drawUnitAt(screen, art, game, i, x, y, true);
+            x += step;
+        }
+    }
+    drawOk(screen, art);
+}
+
+void drawSonsOfLiberty(Screen& screen, const Art& art, const Game& game, int nation, int page) {
+    drawColonyAdviserGround(screen, art, 209, "Sons of Liberty");
+    const auto colonies = nationColonies(game, nation);
+    const auto& save = game.state();
+    constexpr int kRebelIcon = 0x7B;
+    constexpr int kBellIcon = 0x3E;
+    constexpr int kStatesmanJob = 17;
+    for (int row = 0; row < kColonyRows; ++row) {
+        const std::size_t at = static_cast<std::size_t>(page * kColonyRows + row);
+        if (at >= colonies.size()) {
+            break;
+        }
+        const auto& colony = save.colonies[static_cast<std::size_t>(colonies[at])];
+        const int y = 20 + 17 * row;
+        drawColonyRowHead(screen, art, colony, y);
+        drawIcon(screen, art, kRebelIcon, 110, y + 2);
+        say(screen, art, 112 + iconWidth(art, kRebelIcon) + 3, y + 7,
+            std::to_string(sonsOfLibertyPercent(colony)) + "%", kHeadingColour);
+        // The printing press or newspaper.
+        const int press = buildingLevel(colony, BuildingKind::PrintingPress);
+        if (press >= 2) {
+            say(screen, art, 153, y + 7, textLine(art.names, "BUILDING", 20, "Newspaper"), kHeadingColour);
+        } else if (press == 1) {
+            say(screen, art, 153, y + 7, label(art, 202, "Press"), kHeadingColour);
+        }
+        drawIcon(screen, art, kBellIcon, 210, y + 2);
+        const auto made =
+            colonyProduction(colony, save.map, game.rules(), save.difficulty, true, nationEffects(save, colony.nation));
+        say(screen, art, 212 + iconWidth(art, kBellIcon) + 3, y + 7, std::to_string(made.produced[cargo::kBells]),
+            kHeadingColour);
+        // The colonists working as statesmen.
+        int x = 250;
+        for (int k = 0; k < colony.population && k < kMaxColonists; ++k) {
+            if (colony.jobs[static_cast<std::size_t>(k)] == kStatesmanJob) {
+                drawShadowedIcon(screen, art,
+                                 colonistIcon(static_cast<std::int8_t>(colony.skills[static_cast<std::size_t>(k)])), x,
+                                 y + 1);
+                x += 12;
+            }
+        }
+    }
+    drawOk(screen, art);
+}
+
+int colonyAdviserPagesEach(const Game& game, int nation) {
+    const int n = static_cast<int>(nationColonies(game, nation).size());
+    return std::max(1, (n + kColonyRows - 1) / kColonyRows);
+}
+
+} // namespace
+
+int colonyAdviserPages(const Game& game, int nation) { return 2 * colonyAdviserPagesEach(game, nation); }
+
+void drawColonyAdviser(Screen& screen, const Art& art, const Game& game, int nation, int page) {
+    // Read from the original: the garrisons first, then the Sons of Liberty.
+    const int each = colonyAdviserPagesEach(game, nation);
+    if (page < each) {
+        drawGarrisons(screen, art, game, nation, page);
+    } else {
+        drawSonsOfLiberty(screen, art, game, nation, page - each);
+    }
+}
+
+namespace {
+
+// Read from the original: text with a black edge one pixel to its right
+// and below.
+void sayEdged(Screen& screen, const Art& art, int x, int y, const std::string& text, std::uint8_t colour) {
+    say(screen, art, x + 1, y, text, kBlack);
+    say(screen, art, x, y + 1, text, kBlack);
+    say(screen, art, x + 1, y + 1, text, kBlack);
+    say(screen, art, x, y, text, colour);
+}
+
+} // namespace
+
+void drawIndianReport(Screen& screen, const Art& art, const Game& game, int nation) {
+    drawReportGround(screen, art, 1, label(art, 29, "INDIAN ADVISER REPORT"));
+    const auto& save = game.state();
+    const auto& block = save.tribesAndMore;
+    const auto tribeByte = [&](int tribe, std::size_t at) -> std::uint8_t {
+        const auto i = static_cast<std::size_t>(tribe) * kTribeRecordSize + at;
+        return i < block.size() ? block[i] : 0;
+    };
+    constexpr std::size_t kFlags = 3;
+    constexpr std::uint8_t kGone = 0x80;
+    constexpr std::size_t kMusketStock = 7;
+    constexpr std::size_t kHorseHerds = 8;
+    constexpr int kArmedBrave = 20;
+    constexpr int kMountedWarrior = 22;
+    constexpr int kMoodIcon = 0x71; // + the tension level; 3 for a tribe gone
+    constexpr int kColumn = 56;
+    const auto* levels = art.names.find("LEVELS");
+    const auto levelField = [&](int level, std::size_t field) {
+        const auto row = static_cast<std::size_t>(level);
+        const auto fields = levels != nullptr && row < levels->lines.size() ? splitFields(levels->lines[row])
+                                                                            : std::vector<std::string>{};
+        return field < fields.size() ? fields[field] : std::string();
+    };
+    int top = 25;
+    for (int tribe = 0; tribe < kTribes; ++tribe) {
+        const bool gone = (tribeByte(tribe, kFlags) & kGone) != 0;
+        const auto& relations = save.nations[static_cast<std::size_t>(nation)].raw;
+        const auto relationAt = static_cast<std::size_t>(52 + kEuropeanNations + tribe);
+        const bool met = relationAt < relations.size() && (relations[relationAt] & 0x20) != 0;
+        if (!met && !gone) {
+            continue;
+        }
+        const int level = gone ? 3 : tensionLevel(tribeTension(save, tribe, nation));
+        drawIcon(screen, art, kMoodIcon + level, 10, top);
+        // Read from the original: each tribe in its colour, the Sioux in a
+        // brighter red than on the map.
+        constexpr int kSioux = 6;
+        const std::uint8_t colour = tribe == kSioux ? 0x0C : nationColour(art, kEuropeanNations + tribe);
+        const auto t = static_cast<std::size_t>(tribe);
+        const std::string name = t < art.rules.tribes.size() ? art.rules.tribes[t].name : "";
+        const int y = top + 3;
+        top += 21;
+        if (gone) {
+            sayEdged(screen, art, 30, y, name + ": " + label(art, 130, "Extinct"), colour);
+            continue;
+        }
+        sayEdged(screen, art, 30, y, name + ": ", colour);
+        const int tribeLevelNow = tribeLevel(save, tribe);
+        const std::string levelName = levelField(tribeLevelNow, 0);
+        sayEdged(screen, art, 311 - Screen::textWidth(art.tiny, levelName), y, levelName, colour);
+        int villages = 0;
+        int missions = 0;
+        for (const auto& s : save.settlements) {
+            if (tribeOf(s) == tribe) {
+                ++villages;
+                missions += missionOf(s) == nation ? 1 : 0;
+            }
+        }
+        int muskets = static_cast<std::int8_t>(tribeByte(tribe, kMusketStock));
+        for (const auto& u : save.units) {
+            if (u.nation == kEuropeanNations + tribe && (u.type == kArmedBrave || u.type == kMountedWarrior)) {
+                ++muskets;
+            }
+        }
+        muskets *= 50;
+        const int herds = static_cast<std::int8_t>(tribeByte(tribe, kHorseHerds));
+        // The second line in black only.
+        const int line = y + art.tiny.height + 2;
+        int x = 40;
+        say(screen, art, x, line, std::to_string(villages) + " " + levelField(tribeLevelNow, villages == 1 ? 1 : 2),
+            kBlack);
+        x += kColumn;
+        if (missions != 0) {
+            say(screen, art, x, line, std::to_string(missions) + " " + label(art, missions == 1 ? 27 : 28, "Missions"),
+                kBlack);
+        }
+        x += kColumn;
+        if (muskets != 0) {
+            say(screen, art, x, line, std::to_string(muskets) + " " + cargoName(game, cargo::kMuskets), kBlack);
+        }
+        x += kColumn;
+        if (herds != 0) {
+            say(screen, art, x, line, std::to_string(herds) + " " + label(art, 45, "Horse Herds"), kBlack);
+        }
+    }
+    drawOk(screen, art);
+}
+
 void drawReport(Screen& screen, const Art& art, const Game& game, int nation, int report, int page) {
     switch (report) {
     case 2:
@@ -556,11 +1108,23 @@ void drawReport(Screen& screen, const Art& art, const Game& game, int nation, in
     case 3:
         drawCongressReport(screen, art, game, nation);
         break;
+    case 4:
+        drawLaborReport(screen, art, game, nation, page - 1);
+        break;
+    case 5:
+        drawEconomyReport(screen, art, game, nation, page);
+        break;
+    case 6:
+        drawColonyAdviser(screen, art, game, nation, page);
+        break;
     case 7:
         drawNavalReport(screen, art, game, nation, page);
         break;
     case 8:
         drawForeignReport(screen, art, game, nation);
+        break;
+    case 9:
+        drawIndianReport(screen, art, game, nation);
         break;
     default:
         break;
