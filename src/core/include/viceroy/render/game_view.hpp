@@ -112,6 +112,13 @@ struct ViewState {
     // Show Hidden Terrain: the land without its forests, roads, colonies,
     // settlements and units, until a key or a click.
     bool hiddenTerrain = false;
+    // The zoom level of the VIEW menu: 0 shows 15 x 12 squares of 16
+    // pixels, 1 shows 30 x 24 of 8, 2 60 x 48 of 4, 3 120 x 96 of 2.
+    int zoom = 0;
+    // Drawing the squares a zoomed map is shrunk from (no blending, coast,
+    // names or resources; read from the original by comparing).
+    bool zoomSource = false;
+    bool zoomPieces = true; // with the settlements, colonies and units
     // While the messages of a turn's end are up, the panel still shows the
     // turn that ended (seen); -1 for the game's own date.
     int shownYear = -1;
@@ -121,6 +128,13 @@ struct ViewState {
 // Puts the square in the middle of the map window, as the original does
 // with the active unit.
 void centreOn(ViewState& view, const Game& game, int x, int y);
+// Whether the square is in the window and not on its outer row or column.
+bool wellInside(const ViewState& view, int x, int y);
+// Moves the window by squares, kept on the map.
+void scrollView(ViewState& view, const Game& game, int dx, int dy);
+// Zooms in or out (0 to 3) around the middle of the window.
+inline constexpr int kZoomLevels = 4;
+void setZoom(ViewState& view, const Game& game, int zoom);
 
 // The small map of the world in the panel, frame included: map columns 1 to
 // 56 and 39 rows around the view, one pixel each.
@@ -144,7 +158,12 @@ std::string seasonName(const Art& art, int season);
 // The sprite in ICONS.SS for a colonist with this skill.
 int colonistIcon(int skill);
 // One map square: terrain, forest, hills, rivers, roads, coast; no units.
-void drawTerrain(Screen& screen, const Art& art, const Game& game, int x, int y, int px, int py, bool hidden = false);
+void drawTerrain(Screen& screen, const Art& art, const Game& game, int x, int y, int px, int py, bool hidden = false,
+                 bool plain = false);
+// The squares of the map window at a zoom level, and their size in pixels.
+int zoomColumns(int zoom);
+int zoomRows(int zoom);
+int zoomSquare(int zoom);
 // Draws a sprite of a sheet if it exists.
 void blitSprite(Screen& screen, const SpriteSheet& sheet, int index, int x, int y);
 std::uint8_t nationColour(const Art& art, int nation);

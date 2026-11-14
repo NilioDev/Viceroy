@@ -96,3 +96,15 @@ Seen in the original:
 - **Show Hidden Terrain** draws the map without forests, roads, the land's
   resources, lost city rumours, colonies, settlements and units (the fish
   stay) until a key or a click, which does nothing else.
+- **Zoom In** (Z), **Zoom Out** (X) and the four **Zoom Level** entries
+  show 15 x 12, 30 x 24, 60 x 48 or 120 x 96 squares in the same window,
+  16, 8, 4 or 2 pixels each. After a zoom the window is centred on the
+  active unit (or stays where it was with none). A zoomed square is a
+  shrunk picture of the full-size one without the coast and the blending
+  of its edges; from 60 x 48 on, colonies, settlements and the units you
+  can see are squares in their owner's colour. When the map is narrower
+  or lower than the window it is centred and the rest is wood; at 120 x 96
+  the whole map shows with the land's name (`@COLONYNAME` of NAMES.TXT,
+  "New Netherlands") above it in white. The small map's frame is cut to
+  the small map, and a window taller than the small map keeps the small
+  map at its top.

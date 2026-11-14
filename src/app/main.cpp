@@ -445,6 +445,10 @@ std::optional<Command> keyCommand(const SDL_KeyboardEvent& key) {
         return Command::Centre;
     case SDLK_G:
         return Command::GoTo;
+    case SDLK_Z:
+        return Command::ZoomIn;
+    case SDLK_X:
+        return Command::ZoomOut;
     case SDLK_V:
         return Command::ViewMode;
     case SDLK_M:
@@ -675,8 +679,8 @@ void click(App& app, float wx, float wy) {
         return;
     }
     const auto& view = app.play->view();
-    const int mx = view.originX + static_cast<int>(x - static_cast<float>(area.x)) / viceroy::kSquare;
-    const int my = view.originY + static_cast<int>(y - static_cast<float>(area.y)) / viceroy::kSquare;
+    const int mx = view.originX + static_cast<int>(x - static_cast<float>(area.x)) / viceroy::zoomSquare(view.zoom);
+    const int my = view.originY + static_cast<int>(y - static_cast<float>(area.y)) / viceroy::zoomSquare(view.zoom);
     app.play->clickSquare(mx, my);
 }
 

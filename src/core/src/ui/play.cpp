@@ -116,9 +116,7 @@ void PlayScreen::activate(int index) {
     if (index >= 0) {
         const auto& u = game_.unit(index);
         // Keep the map still while the unit is well inside the window.
-        const bool inside = u.x > view_.originX && u.y > view_.originY && u.x < view_.originX + kViewColumns - 1 &&
-                            u.y < view_.originY + kViewRows - 1;
-        if (!inside) {
+        if (!wellInside(view_, u.x, u.y)) {
             centreOn(view_, game_, u.x, u.y);
         }
         view_.endOfTurn = false;
@@ -173,9 +171,7 @@ void PlayScreen::moveActive(Step step) {
                        result == MoveResult::Boarded || (result == MoveResult::Moved && game_.movesLeft(index) <= 0)};
         // Keep the unit in sight while it moves.
         const auto& u = game_.unit(index);
-        const bool inside = u.x > view_.originX && u.y > view_.originY && u.x < view_.originX + kViewColumns - 1 &&
-                            u.y < view_.originY + kViewRows - 1;
-        if (!inside) {
+        if (!wellInside(view_, u.x, u.y)) {
             centreOn(view_, game_, u.x, u.y);
         }
         view_.slideUnit = index;
@@ -3555,7 +3551,8 @@ bool PlayScreen::handleColonyScreen(Command command) {
 }
 
 void PlayScreen::clickSquare(int x, int y) {
-    if (slide_) {
+    const auto& map = game_.state().map;
+    if (slide_ || x < 1 || y < 1 || x > map.width - 2 || y > map.height - 2) {
         return;
     }
     if (const auto colony = game_.colonyAt(x, y)) {
@@ -3592,11 +3589,17 @@ void PlayScreen::clickMinimap(int x, int y) {
     }
 }
 
-void PlayScreen::scrollView(int dx, int dy) {
-    const auto& map = game_.state().map;
-    view_.originX = std::clamp(view_.originX + dx, 1, std::max(1, map.width - 1 - kViewColumns));
-    view_.originY = std::clamp(view_.originY + dy, 1, std::max(1, map.height - 1 - kViewRows));
+void PlayScreen::zoomTo(int zoom) {
+    // Seen: the window is then centred on the active unit (zooming in from
+    // the whole map too), or stays where it is with none.
+    setZoom(view_, game_, zoom);
+    const int active = game_.activeUnit();
+    if (active >= 0 && game_.onMap(active)) {
+        centreOn(view_, game_, game_.unit(active).x, game_.unit(active).y);
+    }
 }
+
+void PlayScreen::scrollView(int dx, int dy) { viceroy::scrollView(view_, game_, dx, dy); }
 
 bool PlayScreen::handle(Command command) {
     if (!dialog_ && notices_.empty()) {
@@ -3717,9 +3720,7 @@ bool PlayScreen::handle(Command command) {
             const auto& map = game_.state().map;
             cursorX_ = std::clamp(cursorX_ + step->dx, 0, map.width - 1);
             cursorY_ = std::clamp(cursorY_ + step->dy, 0, map.height - 1);
-            const bool inside = cursorX_ > view_.originX && cursorY_ > view_.originY &&
-                                cursorX_ < view_.originX + kViewColumns - 1 && cursorY_ < view_.originY + kViewRows - 1;
-            if (!inside) {
+            if (!wellInside(view_, cursorX_, cursorY_)) {
                 centreOn(view_, game_, cursorX_, cursorY_);
             }
             return true;
@@ -3754,8 +3755,8 @@ bool PlayScreen::handle(Command command) {
             cursorX_ = game_.unit(active).x;
             cursorY_ = game_.unit(active).y;
         } else {
-            cursorX_ = view_.originX + kViewColumns / 2;
-            cursorY_ = view_.originY + kViewRows / 2;
+            cursorX_ = view_.originX + zoomColumns(view_.zoom) / 2;
+            cursorY_ = view_.originY + zoomRows(view_.zoom) / 2;
         }
         break;
     }
@@ -3849,6 +3850,12 @@ bool PlayScreen::handle(Command command) {
         if (active >= 0) {
             centreOn(view_, game_, game_.unit(active).x, game_.unit(active).y);
         }
+        break;
+    case Command::ZoomIn:
+        zoomTo(view_.zoom - 1);
+        break;
+    case Command::ZoomOut:
+        zoomTo(view_.zoom + 1);
         break;
     case Command::GoTo:
         if (active >= 0) {
@@ -4140,10 +4147,11 @@ void PlayScreen::drawScreen(Screen& screen, const Art& art) const {
     if ((viewMode_ || lookAtEnd) && view_.blinkOn) {
         const int lx = viewMode_ ? cursorX_ : view_.lookX;
         const int ly = viewMode_ ? cursorY_ : view_.lookY;
-        const int px = kMapArea.x + (lx - view_.originX) * kSquare;
-        const int py = kMapArea.y + (ly - view_.originY) * kSquare;
+        const int size = zoomSquare(view_.zoom);
+        const int px = kMapArea.x + (lx - view_.originX) * size;
+        const int py = kMapArea.y + (ly - view_.originY) * size;
         screen.setClip(kMapArea);
-        screen.frame({px, py, kSquare, kSquare}, 0x0F);
+        screen.frame({px, py, size, size}, 0x0F);
         screen.resetClip();
     }
 }
@@ -4307,6 +4315,9 @@ constexpr int kMovePieces = 0;
 constexpr int kViewPieces = 1;
 constexpr int kEuropeanStatus = 2;
 constexpr int kFindColony = 3;
+constexpr int kZoomIn = 4;
+constexpr int kZoomOut = 5;
+constexpr int kZoomLevel = 6; // 120 x 96 down to 15 x 12 (7, 8, 9)
 constexpr int kHiddenTerrain = 10;
 constexpr int kCentre = 11;
 } // namespace view_menu
@@ -4867,6 +4878,16 @@ bool PlayScreen::pickMenuEntry(int entry) {
             return handle(Command::Centre);
         case view_menu::kHiddenTerrain:
             view_.hiddenTerrain = true;
+            return true;
+        case view_menu::kZoomIn:
+            return handle(Command::ZoomIn);
+        case view_menu::kZoomOut:
+            return handle(Command::ZoomOut);
+        case view_menu::kZoomLevel:
+        case view_menu::kZoomLevel + 1:
+        case view_menu::kZoomLevel + 2:
+        case view_menu::kZoomLevel + 3:
+            zoomTo(kZoomLevels - 1 - (entry - view_menu::kZoomLevel));
             return true;
         case view_menu::kEuropeanStatus:
             return handle(Command::Europe); // seen: the home port's screen

@@ -286,7 +286,8 @@ void drawResource(Screen& screen, const Art& art, const SaveMap& map, int x, int
 
 } // namespace
 
-void drawTerrain(Screen& screen, const Art& art, const Game& game, int x, int y, int px, int py, bool hidden) {
+void drawTerrain(Screen& screen, const Art& art, const Game& game, int x, int y, int px, int py, bool hidden,
+                 bool plain) {
     const auto& map = game.state().map;
     if (!map.inside(x, y)) {
         blitSprite(screen, art.phys, kUnexplored, px, py);
@@ -299,6 +300,28 @@ void drawTerrain(Screen& screen, const Art& art, const Game& game, int x, int y,
         return;
     }
     blitSprite(screen, art.terrain, baseTile(sq), px, py);
+    if (plain) {
+        // A zoomed map: each square on its own, without the land's edges
+        // and the resources.
+        if (sq.isLand()) {
+            if (sq.flags & MapSquare::kPlowed) {
+                blitSprite(screen, art.phys, kPlowed, px, py);
+            }
+            if (forestShown(sq)) {
+                blitSprite(screen, art.phys, kForest + neighbourMask(map, x, y, forestShown), px, py);
+            }
+            if (sq.hills()) {
+                blitSprite(screen, art.phys,
+                           kHills + neighbourMask(map, x, y, [](const MapSquare& n) { return n.hills(); }), px, py);
+            }
+            if (sq.mountains()) {
+                blitSprite(screen, art.phys,
+                           kMountains + neighbourMask(map, x, y, [](const MapSquare& n) { return n.mountains(); }), px,
+                           py);
+            }
+        }
+        return;
+    }
     if (!sq.isLand()) {
         blendGround(screen, art, map, x, y, px, py, game.human());
         drawCoast(screen, art, map, x, y, px, py);
@@ -915,7 +938,9 @@ Art loadArt(const std::filesystem::path& folder) {
 
 int minimapTop(const Game& game, const ViewState& view) {
     const auto& map = game.state().map;
-    return std::clamp(view.originY + kViewRows / 2 - 20, 0, std::max(0, map.height - 41));
+    // A window taller than the small map keeps its top in sight (measured
+    // on the original zoomed out).
+    return std::clamp(view.originY + std::min(zoomRows(view.zoom), 39) / 2 - 20, 0, std::max(0, map.height - 41));
 }
 
 std::optional<std::pair<int, int>> minimapSquare(const Game& game, const ViewState& view, int x, int y) {
@@ -935,8 +960,34 @@ void centreOn(ViewState& view, const Game& game, int x, int y) {
     const auto& map = game.state().map;
     // The outermost row and column of the map are a border the view never
     // shows (the original stops at row 1 and at the second-last row).
-    view.originX = std::clamp(x - kViewColumns / 2, 1, std::max(1, map.width - 1 - kViewColumns));
-    view.originY = std::clamp(y - kViewRows / 2, 1, std::max(1, map.height - 1 - kViewRows));
+    // Zoomed out further than the map is wide or high, the map is centred
+    // in the window (measured on the original).
+    const auto axis = [](int at, int squares, int size) {
+        const int inner = size - 2;
+        if (squares >= inner) {
+            return 1 - (squares - inner) / 2;
+        }
+        return std::clamp(at - squares / 2, 1, size - 1 - squares);
+    };
+    view.originX = axis(x, zoomColumns(view.zoom), map.width);
+    view.originY = axis(y, zoomRows(view.zoom), map.height);
+}
+
+bool wellInside(const ViewState& view, int x, int y) {
+    return x > view.originX && y > view.originY && x < view.originX + zoomColumns(view.zoom) - 1 &&
+           y < view.originY + zoomRows(view.zoom) - 1;
+}
+
+void scrollView(ViewState& view, const Game& game, int dx, int dy) {
+    centreOn(view, game, view.originX + zoomColumns(view.zoom) / 2 + dx, view.originY + zoomRows(view.zoom) / 2 + dy);
+}
+
+void setZoom(ViewState& view, const Game& game, int zoom) {
+    // The middle of the window stays where it is.
+    const int x = view.originX + zoomColumns(view.zoom) / 2;
+    const int y = view.originY + zoomRows(view.zoom) / 2;
+    view.zoom = std::clamp(zoom, 0, kZoomLevels - 1);
+    centreOn(view, game, x, y);
 }
 
 std::uint8_t nationColour(const Art& art, int nation) {
@@ -1006,16 +1057,108 @@ bool settlementAt(const SaveGame& save, int x, int y) {
 }
 } // namespace
 
+int zoomColumns(int zoom) { return kViewColumns << std::clamp(zoom, 0, 3); }
+
+int zoomRows(int zoom) { return kViewRows << std::clamp(zoom, 0, 3); }
+
+int zoomSquare(int zoom) { return kSquare >> std::clamp(zoom, 0, 3); }
+
+namespace {
+
+// Compared with the original: at 30 x 24 the map is drawn square by square
+// as at full size, without the land's edges, names and resources, and
+// shrunk by taking every second pixel from the second one on; the pieces
+// shrink with it. Further out the pieces are squares in their owner's
+// colour, as on the small map. Squares beyond the map's border are the
+// panel's wood.
+void drawZoomedMap(Screen& screen, const Art& art, const Game& game, const ViewState& view) {
+    static Screen scratch;
+    const auto& save = game.state();
+    const int size = zoomSquare(view.zoom);
+    const int step = kSquare / size;
+    const int blocksX = zoomColumns(view.zoom) / kViewColumns;
+    const int blocksY = zoomRows(view.zoom) / kViewRows;
+    for (int by = 0; by < blocksY; ++by) {
+        for (int bx = 0; bx < blocksX; ++bx) {
+            ViewState part = view;
+            part.zoom = 0;
+            part.zoomSource = true;
+            part.zoomPieces = view.zoom == 1;
+            part.originX = view.originX + bx * kViewColumns;
+            part.originY = view.originY + by * kViewRows;
+            scratch.clear(0);
+            drawMap(scratch, art, game, part);
+            const int left = kMapArea.x + bx * kViewColumns * size;
+            const int top = kMapArea.y + by * kViewRows * size;
+            for (int j = 0; j < kViewRows * size; ++j) {
+                for (int i = 0; i < kViewColumns * size; ++i) {
+                    screen.pixel(left + i, top + j,
+                                 scratch.at(kMapArea.x + i * step + step / 2, kMapArea.y + j * step + step / 2));
+                }
+            }
+        }
+    }
+    screen.setClip(kMapArea);
+    if (view.zoom >= 2) {
+        std::map<std::pair<int, int>, std::uint8_t> marks;
+        const auto owner = [&](int nation) { return nationColour(art, game, nation); };
+        for (const auto& st : save.settlements) {
+            marks[{st.x, st.y}] = owner(st.nation);
+        }
+        for (int i = 0; i < game.unitCount(); ++i) {
+            const auto& u = game.unit(i);
+            const bool seen = u.nation == game.human() || ((u.raw[3] >> (4 + game.human())) & 1) != 0;
+            if (seen && game.onMap(i) && !game.isAboard(i)) {
+                marks[{u.x, u.y}] = owner(u.nation);
+            }
+        }
+        for (const auto& c : save.colonies) {
+            marks[{c.x, c.y}] = owner(c.nation);
+        }
+        for (const auto& [at, colour] : marks) {
+            if (save.map.inside(at.first, at.second) && save.map.at(at.first, at.second).seenBy(game.human())) {
+                screen.fill({kMapArea.x + (at.first - view.originX) * size,
+                             kMapArea.y + (at.second - view.originY) * size, size, size},
+                            colour);
+            }
+        }
+    }
+    // Beyond the border row and column.
+    for (int row = 0; row < zoomRows(view.zoom); ++row) {
+        for (int col = 0; col < zoomColumns(view.zoom); ++col) {
+            const int x = view.originX + col;
+            const int y = view.originY + row;
+            if (x < 1 || y < 1 || x > save.map.width - 2 || y > save.map.height - 2) {
+                const Rect r{kMapArea.x + col * size, kMapArea.y + row * size, size, size};
+                screen.setClip(r);
+                screen.tile(art.wood, kMapArea);
+            }
+        }
+    }
+    screen.resetClip();
+    if (view.zoom == 3) {
+        // The whole map fits: the nation's land name above it, in white.
+        const std::string land = textLine(art.names, "COLONYNAME", game.human(), "");
+        drawCentredText(screen, art.tiny, kMapArea.x + kMapArea.w / 2, 24, land, {kWhite, kWhite, kWhite});
+    }
+}
+
+} // namespace
+
 void drawMap(Screen& screen, const Art& art, const Game& game, const ViewState& view) {
+    if (view.zoom > 0) {
+        drawZoomedMap(screen, art, game, view);
+        return;
+    }
     screen.setClip(kMapArea);
     const auto& save = game.state();
     for (int row = 0; row < kViewRows; ++row) {
         for (int col = 0; col < kViewColumns; ++col) {
             drawTerrain(screen, art, game, view.originX + col, view.originY + row, kMapArea.x + col * kSquare,
-                        kMapArea.y + row * kSquare, view.hiddenTerrain);
+                        kMapArea.y + row * kSquare, view.hiddenTerrain, view.zoomSource);
         }
     }
-    if (view.hiddenTerrain) {
+    if (view.hiddenTerrain || (view.zoomSource && !view.zoomPieces)) {
         screen.resetClip();
         return;
     }
@@ -1050,7 +1193,9 @@ void drawMap(Screen& screen, const Art& art, const Game& game, const ViewState& 
         blitSprite(screen, art.icons, kNationFlagBase + std::clamp(c.nation, 0, kEuropeanNations - 1), px + 3, py);
         const std::string population = std::to_string(c.population);
         drawCentredText(screen, art.tiny, px + 8, py + 5, population, {kWhite, kBlack, kBlack});
-        screen.text(art.labels, px + 2, py + 16, c.name, {kWhite, kBlack, kBlack});
+        if (!view.zoomSource) {
+            screen.text(art.labels, px + 2, py + 16, c.name, {kWhite, kBlack, kBlack});
+        }
     }
     // Units: the top one on each square (the active unit wins its square).
     std::map<std::pair<int, int>, int> top;
@@ -1147,7 +1292,14 @@ void drawPanel(Screen& screen, const Art& art, const Game& game, const ViewState
             screen.pixel(x, y, c);
         }
     }
-    screen.frame({mini.x + view.originX, mini.y + view.originY - top, kViewColumns, kViewRows}, kWhite);
+    {
+        // Zoomed out, the frame is cut to the small map.
+        const int left = std::max(mini.x + view.originX, mini.x + 1);
+        const int up = std::max(mini.y + view.originY - top, mini.y + 1);
+        const int right = std::min(mini.x + view.originX + zoomColumns(view.zoom), mini.x + mini.w - 1);
+        const int down = std::min(mini.y + view.originY - top + zoomRows(view.zoom), mini.y + mini.h - 1);
+        screen.frame({left, up, right - left, down - up}, kWhite);
+    }
     screen.fill({241, 49, 79, 1}, kBlack);
 
     const TextColours green{kGreen, kNoColour, kNoColour};
