@@ -214,7 +214,7 @@ VCR_TEST("original files: Pick Music plays the tune picked") {
     play.handle(Command::Confirm);
     // Twelve tunes and three more lists; the bar starts on the tune playing.
     VCR_CHECK(play.dialog().has_value() && play.dialog()->options.size() == 15);
-    VCR_CHECK(play.dialog()->selected == 9);
+    VCR_CHECK(play.dialog()->selected == 9 && play.dialog()->marked == 9);
     Screen screen;
     drawDialog(screen, art, *play.dialog());
     dump(screen, art, "pick");

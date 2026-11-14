@@ -1222,6 +1222,7 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
                     choices_.push_back(kFirstTune[list] + i);
                     if (sound::tuneCommand(kFirstTune[list] + i) == playing) {
                         dialog_->selected = i;
+                        dialog_->marked = i;
                     }
                 }
             }
@@ -2752,6 +2753,9 @@ void PlayScreen::showPickMusic() {
     for (int tune = 1; tune <= sound::kTuneCount; ++tune) {
         if (sound::tuneCommand(tune) == playing) {
             dialog_->selected = tune <= 12 ? tune - 1 : tune <= 18 ? 12 : tune <= 22 ? 13 : 14;
+            if (tune <= 12) {
+                dialog_->marked = tune - 1; // seen: the tune playing in gold
+            }
             break;
         }
     }
