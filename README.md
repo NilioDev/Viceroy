@@ -98,6 +98,11 @@ touch controls.
 > Fountain of Youth, a city of gold, ruins, burial mounds, a friendly
 > tribe's gift, survivors of a lost colony, angry shrines, nothing, or an
 > expedition that vanishes. Scouts and Hernando de Soto do better.
+>
+> The music plays during a game: the original's own tunes, read from its
+> sound driver for OPL3 cards (Sound Blaster Pro and 16) and played on an
+> emulated chip. As in the original a new tune starts whenever one ends,
+> and the Sound Options of your savegame decide whether music plays.
 
 Viceroy is not affiliated with or endorsed by the makers of the original
 game. It contains none of the original game's files: you need your own copy.

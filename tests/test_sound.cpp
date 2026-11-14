@@ -2,6 +2,7 @@
 #include "test.hpp"
 
 #include "viceroy/game_files.hpp"
+#include "viceroy/sound/background_music.hpp"
 #include "viceroy/sound/music_driver.hpp"
 #include "viceroy/sound/music_stream.hpp"
 
@@ -120,4 +121,66 @@ VCR_TEST("original files: the music stream makes sound") {
         peak = std::max(peak, s < 0 ? -static_cast<int>(s) : static_cast<int>(s));
     }
     VCR_CHECK(peak > 1000);
+}
+
+VCR_TEST("original files: Northfire starts and joins the tune after it") {
+    const auto driver = loadDriver("PSOUND.COL");
+    if (!driver) {
+        VCR_SKIP("no PSOUND.COL in gamedata/");
+    }
+    const Piece* north = driver->piece(0x25);
+    VCR_CHECK(north != nullptr && north->segue.has_value());
+    MusicPlayer player(*driver);
+    player.command(0x25);
+    player.tick();
+    VCR_CHECK(player.busy());
+}
+
+VCR_TEST("sound options follow the save game's bits") {
+    const SoundOptions all = SoundOptions::fromSave(0x9E);
+    VCR_CHECK(all.background && all.events && all.effects);
+    const SoundOptions none = SoundOptions::fromSave(0x90);
+    VCR_CHECK(!none.background && !none.events && !none.effects);
+    SoundOptions some;
+    some.events = false;
+    VCR_CHECK(some.toSave(0x91) == 0x9B);
+}
+
+VCR_TEST("background music picks a new tune whenever one ends") {
+    BackgroundMusic music(7);
+    std::vector<int> out = music.update(false, false);
+    VCR_CHECK(out.size() == 1 && out[0] >= 0x20 && out[0] <= 0x3F);
+    const int first = out[0];
+    VCR_CHECK(music.update(true, false).empty()); // still playing
+    out = music.update(false, false);
+    VCR_CHECK(out.size() == 1 && out[0] != first);
+}
+
+VCR_TEST("background music: Pick Music fades out and plays the pick") {
+    BackgroundMusic music(3);
+    music.update(false, false);
+    music.pick(0x3A);
+    std::vector<int> out = music.update(true, false);
+    VCR_CHECK(out.size() == 1 && out[0] == 1);
+    out = music.update(false, false);
+    VCR_CHECK(out.size() == 1 && out[0] == 0x3A && music.current() == 0x3A);
+}
+
+VCR_TEST("background music: moods pick from their group of tunes") {
+    BackgroundMusic music(11);
+    for (int i = 0; i < 20; ++i) {
+        music.setMood(3); // the independence tunes, 13-18
+        const std::vector<int> out = music.update(false, false);
+        VCR_CHECK(out.size() == 1 && out[0] >= 0x28 && out[0] <= 0x2D);
+    }
+}
+
+VCR_TEST("background music: options silence what they turn off") {
+    BackgroundMusic music(5);
+    music.options.background = false;
+    VCR_CHECK(music.update(false, false).empty());
+    music.options.events = false;
+    VCR_CHECK(!music.allowed(0x25) && music.allowed(1));
+    music.options.effects = false;
+    VCR_CHECK(!music.allowed(0x45));
 }

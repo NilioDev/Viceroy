@@ -11,6 +11,8 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 
+#include "audio.hpp"
+
 #include "viceroy/data/reader.hpp"
 #include "viceroy/data/savegame.hpp"
 #include "viceroy/game_files.hpp"
@@ -69,6 +71,7 @@ struct App {
     std::unique_ptr<viceroy::ColonyArt> colonyArt;
     std::unique_ptr<viceroy::PlayScreen> play;
     viceroy::DebugMenu debug;
+    Audio audio;
     viceroy::Screen screen;
     Uint64 lastTicks = 0;
 
@@ -150,6 +153,7 @@ viceroy::Bytes readAll(const std::filesystem::path& path) {
 }
 
 void showLoadMenu(App& app) {
+    app.audio.setPlaying(false);
     app.play.reset();
     app.load = std::make_unique<viceroy::LoadMenu>(
         viceroy::listSaves(viceroy::pack::savesFolder(app.library), *app.art));
@@ -171,6 +175,7 @@ void showTitle(App& app) {
         showLoadMenu(app);
         return;
     }
+    app.audio.setPlaying(false);
     app.play.reset();
     if (app.intro && !app.intro->finished()) {
         app.intro.reset(); // skipped: the still title picture instead
@@ -186,6 +191,8 @@ void beginPlay(App& app, viceroy::Game game, const std::filesystem::path& path) 
     app.play->setColonyArt(app.colonyArt.get());
     app.play->setArt(app.art.get());
     app.mode = Mode::Play;
+    app.audio.music().options = viceroy::sound::SoundOptions::fromSave(app.play->game().soundOptionBits());
+    app.audio.setPlaying(true);
 }
 
 // Where a new game is saved: the first free slot, or else the one saved
@@ -290,6 +297,7 @@ void openLibrary(App& app) {
             showTitle(app);
         }
         app.status.clear();
+        app.audio.open(viceroy::pack::baseFolder(app.library));
     } catch (const std::exception& e) {
         app.art.reset();
         app.status = std::string("Cannot read the imported game: ") + e.what() + " Drop it here again.";
@@ -924,6 +932,7 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
     app->lastTicks = now;
     if (app->mode == Mode::Play) {
         app->play->tick(elapsed);
+        app->audio.update(app->play->game().independenceDeclared());
     }
     if (app->mode == Mode::NewGame) {
         app->newGame->tick(elapsed);

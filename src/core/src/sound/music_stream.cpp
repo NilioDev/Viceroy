@@ -35,25 +35,11 @@ MusicStream::MusicStream(const MusicDriver& driver, int sampleRate)
 }
 
 void MusicStream::reset(bool opl3) {
-    for (int set = 0; set < 2; ++set) {
-        if (set == 1 && !opl3) {
-            break;
-        }
-        if (set == 1) {
-            chip_.write(1, 0x05, 0x01); // OPL3 features on
-            chip_.write(1, 0x04, 0x3F); // every channel pair four-operator
-        }
-        for (int reg = 0x56; reg >= 0x40; --reg) {
-            chip_.write(set, reg, 0x3F);
-        }
-        for (int reg = 0xFF; reg >= 0x60; --reg) {
-            chip_.write(set, reg, 0);
-        }
-        for (int reg = 0x3F; reg >= 0x20; --reg) {
-            chip_.write(set, reg, 0);
-        }
-        chip_.write(set, 0xBD, 0xC0);
+    if (opl3) {
+        chip_.write(1, 0x05, 0x01); // OPL3 features on
+        chip_.write(1, 0x04, 0x3F); // every channel pair four-operator
     }
+    player_.reset();
 }
 
 void MusicStream::render(std::span<std::int16_t> stereo) {

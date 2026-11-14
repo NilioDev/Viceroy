@@ -175,14 +175,69 @@ std::optional<MusicDriver> MusicDriver::load(std::span<const std::uint8_t> file)
             parse(0x20 + i, le16(code, effects + static_cast<std::size_t>(i) * 2));
         }
     }
+    const auto toVoice = [&](std::uint16_t state) { return (state - firstVoice) / 0x32; };
     for (std::size_t i = 0; i < raw.size(); ++i) {
         for (const Raw& r : raw[i]) {
-            const int voice = (r.state - firstVoice) / 0x32;
+            const int voice = toVoice(r.state);
             if (voice >= 0 && voice < 9) {
                 d.pieces_[i].starts.push_back({voice, r.stream});
             }
         }
         d.known_[i] = !d.pieces_[i].starts.empty();
+    }
+
+    // Segues: "if the clock is not running, start at once; otherwise if
+    // stream X or Y plays, set the clock's piece to B; otherwise unless
+    // stream Z plays, to A." Read the clock period, the three streams and
+    // the two pieces (each: reset, then voices started).
+    const auto block = [&](std::size_t at) {
+        std::vector<Piece::Start> starts;
+        if (at + 3 < code.size() && code[at] == 0xE8) {
+            at += 3;
+        }
+        while (at + 7 < code.size() && code[at] == 0x8D && code[at + 1] == 0x0E && code[at + 4] == 0xE8) {
+            const std::size_t target =
+                (at + 7 + static_cast<std::size_t>(static_cast<std::int16_t>(le16(code, at + 5)))) & 0xFFFF;
+            const std::uint16_t state = voiceStub(code, target);
+            if (state == 0) {
+                break;
+            }
+            starts.push_back({toVoice(state), le16(code, at + 2)});
+            at += 7;
+        }
+        return starts;
+    };
+    for (int i = 0; i < 0x20; ++i) {
+        const std::size_t at = le16(code, tunes + static_cast<std::size_t>(i) * 2);
+        if (d.known_[static_cast<std::size_t>(i)] || at + 0x60 > code.size() || code[at] != 0x83 ||
+            code[at + 1] != 0x3E) {
+            continue;
+        }
+        Piece::Segue s;
+        std::vector<std::uint16_t> checks;
+        std::vector<std::size_t> pieces;
+        for (std::size_t k = at; k < at + 0x50; ++k) {
+            if (code[k] == 0x8D && code[k + 1] == 0x0E && code[k + 4] == 0xE8) {
+                checks.push_back(le16(code, k + 2));
+            } else if (code[k] == 0x8D && code[k + 1] == 0x1E && code[k + 4] == 0x89 && code[k + 5] == 0x1E) {
+                pieces.push_back(le16(code, k + 2));
+            } else if (code[k] == 0xC7 && code[k + 1] == 0x06 && s.period == 0 && le16(code, k + 4) != 0) {
+                s.period = le16(code, k + 4);
+            }
+        }
+        if (checks.size() != 3 || pieces.size() != 2 || s.period == 0) {
+            continue;
+        }
+        s.now = block(pieces[1]);
+        s.laterAfter = block(pieces[0]);
+        s.ifPlaying = {checks[0], checks[1]};
+        if (s.now.empty() || s.laterAfter.empty() || s.now.front().stream != checks[2]) {
+            continue;
+        }
+        Piece& p = d.pieces_[static_cast<std::size_t>(i)];
+        p.starts = s.now;
+        p.segue = std::move(s);
+        d.known_[static_cast<std::size_t>(i)] = true;
     }
 
     // The tables the player needs, at the places both FM drivers keep them.
@@ -293,16 +348,37 @@ void MusicPlayer::stop() {
 }
 
 bool MusicPlayer::command(int command) {
+    if (command == 0) {
+        reset();
+        return true;
+    }
+    if (command == 1) {
+        stop();
+        return true;
+    }
     const Piece* p = driver_.piece(command);
     if (p == nullptr) {
         return false;
     }
-    if (p->onlyIfIdle && !p->starts.empty()) {
-        for (const Voice& v : voices_) {
-            if (v.r[kTicks] != 0 && v.start == p->starts.front().stream) {
-                return true;
-            }
+    if (p->segue) {
+        const Piece::Segue& s = *p->segue;
+        bool music = false;
+        for (int i = 0; i < 6; ++i) {
+            music = music || voices_[static_cast<std::size_t>(i)].r[kTicks] != 0;
         }
+        if (clock_ == 0 || !music) {
+            clock_ = clockPeriod_ = s.period;
+            waiting_ = nullptr;
+            startNow(s.now);
+        } else if (playing(s.ifPlaying[0]) || playing(s.ifPlaying[1])) {
+            waiting_ = &s.laterAfter;
+        } else if (!playing(s.now.front().stream)) {
+            waiting_ = &s.now;
+        }
+        return true;
+    }
+    if (p->onlyIfIdle && !p->starts.empty() && playing(p->starts.front().stream)) {
+        return true;
     }
     drumVoice_ = p->drumVoice;
     if (p->stopFirst) {
@@ -314,19 +390,57 @@ bool MusicPlayer::command(int command) {
     return true;
 }
 
-bool MusicPlayer::busy() const {
+bool MusicPlayer::playing(std::uint16_t stream) const {
     for (int i = 0; i < 6; ++i) {
-        if (voices_[static_cast<std::size_t>(i)].r[kTicks] != 0) {
+        const Voice& v = voices_[static_cast<std::size_t>(i)];
+        if (v.r[kTicks] != 0 && v.restart == stream) {
             return true;
         }
     }
     return false;
 }
 
+void MusicPlayer::reset() {
+    for (Voice& v : voices_) {
+        v.r[kTicks] = v.r[kBend] = v.r[kFadeStep] = v.r[kPanStep] = v.r[kNoiseCount] = 0;
+        v.noise = v.noiseStep = v.noiseMask = 0;
+    }
+    for (int reg = 0x56; reg >= 0x40; --reg) {
+        write(3, reg, 0x3F);
+    }
+    for (int reg = 0xFF; reg >= 0x60; --reg) {
+        write(3, reg, 0);
+    }
+    for (int reg = 0x3F; reg >= 0x20; --reg) {
+        write(3, reg, 0);
+    }
+    write(3, 0xBD, 0xC0);
+    drumVoice_ = -1;
+}
+
+void MusicPlayer::startNow(const std::vector<Piece::Start>& starts) {
+    reset();
+    for (const Piece::Start& s : starts) {
+        startVoice(s.voice, s.stream);
+    }
+}
+
+bool MusicPlayer::busy() const {
+    return std::any_of(voices_.begin(), voices_.end(), [](const Voice& v) { return v.r[kTicks] != 0; });
+}
+
 void MusicPlayer::tick() {
     random();
     for (int i = 0; i < 9; ++i) {
         update(i);
+    }
+    if (clockPeriod_ != 0 && --clock_ <= 0) {
+        clock_ = clockPeriod_;
+        if (waiting_ != nullptr) {
+            const auto* starts = waiting_;
+            waiting_ = nullptr;
+            startNow(*starts);
+        }
     }
     fadeStep();
     for (int i = 8; i >= 0; --i) {

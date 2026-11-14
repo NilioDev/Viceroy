@@ -28,6 +28,18 @@ struct Piece {
     int drumVoice = -1;
     bool stopFirst = false;     // the other voices fade out first
     bool onlyIfIdle = false;    // started only when the first stream is not already playing
+
+    // A piece that cuts in on a beat: the driver keeps a clock of `period`
+    // ticks. With nothing else playing (or no clock yet) it starts at once
+    // with the voices silenced; otherwise it waits for the clock to come
+    // round, as `later` or, while one of `ifPlaying` plays, as `laterAfter`.
+    struct Segue {
+        int period = 0;
+        std::vector<Start> now;
+        std::vector<Start> laterAfter;
+        std::array<std::uint16_t, 2> ifPlaying{};
+    };
+    std::optional<Segue> segue;
 };
 
 // The data of one FM driver file.
@@ -85,12 +97,16 @@ public:
 
     explicit MusicPlayer(const MusicDriver& driver);
 
-    // A driver command (0x20-0x5D). Returns false when nothing starts.
+    // A driver command: 0 resets, 1 fades every voice out, 0x20-0x5D
+    // start a piece. Returns false when nothing starts.
     bool command(int command);
     // Fades every voice out, as the driver's "stop" command does.
     void stop();
-    // True while any music voice (0-5) is playing: the game asks this before
-    // it picks the next tune.
+    // Silences every voice at once and sets the chip up, as the driver's
+    // "reset" command does.
+    void reset();
+    // True while any voice is playing: the game asks this before it picks
+    // the next tune.
     bool busy() const;
 
     void tick();
@@ -127,6 +143,8 @@ private:
     void loadInstrument(int voice);
     void fadeStep();
     void noiseStep(int voice);
+    bool playing(std::uint16_t stream) const;
+    void startNow(const std::vector<Piece::Start>& starts);
     int pan(int voice) const;
     std::uint16_t instrument(int voice) const;
 
@@ -139,6 +157,10 @@ private:
     int drumVoice_ = -1;
     bool digital_ = false;
     bool fading_ = false;
+    // The segue clock and the piece waiting for it.
+    int clock_ = 0;
+    int clockPeriod_ = 0;
+    const std::vector<Piece::Start>* waiting_ = nullptr;
 };
 
 } // namespace viceroy::sound
