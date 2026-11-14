@@ -181,6 +181,10 @@ struct NationEffects {
     // Read from the original: with Simon Bolivar the player's colonies
     // count 20 points more Sons of Liberty than their bells make.
     int libertyExtra(bool human) const { return human && has(18) ? 20 : 0; }
+    // Read from the original: a nation may have no more wagon trains than
+    // colonies.
+    int colonies = 0;
+    bool wagonsFull = false;
 };
 // From the nation's record in the save; none for a tribe.
 NationEffects nationEffects(const SaveGame& save, int nation);
@@ -266,6 +270,8 @@ struct ColonyTurn {
     int foodMissing = 0;     // how far below nothing the store would have gone
     int foodBefore = 0;      // the food in store when the turn began
     int bells = 0;           // liberty bells made this turn
+    bool noMoreWagons = false;    // the wagon train is done but not allowed
+    bool noMoreWarehouse = false; // a second expansion is not allowed
 };
 
 // A colonist leaves the colony (starved): the ones after it move up, and

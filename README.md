@@ -33,7 +33,8 @@ touch controls.
 > the buildings, wagon trains, artillery and ships under way, and your
 > advisors report full warehouses (with Tutorial Hints on, the first time
 > comes with a hint on shipping the cargo home), waste, food running low and workshops
-> out of raw goods; a colony that stays without food loses colonists to
+> out of raw goods, inefficient government and mines that wear out (no
+> more wagon trains than colonies); a colony that stays without food loses colonists to
 > hunger. Ships sail to Europe from
 > the high seas, sell and buy goods there (prices move as you trade), take colonists from the docks and
 > sail back. In Europe you can recruit colonists, buy artillery and ships,
