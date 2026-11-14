@@ -74,8 +74,9 @@ touch controls.
 > declare independence from the Game menu: the other nations leave, your
 > ships in Europe are seized, your veterans join the Continental Army,
 > mercenaries are offered, and enough liberty bells bring a foreign power
-> and its force to your side. The King's campaign and the end of the war
-> are still to come. The other nations elect their own
+> and its force to your side. The King's men-of-war land his army next to
+> your colonies, and when he has none left to send, the Tories rise. How
+> his army fights on and the end of the war are still to come. The other nations elect their own
 > fathers as the original's do. A tribe you meet for the first time
 > offers you peace; refusing it angers the tribe. Missionaries can found missions,
 > which the tribe takes well or badly as in the original, pay a tribe to

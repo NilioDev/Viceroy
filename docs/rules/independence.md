@@ -103,14 +103,71 @@ mercenaries of [king.md](king.md).)
 
 **The Crown.** The original calls for the Crown's army to grow at the
 start of its turn, but the routine returns at once during the war, so its
-`KINGMOBILIZE` news never comes.
+`KINGMOBILIZE` news never comes. Then, while the Crown has land units at
+home (regulars, or any dragoons or artillery), it lands some; otherwise
+the Tories may rise.
+
+## The Crown's landings
+
+The royal force at home is in header words 106 to 112 (regulars,
+dragoons, men-of-war, artillery).
+
+- With no man-of-war at home, it gets one when it has none out on the map
+  either (its census count of men-of-war), and nothing lands this turn.
+- When the whole force is four or fewer, or only men-of-war, this is its
+  last chance: if nothing lands this turn, the whole force at home is
+  struck off. With only men-of-war left that happens at once.
+- The candidates are the rebels' first ten coastal colonies, each with a
+  key of people × (Tories in % + 25) − 75 × its armed men (non-ships with
+  a combat above 1), at least the Tories in %, sorted from the smallest
+  as the original sorts.
+- What a colony needs: (muskets + 50) / 100 + 1, plus for every non-ship
+  standing there its defence in eighths (combat × 8, half again for a
+  veteran soldier or dragoon, damaged artillery 2 less) divided by 16;
+  twice that behind a fortress, half again behind a fort; at least 1.
+  (The original also means to take one off for every armed royal unit
+  next to the colony, but it checks the wrong unit's nation, so it never
+  does.)
+- From the highest key down it takes the first colony the regulars, plus
+  up to need / 8 (at least 1) dragoons and as many guns, can match; when
+  there are no more dragoons and guns than regulars, one of each. If none
+  can, the same again with the need cut to a shipload (the man-of-war's
+  holds, 6), then simply the first.
+- The ship's square: the open sea (the ocean's region) next to the colony
+  with the most free land of the colony's own next to it; a square with a
+  rebel man-of-war on it counts as one. Without one nothing lands.
+- Everyone on that square who is not the Crown's is lost (`SEIZURESEA`
+  for the rebels' ships). A man-of-war leaves home and appears there, with
+  `INVASION` (mood now 3).
+- The men: at least 3, at most a shipload, onto the land squares next to
+  both the ship and the colony, in the colony's own land region and
+  without a colony. First onto the square where the fewest men stand
+  (everyone there is lost, `SEIZURELAND` for the rebels' men); then, round
+  after round, onto the squares the Crown already holds: regulars, with
+  up to need / 8 (at most 2 while there are two regulars or more, 1 when
+  dragoons and guns are no more than the regulars) cavalry and as many
+  guns among them. A kind that is used up is skipped.
+- Every unit landed has used its moves, and the rebels see it.
+
+## The Tory uprising
+
+When the Crown has no land units at home, one turn in d + 2 (d the
+difficulty) passes quietly; otherwise the Tories of one colony rise,
+never twice in the same colony (bit 01h of colony byte 28 marks it). The
+colony is the one with most Tories: (100 − Sons of Liberty) × 2 × people
+/ 100 + d + 1, less the combat of every unit standing in it. A colony with
+royal units next to it, or with no free land next to it, does not count.
+That many Tory soldiers of the Crown are put round the colony, on the free
+land and the squares the Crown already holds, round after round. Each has
+a chance of d + 1 in d + 2 to be a veteran (every odd one) and to be
+mounted as dragoons (every third). Then `TORYUPRISING`. If none fits, the
+colony may rise later.
 
 ## Not yet done
 
 - The signing screen.
-- The Crown's campaign: the landing (`INVASION`), the Tory uprising
-  (`TORYUPRISING`), the captures (`SEIZURESEA`, `SEIZURELAND`), how its
-  units fight and move, and the end of the war (`KINGWIN`, `KINGLOSE`).
+- How the Crown's units fight and move once landed (for now they move as
+  any computer nation's), and the end of the war (`KINGWIN`, `KINGLOSE`).
 - Veterans that harden to Continental Army in battle (`CONTINENTAL`).
 - The Foreign Affairs report's `FOREIGNNOTAVAIL`, with the reports.
 - Where the boxes of the war stand on the screen is not measured; they

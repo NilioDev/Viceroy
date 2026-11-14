@@ -958,6 +958,12 @@ private:
     void forceArrives(bool mercenaries);
     void interventionDeclared();
     void independenceBells(int nation, int bells);
+    int colonyStrength(int colony) const;
+    void seizeAt(int x, int y);
+    void placeCrownUnit(int x, int y, int type);
+    void crownLands();
+    void toryUprising();
+    static void sortLikeTheOriginal(std::vector<int>& keys, std::vector<int>& values);
     void kingArmyGrowth(int nation);
     int royalUnitType(int kind, int nation) const;
     // The Continental Congress.

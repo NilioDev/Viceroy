@@ -96,7 +96,7 @@ are four kinds of call:
 | Treasure in burial mounds (`BURIAL3`), with no tribe angered | tune 24h |
 | The mounds were a tribe's burial ground (`SCREWED`) | tune 32h |
 | The War of the Spanish Succession ends (`SUCCESSION`) | mood now 3 |
-| Independence is declared, the Continental Army forms (`MOBILIZE`, `MOBILIZE2`), a power joins the war (`INTERVENTION`) | mood now 3 |
+| Independence is declared, the Continental Army forms (`MOBILIZE`, `MOBILIZE2`), a power joins the war (`INTERVENTION`), the Crown lands (`INVASION`) | mood now 3 |
 | The power's force lands (`INTERVENE`) | event mood 3, then tune 3Fh |
 | A treaty breaks in an attack (`CANCELPEACE`, `SNEAK`) | mood now 4 |
 | The leader declares war (`WARMEEK`, `WARMANLY`, `PROVOKE` after a threat), or takes the player's money for a war (`MERCENARY`) | mood now 4 |
