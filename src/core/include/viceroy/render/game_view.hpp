@@ -40,6 +40,7 @@ struct Art {
     std::vector<SpriteSheet> portraits; // advisors: MSS0.SS, ...
     Picture congressHall;               // CCBKGD.PIK
     Picture congressReport;             // REPORT3.PIK
+    std::vector<Picture> reports;       // REPORT1.PIK to REPORT9.PIK, from 0
     std::vector<SpriteSheet> fathers;   // CC-00.SS to CC-24.SS, by row of @FATHERS
     Picture declaration;                // DECOIND.PIK: the declaration to sign
     std::vector<SpriteSheet> penCapitals; // DEC-UPPA.SS to DEC-UPPZ.SS: a capital written
@@ -162,6 +163,8 @@ void drawUnitInColonyList(Screen& screen, const Art& art, const Game& game, int 
 // A unit standing small on the horizon of the Units Present panel, centred on
 // px; nothing is drawn from x `right` on.
 void drawSmallUnit(Screen& screen, const Art& art, const Game& game, int index, int px, int py, int right);
+// A unit as the map draws it, on the square at (px, py).
+void drawUnitAt(Screen& screen, const Art& art, const Game& game, int index, int px, int py);
 // The first field of a row of a section of a text file, or `fallback`.
 std::string textLine(const TextFile& file, const char* section, int row, const char* fallback);
 

@@ -457,8 +457,22 @@ std::optional<Command> keyCommand(const SDL_KeyboardEvent& key) {
         return Command::Train;
     case SDLK_TAB:
         return (key.mod & SDL_KMOD_SHIFT) ? Command::PreviousUnit : Command::NextUnit;
+    case SDLK_F2:
+        return Command::ReligionReport;
     case SDLK_F3:
         return Command::CongressReport;
+    case SDLK_F4:
+        return Command::LaborReport;
+    case SDLK_F5:
+        return Command::EconomyReport;
+    case SDLK_F6:
+        return Command::ColonyAdviser;
+    case SDLK_F7:
+        return Command::NavalReport;
+    case SDLK_F8:
+        return Command::ForeignReport;
+    case SDLK_F9:
+        return Command::NativeReport;
     case SDLK_F10:
         return Command::Menu;
     default:

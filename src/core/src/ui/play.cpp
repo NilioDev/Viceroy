@@ -3551,9 +3551,13 @@ bool PlayScreen::handle(Command command) {
         showNotices();
         return true;
     }
-    if (congressReport_) {
-        // Any key closes the report.
-        congressReport_ = false;
+    if (report_ != 0) {
+        // Any key turns the page, and closes the report after the last.
+        if (report_ == 7 && reportPage_ + 1 < navalReportPages(game_, game_.human())) {
+            ++reportPage_;
+            return true;
+        }
+        report_ = 0;
         return true;
     }
     if (dialog_) {
@@ -3584,9 +3588,27 @@ bool PlayScreen::handle(Command command) {
         openEurope();
         return true;
     }
-    if (command == Command::CongressReport) {
-        congressReport_ = true;
+    switch (command) {
+    case Command::ReligionReport:
+        openReport(2);
         return true;
+    case Command::CongressReport:
+        openReport(3);
+        return true;
+    case Command::NavalReport:
+        openReport(7);
+        return true;
+    case Command::ForeignReport:
+        openReport(8);
+        return true;
+    case Command::LaborReport:
+    case Command::EconomyReport:
+    case Command::ColonyAdviser:
+    case Command::NativeReport:
+        notYet();
+        return true;
+    default:
+        break;
     }
     if (command == Command::Menu) {
         openMenu(0, true);
@@ -3862,8 +3884,8 @@ void PlayScreen::draw(Screen& screen, const Art& art) const {
         drawCongressHall(screen, art, fathers);
         return;
     }
-    if (congressReport_) {
-        drawCongressReport(screen, art, game_, game_.human());
+    if (report_ != 0) {
+        drawReport(screen, art, game_, game_.human(), report_, reportPage_);
         return;
     }
     drawScreen(screen, art);
@@ -4029,7 +4051,10 @@ constexpr int kViewPieces = 1;
 constexpr int kCentre = 11;
 } // namespace view_menu
 namespace reports_menu {
+constexpr int kReligion = 1;
 constexpr int kCongress = 2;
+constexpr int kNaval = 6;
+constexpr int kForeign = 7;
 } // namespace reports_menu
 namespace orders_menu {
 constexpr int kActivate = 0;
@@ -4397,6 +4422,17 @@ void PlayScreen::pickTune(int tune) {
     }
 }
 
+void PlayScreen::openReport(int report) {
+    // Read from the original: after the declaration there is no foreign
+    // affairs to report.
+    if (report == 8 && game_.independenceDeclared()) {
+        tell({"FOREIGNNOTAVAIL", {}});
+        return;
+    }
+    report_ = report;
+    reportPage_ = 0;
+}
+
 void PlayScreen::notYet() {
     say("Not in Viceroy yet.");
 }
@@ -4452,8 +4488,14 @@ bool PlayScreen::pickMenuEntry(int entry) {
     }
     if (section == "REPORTS") {
         switch (entry) {
+        case reports_menu::kReligion:
+            return handle(Command::ReligionReport);
         case reports_menu::kCongress:
             return handle(Command::CongressReport);
+        case reports_menu::kNaval:
+            return handle(Command::NavalReport);
+        case reports_menu::kForeign:
+            return handle(Command::ForeignReport);
         default:
             notYet();
             return true;

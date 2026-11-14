@@ -59,6 +59,13 @@ enum class Command {
     Menu,           // F10: the menu bar
     GoTo,           // G: send the unit to a colony (a ship also to Europe)
     CongressReport, // F3
+    ReligionReport, // F2
+    LaborReport,    // F4
+    EconomyReport,  // F5
+    ColonyAdviser,  // F6
+    NavalReport,    // F7
+    ForeignReport,  // F8
+    NativeReport,   // F9
     Disband,        // Shift+D: Disband Unit
     Dump,           // O: Dump Cargo Overboard
 };
@@ -124,7 +131,9 @@ public:
     bool clickRouteScreen(int x, int y);
     // The hall of the Continental Congress with a new father in it.
     bool congressHallUp() const { return congressHall_ >= 0; }
-    bool reportUp() const { return congressReport_; }
+    bool reportUp() const { return report_ != 0; }
+    // The report up (its function key, 2 to 9), or 0.
+    int report() const { return report_; }
     // The leader signing the declaration of independence.
     bool signingUp() const { return signing_.has_value(); }
     // Set by the app after loading Art: needed for message boxes.
@@ -360,7 +369,9 @@ private:
     int scoutColony_ = -1;  // the colony a scout has reached (SCOUTCOLONY)
     int foreignTradeColony_ = -1; // the foreign colony a wagon train or ship trades with
     int congressHall_ = -1; // the father just come into the hall, shown until a key
-    bool congressReport_ = false; // F3, shown until a key or a click
+    int report_ = 0;        // the report up, by its function key; shown until a key or a click
+    int reportPage_ = 0;    // its page, for those with more than one
+    void openReport(int report);
     struct Signing {
         std::vector<PenStroke> strokes;
         std::size_t stroke = 0; // the letter being written

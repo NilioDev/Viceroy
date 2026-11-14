@@ -903,6 +903,10 @@ void Game::endTurn() {
             kingDeclaresWar(human(), save_.turn + 1);
         }
     }
+    // The player's nation is counted too, as the computer's are at the
+    // start of their turns (its figures in the Foreign Affairs report come
+    // from this count).
+    nationCensus(human());
     // Measured: the original goes through the colonies from the last
     // founded to the first, which sets the order of its messages.
     for (std::size_t c = save_.colonies.size(); c-- > 0;) {
