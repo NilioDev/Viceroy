@@ -976,6 +976,7 @@ private:
     void toryUprising();
     void othersGranted();
     void coloniesChangeHands(int colony);
+    bool rebelAmbush(const SaveUnit& attacker, const SaveUnit& defender) const;
     static void sortLikeTheOriginal(std::vector<int>& keys, std::vector<int>& values);
     void kingArmyGrowth(int nation);
     int royalUnitType(int kind, int nation) const;

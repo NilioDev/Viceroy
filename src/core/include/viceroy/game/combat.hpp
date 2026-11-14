@@ -16,12 +16,17 @@ inline constexpr int kVeteran = 65;
 inline constexpr int kTitle = 75; // "COMBAT ANALYSIS"
 inline constexpr int kFatigue = 76;
 inline constexpr int kAttackBonus = 77;
+inline constexpr int kAmbush = 78;
 inline constexpr int kTerrain = 79;
 inline constexpr int kColony = 80;
 inline constexpr int kFortified = 81;
 inline constexpr int kSpainBonus = 82;
 inline constexpr int kArtilleryInOpen = 84;
+inline constexpr int kExpeditionaryForce = 85;
+inline constexpr int kRebels = 86;
+inline constexpr int kTories = 87;
 inline constexpr int kDrakeBonus = 90; // "Drake"
+inline constexpr int kBombard = 104;
 } // namespace combat_label
 
 struct CombatBonus {

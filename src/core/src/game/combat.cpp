@@ -140,6 +140,16 @@ int Game::addColonyBonus(CombatSide& side, int colony) const {
     return quarters;
 }
 
+bool Game::rebelAmbush(const SaveUnit& attacker, const SaveUnit& defender) const {
+    // Read from the original: during the war a human player attacking a
+    // European in the open takes the square's bonus as an ambush, and the
+    // defender gets none.
+    const int a = attacker.nation;
+    return (save_.header[18] & 0x01) != 0 && a >= 0 && a < kEuropeanNations &&
+           save_.players[static_cast<std::size_t>(a)].control == 0 && defender.nation < kEuropeanNations &&
+           !colonyAt(defender.x, defender.y) && !settlementAt(defender.x, defender.y);
+}
+
 CombatAnalysis Game::analyseAttack(int attacker, int defender) const {
     using namespace combat_label;
     CombatAnalysis a;
@@ -166,6 +176,16 @@ CombatAnalysis Game::analyseAttack(int attacker, int defender) const {
     if (au.type == kPrivateer && hasFather(au.nation, kDrake)) {
         a.attacker.bonuses.push_back({kDrakeBonus, 50});
     }
+    const bool ambush = rebelAmbush(au, du) && save_.map.inside(du.x, du.y);
+    if (ambush) {
+        const int row = terrainRow(save_.map.at(du.x, du.y));
+        if (row >= 0 && row < static_cast<int>(rules_.terrain.size())) {
+            const int bonus = rules_.terrain[static_cast<std::size_t>(row)].defenseBonus * 25;
+            if (bonus > 0) {
+                a.attacker.bonuses.push_back({kAmbush, bonus, true});
+            }
+        }
+    }
     a.attacker.bonuses.push_back({kAttackBonus, 50});
     // Measured: no penalty against a fortified unit (the manual: artillery
     // is good at attacking fortified units).
@@ -173,6 +193,24 @@ CombatAnalysis Game::analyseAttack(int attacker, int defender) const {
                        du.nation < kEuropeanNations;
     if (au.type == kArtillery && !defenderInColony && !dugIn) {
         a.attacker.bonuses.push_back({kArtilleryInOpen, -75});
+    }
+    // The war of independence (labels after the order of LABELS.TXT, not
+    // measured on the box).
+    if ((save_.header[18] & 0x01) != 0 && au.nation < kEuropeanNations) {
+        const bool crown = au.nation == crownNation();
+        if (defenderInColony) {
+            if (crown || (save_.header[18] & 0x02) != 0) {
+                a.attacker.bonuses.push_back({kBombard, 50});
+            }
+            const auto& c = save_.colonies[static_cast<std::size_t>(*colonyAt(du.x, du.y))];
+            const int sons = sonsOfLibertyPercent(c, nationEffects(save_, c.nation).libertyExtra(true));
+            const int share = crown ? 100 - sons : sons;
+            if (share > 0) {
+                a.attacker.bonuses.push_back({crown ? kTories : kRebels, share});
+            }
+        } else if (crown && !save_.map.at(du.x, du.y).isWater() && save_.difficulty > 0) {
+            a.attacker.bonuses.push_back({kExpeditionaryForce, 5 * save_.difficulty});
+        }
     }
 
     a.defender.unit = defender;
@@ -186,7 +224,7 @@ CombatAnalysis Game::analyseAttack(int attacker, int defender) const {
     if (du.type == kPrivateer && hasFather(du.nation, kDrake)) {
         a.defender.bonuses.push_back({kDrakeBonus, 50});
     }
-    if (!defenderInColony) {
+    if (!defenderInColony && !ambush) {
         const auto& square = save_.map.at(du.x, du.y);
         const int row = terrainRow(square);
         if (row >= 0 && row < static_cast<int>(rules_.terrain.size())) {
@@ -245,7 +283,7 @@ int Game::defenceStrength(int attacker, const SaveUnit& du, bool defenderShip, b
         m = 2 * (buildingLevel(save_.colonies[static_cast<std::size_t>(*colony)], BuildingKind::Fortification) + 1);
     } else if (settlement) {
         m = settlementQuarters(*settlement);
-    } else if (!defenderEuropean || attackerEuropean) {
+    } else if ((!defenderEuropean || attackerEuropean) && !rebelAmbush(au, du)) {
         const int row = terrainRow(save_.map.at(du.x, du.y));
         if (row >= 0 && row < static_cast<int>(rules_.terrain.size())) {
             m = rules_.terrain[static_cast<std::size_t>(row)].defenseBonus;
@@ -296,8 +334,10 @@ CombatStrengths Game::strengthsAgainst(int attacker, const SaveUnit& du, bool de
     // The ambush, read from the original: a tribe attacking a European in
     // the open who is not fortified has the square's defence bonus (in
     // quarters) on its own side; the defender then gets none.
-    if (!attackerEuropean && defenderEuropean && !colony && !settlement && du.orders != SaveUnit::kFortified &&
-        save_.map.inside(du.x, du.y)) {
+    // During the war the rebels ambush the Crown in the open the same way,
+    // fortified or not.
+    if (((!attackerEuropean && defenderEuropean && du.orders != SaveUnit::kFortified) || rebelAmbush(au, du)) &&
+        !colony && !settlement && save_.map.inside(du.x, du.y)) {
         const int row = terrainRow(save_.map.at(du.x, du.y));
         if (row >= 0 && row < static_cast<int>(rules_.terrain.size())) {
             a = a * (4 + rules_.terrain[static_cast<std::size_t>(row)].defenseBonus) >> 2;

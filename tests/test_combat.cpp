@@ -564,6 +564,7 @@ VCR_TEST("combat: the war's bonuses on the attack") {
     // The Crown in the open: 5% a level.
     s.header[18] = 0x01;
     s.header[98] = kDutch;
+    s.players[kDutch].control = 1;
     VCR_CHECK(g.combatStrengths(0, 1).attack == 28);
     // On a colony of 60% Sons of Liberty: half again, then the Tories' 40%.
     SaveColony c;
@@ -581,4 +582,28 @@ VCR_TEST("combat: the war's bonuses on the attack") {
     VCR_CHECK(g.combatStrengths(0, 1).attack == 38);
     s.header[18] |= 0x02;
     VCR_CHECK(g.combatStrengths(0, 1).attack == 57);
+}
+
+VCR_TEST("combat: during the war the rebels ambush the Crown in the open") {
+    using namespace combat_label;
+    Game g = battle(unit_type::kSoldier, unit_type::kDragoon);
+    auto& s = g.state();
+    s.difficulty = 4;
+    s.turn = 200;
+    VCR_CHECK(g.combatStrengths(0, 1).attack == 24 && g.combatStrengths(0, 1).defense == 36);
+    s.header[18] = 0x01;
+    s.header[98] = kFrench;
+    s.units[1].orders = SaveUnit::kFortified; // no help to the Crown
+    // 16 x 6/4 x 3/2 against 24 with no terrain, + 50% fortified.
+    VCR_CHECK(g.combatStrengths(0, 1).attack == 36 && g.combatStrengths(0, 1).defense == 36);
+    const auto a = g.analyseAttack(0, 1);
+    VCR_CHECK(labels(a.attacker) == (std::vector<int>{kAmbush, kAttackBonus}));
+    VCR_CHECK(labels(a.defender) == std::vector<int>{kFortified});
+    // The Crown attacking gets no ambush but its 20% on this level.
+    Game h = battle(unit_type::kSoldier, unit_type::kDragoon);
+    h.state().difficulty = 4;
+    h.state().header[18] = 0x01;
+    h.state().header[98] = kDutch;
+    h.state().players[kDutch].control = 1;
+    VCR_CHECK(labels(h.analyseAttack(0, 1).attacker) == (std::vector<int>{kAttackBonus, kExpeditionaryForce}));
 }
