@@ -59,6 +59,35 @@ Except for an attack, the scout's turn is over. A computer scout always
 attacks, so the text for the player catching a foreign scout
 (`LOSTTHEIRSCOUTS`) never shows.
 
+## Trade with a foreign colony
+
+A wagon train or ship of the player's that moves into another nation's
+colony offers it one of its loads (`TRADEWHICH` when it carries more than
+one). Its turn is over in any case.
+
+- Not without a treaty (`TRADEATWAR`).
+- Not without Jan de Witt in the Congress: the leader refuses in the
+  interests of mercantilism (`TRADEMERCANTILISM`).
+- Not with nothing aboard (`TRADENOCARGO`).
+
+The load is worth the colony nation's market price × the amount. The gold
+offered is that, less the nation's tax, halved when that nation is out for
+revenge, less 10% to 12 × (difficulty + 1)% at random (during the war of
+independence the power that helps the player takes only 5% + the
+difficulty). It is at least 1. Like the original, Viceroy keeps only 16
+bits of each product before dividing, so very large loads come out oddly.
+
+The goods offered instead are the colony's (up to 100 of one good) worth
+the most without going over the load's worth. Food, lumber, tools and
+muskets are never offered before independence. During the war, muskets
+and horses can always be had: 50 at least, or 100 from the helping power.
+With nothing to offer the leader is not interested (`TRADENOWANT`).
+Otherwise (`TRADEWITH`) the player takes the goods, takes the gold, or
+walks away. Either way the colony gets the load. As in the original, the
+goods it gives are not taken from its stores.
+
+A computer's wagon trains and ships just stop at a foreign colony.
+
 ## What the leader weighs
 
 Before talking, the leader looks at the map through the turn's census:
@@ -133,6 +162,17 @@ Before talking, the leader looks at the map through the turn's census:
 After a gift for peace the original keeps the wrong text name and shows no
 menu; we do the same. A meeting that ends while the leader was still
 bold leaves a grudge.
+
+## Attacks in peace
+
+A player who attacks a nation they have a treaty with is asked first
+(`HAVETREATY`). Breaking it shows `CANCELPEACE`, the music turns to war,
+and the victim will want revenge.
+
+A computer nation at peace with its target holds back while the timer from
+its last talk with that side runs. Otherwise the treaty breaks: the player
+attacked in peace hears of a sneak attack (`SNEAK`, with the war mood), and
+every computer attack in peace also makes the news (`DECLAREWAR`).
 
 ## Two computer nations
 

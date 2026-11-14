@@ -239,6 +239,11 @@ void PlayScreen::moveActive(Step step) {
             if (dialog_) {
                 placeFrontiersmanDialog(*dialog_);
             }
+        } else if (colony && game_.state().colonies[static_cast<std::size_t>(*colony)].nation < kEuropeanNations &&
+                   game_.unit(index).type < static_cast<int>(game_.rules().units.size()) &&
+                   game_.rules().units[static_cast<std::size_t>(game_.unit(index).type)].cargoSlots > 0) {
+            // Read from the original: wagon trains and ships trade there.
+            foreignTrade(index, *colony);
         } else if (defender >= 0 && !settlement) {
             startAttack(index, defender);
         } else if (colony && !game_.isShip(index) && game_.canAttack(index) && game_.colonyUndefended(*colony)) {
@@ -542,6 +547,31 @@ void PlayScreen::scoutColony(int unit, int colony, int choice) {
         }
     } else {
         game_.skipUnit(unit);
+    }
+    for (auto& notice : game_.takeNotices()) {
+        notices_.push_back(std::move(notice));
+    }
+    advanceAfterNotices_ = true;
+}
+
+void PlayScreen::foreignTrade(int unit, int colony) {
+    const int holds = game_.startForeignTrade(unit, colony);
+    if (holds == 1) {
+        game_.offerForeignTrade(unit, colony, 0);
+    } else if (holds > 1) {
+        // "Which cargo shall we offer to trade, Your Excellency?"
+        ask("TRADEWHICH", unit);
+        if (dialog_) {
+            const auto& u = game_.unit(unit);
+            for (int k = 0; k < u.holds; ++k) {
+                addOption(*dialog_, std::to_string(holdAmount(u, k)) + " " + goodName(holdGood(u, k)));
+            }
+            addOption(*dialog_, textLine(art_->labelText, "MISC", 32, "Nothing"));
+            placeCentredDialog(*dialog_);
+            question_ = "FOREIGNTRADEWHICH";
+            foreignTradeColony_ = colony;
+            return;
+        }
     }
     for (auto& notice : game_.takeNotices()) {
         notices_.push_back(std::move(notice));
@@ -1415,6 +1445,19 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
         } else if (option == kVillageAttack && village_ >= 0) {
             attackVillage(unit);
         }
+    } else if (question == "FOREIGNTRADEWHICH") {
+        const int colony = std::exchange(foreignTradeColony_, -1);
+        if (colony >= 0 && choice >= 0 && choice < game_.unit(unit).holds) {
+            game_.offerForeignTrade(unit, colony, choice);
+        }
+        for (auto& notice : game_.takeNotices()) {
+            notices_.push_back(std::move(notice));
+        }
+        advanceAfterNotices_ = true;
+    } else if (question == "TRADEWITH") {
+        // "We'll take the goods.", "Just give us the gold." or "Do you take
+        // us for fools?"
+        game_.answerForeignTrade(choice);
     } else if (question == "SCOUTCOLONY") {
         scoutColony(unit, std::exchange(scoutColony_, -1), choice);
     } else if (question == "SAILPORT" || question == "TRAVELPLACE") {
@@ -1550,9 +1593,10 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
         if (choice == 1 && attack_) {
             const int us = game_.unit(attack_->attacker).nation;
             const int them = defenderNation(*attack_);
-            game_.declareWar(us, them);
+            game_.europeanAttack(us, them);
             // Measured: "Spanish cancel peace treaty with Dutch." when the
-            // Dutch attack the Spanish.
+            // Dutch attack the Spanish; the music turns to war.
+            playMusic({{MusicCue::Kind::ChangeMood, 4}});
             ask("CANCELPEACE", -1, {adjective(them), adjective(us)});
             if (dialog_) {
                 placeMapDialog(*dialog_);

@@ -2835,11 +2835,19 @@ void Game::aiAttack(int i, int x, int y) {
         return;
     }
     const int defender = defenderAt(x, y, i);
+    const auto colony = colonyAt(x, y);
+    const int target = defender >= 0                             ? unit(defender).nation
+                       : colony && !isShip(i) && colonyUndefended(*colony)
+                           ? save_.colonies[static_cast<std::size_t>(*colony)].nation
+                           : -1;
+    if (target >= 0 && target < kEuropeanNations && !europeanAttack(unit(i).nation, target)) {
+        aiEndMoves(i);
+        return;
+    }
     if (defender >= 0) {
         attack(i, defender);
         return;
     }
-    const auto colony = colonyAt(x, y);
     if (colony && !isShip(i) && colonyUndefended(*colony)) {
         attackColony(i, *colony, pickColonyDefender(*colony));
         return;

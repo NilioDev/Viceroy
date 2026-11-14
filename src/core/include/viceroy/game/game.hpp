@@ -270,6 +270,24 @@ public:
     int relation(int nation, int other) const;
     // Breaks the treaty both ways: the two nations are at war.
     void declareWar(int nation, int other);
+    // An attack by one European nation on another (read from the
+    // original): false when a computer attacker holds back because it
+    // talked with the other side lately. A treaty breaks: the player
+    // attacked hears of a sneak attack (SNEAK), a computer's attack makes
+    // news (DECLAREWAR), and a side the player attacks in peace wants
+    // revenge. The player's own "Break Treaty" comes first (HAVETREATY).
+    bool europeanAttack(int attacker, int defender);
+
+    // A wagon train or ship of the player's entering another nation's
+    // colony trades there (read from the original; docs/rules/diplomacy.md).
+    // Its turn is over. Without a treaty (TRADEATWAR), without Jan de Witt
+    // (TRADEMERCANTILISM) or with nothing aboard (TRADENOCARGO) a notice
+    // says so and the result is 0; otherwise the number of holds to offer.
+    int startForeignTrade(int unit, int colony);
+    // The colony's offer for one hold: TRADENOWANT, or TRADEWITH (goods
+    // or gold), whose answer (the choice from 0) goes to answerForeignTrade.
+    void offerForeignTrade(int unit, int colony, int hold);
+    void answerForeignTrade(int choice);
     // The Sound Options as the save keeps them (header byte 22).
     std::uint8_t soundOptionBits() const { return save_.header[22]; }
     void setSoundOptionBits(std::uint8_t bits) { save_.header[22] = bits; }
@@ -619,6 +637,18 @@ public:
     // The chance in 36 that a scout infiltrating the colony is caught.
     int infiltrationRisk(int unit, int colony) const;
 
+    struct ForeignTradeOffer {
+        int unit = -1;
+        int colony = -1;
+        int hold = -1;
+        int good = -1;     // what the player brought
+        int amount = 0;
+        int giveGood = -1; // what the colony gives for it
+        int giveAmount = 0;
+        int gold = 0;      // or this much gold
+    };
+    const std::optional<ForeignTradeOffer>& foreignTradeOffer() const { return foreignTrade_; }
+
     // --- Map -----------------------------------------------------------------
     void reveal(int x, int y, int radius, int nation);
     // What a chief's tales show: the land of the same landmass within the
@@ -881,6 +911,7 @@ private:
     };
     static constexpr int kPaidTribute = 999; // the original's mark after a tribute was asked
     std::deque<Meeting> meetings_;
+    std::optional<ForeignTradeOffer> foreignTrade_;
     void addRelationBits(int nation, int other, std::uint8_t bits);
     void clearRelationBits(int nation, int other, std::uint8_t bits);
     int strongestNation() const;

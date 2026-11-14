@@ -67,7 +67,8 @@ touch controls.
 > requests for withdrawal, gifts or an alliance against a third party.
 > The computer nations make peace and war among themselves, and you hear
 > of it. A scout at another nation's colony can meet its mayor or try to
-> spy on the colony. The King may drag you into his wars in Europe, and
+> spy on the colony; with Jan de Witt your wagon trains and ships can
+> trade with other nations' colonies. The King may drag you into his wars in Europe, and
 > when your rebels reach half, the War of the Spanish Succession hands the
 > weakest nation's colonies to another. The other nations elect their own
 > fathers as the original's do. A tribe you meet for the first time
