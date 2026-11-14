@@ -396,6 +396,21 @@ void PlayScreen::openColony(int index) {
     lastColony_ = index;
 }
 
+void PlayScreen::pointAt(int x, int y) {
+    if (!colonyScreen_) {
+        return;
+    }
+    const auto& save = game_.state();
+    const auto index = static_cast<std::size_t>(colonyScreen_->colony);
+    if (index >= save.colonies.size()) {
+        return;
+    }
+    const int place = townPlaceAt(save, save.colonies[index], x, y);
+    if (place >= 0) {
+        colonyScreen_->townLabel = place;
+    }
+}
+
 void PlayScreen::openEurope() {
     EuropeViewState state;
     const auto ships = unitsInEurope(game_.state(), game_.rules(), game_.human(), EuropePlace::InPort, true);

@@ -40,6 +40,8 @@ struct ColonyViewState {
     int selectedOutside = -1; // a unit standing outside the colony, picked in the town
     int outsideMenu = -1;     // the highlighted line of the menu of jobs outside, -1 when closed
     bool outsideFromMore = false; // that menu came from "(More)": its first line goes back
+    int selectedGood = 0;         // the warehouse's framed good, as in the original (food at first)
+    int townLabel = -1;           // the place in the town last pointed at, named in a label; -1 for none
 };
 
 // What is under a point of the colony screen, for clicks: a colonist (in
@@ -55,6 +57,10 @@ struct ColonyHit {
     int unit = -1;   // a unit outside
 };
 ColonyHit colonyHitAt(const Game& game, const SaveColony& colony, int x, int y, const Art* art = nullptr);
+
+// The place in the town (0-14, in the order of the original's places) under
+// the pointer, or -1: its name is shown while the pointer is over the town.
+int townPlaceAt(const SaveGame& save, const SaveColony& colony, int x, int y);
 
 // The units standing outside the colony in its town, left to right.
 std::vector<int> unitsOutside(const Game& game, const SaveColony& colony);

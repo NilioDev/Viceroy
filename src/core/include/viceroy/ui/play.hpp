@@ -98,6 +98,9 @@ public:
     // A click on the colony screen: the panel buttons, CHANGE, and the list
     // of things to build. Returns true when it was used.
     bool clickColonyScreen(int x, int y);
+    // The pointer moved to this point (screen pixels): on the colony screen,
+    // a place in the town gets its name label.
+    void pointAt(int x, int y);
     // The home port in Europe, when it is shown.
     const std::optional<EuropeViewState>& europeScreen() const { return europeScreen_; }
     void openEurope();

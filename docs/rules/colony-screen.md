@@ -7,7 +7,7 @@ All positions are on the 320×200 screen.
 
 | Part | Where | What |
 | --- | --- | --- |
-| Top line | y 0-6, black line at 7 | `WOODTILE` tiled; "Name.  Season, Year.  Gold: N$" centred on x 160 in `FONTTINY`, colour 0x44 |
+| Top line | y 0-6, black line at 7 | `WOODTILE` tiled; "Name.   Season, Year.  Gold: N$" (three spaces after the name, measured) centred on x 160 in `FONTTINY`, colour 0x44 |
 | Town | x 0-198, y 8-127 | `PARCH.SS` tiled from the screen origin; black line at x 199 |
 | Side | x 200-319, y 8-127 | `WOODTILE` tiled; the area view in a black frame at (223, 31), 74×74 |
 | Lower part | from y 128 | `COLONY.PIK` (320×72), with a black line at y 128 |
@@ -40,6 +40,19 @@ identity, which is how it was first measured.
 An empty spot shows trees or a shore instead (sprites 42-45, by its size).
 The fortification's spot shows a rail fence (16) when there is none. The
 warehouse and the stable share a spot: barn (15), corral (46) or both (47).
+
+### Name labels
+
+Read from the original: when the pointer is over a spot (the spots are tried
+in the order of the table above, so the carpenter's shop at (128, 53) wins
+over the docks around it), the town shows that place's name in white
+`FONTTINY` on a black box, 7 high and one pixel wider than the text. The box
+is centred on the spot and at its top; for the large buildings, the docks and
+an empty place it sits halfway down (spot height / 2 − 3). It is kept inside
+the town (x at most 199 − width). A building shows its level's name from
+`@BUILDING` (the warehouse expansion when there is one), the stockade adds
+"(Outside Colony)" (`@MISC`), and an empty place says "Trees" (`@MISC`). The
+label stays until the pointer is over another place.
 
 ### People at work and what they make
 
@@ -121,7 +134,13 @@ original:
 buttons are `ICONS.SS` 67-69.
 
 The warehouse shows the 16 goods (`ICONS.SS` 22-37) centred on
-x 10 + 19k at y 181, with the amount in colour 0x3D centred below at y 194.
+x 10 + 19k at y 181, with the amount below at y 194, read from the original:
+the text starts at 19k + 11 − (width + 1) / 2. The hundreds are written in
+colour 0x94 and the rest (two digits) in 0x3D; goods the custom house sells
+have the rest in 0x0A; goods beyond what the warehouse keeps (not food) have
+the hundreds in 0x0C and the rest in 0x04. The chosen good (food when the
+screen opens) has a bright green frame (0x0A) around its cell, 20×21 at
+(19k, 179).
 
 ## Jobs menu
 

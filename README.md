@@ -19,7 +19,8 @@ touch controls.
 > advisors warn of a poor site and you type the name), look inside your colonies, end turns and save. The colony screen
 > shows its buildings (laid out differently in every colony, as in the
 > original), people, what they produce (with what is missing crossed out
-> and the fishermen's catch shown as fish) and the warehouse; give
+> and the fishermen's catch shown as fish) and the warehouse; point at a
+> building to see its name; give
 > colonists other jobs with the jobs menu (where an expert can also be made
 > an ordinary free colonist) or by clicking a colonist and then
 > a building or field, send them out of the colony as colonists, pioneers,
