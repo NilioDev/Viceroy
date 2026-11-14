@@ -94,6 +94,14 @@ and before the steps for the easy levels:
 - On Discoverer and Explorer the help to a human colony under attack
   (step 8, its first two parts) is gone during the war, unless a ship
   attacks.
+- A human player attacking a European in the open ambushes it as a tribe
+  does (step 3), fortified or not, and the defender gets no terrain
+  (read from the original's defence bonus).
+
+The Combat Analysis box shows these as Ambush, Bombard (the half again),
+Rebels or Tories (the colony's share) and Expeditionary Force (the
+Crown's bonus in the open). Those labels follow the order of
+`LABELS.TXT`; the box itself is not measured during the war.
 
 At sea, the last ship of a kind is no longer only damaged during the war;
 only the Crown's last man-of-war is. A rebel ship that is damaged with no
