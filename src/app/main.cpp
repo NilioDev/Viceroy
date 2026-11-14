@@ -156,7 +156,7 @@ void showLoadMenu(App& app) {
     app.audio.setPlaying(false);
     app.play.reset();
     app.load = std::make_unique<viceroy::LoadMenu>(
-        viceroy::listSaves(viceroy::pack::savesFolder(app.library), *app.art));
+        *app.art, viceroy::listSaves(viceroy::pack::savesFolder(app.library), *app.art));
     app.mode = Mode::Load;
     app.debug = viceroy::DebugMenu{};
 }
@@ -306,11 +306,13 @@ void openLibrary(App& app) {
     }
 }
 
-void startGame(App& app, const viceroy::SaveSlot& slot) {
+bool startGame(App& app, const viceroy::SaveSlot& slot) {
     try {
         beginPlay(app, viceroy::Game(viceroy::readSaveGame(readAll(slot.path)), app.art->rules), slot.path);
+        return true;
     } catch (const viceroy::FormatError& e) {
         app.status = std::string("Cannot read this savegame: ") + e.what();
+        return false;
     }
 }
 
@@ -651,9 +653,6 @@ void click(App& app, float wx, float wy) {
         return;
     }
     if (!app.debug.open() && app.play->clickMenu(static_cast<int>(x), static_cast<int>(y))) {
-        if (app.play->loadRequested()) {
-            showLoadMenu(app);
-        }
         return;
     }
     if (!app.play->dialog() && !app.debug.open()) {
@@ -834,9 +833,7 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
             }
             if (letter && app->play->menu()) {
                 app->play->menuLetter(static_cast<char>('A' + (k - SDLK_A)));
-                if (app->play->loadRequested()) {
-                    showLoadMenu(*app);
-                } else if (app->play->quitRequested()) {
+                if (app->play->quitRequested()) {
                     return SDL_APP_SUCCESS;
                 }
                 break;
@@ -990,6 +987,16 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
     const Uint64 now = SDL_GetTicks();
     const Uint64 elapsed = now - app->lastTicks;
     app->lastTicks = now;
+    if (app->mode == Mode::Play && !app->play->loadRequested().empty()) {
+        // A game picked in the Load Game box replaces this one.
+        const viceroy::SaveSlot slot{app->play->loadRequested(), {}, false};
+        if (startGame(*app, slot)) {
+            app->play->showLoaded();
+        } else {
+            app->status.clear();
+            app->play->loadFailed();
+        }
+    }
     if (app->mode == Mode::Play) {
         app->play->tick(elapsed);
         app->audio.update(app->play->game().independenceDeclared());

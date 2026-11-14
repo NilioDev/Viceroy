@@ -137,17 +137,81 @@ VCR_TEST("original files: the menus open, move and act") {
     play.handle(Command::Menu);
     VCR_CHECK(play.clickMenu(200, 150)); // outside closes it
     VCR_CHECK(!play.menu().has_value());
-    // Load Game goes back to the load menu.
+    // Load Game opens the box of the ten slots.
     play.handle(Command::Menu);
     for (int i = 0; i < 5; ++i) {
         play.handle(Command::MoveS);
     }
     VCR_CHECK(play.menu()->selected == 5);
-    VCR_CHECK(!play.handle(Command::Confirm));
+    VCR_CHECK(play.handle(Command::Confirm));
+    VCR_CHECK(play.dialog() && play.dialog()->options.size() == 10);
+    play.handle(Command::Cancel);
+    VCR_CHECK(!play.dialog() && play.loadRequested().empty());
     // In the orders menu a gold letter picks the entry: W for Wait.
     play.openMenu(2, false);
     play.menuLetter('w');
     VCR_CHECK(!play.menu().has_value());
+}
+
+VCR_TEST("original files: Save Game and Load Game offer the original's slots") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    const auto work = std::filesystem::temp_directory_path() / "viceroy_test_slots";
+    std::filesystem::remove_all(work);
+    std::filesystem::create_directories(work);
+    std::filesystem::copy_file(*findFileNoCase(dir, "COLONY04.SAV"), work / "COLONY09.SAV");
+    std::ifstream in(work / "COLONY09.SAV", std::ios::binary);
+    const Bytes bytes(std::istreambuf_iterator<char>(in), {});
+    PlayScreen play(Game(readSaveGame(bytes), art.rules), work / "COLONY09.SAV");
+    play.setArt(&art);
+    const auto pick = [&](int entry) {
+        play.handle(Command::Menu);
+        for (int i = 0; i < entry; ++i) {
+            play.handle(Command::MoveS);
+        }
+        play.handle(Command::Confirm);
+    };
+
+    // Save Game: the first eight slots, empty ones as the original names
+    // them; Escape saves nothing.
+    pick(4);
+    VCR_CHECK(play.dialog() && play.dialog()->options.size() == 8);
+    VCR_CHECK(play.dialog()->options[0] == "(EMPTY)");
+    VCR_CHECK(play.dialog()->small && play.dialog()->x == 62 && play.dialog()->y == 59); // centred, as measured
+    play.handle(Command::Cancel);
+    VCR_CHECK(!play.dialog() && !std::filesystem::exists(work / "COLONY00.SAV"));
+    pick(4);
+    play.handle(Command::MoveS);
+    play.handle(Command::MoveS);
+    play.handle(Command::Confirm);
+    VCR_CHECK(std::filesystem::exists(work / "COLONY02.SAV"));
+    VCR_CHECK(play.savePath() == work / "COLONY02.SAV");
+    VCR_CHECK(play.dialog().has_value());
+    std::string said;
+    for (const auto& line : play.dialog()->lines) {
+        said += line + " ";
+    }
+    VCR_CHECK(said == "Conquistador Michiel de jager of the Dutch (Spring 1727) saved as COLONY02.SAV. "); // seen
+    play.handle(Command::Confirm);
+
+    // Load Game: all ten; an empty slot does nothing, a game is handed to
+    // the app.
+    pick(5);
+    VCR_CHECK(play.dialog() && play.dialog()->options.size() == 10);
+    VCR_CHECK(play.dialog()->options[2] == "Conquistador Michiel de jager of the Dutch, Spring 1727"); // seen
+    VCR_CHECK(play.dialog()->options[9] == play.dialog()->options[2]);
+    VCR_CHECK(play.dialog()->y == 51); // measured
+    play.handle(Command::Confirm);
+    VCR_CHECK(!play.dialog() && play.loadRequested().empty());
+    pick(5);
+    play.handle(Command::MoveS);
+    play.handle(Command::MoveS);
+    play.handle(Command::Confirm);
+    VCR_CHECK(play.loadRequested() == work / "COLONY02.SAV");
+    std::filesystem::remove_all(work);
 }
 
 VCR_TEST("original files: Sound Options turn music on and off") {

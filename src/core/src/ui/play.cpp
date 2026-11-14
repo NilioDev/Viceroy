@@ -28,7 +28,6 @@ constexpr std::uint64_t kBlinkMs = 250;
 constexpr std::uint64_t kSlideMs = 160;
 constexpr std::uint64_t kPauseMs = 250;
 constexpr std::uint8_t kGreen = 0x44;
-constexpr std::uint8_t kGold = 0x95;
 constexpr std::uint8_t kBlack = 0x00;
 // Rows of LABELS.TXT for the custom house's sales.
 constexpr int kLabelSells = 47; // @MISC "sells"
@@ -1038,6 +1037,7 @@ bool PlayScreen::handleDialog(Command command) {
             break;
         }
         if (question_ == "SAILPORT" || question_ == "TRAVELPLACE" || question_.rfind("PICK", 0) == 0 ||
+            question_ == "SAVEGAME" || question_ == "LOADGAME" ||
             (question_.rfind("ROUTE", 0) == 0 && question_ != "ROUTESURE")) {
             // Go To has no "None": Escape leaves the unit as it was.
             // Pick Music and its lists close without a pick.
@@ -2268,6 +2268,28 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
             auto news = game_.takeNotices();
             notices_.insert(notices_.begin(), std::make_move_iterator(news.begin()), std::make_move_iterator(news.end()));
             game_.setActiveUnit(-1);
+        }
+    } else if (question == "SAVEGAME") {
+        if (choice >= 0 && choice < 8 && art_ != nullptr) {
+            const std::string name = "COLONY0" + std::to_string(choice) + ".SAV";
+            const auto folder = savePath_.parent_path();
+            const auto found = findFileNoCase(folder, name);
+            if (saveTo(found ? *found : folder / name)) {
+                ask("SAVEGOOD", -1, {name, saveTitle(game_.state(), *art_, true)});
+            } else {
+                ask("SAVEERROR", -1, {name});
+            }
+            if (dialog_) {
+                placeCentredDialog(*dialog_);
+            }
+        }
+    } else if (question == "LOADGAME") {
+        // Seen: an empty slot does nothing.
+        if (choice >= 0 && art_ != nullptr) {
+            const auto slots = listSaves(savePath_.parent_path(), *art_);
+            if (static_cast<std::size_t>(choice) < slots.size() && !slots[static_cast<std::size_t>(choice)].empty) {
+                loadPath_ = slots[static_cast<std::size_t>(choice)].path;
+            }
         }
     } else if (question == "RETIRE") {
         // "Yes" or "No".
@@ -3811,9 +3833,7 @@ bool PlayScreen::handle(Command command) {
         work(SaveUnit::kRoad);
         break;
     case Command::Save:
-        if (save()) {
-            say("Game saved.");
-        }
+        showSaveSlots();
         break;
     default:
         break;
@@ -3821,9 +3841,11 @@ bool PlayScreen::handle(Command command) {
     return true;
 }
 
-bool PlayScreen::save() {
+bool PlayScreen::save() { return saveTo(savePath_); }
+
+bool PlayScreen::saveTo(const std::filesystem::path& path) {
     const Bytes bytes = writeSaveGame(game_.state());
-    const auto temp = savePath_.string() + ".new";
+    const auto temp = path.string() + ".new";
     {
         std::ofstream out(temp, std::ios::binary | std::ios::trunc);
         out.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
@@ -3833,12 +3855,84 @@ bool PlayScreen::save() {
         }
     }
     std::error_code ec;
-    std::filesystem::rename(temp, savePath_, ec);
+    std::filesystem::rename(temp, path, ec);
     if (ec) {
         say("Could not save the game.");
         return false;
     }
+    savePath_ = path;
     return true;
+}
+
+// The box of slots, measured on the original: the small letters, as wide
+// as the widest slot needs (8 more than its text) and centred on the
+// screen.
+Dialog saveSlotBox(const Art& art, std::string_view section, const std::vector<SaveSlot>& slots) {
+    Dialog d = makeDialog(art, section);
+    d.small = true;
+    for (const auto& slot : slots) {
+        addOption(d, slot.label);
+        d.width = std::max(d.width, Screen::textWidth(art.tiny, slot.label) + 8);
+    }
+    placeCentredDialog(d);
+    d.x = (Screen::kWidth - d.width - 6 + 1) / 2; // an odd width leaves the spare pixel on the left
+    return d;
+}
+
+namespace {
+
+// A savegame's name as the messages give it: "COLONY03.SAV".
+std::string slotFileName(const std::filesystem::path& path) {
+    std::string name = path.filename().string();
+    for (auto& c : name) {
+        c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+    }
+    return name;
+}
+
+// "Loaded COLONY03.SAV successfully.", or why the game could not be read.
+Dialog loadMessage(const Art& art, const std::filesystem::path& path, bool good) {
+    Dialog d = makeDialog(art, good ? "LOADGOOD" : "LOADNOT", {slotFileName(path)});
+    placeCentredDialog(d);
+    return d;
+}
+
+} // namespace
+
+void PlayScreen::showSaveSlots() {
+    // Seen: the first eight slots (the last two are the autosaves), the bar
+    // on the first.
+    if (art_ == nullptr) {
+        return;
+    }
+    ask("SAVEGAME", -1);
+    if (dialog_) {
+        *dialog_ = saveSlotBox(*art_, "SAVEGAME", listSaves(savePath_.parent_path(), *art_, 8));
+    }
+}
+
+void PlayScreen::showLoadSlots() {
+    if (art_ == nullptr) {
+        return;
+    }
+    ask("LOADGAME", -1);
+    if (dialog_) {
+        *dialog_ = saveSlotBox(*art_, "LOADGAME", listSaves(savePath_.parent_path(), *art_));
+    }
+}
+
+void PlayScreen::showLoaded() {
+    ask("LOADGOOD", -1, {slotFileName(savePath_)});
+    if (dialog_) {
+        placeCentredDialog(*dialog_);
+    }
+}
+
+void PlayScreen::loadFailed() {
+    ask("LOADNOT", -1, {slotFileName(std::exchange(loadPath_, {}))});
+    if (dialog_) {
+        placeCentredDialog(*dialog_);
+    }
 }
 
 void PlayScreen::tick(std::uint64_t milliseconds) {
@@ -3991,54 +4085,89 @@ void PlayScreen::drawScreen(Screen& screen, const Art& art) const {
 
 // --- Load menu ---------------------------------------------------------------
 
-std::vector<SaveSlot> listSaves(const std::filesystem::path& folder, const Art& art) {
+std::string saveTitle(const SaveGame& save, const Art& art, bool brackets) {
+    const std::string difficulty = textLine(art.names, "DIFFICULTY", save.difficulty, "");
+    const auto human = static_cast<std::size_t>(save.humanNation);
+    const std::string name = human < save.players.size() ? save.players[human].name : "";
+    const std::string nation = textLine(art.names, "NATIONALITY", save.humanNation, "");
+    const std::string when = textLine(art.names, "SEASONS", save.season, save.season == 0 ? "Spring" : "Autumn") + " " +
+                             std::to_string(save.year);
+    const std::string who = difficulty + " " + name + " of the " + nation;
+    return brackets ? who + " (" + when + ")" : who + ", " + when;
+}
+
+std::vector<SaveSlot> listSaves(const std::filesystem::path& folder, const Art& art, int count) {
     std::vector<SaveSlot> slots;
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < count; ++i) {
         const std::string name = "COLONY0" + std::to_string(i) + ".SAV";
-        const auto path = findFileNoCase(folder, name);
-        if (!path) {
-            continue;
-        }
-        try {
-            const auto save = readSaveGame(readFile(*path));
-            std::string nation = "?";
-            if (const auto* s = art.names.find("NATIONALITY")) {
-                if (static_cast<std::size_t>(save.humanNation) < s->lines.size()) {
-                    nation = s->lines[static_cast<std::size_t>(save.humanNation)];
-                }
+        SaveSlot slot{folder / name, "(EMPTY)", true};
+        if (const auto path = findFileNoCase(folder, name)) {
+            slot.path = *path;
+            try {
+                slot.label = saveTitle(readSaveGame(readFile(*path)), art);
+                slot.empty = false;
+            } catch (const FormatError&) {
+                // Not a save that can be read: an empty slot.
             }
-            std::string season = save.season == 0 ? "Spring" : "Autumn";
-            if (const auto* s = art.names.find("SEASONS")) {
-                if (static_cast<std::size_t>(save.season) < s->lines.size()) {
-                    season = s->lines[static_cast<std::size_t>(save.season)];
-                }
-            }
-            const auto& player = save.players[static_cast<std::size_t>(save.humanNation)];
-            slots.push_back({*path, name.substr(0, 8) + "  " + player.name + ", " + nation + "  " + season + " " +
-                                        std::to_string(save.year)});
-        } catch (const FormatError&) {
-            // Not a save we can read: leave it out.
         }
+        slots.push_back(std::move(slot));
     }
     return slots;
 }
 
-std::optional<SaveSlot> LoadMenu::handle(Command command) {
-    if (slots_.empty()) {
+LoadMenu::LoadMenu(const Art& art, std::vector<SaveSlot> slots)
+    : art_(&art), slots_(std::move(slots)), list_(saveSlotBox(art, "LOADGAME", slots_)) {}
+
+namespace {
+// Measured on the original: on the main menu's wooden screen the list
+// has no box; the title is at row 67 and the slots 6 rows apart from row
+// 75, the chosen one on a bar 8 high, a pixel narrower at each end than in
+// a box.
+constexpr int kTitleListTop = 67;
+constexpr int kTitleListRows = 75;
+constexpr int kTitleListStep = 6;
+} // namespace
+
+std::optional<SaveSlot> LoadMenu::pick(int row) {
+    if (row < 0 || row >= static_cast<int>(slots_.size())) {
         return std::nullopt;
     }
-    const int count = static_cast<int>(slots_.size());
+    const auto& slot = slots_[static_cast<std::size_t>(row)];
+    if (slot.empty) {
+        return std::nullopt; // seen: an empty slot does nothing
+    }
+    bool good = true;
+    try {
+        (void)readSaveGame(readFile(slot.path));
+    } catch (const FormatError&) {
+        good = false;
+    }
+    message_ = loadMessage(*art_, slot.path, good);
+    if (good) {
+        loaded_ = slot;
+    }
+    return std::nullopt;
+}
+
+std::optional<SaveSlot> LoadMenu::handle(Command command) {
+    if (message_) {
+        if (command == Command::Confirm || command == Command::Cancel || command == Command::Skip) {
+            message_.reset();
+            return std::exchange(loaded_, std::nullopt);
+        }
+        return std::nullopt;
+    }
     switch (command) {
     case Command::Up:
     case Command::MoveN:
-        selected_ = (selected_ + count - 1) % count;
+        stepSelection(list_, -1);
         break;
     case Command::Down:
     case Command::MoveS:
-        selected_ = (selected_ + 1) % count;
+        stepSelection(list_, 1);
         break;
     case Command::Confirm:
-        return slots_[static_cast<std::size_t>(selected_)];
+        return pick(list_.selected);
     default:
         break;
     }
@@ -4046,36 +4175,46 @@ std::optional<SaveSlot> LoadMenu::handle(Command command) {
 }
 
 std::optional<SaveSlot> LoadMenu::click(int x, int y) {
-    // The rows as draw() lays them out: from y 50, 10 apart.
-    if (x < 34 || x >= 286 || y < 48) {
+    if (message_) {
+        return handle(Command::Confirm);
+    }
+    const int width = list_.width + 6;
+    if (x < list_.x + 4 || x >= list_.x + width - 4 || y < kTitleListRows - 1) {
         return std::nullopt;
     }
-    const int row = (y - 48) / 10;
-    if (row >= static_cast<int>(slots_.size())) {
+    const int row = (y - kTitleListRows + 1) / kTitleListStep;
+    if (row >= static_cast<int>(list_.options.size())) {
         return std::nullopt;
     }
-    selected_ = row;
-    return slots_[static_cast<std::size_t>(row)];
+    list_.selected = row;
+    return pick(row);
 }
 
 void LoadMenu::draw(Screen& screen, const Art& art) const {
     screen.clear(kBlack);
-    screen.tile(art.wood, {0, 0, Screen::kWidth, Screen::kHeight});
-    const Rect box{30, 30, 260, 24 + 10 * static_cast<int>(std::max<std::size_t>(slots_.size(), 1))};
-    screen.fill(box, kBlack);
-    screen.frame(box, kGold);
-    screen.text(art.small, box.x + 8, box.y + 6, "Load Game", {kGold, kGold, kGold});
-    if (slots_.empty()) {
-        screen.text(art.tiny, box.x + 8, box.y + 20, "No savegames found.", {kGreen, kNoColour, kNoColour});
+    if (art.woodPanel.palette) {
+        screen.setColours(*art.woodPanel.palette, 16, 255);
     }
-    for (std::size_t i = 0; i < slots_.size(); ++i) {
-        const int y = box.y + 20 + 10 * static_cast<int>(i);
-        const bool selected = static_cast<int>(i) == selected_;
-        if (selected) {
-            screen.fill({box.x + 4, y - 2, box.w - 8, 9}, kGreen);
+    screen.blit(art.woodPanel.image, 0, 0);
+    constexpr TextColours kListColours{kGreen, 0x80, 0x2F};
+    const int width = list_.width + 6;
+    for (const auto& line : list_.lines) {
+        screen.text(art.tiny, list_.x + 5, kTitleListTop, line, kListColours);
+    }
+    // Seen: each slot is drawn after the one above, its bar over that
+    // one's last row of pixels, and the list is cut off a row early.
+    const int bottom = kTitleListRows + kTitleListStep * static_cast<int>(list_.options.size()) - 1;
+    screen.setClip({0, 0, Screen::kWidth, bottom});
+    for (std::size_t i = 0; i < list_.options.size(); ++i) {
+        const int y = kTitleListRows + kTitleListStep * static_cast<int>(i);
+        if (static_cast<int>(i) == list_.selected) {
+            screen.fill({list_.x + 5, y - 1, width - 10, 8}, 0x8A);
         }
-        screen.text(art.tiny, box.x + 8, y, slots_[i].label,
-                    {selected ? kBlack : kGreen, kNoColour, kNoColour});
+        screen.text(art.tiny, list_.x + 9, y, list_.options[i], kListColours);
+    }
+    screen.resetClip();
+    if (message_) {
+        drawDialog(screen, art, *message_);
     }
 }
 
@@ -4302,9 +4441,7 @@ bool PlayScreen::clickMenu(int x, int y) {
     const int entry = menuEntryAt(*art_, def, *menu_, x, y);
     const Rect box = menuBox(*art_, def, *menu_);
     if (entry >= 0) {
-        if (!pickMenuEntry(entry)) {
-            quitToLoad_ = true;
-        }
+        pickMenuEntry(entry);
     } else if (x < box.x || x >= box.x + box.w || y < box.y || y >= box.y + box.h) {
         menu_.reset(); // a click outside closes the menu
     }
@@ -4321,9 +4458,7 @@ void PlayScreen::menuLetter(char letter) {
         if (def.entries[static_cast<std::size_t>(i)].hotkey == upper &&
             menu_->states[static_cast<std::size_t>(i)] == EntryState::Enabled) {
             menu_->selected = i;
-            if (!pickMenuEntry(i)) {
-                quitToLoad_ = true;
-            }
+            pickMenuEntry(i);
             return;
         }
     }
@@ -4606,12 +4741,11 @@ bool PlayScreen::pickMenuEntry(int entry) {
             showPickMusic();
             return true;
         case game_menu::kSave:
-            if (save()) {
-                say("Game saved.");
-            }
+            showSaveSlots();
             return true;
         case game_menu::kLoad:
-            return false;
+            showLoadSlots();
+            return true;
         case game_menu::kDeclare:
             tell(game_.independenceQuestion());
             return true;

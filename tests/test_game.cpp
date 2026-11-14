@@ -250,8 +250,17 @@ VCR_TEST("original files: a turn can be played and saved") {
     std::filesystem::copy_file(*findFileNoCase(dir, "COLONY09.SAV"), work / "COLONY09.SAV");
 
     const auto slots = listSaves(work, art);
-    VCR_CHECK(slots.size() == 1);
-    LoadMenu menu(slots);
+    VCR_CHECK(slots.size() == 10);
+    VCR_CHECK(slots[0].empty && slots[0].label == "(EMPTY)");
+    VCR_CHECK(!slots[9].empty);
+    LoadMenu menu(art, slots);
+    VCR_CHECK(!menu.handle(Command::Confirm).has_value()); // an empty slot does nothing
+    VCR_CHECK(menu.message() == nullptr);
+    for (int i = 0; i < 9; ++i) {
+        menu.handle(Command::Down);
+    }
+    VCR_CHECK(!menu.handle(Command::Confirm).has_value()); // first the word that it loaded
+    VCR_CHECK(menu.message() != nullptr);
     const auto chosen = menu.handle(Command::Confirm);
     VCR_CHECK(chosen.has_value());
 
