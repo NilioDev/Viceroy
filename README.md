@@ -269,6 +269,7 @@ saved in the first free slot, or over the savegame saved longest ago.
 | Save the game in one of eight slots | Ctrl+S, or Game, Save Game | Start, then Save Game |
 | Load another savegame while playing | Game, Load Game | Start, then Load Game |
 | Quit (asks first, as the original) | Game, Exit to DOS | Start, then Exit to DOS |
+| Find a colony by its name; see the land under the forests; the home port | View, Find Colony; View, Show Hidden Terrain (a key brings the map back); View, European Status | Start, then View |
 | Back to the load menu | Esc | Guide |
 
 The mouse pointer is the game's own arrow, drawn in the picture as the

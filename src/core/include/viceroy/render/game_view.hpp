@@ -109,6 +109,9 @@ struct ViewState {
     int lookX = -1;
     int lookY = -1;
     bool endOfTurn = false; // "End of Turn" below that
+    // Show Hidden Terrain: the land without its forests, roads, colonies,
+    // settlements and units, until a key or a click.
+    bool hiddenTerrain = false;
     // While the messages of a turn's end are up, the panel still shows the
     // turn that ended (seen); -1 for the game's own date.
     int shownYear = -1;
@@ -141,7 +144,7 @@ std::string seasonName(const Art& art, int season);
 // The sprite in ICONS.SS for a colonist with this skill.
 int colonistIcon(int skill);
 // One map square: terrain, forest, hills, rivers, roads, coast; no units.
-void drawTerrain(Screen& screen, const Art& art, const Game& game, int x, int y, int px, int py);
+void drawTerrain(Screen& screen, const Art& art, const Game& game, int x, int y, int px, int py, bool hidden = false);
 // Draws a sprite of a sheet if it exists.
 void blitSprite(Screen& screen, const SpriteSheet& sheet, int index, int x, int y);
 std::uint8_t nationColour(const Art& art, int nation);

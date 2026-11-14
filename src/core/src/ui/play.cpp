@@ -2037,6 +2037,33 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
         if (choice == 0 && colonyScreen_) {
             game_.clearSpecialty(colonyScreen_->colony, colonyScreen_->selectedColonist);
         }
+    } else if (question == "FINDCITY") {
+        // Seen: the whole name, in any case; the map then shows the colony
+        // with the view cursor on it. Another name is "not found".
+        if (choice == 0 && !typed_.empty()) {
+            const auto lower = [](std::string text) {
+                for (auto& c : text) {
+                    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+                }
+                return text;
+            };
+            int found = -1;
+            const auto& colonies = game_.state().colonies;
+            for (std::size_t i = 0; i < colonies.size() && found < 0; ++i) {
+                if (lower(colonies[i].name) == lower(typed_)) {
+                    found = static_cast<int>(i);
+                }
+            }
+            if (found >= 0) {
+                const auto& c = colonies[static_cast<std::size_t>(found)];
+                viewMode_ = true;
+                cursorX_ = c.x;
+                cursorY_ = c.y;
+                centreOn(view_, game_, c.x, c.y);
+            } else {
+                ask("NOCITY", -1, {typed_});
+            }
+        }
     } else if (question == "RENAMECOLONY") {
         // An empty name keeps the old one (read from the original).
         if (choice == 0 && !typed_.empty() && colonyScreen_) {
@@ -3579,6 +3606,10 @@ bool PlayScreen::handle(Command command) {
         // Input waits until the unit has arrived.
         return true;
     }
+    if (view_.hiddenTerrain) {
+        view_.hiddenTerrain = false; // seen: any key brings the map back
+        return true;
+    }
     if (signing_) {
         // Read from the original: a key finishes the letter at once.
         ++signing_->stroke;
@@ -4004,9 +4035,9 @@ void PlayScreen::tick(std::uint64_t milliseconds) {
     // turn ends by itself once no unit waits for orders and nothing else
     // is on the screen. A short pause first, so the last move is seen.
     const bool idle = game_.activeUnit() < 0 && !game_.gameOption(game_option::kEndOfTurn) && !dialog_ &&
-                      notices_.empty() && !menu_ && !colonyScreen_ && !europeScreen_ && !reportUp() &&
-                      routeScreen_ < 0 && !congressHallUp() && !signing_ && !slide_ && !attack_ && !viewMode_ &&
-                      !game_.gameOver();
+                      !view_.hiddenTerrain && notices_.empty() && !menu_ && !colonyScreen_ && !europeScreen_ &&
+                      !reportUp() && routeScreen_ < 0 && !congressHallUp() && !signing_ && !slide_ && !attack_ &&
+                      !viewMode_ && !game_.gameOver();
     idleMs_ = idle ? idleMs_ + milliseconds : 0;
     if (idle && idleMs_ >= kPauseMs) {
         idleMs_ = 0;
@@ -4274,6 +4305,9 @@ constexpr int kExit = 8;
 namespace view_menu {
 constexpr int kMovePieces = 0;
 constexpr int kViewPieces = 1;
+constexpr int kEuropeanStatus = 2;
+constexpr int kFindColony = 3;
+constexpr int kHiddenTerrain = 10;
 constexpr int kCentre = 11;
 } // namespace view_menu
 namespace reports_menu {
@@ -4831,6 +4865,18 @@ bool PlayScreen::pickMenuEntry(int entry) {
             return handle(Command::ViewMode);
         case view_menu::kCentre:
             return handle(Command::Centre);
+        case view_menu::kHiddenTerrain:
+            view_.hiddenTerrain = true;
+            return true;
+        case view_menu::kEuropeanStatus:
+            return handle(Command::Europe); // seen: the home port's screen
+        case view_menu::kFindColony:
+            // Seen: "Where the heck is . . .", an empty field to type in.
+            ask("FINDCITY", -1);
+            if (dialog_ && art_ != nullptr) {
+                makeInput(*art_, *dialog_, "", 23);
+            }
+            return true;
         default:
             notYet();
             return true;

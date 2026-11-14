@@ -83,3 +83,16 @@ OK sets the eight bits anew and keeps the others of the two bytes (the
 original masks the word with 0x207F). Every savegame of the original we have
 seen has byte 19 at 0xC6, so a new game starts with it. The gold letter of
 an option turns it over.
+
+## The VIEW menu
+
+Seen in the original:
+
+- **European Status** opens the home port's screen, as E does.
+- **Find Colony** asks "Where the heck is . . ." (`FINDCITY`) with an empty
+  field. The whole name of a colony, in any case, brings the map round to
+  it with the view cursor on it (View Pieces); anything else, part of a
+  name too, says `"Bah" not found.` (`NOCITY`).
+- **Show Hidden Terrain** draws the map without forests, roads, the land's
+  resources, lost city rumours, colonies, settlements and units (the fish
+  stay) until a key or a click, which does nothing else.
