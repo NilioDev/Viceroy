@@ -391,16 +391,16 @@ void Game::rebelSentiment(int nation) {
 void Game::offerMercenaries() {
     // Read from the original: one turn in 21 a European king (perhaps the
     // player's own) offers a few veteran dragoons and an artillery or two,
-    // if the player has met his nation and can pay.
+    // if that nation is at peace with the player and the player can pay.
     if ((save_.header[kIndependence] & 0x01) != 0 || aiRandom(0, 20) != 0) {
         return;
     }
     const int nation = human();
     const int country = aiRandom(0, kEuropeanNations - 1);
     constexpr std::size_t kRelations = 52;
-    constexpr std::uint8_t kMet = 0x40;
+    constexpr std::uint8_t kPeace = 0x40;
     if (country != nation &&
-        (save_.nations[static_cast<std::size_t>(country)].raw[kRelations + static_cast<std::size_t>(nation)] & kMet) ==
+        (save_.nations[static_cast<std::size_t>(country)].raw[kRelations + static_cast<std::size_t>(nation)] & kPeace) ==
             0) {
         return;
     }

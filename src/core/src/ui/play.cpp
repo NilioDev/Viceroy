@@ -717,6 +717,10 @@ bool PlayScreen::handleDialog(Command command) {
             d.selected = 1; // the ring again: the treasure stays
             break;
         }
+        if (question_ == "MEETING") {
+            d.selected = -1; // no answer: the leader takes it as none of his
+            break;
+        }
         if (question_ == "SAILPORT" || question_ == "TRAVELPLACE" || question_.rfind("PICK", 0) == 0) {
             // Go To has no "None": Escape leaves the unit as it was.
             // Pick Music and its lists close without a pick.
@@ -892,8 +896,19 @@ void PlayScreen::showNotices() {
             if (notice.strings.size() <= static_cast<std::size_t>(line.string)) {
                 notice.strings.resize(static_cast<std::size_t>(line.string) + 1);
             }
-            notice.strings[static_cast<std::size_t>(line.string)] =
-                textLine(line.names ? art_->names : art_->gameText, line.section.c_str(), line.row, "");
+            // A line of GAME.TXT is taken whole ("His Most Christian
+            // Majesty, King Louis"); NAMES.TXT gives its first field.
+            std::string text;
+            if (line.names) {
+                text = textLine(art_->names, line.section.c_str(), line.row, "");
+            } else if (const auto* s = art_->gameText.find(line.section);
+                       s != nullptr && line.row >= 0 && static_cast<std::size_t>(line.row) < s->lines.size()) {
+                text = s->lines[static_cast<std::size_t>(line.row)];
+                while (!text.empty() && (text.back() == ' ' || text.back() == '\r')) {
+                    text.pop_back();
+                }
+            }
+            notice.strings[static_cast<std::size_t>(line.string)] = text + line.after;
         }
     }
     for (const auto& [string, row] : notice.labels) {
@@ -927,6 +942,33 @@ void PlayScreen::showNotices() {
             const auto& u = game_.unit(notice.unit);
             centreOn(view_, game_, u.x, u.y);
         }
+    }
+    if (notice.leader >= 0) {
+        // A foreign leader speaks, his portrait over the box (measured).
+        ask(notice.section, -1, notice.strings, -1, notice.numbers);
+        if (dialog_) {
+            if (notice.section == "MILITARY") {
+                // "You must attack the infidel . . ." and whom.
+                for (const auto& [who, name] : game_.allianceChoices()) {
+                    addOption(*dialog_, who < kEuropeanNations ? adjective(who) : name);
+                }
+                dialog_->selected = 0;
+            }
+            if (notice.value == Game::kMeetingQuestion) {
+                question_ = "MEETING";
+            }
+            placeLeaderDialog(*art_, *dialog_, notice.leader);
+        }
+        return;
+    }
+    if (notice.value == Game::kForeignNews) {
+        // Treaties and wars between other nations: the man of the home port
+        // tells them.
+        ask(notice.section, -1, notice.strings, -1, notice.numbers);
+        if (dialog_) {
+            placeForeignNewsDialog(*dialog_);
+        }
+        return;
     }
     if (notice.section.rfind("KING", 0) == 0 && notice.section != "KINGBUY") {
         // The King speaks, standing left of the box; a rise in tax may be
@@ -1488,6 +1530,11 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
     } else if (question.rfind("KINGGALLEON", 0) == 0) {
         // "Very well, and let the Crown claim its rightful share."
         game_.answerTreasure(choice == 0);
+        auto news = game_.takeNotices();
+        notices_.insert(notices_.begin(), std::make_move_iterator(news.begin()), std::make_move_iterator(news.end()));
+    } else if (question == "MEETING") {
+        // A foreign leader's question: the talk goes on at once.
+        game_.answerMeeting(choice);
         auto news = game_.takeNotices();
         notices_.insert(notices_.begin(), std::make_move_iterator(news.begin()), std::make_move_iterator(news.end()));
     } else if (question == "MERCENARIES") {

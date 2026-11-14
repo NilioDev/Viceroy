@@ -101,8 +101,25 @@ bool Game::meetNeighbours(int index) {
             seen[static_cast<std::size_t>(other)]) {
             continue;
         }
-        // A European nation meeting a tribe (in either order); Europeans
-        // meeting each other are not done yet.
+        if (u.nation < kEuropeanNations && other < kEuropeanNations) {
+            // Two European nations: the player's side talks (see
+            // diplomacy.cpp), two computer nations settle it at once.
+            int a = u.nation;
+            int b = other;
+            if (save_.players[static_cast<std::size_t>(b)].control == 0 &&
+                save_.players[static_cast<std::size_t>(a)].control != 0) {
+                std::swap(a, b);
+            }
+            bool met = false;
+            meetEuropean(a, b, index, static_cast<int>(d), met);
+            seen[static_cast<std::size_t>(other)] = met;
+            if (met) {
+                addRelationBits(a, b, kMet);
+                asked = asked || meetingWaiting();
+            }
+            continue;
+        }
+        // A European nation meeting a tribe (in either order).
         const bool europeanHere = u.nation < kEuropeanNations;
         const int nation = europeanHere ? u.nation : other;
         const int tribe = (europeanHere ? other : u.nation) - kEuropeanNations;

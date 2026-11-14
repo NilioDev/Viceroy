@@ -95,11 +95,12 @@ are four kinds of call:
 | A rumour with gold | next mood 2 (and mood now without Background Music) |
 | Treasure in burial mounds (`BURIAL3`), with no tribe angered | tune 24h |
 | The mounds were a tribe's burial ground (`SCREWED`) | tune 32h |
+| The leader declares war (`WARMEEK`, `WARMANLY`, `PROVOKE` after a threat), or takes the player's money for a war (`MERCENARY`) | mood now 4 |
 
 The tribe's mood is 7 for the Inca, 6 for the Aztecs and 5 for the others.
 
 Not yet in Viceroy, so not yet with music: the King's wars,
-independence and the War of Independence, wars between nations, the
+independence and the War of Independence, the
 natives' talks and threats, colonies taken or burned by other nations, and
 the end of the game.
 
@@ -151,6 +152,7 @@ beaten by a ship plays 4Dh, whoever attacked.
 | A unit in a colony is told to fortify (`UNITOPTIONS`) | 58h |
 | The King raises the tax and no party is possible | 3Eh |
 | A tea party (`TEAPARTY`) | 56h |
+| A European leader comes to talk (`HELLO...`) | 8020h + the leader's nation |
 
 Read from the original but not yet in Viceroy: 5Ch when a colonist or
 soldier takes horses and 8024h when one is blessed as a missionary (in the
