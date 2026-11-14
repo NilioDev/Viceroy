@@ -175,6 +175,71 @@ std::optional<MusicDriver> MusicDriver::load(std::span<const std::uint8_t> file)
             parse(0x20 + i, le16(code, effects + static_cast<std::size_t>(i) * 2));
         }
     }
+    // Sound effects: "mov ax, n; call play_sample" tries recording n first
+    // (the call returns past the rest when the recording is queued), then
+    // "mov cx, stream" or "lea cx, stream" with a call or jump to the routine
+    // that starts a stream on a free effect voice.
+    const auto parseEffect = [&](int index, std::size_t at) {
+        Piece p;
+        for (int steps = 0; steps < 12 && at + 4 < code.size(); ++steps) {
+            const std::uint8_t op = code[at];
+            if (op == 0xB8 && code[at + 3] == 0xE8) { // mov ax, n; call
+                p.sample = le16(code, at + 1);
+                at += 6;
+            } else if (op == 0xB9 && (code[at + 3] == 0xE8 || code[at + 3] == 0xE9)) { // mov cx, stream
+                p.effectStreams.push_back(le16(code, at + 1));
+                const bool last = code[at + 3] == 0xE9;
+                at += 6;
+                if (last) {
+                    break;
+                }
+            } else if (op == 0x8D && code[at + 1] == 0x0E && (code[at + 4] == 0xE8 || code[at + 4] == 0xE9)) {
+                p.effectStreams.push_back(le16(code, at + 2)); // lea cx, stream
+                const bool last = code[at + 4] == 0xE9;
+                at += 7;
+                if (last) {
+                    break;
+                }
+            } else {
+                break; // ret, or code this player does not know
+            }
+        }
+        if (p.sample >= 0 || !p.effectStreams.empty()) {
+            d.pieces_[static_cast<std::size_t>(index)] = std::move(p);
+            d.known_[static_cast<std::size_t>(index)] = true;
+        }
+    };
+    if (effects != 0) {
+        for (int i = 0; i < 0x1E; ++i) {
+            if (raw[static_cast<std::size_t>(0x20 + i)].empty()) {
+                parseEffect(0x20 + i, le16(code, effects + static_cast<std::size_t>(i) * 2));
+            }
+        }
+    }
+
+    // The recordings: the routine that finds one ("FINDWV") walks a table of
+    // offset and length pairs. The five drum hits play at 19050 a second,
+    // the rest at 11025 (the rates the driver sets the card to).
+    static constexpr std::uint8_t kFind[] = {'F', 'I', 'N', 'D', 'W', 'V'};
+    const auto find = std::search(code.begin(), code.end(), std::begin(kFind), std::end(kFind));
+    if (find != code.end()) {
+        const auto from = static_cast<std::size_t>(find - code.begin()) + 6;
+        for (std::size_t k = from; k + 4 < code.size() && k < from + 10; ++k) {
+            if (code[k] == 0x8D && code[k + 1] == 0x36) { // lea si, table
+                for (std::size_t e = le16(code, k + 2); e + 8 <= code.size() && d.samples_.size() < 64; e += 8) {
+                    const std::uint32_t offset = le16(code, e) | (static_cast<std::uint32_t>(le16(code, e + 2)) << 16);
+                    const std::uint32_t length =
+                        le16(code, e + 4) | (static_cast<std::uint32_t>(le16(code, e + 6)) << 16);
+                    if (length == 0) {
+                        break;
+                    }
+                    d.samples_.push_back({offset, length, d.samples_.size() < 5 ? 19050 : 11025});
+                }
+                break;
+            }
+        }
+    }
+
     const auto toVoice = [&](std::uint16_t state) { return (state - firstVoice) / 0x32; };
     for (std::size_t i = 0; i < raw.size(); ++i) {
         for (const Raw& r : raw[i]) {
@@ -183,7 +248,7 @@ std::optional<MusicDriver> MusicDriver::load(std::span<const std::uint8_t> file)
                 d.pieces_[i].starts.push_back({voice, r.stream});
             }
         }
-        d.known_[i] = !d.pieces_[i].starts.empty();
+        d.known_[i] = !d.pieces_[i].starts.empty() || d.pieces_[i].sample >= 0 || !d.pieces_[i].effectStreams.empty();
     }
 
     // Segues: "if the clock is not running, start at once; otherwise if
@@ -332,6 +397,25 @@ void MusicPlayer::startVoice(int voice, std::uint16_t stream) {
     v.r[kTicks] = 1;
 }
 
+void MusicPlayer::startEffect(std::uint16_t stream) {
+    // A free effect voice: 7, 8 or 6 if one is silent, else 6, 7 or 8 if
+    // one is fading; with none, the effect is not played.
+    const auto silent = [&](int v) { return voices_[static_cast<std::size_t>(v)].r[kTicks] == 0; };
+    const auto fading = [&](int v) { return voices_[static_cast<std::size_t>(v)].r[kFading] == 0xFF; };
+    for (const int v : {7, 8, 6}) {
+        if (silent(v)) {
+            startVoice(v, stream);
+            return;
+        }
+    }
+    for (const int v : {6, 7, 8}) {
+        if (fading(v)) {
+            startVoice(v, stream);
+            return;
+        }
+    }
+}
+
 void MusicPlayer::fadeVoice(int voice) {
     Voice& v = voices_[static_cast<std::size_t>(voice)];
     if (v.r[kTicks] != 0) {
@@ -376,6 +460,17 @@ bool MusicPlayer::command(int command) {
             waiting_ = &s.now;
         }
         return true;
+    }
+    if (p->sample >= 0 || !p->effectStreams.empty()) {
+        // A recording first (not while a piece plays digitised drums), else
+        // the FM version on free effect voices.
+        if (digital_ && p->sample >= 0 && drumVoice_ < 0 && onSample && onSample(p->sample)) {
+            return true;
+        }
+        for (const std::uint16_t stream : p->effectStreams) {
+            startEffect(stream);
+        }
+        return !p->effectStreams.empty();
     }
     if (p->onlyIfIdle && !p->starts.empty() && playing(p->starts.front().stream)) {
         return true;

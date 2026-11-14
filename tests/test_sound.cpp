@@ -184,3 +184,70 @@ VCR_TEST("background music: options silence what they turn off") {
     music.options.effects = false;
     VCR_CHECK(!music.allowed(0x45));
 }
+
+VCR_TEST("original files: the OPL3 driver's effects and recordings") {
+    const auto driver = loadDriver("PSOUND.COL");
+    if (!driver) {
+        VCR_SKIP("no PSOUND.COL in gamedata/");
+    }
+    // 35 recordings, one after another, filling COLDIG.BIN; the five drum
+    // hits play faster than the rest.
+    const auto& samples = driver->samples();
+    VCR_CHECK(samples.size() == 35);
+    VCR_CHECK(samples[0].offset == 0 && samples[0].length == 4960 && samples[0].rate == 19050);
+    VCR_CHECK(samples[5].rate == 11025 && samples[34].offset + samples[34].length == 993755);
+    // Effect 40h: recording 1Fh, else one FM stream; 46h only FM; 4Dh only
+    // a recording.
+    const Piece* first = driver->piece(0x40);
+    VCR_CHECK(first != nullptr && first->sample == 0x1F && first->effectStreams.size() == 1);
+    const Piece* fm = driver->piece(0x46);
+    VCR_CHECK(fm != nullptr && fm->sample == -1 && fm->effectStreams.size() == 1);
+    const Piece* digital = driver->piece(0x4D);
+    VCR_CHECK(digital != nullptr && digital->sample == 0x0A && digital->effectStreams.empty());
+
+    // Without samples the FM version plays on an effect voice.
+    MusicPlayer fmPlayer(*driver);
+    VCR_CHECK(fmPlayer.command(0x40));
+    fmPlayer.tick();
+    VCR_CHECK(fmPlayer.busy());
+    // With them the recording is queued instead, and the voices stay silent;
+    // a full queue falls back to FM.
+    MusicPlayer player(*driver);
+    player.setDigital(true);
+    std::vector<int> queued;
+    bool full = false;
+    player.onSample = [&](int s) {
+        if (full) {
+            return false;
+        }
+        queued.push_back(s);
+        return true;
+    };
+    VCR_CHECK(player.command(0x40) && queued == std::vector<int>({0x1F}));
+    player.tick();
+    VCR_CHECK(!player.busy());
+    full = true;
+    VCR_CHECK(player.command(0x40));
+    player.tick();
+    VCR_CHECK(player.busy());
+}
+
+VCR_TEST("original files: a recording plays through the music stream") {
+    const auto driver = loadDriver("PSOUND.COL");
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    const auto coldig = findFileNoCase(dir, "COLDIG.BIN");
+    if (!driver || !coldig) {
+        VCR_SKIP("no PSOUND.COL or COLDIG.BIN in gamedata/");
+    }
+    std::ifstream in(*coldig, std::ios::binary);
+    MusicStream stream(*driver, 44100);
+    stream.setRecordings({std::istreambuf_iterator<char>(in), {}});
+    VCR_CHECK(stream.player().command(0x4D));
+    std::vector<std::int16_t> pcm(44100 * 2); // one second
+    stream.render(pcm);
+    int peak = 0;
+    for (const std::int16_t s : pcm) {
+        peak = std::max(peak, s < 0 ? -static_cast<int>(s) : static_cast<int>(s));
+    }
+    VCR_CHECK(peak > 1000);
+}

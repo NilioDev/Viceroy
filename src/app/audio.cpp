@@ -44,6 +44,12 @@ void Audio::open(const std::filesystem::path& gameFolder) {
         return;
     }
     music_stream_ = std::make_unique<viceroy::sound::MusicStream>(*driver_, kSampleRate);
+    // The recordings for the drums and effects, as with a card that plays
+    // samples.
+    if (const auto coldig = viceroy::findFileNoCase(gameFolder, "COLDIG.BIN")) {
+        std::ifstream recordings(*coldig, std::ios::binary);
+        music_stream_->setRecordings({std::istreambuf_iterator<char>(recordings), {}});
+    }
     const SDL_AudioSpec spec{SDL_AUDIO_S16, 2, kSampleRate};
     stream_ = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, &Audio::feed, this);
     if (stream_ == nullptr) {

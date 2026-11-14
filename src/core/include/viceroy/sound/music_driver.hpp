@@ -40,6 +40,18 @@ struct Piece {
         std::array<std::uint16_t, 2> ifPlaying{};
     };
     std::optional<Segue> segue;
+
+    // A sound effect: a recording to play with a card that plays samples
+    // (-1: none), else the streams to start on free effect voices.
+    int sample = -1;
+    std::vector<std::uint16_t> effectStreams;
+};
+
+// Where a recording lies in COLDIG.BIN, and how fast it plays.
+struct Sample {
+    std::uint32_t offset = 0;
+    std::uint32_t length = 0;
+    int rate = 0; // samples a second
 };
 
 // The data of one FM driver file.
@@ -55,6 +67,9 @@ public:
 
     // True for the OPL3 driver (four-operator voices on two register sets).
     bool opl3() const { return opl3_; }
+
+    // The recordings of COLDIG.BIN, as the driver lists them.
+    const std::vector<Sample>& samples() const { return samples_; }
 
     std::uint8_t byte(std::uint16_t at) const { return data_[at]; }
     std::uint16_t word(std::uint16_t at) const {
@@ -86,6 +101,7 @@ private:
     std::vector<std::uint8_t> code_;
     std::array<Piece, 0x3E> pieces_{};         // commands 0x20..0x5D
     std::array<bool, 0x3E> known_{};
+    std::vector<Sample> samples_;
     bool opl3_ = false;
 };
 
@@ -116,7 +132,8 @@ public:
     void setDigital(bool on) { digital_ = on; }
 
     std::function<void(int port, int reg, int value)> onWrite;
-    std::function<void(int sample)> onSample;
+    // A recording to queue; false when the queue is full.
+    std::function<bool(int sample)> onSample;
 
 private:
     struct Voice {
@@ -130,6 +147,7 @@ private:
     int shadow(int port, int reg) const;
     std::uint16_t random();
     void startVoice(int voice, std::uint16_t stream);
+    void startEffect(std::uint16_t stream);
     void fadeVoice(int voice);
     void update(int voice);
     void interpret(int voice, bool& refresh);
