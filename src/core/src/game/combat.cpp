@@ -497,6 +497,7 @@ void Game::captureColony(int colony, int attacker) {
     a.y = c.y;
     a.orders = SaveUnit::kNoOrders;
     reveal(c.x, c.y, 2, a.nation);
+    coloniesChangeHands(colony);
     // "Dutch march into Martinique! 62 plundered!"
     GameNotice notice{"CAPTURED", {"", "", c.name}};
     notice.adjectives = {{0, a.nation}};

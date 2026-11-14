@@ -930,6 +930,11 @@ void PlayScreen::tell(GameNotice notice) {
 }
 
 void PlayScreen::showNotices() {
+    if (!dialog_ && notices_.empty() && game_.gameOver()) {
+        // The game is over: as the original, the program ends.
+        quit_ = true;
+        return;
+    }
     if (!dialog_ && notices_.empty()) {
         view_.shownYear = -1; // the new turn's date
         if (advanceAfterNotices_) {
@@ -1260,7 +1265,12 @@ void PlayScreen::showNotices() {
                                                  "ALREADYREVOLUTION", "TOOTORY", "MULTIREV", "DECLARE",
                                                  "INDEPENDENCE", "SEIZURE", "MOBILIZE", "MOBILIZE2", "INTERVENE",
                                                  "INTERVENTION", "AMBUSHHINT", "CONSIDER", "NOWARSDURINGREV",
-                                                 "EUROPENOTAVAIL", "EUROPENOTLEAVE", "NOCOLONIESEITHER"};
+                                                 "EUROPENOTAVAIL", "EUROPENOTLEAVE", "NOCOLONIESEITHER", "INVASION",
+                                                 "SEIZURESEA", "SEIZURELAND", "TORYUPRISING", "HOWTOWIN", "WINNING",
+                                                 "LOSING1", "LOSING2", "LOSING3", "WARN1", "WARN2", "WARN3",
+                                                 // The end of the game (placement not measured yet).
+                                                 "LOSENOCOLONIES", "SOONRETIRING0", "SOONRETIRING1", "RETIRING",
+                                                 "RETIRING2", "SCORED", "OTHERGRANTED", "OTHERMIGHT", "OTHERLESS"};
         if (std::find(std::begin(kBattles), std::end(kBattles), notice.section) != std::end(kBattles)) {
             placeMapDialog(*dialog_);
         } else if (notice.section == "LOOTCASH" || notice.section == "CASHTREASURE") {
@@ -1665,6 +1675,11 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
             auto news = game_.takeNotices();
             notices_.insert(notices_.begin(), std::make_move_iterator(news.begin()), std::make_move_iterator(news.end()));
             game_.setActiveUnit(-1);
+        }
+    } else if (question == "SCORED") {
+        // "That's all." or "Keep playing anyway."
+        if (choice == 1) {
+            game_.keepPlaying();
         }
     } else if (question == "MERCENARIES") {
         // "No thank you." or "Pay": they land at once.

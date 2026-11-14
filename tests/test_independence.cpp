@@ -171,7 +171,7 @@ VCR_TEST("independence: the declaration clears the field for the war") {
     VCR_CHECK(st.players[kCrown].control == 1);
     VCR_CHECK(g.unitCount() == 1 && g.unit(0).nation == kHuman && g.unit(0).type == 1);
     VCR_CHECK(g.unit(0).movesUsed >= 1);
-    const auto rel = [&](int a, int b) { return st.nations[static_cast<std::size_t>(a)].raw[52 + b]; };
+    const auto rel = [&](int a, int b) { return st.nations[static_cast<std::size_t>(a)].raw[static_cast<std::size_t>(52 + b)]; };
     VCR_CHECK((rel(kOther, kHuman) & 0x60) == 0x60 && (rel(kHuman, kOther) & 0x60) == 0x60);
     VCR_CHECK((rel(kHuman, kCrown) & 0x62) == 0x22 && (rel(kCrown, kHuman) & 0x62) == 0x22);
     // The ship in Europe is seized; the colonist on the docks just goes.

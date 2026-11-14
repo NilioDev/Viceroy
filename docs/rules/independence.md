@@ -167,7 +167,8 @@ colony may rise later.
 
 - The signing screen.
 - How the Crown's units fight and move once landed (for now they move as
-  any computer nation's), and the end of the war (`KINGWIN`, `KINGLOSE`).
+  any computer nation's). The end of the war is in
+  [the-end.md](the-end.md).
 - Veterans that harden to Continental Army in battle (`CONTINENTAL`).
 - The Foreign Affairs report's `FOREIGNNOTAVAIL`, with the reports.
 - Where the boxes of the war stand on the screen is not measured; they

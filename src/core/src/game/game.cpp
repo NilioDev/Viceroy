@@ -750,6 +750,8 @@ void Game::endTurn() {
     for (int n = 0; n < human(); ++n) {
         europeanTurn(n);
     }
+    // The year has turned: is the game over?
+    checkTheEnd();
     // The player's units under Go To set off before anyone is asked.
     moveGoToUnits();
     save_.activeUnit = nextUnitNeedingOrders(-1);
