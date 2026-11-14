@@ -683,6 +683,74 @@ void Game::storageNotices(const ColonyTurn& turn, int c) {
     }
 }
 
+void Game::setExport(int c, int good, bool on) {
+    setExportTicked(save_.colonies[static_cast<std::size_t>(c)], good, on);
+}
+
+int Game::customsOf(int c) const {
+    // Read from the original: a colony with a custom house sells, unless it
+    // is the player's and an armed ship of another nation (privateer,
+    // frigate, man-o-war) is within 5 squares of it.
+    const auto& colony = save_.colonies[static_cast<std::size_t>(c)];
+    if (buildingLevel(colony, BuildingKind::CustomHouse) == 0 || colony.nation < 0 ||
+        colony.nation >= kEuropeanNations) {
+        return static_cast<int>(NationEffects::Customs::None);
+    }
+    const bool player = save_.players[static_cast<std::size_t>(colony.nation)].control == 0;
+    if (!player) {
+        return static_cast<int>(NationEffects::Customs::Computer);
+    }
+    for (const auto& u : save_.units) {
+        constexpr int kFirstShip = 13, kLastShip = 18;
+        if (u.nation == colony.nation || u.nation >= kEuropeanNations || u.type < kFirstShip || u.type > kLastShip ||
+            static_cast<std::size_t>(u.type) >= rules_.units.size() ||
+            rules_.units[static_cast<std::size_t>(u.type)].attack <= 0 || !save_.map.inside(u.x, u.y)) {
+            continue;
+        }
+        const int dx = std::abs(u.x - colony.x);
+        const int dy = std::abs(u.y - colony.y);
+        if (std::max(dx, dy) + std::min(dx, dy) / 2 <= 5) {
+            return static_cast<int>(NationEffects::Customs::None);
+        }
+    }
+    return static_cast<int>(NationEffects::Customs::Ticked);
+}
+
+void Game::sellExports(const ColonyTurn& turn, int c) {
+    // Read from the original: what the custom house sells goes at the price
+    // of Europe, with the nation's tax (none after the declaration), and
+    // moves the market as a sale there does. The player reads each sale on
+    // the top line: "Curacao sells 143 Ore for 715.  2% Tax: 14.  Net: 701".
+    const auto& colony = save_.colonies[static_cast<std::size_t>(c)];
+    if (colony.nation < 0 || colony.nation >= kEuropeanNations) {
+        return;
+    }
+    auto& nation = save_.nations[static_cast<std::size_t>(colony.nation)];
+    const bool independent = (save_.header[18] & 0x01) != 0;
+    for (int good = 0; good < kGoodsKinds; ++good) {
+        const auto g = static_cast<std::size_t>(good);
+        const int amount = turn.exported[g];
+        if (amount <= 0) {
+            continue;
+        }
+        const int gross = amount * bidPrice(nation, good);
+        const int tax = independent ? 0 : gross * nation.taxRate / 100;
+        nation.gold += gross - tax;
+        nation.tradeGold[g] += gross - tax;
+        nation.tonsTraded[g] += amount;
+        nation.tonsTraded2[g] += amount;
+        moveMarket(rules_, nation, good, amount);
+        if (colony.nation == human()) {
+            GameNotice notice{"CUSTOMSALE",
+                              {colony.name, rules_.cargo.size() > g ? rules_.cargo[g].name : std::string()},
+                              independent ? -1 : nation.taxRate,
+                              {amount, gross, tax, gross - tax},
+                              c};
+            notices_.push_back(std::move(notice));
+        }
+    }
+}
+
 void Game::wearMines(int c) {
     // Read from the original. Each turn every miner on a resource adds to
     // a count: an ore miner on minerals 1, a silver miner on minerals 2, a
@@ -828,8 +896,10 @@ void Game::endTurn() {
         const bool tories = colony.nation >= 0 && colony.nation < kEuropeanNations &&
                             save_.players[static_cast<std::size_t>(colony.nation)].control == 0;
         const int sonsBefore = sonsOfLibertyPercent(colony, nationEffects(save_, colony.nation).libertyExtra(true));
-        const ColonyTurn turn = runColonyTurn(colony, save_.map, rules_, save_.difficulty, tories,
-                                              nationEffects(save_, colony.nation));
+        NationEffects effects = nationEffects(save_, colony.nation);
+        effects.customs = static_cast<NationEffects::Customs>(customsOf(static_cast<int>(c)));
+        const ColonyTurn turn = runColonyTurn(colony, save_.map, rules_, save_.difficulty, tories, effects);
+        sellExports(turn, static_cast<int>(c));
         // Read from the original: the colony's bells go to the congress
         // first, before its messages.
         addCongressBells(colony.nation, turn.bells);

@@ -97,6 +97,9 @@ struct ViewState {
     int slideX = 0;
     int slideY = 0;
     std::string message; // a line shown at the bottom of the panel
+    // News written over the menu bar, as the custom house's sales (read
+    // from the original), until the player acts again.
+    std::string topLine;
     // With no unit to move, the panel tells about this square (the view
     // cursor's, or at the end of the turn the last unit's) and its units.
     int lookX = -1;

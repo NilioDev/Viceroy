@@ -731,3 +731,74 @@ VCR_TEST("original files: BUY finishes the construction for gold") {
     VCR_CHECK(colony.hammers == 40);
     VCR_CHECK(play.game().state().nations[static_cast<std::size_t>(play.game().human())].gold == 1000 - 130);
 }
+
+VCR_TEST("original files: the custom house sells all but 50 (measured on Curacao)") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
+    Game game(readSaveGame(Bytes(std::istreambuf_iterator<char>(in), {})), art.rules);
+    // Measured: with a custom house, 150 furs and 191 ore, both ticked,
+    // Curacao sold 103 furs for 515 (2% tax 10, net 505) and 143 ore for
+    // 715 (tax 14, net 701).
+    auto& curacao = game.state().colonies[13];
+    VCR_CHECK(curacao.name == "Curacao");
+    setBuildingLevel(curacao, BuildingKind::CustomHouse, 1);
+    curacao.stock[cargo::kFurs] = 150;
+    VCR_CHECK(exportTicked(curacao, cargo::kFurs) && exportTicked(curacao, cargo::kOre) &&
+              !exportTicked(curacao, cargo::kLumber));
+    const int gold = game.state().nations[3].gold;
+    game.endTurn();
+    int sold = 0;
+    for (const auto& n : game.takeNotices()) {
+        if (n.section != "CUSTOMSALE") {
+            continue;
+        }
+        ++sold;
+        VCR_CHECK(n.value == 2 && n.numbers.size() == 4);
+        VCR_CHECK(n.numbers[1] == 5 * n.numbers[0] && n.numbers[2] == n.numbers[1] * 2 / 100 &&
+                  n.numbers[3] == n.numbers[1] - n.numbers[2]);
+        VCR_CHECK(n.strings[1] == "Furs" || n.strings[1] == "Ore");
+    }
+    VCR_CHECK(sold == 2);
+    VCR_CHECK(game.state().nations[3].gold > gold);
+    for (const auto& c : game.state().colonies) {
+        if (c.name == "Curacao") {
+            VCR_CHECK(c.stock[cargo::kFurs] == 50 && c.stock[cargo::kOre] == 50);
+        }
+    }
+}
+
+VCR_TEST("custom house: the computer keeps food, lumber, horses, tools and muskets (read from the original)") {
+    SaveMap map;
+    SaveColony c;
+    setBuildingLevel(c, BuildingKind::CustomHouse, 1);
+    for (int g = 0; g < kGoodsKinds; ++g) {
+        c.stock[static_cast<std::size_t>(g)] = 120;
+    }
+    Ruleset r;
+    NationEffects computer;
+    computer.customs = NationEffects::Customs::Computer;
+    auto turn = runColonyTurn(c, map, r, 0, false, computer);
+    VCR_CHECK(turn.exported[cargo::kFurs] == 70 && c.stock[cargo::kFurs] == 50);
+    VCR_CHECK(turn.exported[cargo::kOre] == 70);
+    for (const int kept : {cargo::kLumber, cargo::kHorses, cargo::kTools, cargo::kMuskets}) {
+        VCR_CHECK(turn.exported[static_cast<std::size_t>(kept)] == 0);
+    }
+    // With an armory the ore stays.
+    setBuildingLevel(c, BuildingKind::Armory, 1);
+    c.stock[cargo::kOre] = 120;
+    turn = runColonyTurn(c, map, r, 0, false, computer);
+    VCR_CHECK(turn.exported[cargo::kOre] == 0);
+    // The player's ticks: only cloth.
+    NationEffects player;
+    player.customs = NationEffects::Customs::Ticked;
+    c.raw[138] = 0;
+    c.raw[139] = 0;
+    setExportTicked(c, cargo::kCloth, true);
+    c.stock[cargo::kCloth] = 100;
+    turn = runColonyTurn(c, map, r, 0, false, player);
+    VCR_CHECK(turn.exported[cargo::kCloth] == 50 && turn.exported[cargo::kFurs] == 0);
+}

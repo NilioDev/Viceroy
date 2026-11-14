@@ -336,6 +336,8 @@ public:
     // Planters and trappers who learn their job by doing it (in the colony
     // turn, after the lessons).
     void learnByDoing(int colony);
+    // Whether the custom house sells this good (colony bytes 138-139).
+    void setExport(int colony, int good, bool on);
     void renameColony(int colony, const std::string& name) {
         save_.colonies[static_cast<std::size_t>(colony)].name = name.substr(0, 23);
     }
@@ -1170,6 +1172,9 @@ private:
     void answerDemand(const BraveVisitState& v, bool give);
     // The messages about a colony's warehouse after its turn.
     void storageNotices(const ColonyTurn& turn, int colony);
+    // How the colony's custom house sells (NationEffects::Customs).
+    int customsOf(int colony) const;
+    void sellExports(const ColonyTurn& turn, int colony);
     // The lumber a cleared forest gives the nearest colony (CLEARCUT).
     void clearCutLumber(int unit);
     void foodNotices(const ColonyTurn& turn, int colony);

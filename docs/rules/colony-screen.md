@@ -144,6 +144,12 @@ A colonist who goes out becomes a unit on the square and takes 50 muskets,
 50 horses or the tools from the warehouse; a unit that comes in leaves
 them there.
 
+## Custom house
+
+Read from the original: a click on the custom house (when there is one)
+opens `@CUSTOM`, a box with a tick for each of the 16 goods, set for those
+the custom house sells. Return keeps the ticks.
+
 ## Renaming
 
 Read from the original: a click on the top line (y 0 to 6, the whole
