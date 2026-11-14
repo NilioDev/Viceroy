@@ -563,6 +563,10 @@ ColonyHit colonyHitAt(const Game& game, const SaveColony& colony, int x, int y) 
                 hit.kind = ColonyHit::Kind::Outside;
                 return hit;
             }
+            if (slot.kind == BuildingKind::CustomHouse && buildingLevel(colony, slot.kind) > 0) {
+                hit.kind = ColonyHit::Kind::CustomHouse;
+                return hit;
+            }
             const int job = buildingJob(slot.kind);
             if (job >= 0 && buildingLevel(colony, slot.kind) > 0) {
                 hit.kind = ColonyHit::Kind::Building;

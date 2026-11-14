@@ -1285,6 +1285,12 @@ void drawSquarePanel(Screen& screen, const Art& art, const Game& game, const Vie
 void drawGameScreen(Screen& screen, const Art& art, const Game& game, const ViewState& view) {
     screen.clear(kBlack);
     drawMenuBar(screen, art);
+    if (!view.topLine.empty()) {
+        // Measured: gold on the wood, centred on x 160, from y 1.
+        screen.tile(art.wood, {0, 0, Screen::kWidth, 7});
+        screen.text(art.tiny, 160 - Screen::textWidth(art.tiny, view.topLine) / 2, 1, view.topLine,
+                    {kGold, kNoColour, kNoColour});
+    }
     drawMap(screen, art, game, view);
     drawPanel(screen, art, game, view);
 }

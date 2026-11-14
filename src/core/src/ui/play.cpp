@@ -29,6 +29,11 @@ constexpr std::uint64_t kPauseMs = 250;
 constexpr std::uint8_t kGreen = 0x44;
 constexpr std::uint8_t kGold = 0x95;
 constexpr std::uint8_t kBlack = 0x00;
+// Rows of LABELS.TXT for the custom house's sales.
+constexpr int kLabelSells = 47; // @MISC "sells"
+constexpr int kLabelFor = 48;   // @MISC "for"
+constexpr int kLabelTax = 17;   // @CMESSAGE "% Tax:"
+constexpr int kLabelNet = 18;   // @CMESSAGE ". Net:"
 
 std::optional<Step> stepOf(Command c) {
     switch (c) {
@@ -1276,6 +1281,23 @@ void PlayScreen::showNotices() {
             }
             placeKingDialog(*dialog_);
         }
+        return;
+    }
+    if (notice.section == "CUSTOMSALE" && notice.strings.size() >= 2 && notice.numbers.size() >= 4) {
+        // Read from the original: the sale is written over the menu bar and
+        // the turn goes on. "Curacao sells 143 Ore for 715." and, with the
+        // tax, " 2% Tax: 14. Net: 701".
+        std::string text = notice.strings[0] + " " + textLine(art_->labelText, "MISC", kLabelSells, "") + " " +
+                           std::to_string(notice.numbers[0]) + " " + notice.strings[1] + " " +
+                           textLine(art_->labelText, "MISC", kLabelFor, "") + " " + std::to_string(notice.numbers[1]) +
+                           ".";
+        if (notice.value >= 0) {
+            text += " " + std::to_string(notice.value) + textLine(art_->labelText, "CMESSAGE", kLabelTax, "") + " " +
+                    std::to_string(notice.numbers[2]) + textLine(art_->labelText, "CMESSAGE", kLabelNet, "") + " " +
+                    std::to_string(notice.numbers[3]);
+        }
+        view_.topLine = text;
+        showNotices();
         return;
     }
     if (notice.section == "SIGNING") {
@@ -2704,6 +2726,17 @@ bool PlayScreen::clickColonyScreen(int x, int y) {
         case ColonyHit::Kind::Building:
             tryColonyMove(who, hit.job);
             return true;
+        case ColonyHit::Kind::CustomHouse:
+            // Read from the original: which goods it sells, ticked.
+            ask("CUSTOM", -1);
+            if (dialog_) {
+                for (int good = 0; good < kGoodsKinds; ++good) {
+                    const auto g = static_cast<std::size_t>(good);
+                    addOption(*dialog_, g < game_.rules().cargo.size() ? game_.rules().cargo[g].name : std::string());
+                    dialog_->checked.push_back(exportTicked(colony, good));
+                }
+            }
+            return true;
         case ColonyHit::Kind::Square:
             if (who.colonist >= 0 || who.unit >= 0) {
                 tryColonyMove(who, game_.jobForSquare(state.colony, who, hit.square), hit.square);
@@ -2891,6 +2924,9 @@ void PlayScreen::scrollView(int dx, int dy) {
 }
 
 bool PlayScreen::handle(Command command) {
+    if (!dialog_ && notices_.empty()) {
+        view_.topLine.clear();
+    }
     if (slide_) {
         // Input waits until the unit has arrived.
         return true;
@@ -3617,6 +3653,11 @@ bool PlayScreen::handleCheckboxes(Command command) {
             game_.setSoundOptionBits(options.toSave(game_.soundOptionBits()));
             if (music_ != nullptr) {
                 music_->options = options;
+            }
+        } else if (question_ == "CUSTOM" && colonyScreen_) {
+            for (int good = 0; good < kGoodsKinds; ++good) {
+                const auto g = static_cast<std::size_t>(good);
+                game_.setExport(colonyScreen_->colony, good, g < d.checked.size() && d.checked[g]);
             }
         } else if (question_ == "COLONYOPTIONS") {
             // Read from the original: the ten options are set anew, the

@@ -45,7 +45,7 @@ struct ColonyViewState {
 // around the colony, or the place outside the colony (by the stockade),
 // with the unit standing there when one is hit.
 struct ColonyHit {
-    enum class Kind { None, Colonist, Building, Square, Outside };
+    enum class Kind { None, Colonist, Building, Square, Outside, CustomHouse };
     Kind kind = Kind::None;
     int colonist = -1;
     int job = -1;    // the building's job

@@ -34,7 +34,8 @@ touch controls.
 > advisors report full warehouses (with Tutorial Hints on, the first time
 > comes with a hint on shipping the cargo home), waste, food running low and workshops
 > out of raw goods, inefficient government and mines that wear out (no
-> more wagon trains than colonies); a colony that stays without food loses colonists to
+> more wagon trains than colonies); a custom house sells the goods you tick
+> above 50; a colony that stays without food loses colonists to
 > hunger. Ships sail to Europe from
 > the high seas, sell and buy goods there (prices move as you trade), take colonists from the docks and
 > sail back. In Europe you can recruit colonists, buy artillery and ships,
@@ -221,6 +222,7 @@ saved in the first free slot, or over the savegame saved longest ago.
 | Pay to finish what the colony builds (BUY) | P, or click BUY on the Make panel | Y |
 | Show what the colony produces again | Click the house button | |
 | Rename the colony | Click its name on the top line, type and Enter | |
+| Choose what the custom house sells | Click the custom house, tick goods with Space, Enter | |
 | Close the colony screen | Esc, or Enter with nobody picked, or click Exit | B |
 | Open the home port in Europe | E | Share / Capture button |
 | In Europe: move between the market, the ships, the docks and the buttons | Up / Down | D-pad up / down |

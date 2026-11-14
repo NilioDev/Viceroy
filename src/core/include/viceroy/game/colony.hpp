@@ -185,6 +185,11 @@ struct NationEffects {
     // colonies.
     int colonies = 0;
     bool wagonsFull = false;
+    // How the colony's custom house sells this turn (set for each colony by
+    // the game): not at all, the goods the player ticked, or the computer's
+    // choice.
+    enum class Customs { None, Ticked, Computer };
+    Customs customs = Customs::None;
 };
 // From the nation's record in the save; none for a tribe.
 NationEffects nationEffects(const SaveGame& save, int nation);
@@ -270,6 +275,7 @@ struct ColonyTurn {
     int foodMissing = 0;     // how far below nothing the store would have gone
     int foodBefore = 0;      // the food in store when the turn began
     int bells = 0;           // liberty bells made this turn
+    std::array<int, kGoodsKinds> exported{}; // sold by the custom house
     bool noMoreWagons = false;    // the wagon train is done but not allowed
     bool noMoreWarehouse = false; // a second expansion is not allowed
 };
@@ -323,6 +329,9 @@ int centreFoodYield(const Ruleset& rules, const MapSquare& square, int difficult
 
 // How much of each good the warehouse holds (food keeps up to 200).
 int storageLimit(const SaveColony& colony);
+// The goods the player has the custom house sell (colony bytes 138-139).
+bool exportTicked(const SaveColony& colony, int good);
+void setExportTicked(SaveColony& colony, int good, bool on);
 
 // How many horses the colony breeds from the food left over after the
 // colonists have eaten (see docs/rules/production.md).

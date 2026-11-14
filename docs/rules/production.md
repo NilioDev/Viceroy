@@ -265,6 +265,26 @@ colonies), and a second warehouse expansion always (`NOMOREWAREHOUSE`).
 The hammers stay, so it is tried again each turn, and the tools are lost
 each time.
 
+## Custom house
+
+Read from the original and measured on Curacao. As each good comes into
+the warehouse at the end of the turn, a colony with a custom house sells
+all of it but 50 once there are 100 or more. The player picks the goods in
+`@CUSTOM` (a click on the custom house; a bit for each good in colony bytes
+138-139). A computer nation sells everything but food, lumber, horses,
+tools and muskets, and ore only without an armory while the colony makes no
+tools or muskets. The player's custom house does not sell while an armed
+ship of another nation (privateer, frigate, man-o-war) is within 5 squares
+(Viceroy counts the squares as the crow flies; the original's own measure
+of that distance is not yet read).
+
+A sale goes at the price of Europe, less the nation's tax (none after the
+declaration of independence), adds to the nation's trade figures and moves
+the market like a sale in Europe. The player reads it over the menu bar,
+gold on the wood and centred: "Curacao sells 143 Ore for 715.  2% Tax: 14.
+Net: 701" (`@MISC` "sells", "for"; `@CMESSAGE` "% Tax:", ". Net:"), and the
+turn goes on.
+
 ## Inefficient government
 
 Read from the original, in every colony's turn: when the colony's tories

@@ -667,6 +667,22 @@ bool assignJobAt(SaveColony& colony, const SaveMap& map, const std::vector<SaveC
     return true;
 }
 
+bool exportTicked(const SaveColony& colony, int good) {
+    constexpr std::size_t kExports = 138; // a bit for each good, from byte 138
+    return good >= 0 && good < kGoodsKinds &&
+           (colony.raw[kExports + static_cast<std::size_t>(good) / 8] & (1 << (good % 8))) != 0;
+}
+
+void setExportTicked(SaveColony& colony, int good, bool on) {
+    constexpr std::size_t kExports = 138;
+    if (good < 0 || good >= kGoodsKinds) {
+        return;
+    }
+    auto& byte = colony.raw[kExports + static_cast<std::size_t>(good) / 8];
+    const auto bit = static_cast<std::uint8_t>(1 << (good % 8));
+    byte = static_cast<std::uint8_t>(on ? (byte | bit) : (byte & ~bit));
+}
+
 int storageLimit(const SaveColony& colony) {
     // Raw byte 149: 0 none, 1 warehouse, 2 warehouse expansion.
     return 100 * (1 + std::clamp<int>(colony.raw[149], 0, 2));
@@ -926,6 +942,29 @@ ColonyTurn runColonyTurn(SaveColony& colony, const SaveMap& map, const Ruleset& 
     turn.foodShort = std::max(0, -made[cargo::kFood]);
     for (int good = 0; good < kGoodsKinds; ++good) {
         colony.stock[static_cast<std::size_t>(good)] += made[static_cast<std::size_t>(good)];
+    }
+    // Read from the original: as each good comes in, a custom house sells
+    // all but 50 of it once there are 100. The player ticks the goods; the
+    // computer sells all but food, lumber, horses, tools and muskets, and
+    // ore only without an armory while the colony makes no tools or
+    // muskets.
+    for (int good = 0; good < kGoodsKinds && nation.customs != NationEffects::Customs::None; ++good) {
+        const auto g = static_cast<std::size_t>(good);
+        bool sells = false;
+        if (nation.customs == NationEffects::Customs::Ticked) {
+            sells = exportTicked(colony, good);
+        } else {
+            sells = good != cargo::kFood && good != cargo::kLumber && good != cargo::kHorses && good != cargo::kTools &&
+                    good != cargo::kMuskets;
+            if (good == cargo::kOre) {
+                sells = buildingLevel(colony, BuildingKind::Armory) == 0 && made[cargo::kTools] == 0 &&
+                        made[cargo::kMuskets] == 0;
+            }
+        }
+        if (sells && colony.stock[g] >= 100) {
+            turn.exported[g] = colony.stock[g] - 50;
+            colony.stock[g] = 50;
+        }
     }
     auto& food = colony.stock[cargo::kFood];
     if (food >= 200) {
