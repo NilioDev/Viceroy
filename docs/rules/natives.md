@@ -386,6 +386,10 @@ alarm toward the defender's nation, and then:
   byte 8 goes up when it had horses and byte 7 when it had muskets.
   `INDIANBURNCOLONY`; the tension falls by 50.
 
+The player hears of these two from the colonial advisor. When the colony is
+a computer player's, the player still hears of it, without music, from the
+frontiersman: "Spies report: ..." (`INDIANWINCOLONY2`, `INDIANBURNCOLONY2`).
+
 The tension change is skipped while the tribe is angry with the nation
 (bit `0x02` of its byte 58 + nation). The place in the messages is the
 nearest colony of anyone (by the distance the original uses, the larger
@@ -435,7 +439,10 @@ others).
 
 Tension changes are skipped while the tribe is angry, as above. At the end
 the home village forgets its alarm toward the nation. The player's raids
-are reported with "Zoom to colony".
+are reported with "Zoom to colony". A raid that did harm to a computer
+player's colony reaches the player as "Spies report: Sioux raiding party
+wreaks havoc in the French colony of Martinique." (`RAIDWREAK`, from the
+frontiersman, without music); one that came to nothing is not told.
 
 ## Braves visit
 

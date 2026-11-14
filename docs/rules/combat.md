@@ -142,6 +142,12 @@ Measured on Martinique (1 colonist) and Quebec (11) of a French nation with
 - The owner loses gold × the colony's colonists / all their colonists in
   colonies, rounded down, to the attacker: 62 for Martinique, 687 for
   Quebec. `@CAPTURED` says so: "Dutch march into Martinique! 62 plundered!"
+  Read from the original: during the war of independence `@CAPTURED3`
+  says it without the plunder; when neither side is the player the man in
+  the home port tells it as a spies' report (`@CAPTURED2`). The colonial
+  advisor tells the other two. `@BURNED`, `@BURNED2` and `@BURNED3` (a
+  colony burned by Europeans) are never shown: only braves burn a colony,
+  and they have their own messages.
 - Then the colony's screen opens.
 - When the colonist wins, the attacker loses as in any fight.
 

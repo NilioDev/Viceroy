@@ -1140,11 +1140,22 @@ VCR_TEST("original files: the natives attack units and colonies (read from the o
             // Martinique, the French colony of one, burns with its last.
             Game game(braveBeside(turn, 27, 18), art.rules);
             const auto colonies = game.state().colonies.size();
-            if (game.nativeAttack(kBrave, 27, 18) == CombatOutcome::AttackerWon) {
+            const auto outcome = game.nativeAttack(kBrave, 27, 18);
+            if (outcome != CombatOutcome::AttackerWon) {
+                // A raid on a computer player's colony: at most "Spies
+                // report: ... wreaks havoc".
+                for (const auto& n : game.takeNotices()) {
+                    VCR_CHECK(n.section == "RAIDWREAK" && n.strings[1] == "Martinique" && n.music.empty());
+                }
+            }
+            if (outcome == CombatOutcome::AttackerWon) {
                 burned = true;
                 VCR_CHECK(game.state().colonies.size() == colonies - 1);
                 VCR_CHECK(!game.colonyAt(27, 18));
-                VCR_CHECK(game.takeNotices().empty()); // not the player's
+                // Not the player's: a spies' report.
+                const auto notices = game.takeNotices();
+                VCR_CHECK(notices.size() == 1 && notices[0].section == "INDIANBURNCOLONY2" &&
+                          notices[0].strings[3] == "Martinique" && notices[0].music.empty());
             }
         }
         {

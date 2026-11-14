@@ -559,8 +559,14 @@ void Game::captureColony(int colony, int attacker) {
     a.orders = SaveUnit::kNoOrders;
     reveal(c.x, c.y, 2, a.nation);
     coloniesChangeHands(colony);
-    // "Dutch march into Martinique! 62 plundered!"
-    GameNotice notice{"CAPTURED", {"", "", c.name}};
+    // "Dutch march into Martinique! 62 plundered!" Read from the original:
+    // during the war of independence without the plunder (CAPTURED3), and
+    // between two computer players as a spies' report (CAPTURED2).
+    const bool told = a.nation == human() || loser == human();
+    GameNotice notice{!told                            ? "CAPTURED2"
+                      : (save_.header[18] & 0x01) != 0 ? "CAPTURED3"
+                                                       : "CAPTURED",
+                      {"", "", c.name}};
     notice.peoples = {{0, a.nation}};
     notice.numbers = {plunder};
     notices_.push_back(std::move(notice));

@@ -267,6 +267,12 @@ CombatOutcome Game::nativeAttack(int index, int x, int y) {
         // Read from the original: the natives' own tune.
         notice.music.push_back({MusicCue::Kind::Pick, kNativesTune});
         notices_.push_back(std::move(notice));
+    } else if (notice.section == "INDIANWINCOLONY" || notice.section == "INDIANBURNCOLONY") {
+        // Read from the original: "Spies report: ..." when the colony is a
+        // computer player's, without music.
+        notice.section += "2";
+        notice.music.clear();
+        notices_.push_back(std::move(notice));
     }
     if (tension != 0 && hasBlock && defenderNation >= 0 && defenderNation < kEuropeanNations &&
         (block[tribeByte(tribe, kTribeRelations + static_cast<std::size_t>(defenderNation))] & kAngry) == 0) {
@@ -479,6 +485,13 @@ void Game::raidColony(int nation, int colonyIndex, int home, bool always) {
         break;
     }
     if (human && !notice.section.empty()) {
+        notices_.push_back(std::move(notice));
+    } else if (!human && !notice.section.empty() && notice.section != "RAIDNOTHING") {
+        // Read from the original: a raid that did harm to a computer
+        // player's colony is told as "Spies report: ... wreaks havoc".
+        notice.section = "RAIDWREAK";
+        notice.music.clear();
+        notice.colony = -1;
         notices_.push_back(std::move(notice));
     }
     if (tension != 0 && hasBlock &&
