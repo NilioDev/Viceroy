@@ -185,9 +185,12 @@ VCR_TEST("game: colony names come from the nation's list") {
     const std::string text = "@DUTCH\r\nNieuw,1600\r\nOud\r\n@STOP\r\n";
     const auto names = parseTextFile(std::span<const std::uint8_t>(
         reinterpret_cast<const std::uint8_t*>(text.data()), text.size()));
-    VCR_CHECK(g.suggestColonyName(names) == "Nieuw");
-    g.foundColony(0, "Nieuw");
-    VCR_CHECK(g.suggestColonyName(names) == "Oud");
+    g.setColonyNames(names);
+    // The count of names given picks the line, used or not.
+    VCR_CHECK(g.nextColonyName(3) == "Nieuw");
+    VCR_CHECK(g.nextColonyName(3) == "Oud");
+    VCR_CHECK(g.nextColonyName(3) == "Nieuw"); // past the end: the first again
+    VCR_CHECK(g.state().players[3].raw[50] == 2);
 }
 
 #include "viceroy/game_files.hpp"

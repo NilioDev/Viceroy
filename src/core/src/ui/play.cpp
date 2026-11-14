@@ -278,6 +278,108 @@ void PlayScreen::moveActive(Step step) {
     }
 }
 
+void PlayScreen::type(char letter) {
+    if (typing()) {
+        typeInto(*dialog_, letter);
+    }
+}
+
+void PlayScreen::eraseTyped() {
+    if (typing()) {
+        eraseInput(*dialog_);
+    }
+}
+
+void PlayScreen::buildColony(int unit) {
+    // Read from the original: what keeps the unit from founding a colony
+    // there, then the warnings, then the name.
+    const auto& save = game_.state();
+    switch (game_.canFoundColony(unit)) {
+    case FoundResult::Founded:
+        founding_ = Founding{unit, game_.foundAdvice(unit)};
+        nextFoundingStep();
+        return;
+    case FoundResult::NotAColonist:
+        say("Only colonists can build a colony.");
+        return;
+    case FoundResult::NotOnLand:
+    case FoundResult::InColony:
+        return;
+    case FoundResult::AtSea:
+        // "It may surprise you to learn that colonies cannot be built at sea."
+        ask("SEACOLONY", unit);
+        if (dialog_) {
+            placeNavalDialog(*dialog_);
+        }
+        return;
+    case FoundResult::TooClose: {
+        // "This land is too near to Jamestown for a new colony."
+        const int near = game_.colonyNextTo(unit);
+        ask("TOONEAR", unit, {near >= 0 ? save.colonies[static_cast<std::size_t>(near)].name : ""});
+        if (dialog_) {
+            placeBuyDialog(*dialog_);
+        }
+        return;
+    }
+    case FoundResult::Mountains:
+        ask("TOOMOUNTAIN", unit);
+        if (dialog_) {
+            placeFrontiersmanDialog(*dialog_);
+        }
+        return;
+    case FoundResult::TooMany:
+        tell({"TOOMANYCOLONIES", {}});
+        return;
+    }
+}
+
+void PlayScreen::nextFoundingStep() {
+    if (!founding_) {
+        return;
+    }
+    auto& f = *founding_;
+    const auto warn = [&](const char* section) {
+        ask(section, f.unit);
+        if (dialog_) {
+            placeFrontiersmanDialog(*dialog_);
+        }
+    };
+    if (f.advice.noPort) {
+        f.advice.noPort = false;
+        warn("NOPORT");
+        return;
+    }
+    if (f.advice.fewSquares) {
+        f.advice.fewSquares = false;
+        warn("TUTNOSPACES");
+        return;
+    }
+    if (f.advice.noForest) {
+        f.advice.noForest = false;
+        warn("TUTNOLUMBER");
+        return;
+    }
+    // "What shall we name this colony?" with the next name of the list,
+    // from the woman of the buy box (MSS5).
+    const auto& u = game_.unit(f.unit);
+    centreOn(view_, game_, u.x, u.y);
+    ask("COLONY", f.unit);
+    if (dialog_ && art_ != nullptr) {
+        makeInput(*art_, *dialog_, game_.nextColonyName(u.nation));
+        placeNameDialog(*dialog_);
+    }
+}
+
+void PlayScreen::foundNamedColony(int unit, const std::string& name) {
+    founding_.reset();
+    if (game_.foundColony(unit, name) != FoundResult::Founded) {
+        return;
+    }
+    openColony(static_cast<int>(game_.state().colonies.size()) - 1);
+    game_.setActiveUnit(-1);
+    activate(game_.nextUnitNeedingOrders(-1));
+}
+
 void PlayScreen::openColony(int index) {
     if (index < 0 || index >= static_cast<int>(game_.state().colonies.size())) {
         return;
@@ -812,6 +914,19 @@ bool PlayScreen::handleDialog(Command command) {
     auto& d = *dialog_;
     if (d.checkbox) {
         return handleCheckboxes(command);
+    }
+    if (d.input) {
+        // Return takes what was typed, Escape gives up (seen).
+        if (command != Command::Confirm && command != Command::Cancel) {
+            return true;
+        }
+        typed_ = d.inputText;
+        const std::string question = question_;
+        const int unit = questionUnit_;
+        dialog_.reset();
+        answer(question, unit, command == Command::Confirm ? 0 : -1);
+        showNotices();
+        return true;
     }
     const int count = std::max(1, static_cast<int>(d.options.size()));
     const bool list = !choices_.empty();
@@ -1796,6 +1911,19 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
         }
     } else if (question == "CHIEFHOWDY") {
         showChiefAnswer();
+    } else if (question == "NOPORT" || question == "TUTNOSPACES" || question == "TUTNOLUMBER") {
+        // The second answer builds anyway; the first, or Escape, gives up.
+        if (choice == 1) {
+            nextFoundingStep();
+        } else {
+            founding_.reset();
+        }
+    } else if (question == "COLONY") {
+        if (choice == 0 && founding_) {
+            foundNamedColony(founding_->unit, typed_);
+        } else {
+            founding_.reset();
+        }
     } else if (question == "GRUDGEWAGONS") {
         startTrade(unit);
     } else if (question == "LESSONDONE") {
@@ -2654,31 +2782,7 @@ bool PlayScreen::handle(Command command) {
             break;
         }
         if (active >= 0) {
-            const std::string name =
-                colonyNames_ != nullptr ? game_.suggestColonyName(*colonyNames_) : "New Colony";
-            switch (game_.foundColony(active, name)) {
-            case FoundResult::Founded:
-                say("Founded " + name + ".");
-                openColony(static_cast<int>(game_.state().colonies.size()) - 1);
-                game_.setActiveUnit(-1);
-                activate(game_.nextUnitNeedingOrders(-1));
-                if (game_.activeUnit() >= 0) {
-                    say("Founded " + name + ".");
-                }
-                break;
-            case FoundResult::NotAColonist:
-                say("Only colonists can build a colony.");
-                break;
-            case FoundResult::NotOnLand:
-                say("Colonies must be built on land.");
-                break;
-            case FoundResult::Mountains:
-                say("No colonies on mountains.");
-                break;
-            case FoundResult::TooClose:
-                say("Too close to another colony.");
-                break;
-            }
+            buildColony(active);
         }
         break;
     case Command::NextUnit:
