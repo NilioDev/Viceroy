@@ -255,6 +255,10 @@ void PlayScreen::moveActive(Step step) {
             startAttack(index, defender);
         } else if (colony && !game_.isShip(index) && game_.canAttack(index) && game_.colonyUndefended(*colony)) {
             startAttack(index, -1, *colony);
+        } else if (!game_.isShip(index) && !game_.canAttack(index) &&
+                   (defender >= 0 || game_.defenderAt(tx, ty, index) >= 0 || foreignColony)) {
+            // "That unit type cannot attack."
+            tell({"CANNOTATTACK", {}});
         } else {
             say("Someone else is there.");
         }
@@ -920,6 +924,14 @@ void PlayScreen::startAttack(int attacker, int defender, int colony) {
         }
         return;
     }
+    if (them >= kEuropeanNations && game_.asksBeforeAttackingTribe(attacker, them - kEuropeanNations)) {
+        // "Shall we attack the Sioux, Your Excellency?"
+        ask("WHACKINDIANS", attacker, {adjective(them)});
+        if (dialog_) {
+            placeMapDialog(*dialog_);
+        }
+        return;
+    }
     continueAttack();
 }
 
@@ -1354,6 +1366,8 @@ void PlayScreen::showNotices() {
             "OTHERMIGHT", "OTHERLESS"};
         if (std::find(std::begin(kBattles), std::end(kBattles), notice.section) != std::end(kBattles)) {
             placeMapDialog(*dialog_);
+        } else if (notice.section == "DEADCONVERTS") {
+            placeReligiousDialog(*dialog_); // read from the original
         } else if (notice.section == "CAPTURED2") {
             placeForeignNewsDialog(*dialog_); // read from the original: the man in the home port
         } else if (notice.section == "LOOTCASH" || notice.section == "CASHTREASURE") {
@@ -1804,6 +1818,14 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
             if (dialog_) {
                 placeMapDialog(*dialog_);
             }
+        } else {
+            attack_.reset();
+        }
+    } else if (question == "WHACKINDIANS") {
+        // "Yes" makes war on the tribe; "No" calls the attack off.
+        if (choice == 0 && attack_) {
+            game_.makeWarOnTribe(game_.unit(attack_->attacker).nation, defenderNation(*attack_) - kEuropeanNations);
+            continueAttack();
         } else {
             attack_.reset();
         }

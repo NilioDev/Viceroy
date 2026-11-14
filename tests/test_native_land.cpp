@@ -222,3 +222,68 @@ VCR_TEST("native trade: a tense tribe refuses ships and wagon trains") {
         VCR_CHECK(killed > 20 && mad > 20);
     }
 }
+
+VCR_TEST("native war: attacking braves asks first and angers the tribe") {
+    Ruleset rules = landRules();
+    rules.units.resize(20);
+    rules.units[unit_type::kSoldier] = {"Soldiers", 103, 1, 2, 2, 0, 1, 0, 0, 0, 0, 0};
+    rules.units[unit_type::kFirstNative] = {"Braves", 119, 1, 1, 1, 0, 1, 0, 0, 0, 0, 0};
+    SaveGame s = landSave();
+    s.units[0].type = unit_type::kSoldier;
+    SaveUnit brave;
+    brave.x = 3;
+    brave.y = 1;
+    brave.type = unit_type::kFirstNative;
+    brave.nation = 4 + kArawak;
+    s.units.push_back(brave);
+    Game g(s, rules);
+    VCR_CHECK(g.asksBeforeAttackingTribe(0, kArawak));
+    setTribeTension(g.state(), kArawak, kDutch, 75);
+    VCR_CHECK(!g.asksBeforeAttackingTribe(0, kArawak)); // already furious
+    setTribeTension(g.state(), kArawak, kDutch, 20);
+    g.makeWarOnTribe(kDutch, kArawak);
+    VCR_CHECK((g.state().nations[kDutch].raw[52 + 4 + kArawak] & 0x04) != 0);
+    VCR_CHECK((g.state().tribesAndMore[kArawak * kTribeRecordSize + 58 + kDutch] & 0x04) != 0);
+    VCR_CHECK(!g.asksBeforeAttackingTribe(0, kArawak)); // at war
+    // The fight: tension up by the level (1) and 5.
+    g.attack(0, 1);
+    VCR_CHECK(tension(g, kDutch) == 26);
+    // A computer player's unit is never asked.
+    g.state().humanNation = kEnglish;
+    setTribeTension(g.state(), kArawak, kDutch, 0);
+    g.state().nations[kDutch].raw[52 + 4 + kArawak] = 0;
+    VCR_CHECK(!g.asksBeforeAttackingTribe(0, kArawak));
+}
+
+VCR_TEST("native war: attacking a capital angers the tribe three times as much") {
+    SaveGame s = landSave();
+    s.settlements[0].raw[3] = kSettlementCapital;
+    Game g(s, landRules());
+    g.attackVillageWar(0, 0);
+    VCR_CHECK(tension(g, kDutch) == 36); // (10 + 2 x 1) x 3
+}
+
+VCR_TEST("native converts: alone outside a colony for more than eight turns they leave") {
+    SaveGame s = landSave();
+    s.units[0].type = unit_type::kColonist;
+    s.units[0].profession = 0x1B; // an Indian convert
+    s.units[0].workTurns = 0;
+    SaveUnit friendOf = s.units[0];
+    friendOf.x = 5;
+    friendOf.y = 5;
+    s.units.push_back(friendOf);
+    SaveUnit other = friendOf;
+    other.profession = 0x1C; // a free colonist keeps it company
+    s.units.push_back(other);
+    Game g(s, landRules());
+    for (int turn = 1; turn <= 8; ++turn) {
+        g.loseFaith();
+        VCR_CHECK(g.unitCount() == 3);
+    }
+    VCR_CHECK(g.unit(0).workTurns == 8);
+    VCR_CHECK(g.unit(1).workTurns == 0); // not alone
+    g.loseFaith();
+    VCR_CHECK(g.unitCount() == 2);
+    const auto notices = g.takeNotices();
+    VCR_CHECK(notices.size() == 1 && notices[0].section == "DEADCONVERTS");
+}

@@ -703,7 +703,8 @@ at (4, 18) in `COLONY00.SAV` (easiest level):
   outcome: the war bit 0x04 is set in the nation's relation to the tribe
   and in the tribe's relation to the nation; the tribe's tension toward
   the nation goes up by 10 and twice the difficulty level (measured 10,
-  14 and 18 on levels 0, 2 and 4, from 0 and from 40 alike); the high byte
+  14 and 18 on levels 0, 2 and 4, from 0 and from 40 alike), three times
+  that at the tribe's capital (read from the original); the high byte
   of the village's alarm toward the nation goes up by one.
 - A native unit standing on the settlement defends it. When there is
   none, one of the village's people stands up: a **brave**, armed when
@@ -754,6 +755,25 @@ at (4, 18) in `COLONY00.SAV` (easiest level):
 - A lost fight is lost as anywhere: a soldier becomes a colonist, a
   dragoon a soldier; a scout dies, without a message (measured).
 - The attacker's turn is over, win or lose.
+
+## Attacking braves
+
+Read from the original. Before the player's unit attacks braves of a tribe
+that is not at war with the nation and whose tension is under 75, the
+colonial advisor asks "Shall we attack the Sioux, Your Excellency?"
+(`@WHACKINDIANS`). *Yes* makes war (the war bit 0x04 on both sides) and
+the fight follows; *No* calls it off. Any European's attack on braves
+raises the tribe's tension by the difficulty level and 5. A unit that
+cannot attack (a colonist, a pioneer, a wagon train) is told "That unit
+type cannot attack." (`@CANNOTATTACK`); a ship is not.
+
+## Converts lose faith
+
+Read from the original. At the end of each turn a convert standing alone
+on a square outside a colony or settlement counts a turn (its byte 22).
+After the eighth it returns to its tribe: the unit is gone, and the
+religious advisor tells the player that converts who do not join colonies
+within eight turns are lost (`@DEADCONVERTS`).
 
 ## Trade
 

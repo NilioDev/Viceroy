@@ -4,6 +4,7 @@
 #include "viceroy/game/colony.hpp"
 #include "viceroy/game/europe.hpp"
 #include "viceroy/game/game.hpp"
+#include "viceroy/game/natives.hpp"
 #include "viceroy/game/sounds.hpp"
 
 #include <algorithm>
@@ -725,6 +726,29 @@ void Game::loseShip(int loser, int winner) {
     }
 }
 
+void Game::loseFaith() {
+    // Read from the original: a convert alone on its square outside a
+    // colony counts the turns (byte 22); past eight it returns to its
+    // tribe. The player hears of it from the religious advisor.
+    for (int i = 0; i < unitCount();) {
+        auto& u = save_.units[static_cast<std::size_t>(i)];
+        if (u.type != unit_type::kColonist || u.profession != kIndianConvert || !onMap(i) || isAboard(i) ||
+            colonyAt(u.x, u.y) || settlementAt(u.x, u.y) || unitsAt(u.x, u.y).size() >= 2) {
+            ++i;
+            continue;
+        }
+        if (++u.workTurns <= 8) {
+            ++i;
+            continue;
+        }
+        const int nation = u.nation;
+        removeUnit(i);
+        if (nation == human()) {
+            notices_.push_back(GameNotice{"DEADCONVERTS", {}});
+        }
+    }
+}
+
 void Game::repairShips() {
     // Read from the original: a damaged ship's counter (byte 22) goes up a
     // turn, two in a drydock on the map, until it reaches the ship's
@@ -820,6 +844,12 @@ CombatOutcome Game::attack(int attacker, int defender) {
     auto& a = save_.units[static_cast<std::size_t>(attacker)];
     a.movesUsed = movementAllowance(attacker);
     const bool shown = a.nation == human() || unit(defender).nation == human();
+    if (const int them = unit(defender).nation - kEuropeanNations;
+        a.nation >= 0 && a.nation < kEuropeanNations && them >= 0 && them < kTribes) {
+        // Read from the original: attacking braves angers their tribe by
+        // the difficulty level and 5.
+        changeTension(them, a.nation, save_.difficulty + 5);
+    }
     fightStartSound(a.nation, a.type, unit(defender).nation, unit(defender).type);
     if (isShip(attacker) && isShip(defender)) {
         // Observed: after the roll, whoever won, a ship with less attack than
