@@ -14,6 +14,7 @@ add_executable(vcr_tests
     test_pioneers.cpp
     test_native_land.cpp
     test_founding.cpp
+    test_colony_moves.cpp
     test_crosses.cpp
     test_liberty.cpp
     test_colony_reports.cpp

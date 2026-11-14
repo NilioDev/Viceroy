@@ -179,6 +179,14 @@ private:
     void say(std::string text);
     bool handleColonyScreen(Command command);
     bool handleBuildList(Command command);
+    // Moving people on the colony screen: the original's checks and
+    // messages, then the move (a land claim may ask first).
+    void tryColonyMove(ColonyMover who, int job, int square = -1);
+    void doColonyMove(ColonyMover who, int job, int square);
+    void tellColonyMove(ColonyMove result, ColonyMover who);
+    void openOutsideMenu(bool fromMore);
+    bool handleOutsideMenu(Command command);
+    ColonyMover colonyMover() const;
     void openBuildList();
     void openBuy();
     // Go To: the list of colonies (and Europe for a ship), ten to a page.
@@ -225,8 +233,12 @@ private:
     // INDIANLAND), and what waits on the answer.
     std::optional<LandClaim> landClaim_;
     int workOrders_ = 0;
-    int landColonist_ = -1;
+    ColonyMover landWho_;
     int landJob_ = -1;
+    int landSquare_ = -1;
+    // A move on the colony screen that waits for an answer (ABANDON).
+    ColonyMover moveWho_;
+    int moveJob_ = -1;
     void askLandClaim(const std::string& section, const LandClaim& claim, int unit);
     enum class LandAfter { Nothing, Work, Colony };
     LandAfter landAfterBribe_ = LandAfter::Nothing;

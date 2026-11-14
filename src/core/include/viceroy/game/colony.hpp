@@ -225,6 +225,11 @@ std::vector<JobChoice> jobChoices(const SaveColony& colony, const SaveMap& map, 
 bool assignJob(SaveColony& colony, const SaveMap& map, const Ruleset& rules,
                const std::vector<SaveColony>& colonies, int colonist, int jobRow);
 
+// Puts a colonist to work on the land at square 0-7, which must be free or
+// theirs already.
+bool assignJobAt(SaveColony& colony, const SaveMap& map, const std::vector<SaveColony>& colonies, int colonist,
+                 int jobRow, int square);
+
 // A square around the colony that nobody else works and that the colony may
 // use (water needs docks).
 bool squareFree(const SaveColony& colony, const SaveMap& map, const std::vector<SaveColony>& colonies, int square);

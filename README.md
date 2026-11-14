@@ -18,7 +18,12 @@ touch controls.
 > clear forests and build roads with your pioneers, found colonies (your
 > advisors warn of a poor site and you type the name), look inside your colonies, end turns and save. The colony screen
 > shows its buildings, people, what they produce and the warehouse; give
-> colonists other jobs with the jobs menu, and choose what the colony builds
+> colonists other jobs with the jobs menu or by clicking a colonist and then
+> a building or field, send them out of the colony as colonists, pioneers,
+> soldiers, scouts or dragoons (with the warehouse's tools, muskets and
+> horses) and take units standing outside back in; your advisors object as
+> in the original (a stockade keeps three, three to a building, who may
+> teach, a siege, abandoning the colony), and choose what the colony builds
 > on its Make panel or pay to finish it there; the musket button lists the
 > units in the colony; click one to move it to the front, clear its orders,
 > sentry or fortify it. At the end of the turn colonies
@@ -204,6 +209,8 @@ saved in the first free slot, or over the savegame saved longest ago.
 | Open your colony | Click it, or Enter on it in view mode | A on it in view mode |
 | Pick a colonist on the colony screen | Arrow keys, Tab | D-pad, LB / RB |
 | Give the colonist another job (jobs menu) | Enter, then the arrow keys and Enter | A, then the D-pad and A |
+| Move a colonist (or a unit outside) to a building or field | Click them, then click the building or field | |
+| Send the colonist out of the colony | Enter, "(More)" and a job; or click them, then the stockade | A, then "(More)" |
 | Give a unit in the colony orders | Click it on the musket panel, then the arrow keys and Enter | |
 | Choose what the colony builds | B, then the arrow keys and Enter; or click the hammer button, then CHANGE and a line | X, then the D-pad and A |
 | Pay to finish what the colony builds (BUY) | P, or click BUY on the Make panel | Y |

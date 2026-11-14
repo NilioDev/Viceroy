@@ -35,7 +35,34 @@ struct ColonyViewState {
     int buildList = -1;       // the highlighted line of the list of things to build, -1 when closed
     int selectedUnit = -1;    // the unit clicked on the Units Present panel, -1 for none
     bool foreign = false;     // another nation's colony that a scout looks round: no changes
+    int selectedOutside = -1; // a unit standing outside the colony, picked in the town
+    int outsideMenu = -1;     // the highlighted line of the menu of jobs outside, -1 when closed
+    bool outsideFromMore = false; // that menu came from "(More)": its first line goes back
 };
+
+// What is under a point of the colony screen, for clicks: a colonist (in
+// a building or on a square), a building that has a job, a free square
+// around the colony, or the place outside the colony (by the stockade),
+// with the unit standing there when one is hit.
+struct ColonyHit {
+    enum class Kind { None, Colonist, Building, Square, Outside };
+    Kind kind = Kind::None;
+    int colonist = -1;
+    int job = -1;    // the building's job
+    int square = -1; // 0-7
+    int unit = -1;   // a unit outside
+};
+ColonyHit colonyHitAt(const Game& game, const SaveColony& colony, int x, int y);
+
+// The units standing outside the colony in its town, left to right.
+std::vector<int> unitsOutside(const Game& game, const SaveColony& colony);
+
+// The menu of jobs outside the colony: its box, for clicks.
+struct OutsideMenuBox {
+    int x, y, w, h;
+    int firstLine; // y of the first line
+};
+OutsideMenuBox outsideMenuBox(int lines);
 
 // Where the panel's parts are, for clicks.
 struct PanelButton {

@@ -148,6 +148,51 @@ struct FoundAdvice {
     bool noForest = false;
 };
 
+// What the original says when a colonist is moved on the colony screen:
+// into the colony, out of it, or to another job (docs/rules/colony-screen.md,
+// "Moving people"). Allowed and Same need no message; Abandon is a question.
+enum class ColonyMove {
+    Allowed,
+    Same,    // already at that job: nothing happens
+    Abandon, // the last colonist leaves (ABANDON, ABANDON2)
+    Full,    // 32 colonists already (FULL)
+    Univ3,   // the school's room for teachers is taken (UNIV3, COLLEGE2, SCHOOL1)
+    College2,
+    School1,
+    NoDocks,        // a fisherman without docks (NODOCKS)
+    NoTeacher,      // only experts teach (NOTEACHER)
+    NeedCollege,    // this expert needs a college (NEEDCOLLEGE)
+    NeedUniversity, // or a university (NEEDUNIVERSITY)
+    Siege,          // only soldiers and dragoons leave a colony under siege (SIEGE)
+    KeepStockade,   // three at least stay where a stockade stands (KEEPSTOCKADE)
+    MoreThanThree,  // three to a building (MORETHANTHREE)
+};
+
+// Who is moved: a colonist of the colony (by number) or a unit standing on
+// its square.
+struct ColonyMover {
+    int colonist = -1;
+    int unit = -1;
+};
+
+// The jobs outside a colony, as rows of @JOB.
+namespace outside_job {
+inline constexpr int kColonist = 19;
+inline constexpr int kPioneer = 20;
+inline constexpr int kSoldier = 21;
+inline constexpr int kScout = 22;
+inline constexpr int kDragoon = 23;
+inline constexpr int kMissionary = 24;
+} // namespace outside_job
+
+// A line of the menu of jobs outside the colony: shown greyed when the
+// colony lacks what the job takes.
+struct OutsideChoice {
+    int job = outside_job::kColonist;
+    bool affordable = true;
+    int tools = 0; // the tools a pioneer would take
+};
+
 class Game {
 public:
     Game(SaveGame save, Ruleset rules);
@@ -251,6 +296,24 @@ public:
     void setColonyNames(const TextFile& colonyNames);
     // The name offered for the nation's next colony (COLONY.TXT).
     std::string nextColonyName(int nation);
+    // Moving people on the colony screen (colony_moves.cpp). The job is a
+    // row of @JOB: 0-18 inside the colony, outside_job:: outside it.
+    ColonyMove checkColonyMove(int colony, ColonyMover who, int job) const;
+    // Enemy soldiers around the colony outnumber its own (SIEGE).
+    bool underSiege(int colony) const;
+    // The job someone has now (an outside_job:: for a unit).
+    int currentJob(int colony, ColonyMover who) const;
+    // The work someone dropped on square 0-7 around the colony takes up.
+    int jobForSquare(int colony, ColonyMover who, int square) const;
+    // The menu of jobs outside the colony, in order.
+    std::vector<OutsideChoice> outsideChoices(int colony, ColonyMover who) const;
+    // Carries out a move checkColonyMove allowed. A colonist who leaves
+    // becomes a unit on the square, taking what the job needs from the
+    // warehouse; a unit that comes in leaves its muskets, horses and tools
+    // there. When the last colonist leaves, the colony is gone. Work on the
+    // land goes to `square` (0-7), or the best free square when it is -1.
+    // Returns the unit for someone who is outside afterwards, else -1.
+    int moveColonist(int colony, ColonyMover who, int job, int square = -1);
 
     // --- Turns -------------------------------------------------------------
     // Ends the human's turn: everyone gets their moves back, and the
