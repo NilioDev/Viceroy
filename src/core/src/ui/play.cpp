@@ -34,6 +34,15 @@ constexpr int kLabelSells = 47; // @MISC "sells"
 constexpr int kLabelFor = 48;   // @MISC "for"
 constexpr int kLabelTax = 17;   // @CMESSAGE "% Tax:"
 constexpr int kLabelNet = 18;   // @CMESSAGE ". Net:"
+// Rows of @CMESSAGE for goods moved on the colony screen.
+constexpr int kLabelMovedTo = 2;
+constexpr int kLabelNoRoom = 4;
+constexpr int kLabelNotEnough = 6;
+constexpr int kLabelToFill = 7;
+constexpr int kLabelNo = 9;
+constexpr int kLabelInHold = 10;
+constexpr int kLabelLoadingGoods = 15;
+constexpr int kLabelUnloadingGoods = 16;
 
 std::optional<Step> stepOf(Command c) {
     switch (c) {
@@ -433,6 +442,14 @@ void PlayScreen::pointAt(int x, int y) {
     if (place >= 0) {
         colonyScreen_->townLabel = place;
     }
+    colonyScreen_->warehouseLabel = warehouseGoodAt(x, y);
+    // Measured: the ship's frame turns white while the pointer is in the
+    // harbour, and green again over the warehouse.
+    if (inHarbour(x, y) && !shipsInPort(game_, save.colonies[index]).empty()) {
+        colonyScreen_->harbourChosen = true;
+    } else if (colonyScreen_->warehouseLabel >= 0) {
+        colonyScreen_->harbourChosen = false;
+    }
 }
 
 void PlayScreen::openEurope() {
@@ -760,6 +777,17 @@ void PlayScreen::endIncite(int unit) {
         notices_.push_back(std::move(notice));
     }
     advanceAfterNotices_ = true;
+}
+
+std::string PlayScreen::unitTypeName(int unit) const {
+    const int type = game_.unit(unit).type;
+    const auto& units = game_.rules().units;
+    return type >= 0 && static_cast<std::size_t>(type) < units.size() ? units[static_cast<std::size_t>(type)].name
+                                                                      : std::string();
+}
+
+std::string PlayScreen::cargoLabel(int line) const {
+    return art_ != nullptr ? textLine(art_->labelText, "CMESSAGE", line, "") : std::string();
 }
 
 std::string PlayScreen::goodName(int good) const {
@@ -1993,6 +2021,56 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
         if (choice == 0 && !typed_.empty() && colonyScreen_) {
             game_.renameColony(colonyScreen_->colony, typed_);
         }
+    } else if (question == "HOWMUCH1" || question == "HOWMUCH2") {
+        const auto move = cargoMove_;
+        cargoMove_ = CargoMove{};
+        const int amount = std::min(std::atoi(typed_.c_str()), move.amount);
+        if (choice == 0 && amount > 0 && colonyScreen_) {
+            if (question == "HOWMUCH1") {
+                const int moved = game_.loadInColony(move.carrier, colonyScreen_->colony, move.good, amount);
+                if (moved > 0) {
+                    setColonyMessage(std::to_string(moved) + " " + goodName(move.good) + " " +
+                                     cargoLabel(kLabelMovedTo) + " " + unitTypeName(move.carrier));
+                }
+            } else {
+                checkWarehouse(move.carrier, move.good, amount);
+            }
+        }
+    } else if (question == "WAREHOUSEFULL") {
+        const auto move = cargoMove_;
+        cargoMove_ = CargoMove{};
+        if (choice == 1 && colonyScreen_) {
+            finishUnload(move.carrier, move.good, move.amount);
+        } else {
+            unloadAll_.clear();
+        }
+    } else if (question == "COLONYSHIP") {
+        const int option = choice >= 0 && choice < static_cast<int>(unitOptions_.size())
+                               ? unitOptions_[static_cast<std::size_t>(choice)]
+                               : kShipNoChange;
+        switch (option) {
+        case kShipFront:
+            game_.moveToFront(unit);
+            if (colonyScreen_) {
+                colonyScreen_->selectedShip = 0;
+            }
+            break;
+        case kShipClear:
+            game_.setOrders(unit, SaveUnit::kNoOrders);
+            break;
+        case kShipSentry:
+            game_.setOrders(unit, SaveUnit::kSentry);
+            break;
+        case kShipAnchor:
+            game_.setOrders(unit, SaveUnit::kFortify);
+            break;
+        case kShipUnloadAll:
+            unloadAll_ = {unit};
+            continueUnloadAll();
+            break;
+        default:
+            break;
+        }
     } else if (question == "COLONY") {
         if (choice == 0 && founding_) {
             foundNamedColony(founding_->unit, typed_);
@@ -2760,6 +2838,36 @@ bool PlayScreen::clickColonyScreen(int x, int y) {
         return true;
     }
     {
+        // Read from the original: pressing on a good of the warehouse picks
+        // it and starts dragging it; in the harbour, pressing on a ship
+        // picks it (pressing the one already picked opens its options when
+        // let go), and on a full hold starts dragging its goods.
+        const auto& colony = game_.state().colonies[static_cast<std::size_t>(state.colony)];
+        if (const int good = warehouseGoodAt(x, y); good >= 0 && x < 300) {
+            state.selectedGood = good;
+            cargoDrag_ = CargoDrag{false, good};
+            setColonyMessage(cargoLabel(kLabelLoadingGoods) + " " + goodName(good));
+            return true;
+        }
+        const auto ships = shipsInPort(game_, colony);
+        if (!ships.empty() && inHarbour(x, y)) {
+            state.selectedShip = std::clamp(state.selectedShip, 0, static_cast<int>(ships.size()) - 1);
+            if (const int k = harbourShipAt(x, y, static_cast<int>(ships.size())); k >= 0) {
+                shipPressedAgain_ = k == state.selectedShip;
+                state.selectedShip = k;
+                state.harbourChosen = true;
+                return true;
+            }
+            const auto& carrier = game_.unit(ships[static_cast<std::size_t>(state.selectedShip)]);
+            if (const int hold = harbourHoldAt(x, y); hold >= 0 && hold < carrier.holds) {
+                const int good = holdGood(carrier, hold);
+                cargoDrag_ = CargoDrag{true, good};
+                setColonyMessage(cargoLabel(kLabelUnloadingGoods) + " " + goodName(good));
+            }
+            return true;
+        }
+    }
+    {
         // Read from the original: a click picks a colonist (or a unit
         // outside); a click on a building, a square or the stockade then
         // moves them there.
@@ -2770,6 +2878,7 @@ bool PlayScreen::clickColonyScreen(int x, int y) {
         case ColonyHit::Kind::Colonist:
             state.selectedColonist = hit.colonist;
             state.selectedOutside = -1;
+            state.harbourChosen = false;
             return true;
         case ColonyHit::Kind::Outside:
             if (hit.unit >= 0) {
@@ -2832,6 +2941,183 @@ bool PlayScreen::clickColonyScreen(int x, int y) {
         return true;
     }
     return false;
+}
+
+bool PlayScreen::releaseColonyScreen(int x, int y, bool shift) {
+    if (!colonyScreen_ || dialog_) {
+        cargoDrag_.reset();
+        shipPressedAgain_ = false;
+        return false;
+    }
+    auto& state = *colonyScreen_;
+    const auto& colony = game_.state().colonies[static_cast<std::size_t>(state.colony)];
+    const auto ships = shipsInPort(game_, colony);
+    const int count = static_cast<int>(ships.size());
+    if (shipPressedAgain_) {
+        shipPressedAgain_ = false;
+        if (count > 0 && harbourShipAt(x, y, count) == state.selectedShip) {
+            openShipOptions(ships[static_cast<std::size_t>(state.selectedShip)], state.selectedShip == 0);
+        }
+        return true;
+    }
+    if (!cargoDrag_) {
+        return false;
+    }
+    const auto drag = *cargoDrag_;
+    cargoDrag_.reset();
+    state.topMessage.clear();
+    if (count == 0) {
+        return true;
+    }
+    state.selectedShip = std::clamp(state.selectedShip, 0, count - 1);
+    if (!drag.fromHold && inHarbour(x, y)) {
+        if (const int k = harbourShipAt(x, y, count); k >= 0) {
+            state.selectedShip = k;
+        }
+        state.harbourChosen = true;
+        startLoad(ships[static_cast<std::size_t>(state.selectedShip)], drag.good, shift);
+    } else if (drag.fromHold && warehouseGoodAt(x, y) >= 0) {
+        startUnload(ships[static_cast<std::size_t>(state.selectedShip)], drag.good, shift);
+    }
+    return true;
+}
+
+void PlayScreen::setColonyMessage(std::string text) {
+    if (colonyScreen_) {
+        colonyScreen_->topMessage = std::move(text);
+        colonyMessageMs_ = 0;
+    }
+}
+
+// Read from the original: loading takes up to 100 (no more than the
+// warehouse has, nor than there is room for); Shift asks how much first.
+void PlayScreen::startLoad(int carrier, int good, bool askAmount) {
+    if (!colonyScreen_) {
+        return;
+    }
+    const int colonyIndex = colonyScreen_->colony;
+    const auto& colony = game_.state().colonies[static_cast<std::size_t>(colonyIndex)];
+    const int stock = colony.stock[static_cast<std::size_t>(good)];
+    if (stock < 1) {
+        setColonyMessage(cargoLabel(kLabelNotEnough) + " " + goodName(good) + " " + cargoLabel(kLabelToFill));
+        return;
+    }
+    const int room = game_.colonyCargoRoom(carrier, good);
+    if (room <= 0) {
+        setColonyMessage(cargoLabel(kLabelNoRoom) + " " + goodName(good) + "!");
+        return;
+    }
+    const int amount = std::min({room, 100, stock});
+    if (askAmount && art_ != nullptr) {
+        ask("HOWMUCH1", carrier, {goodName(good), unitTypeName(carrier)}, -1, {amount});
+        if (dialog_) {
+            makeInput(*art_, *dialog_, std::to_string(amount), 3);
+            cargoMove_ = CargoMove{carrier, good, amount};
+        }
+        return;
+    }
+    const int moved = game_.loadInColony(carrier, colonyIndex, good, amount);
+    if (moved > 0) {
+        setColonyMessage(std::to_string(moved) + " " + goodName(good) + " " + cargoLabel(kLabelMovedTo) + " " +
+                         unitTypeName(carrier));
+    }
+}
+
+// Read from the original: unloading empties the first hold of the good;
+// Shift asks how much first, and the rest stays aboard.
+void PlayScreen::startUnload(int carrier, int good, bool askAmount) {
+    if (!colonyScreen_) {
+        return;
+    }
+    const int aboard = game_.colonyCargoHold(carrier, good);
+    if (aboard < 0) {
+        setColonyMessage(cargoLabel(kLabelNo) + " " + goodName(good) + " " + cargoLabel(kLabelInHold));
+        return;
+    }
+    if (askAmount && art_ != nullptr) {
+        const auto& colony = game_.state().colonies[static_cast<std::size_t>(colonyScreen_->colony)];
+        ask("HOWMUCH2", carrier, {goodName(good), unitTypeName(carrier), colony.name}, -1, {aboard});
+        if (dialog_) {
+            makeInput(*art_, *dialog_, std::to_string(aboard), 3);
+            cargoMove_ = CargoMove{carrier, good, aboard};
+        }
+        return;
+    }
+    checkWarehouse(carrier, good, aboard);
+}
+
+// Read from the original: past what the warehouse keeps (food aside) it
+// warns that goods will spoil, and unloads only when told to anyway.
+void PlayScreen::checkWarehouse(int carrier, int good, int amount) {
+    const auto& colony = game_.state().colonies[static_cast<std::size_t>(colonyScreen_->colony)];
+    const int stock = colony.stock[static_cast<std::size_t>(good)];
+    const int limit = storageLimit(colony);
+    if (good != cargo::kFood && stock + amount > limit && art_ != nullptr) {
+        ask("WAREHOUSEFULL", carrier, {colony.name, goodName(good)}, -1, {stock, limit, amount});
+        if (dialog_) {
+            cargoMove_ = CargoMove{carrier, good, amount};
+            return;
+        }
+    }
+    finishUnload(carrier, good, amount);
+}
+
+void PlayScreen::finishUnload(int carrier, int good, int amount) {
+    if (!colonyScreen_) {
+        return;
+    }
+    const int colonyIndex = colonyScreen_->colony;
+    const int moved = game_.unloadInColony(carrier, colonyIndex, good, amount);
+    if (moved > 0) {
+        setColonyMessage(std::to_string(moved) + " " + goodName(good) + " " + cargoLabel(kLabelMovedTo) + " " +
+                         game_.state().colonies[static_cast<std::size_t>(colonyIndex)].name);
+    }
+    continueUnloadAll();
+}
+
+// "Unload all cargo.": every hold in turn, each as if dragged ashore.
+void PlayScreen::continueUnloadAll() {
+    while (!unloadAll_.empty() && !dialog_ && colonyScreen_) {
+        const int carrier = unloadAll_.front();
+        const auto& u = game_.unit(carrier);
+        if (u.holds <= 0) {
+            unloadAll_.clear();
+            return;
+        }
+        startUnload(carrier, holdGood(u, 0), false);
+        if (game_.unit(carrier).holds == u.holds && !dialog_) {
+            unloadAll_.clear(); // nothing moved: stop rather than loop
+        }
+    }
+}
+
+// Read from the original: a click on the ship already picked. "Move to
+// front." is left out for the first, "Clear orders." without orders,
+// "Sentry." when sentried, "Anchor in harbor" when fortified and for a
+// wagon train, "Unload all cargo." with nothing aboard.
+void PlayScreen::openShipOptions(int carrier, bool first) {
+    if (art_ == nullptr) {
+        return;
+    }
+    const auto& u = game_.unit(carrier);
+    ask("COLONYUNIT", carrier, {game_.unitName(carrier), ""});
+    if (!dialog_) {
+        return;
+    }
+    question_ = "COLONYSHIP";
+    unitOptions_.clear();
+    for (int option = kShipFront; option <= kShipNoChange; ++option) {
+        if ((option == kShipFront && first) || (option == kShipClear && u.orders == SaveUnit::kNoOrders) ||
+            (option == kShipSentry && u.orders == SaveUnit::kSentry) ||
+            (option == kShipAnchor && (u.orders == SaveUnit::kFortify || u.orders == SaveUnit::kFortified ||
+                                       u.type == unit_type::kWagonTrain)) ||
+            (option == kShipUnloadAll && u.holds == 0)) {
+            continue;
+        }
+        addOption(*dialog_, textLine(art_->gameText, "SHIPOPTIONS", option, ""));
+        unitOptions_.push_back(option);
+    }
+    placeUnitDialog(*dialog_, carrier);
 }
 
 bool PlayScreen::handleColonyScreen(Command command) {
@@ -3231,6 +3517,14 @@ bool PlayScreen::save() {
 
 void PlayScreen::tick(std::uint64_t milliseconds) {
     clock_ += milliseconds;
+    if (colonyScreen_ && !colonyScreen_->topMessage.empty() && !cargoDrag_) {
+        // Measured: a message about goods moved stays about two seconds.
+        constexpr std::uint64_t kColonyMessageMs = 2000;
+        colonyMessageMs_ += milliseconds;
+        if (colonyMessageMs_ >= kColonyMessageMs) {
+            colonyScreen_->topMessage.clear();
+        }
+    }
     playMusic(game_.takeMusicCues());
     view_.blinkOn = (clock_ / kBlinkMs) % 2 == 0;
     if (dialog_) {

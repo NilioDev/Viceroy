@@ -852,6 +852,16 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
             }
         }
         break;
+    case SDL_EVENT_MOUSE_BUTTON_UP:
+        if (event->button.button == SDL_BUTTON_LEFT && app->mode == Mode::Play && app->play &&
+            app->play->colonyScreen()) {
+            float x = 0;
+            float y = 0;
+            SDL_RenderCoordinatesFromWindow(app->renderer, event->button.x, event->button.y, &x, &y);
+            app->play->releaseColonyScreen(static_cast<int>(x), static_cast<int>(y),
+                                           (SDL_GetModState() & SDL_KMOD_SHIFT) != 0);
+        }
+        break;
     case SDL_EVENT_GAMEPAD_BUTTON_DOWN: {
         app->pointerShown = false;
         if (app->mode == Mode::Intro) {

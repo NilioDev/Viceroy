@@ -4,6 +4,7 @@
 #include "viceroy/data/image.hpp"
 #include "viceroy/data/reader.hpp"
 #include "viceroy/game/colony.hpp"
+#include "viceroy/game/europe.hpp"
 #include "viceroy/game/natives.hpp"
 #include "viceroy/game_files.hpp"
 
@@ -34,6 +35,7 @@ constexpr std::uint8_t kSelectGreen = 0x45;
 constexpr std::uint8_t kBrightGreen = 0x0A;
 constexpr int kExpertIcons = 81;
 constexpr std::uint8_t kHarbourText = 0x39;
+constexpr std::uint8_t kTopMessage = 0x95;
 constexpr std::uint8_t kStockText = 0x3D;
 constexpr std::uint8_t kStockHundreds = 0x94;
 constexpr std::uint8_t kStockOver = 0x04;
@@ -66,6 +68,9 @@ constexpr int kButtonUnits = 68;
 constexpr int kButtonBuild = 69;
 constexpr int kEmptyHold = 122;
 constexpr int kRebelFlag = 123;
+constexpr int kGreyGoodsIcon = 38; // part-filled holds
+constexpr int kLabelNoShips = 11;  // @MISC
+constexpr int kLabelLoading = 23;  // @MISC
 constexpr int kCrown = 124;
 
 int goodIcon(int good) {
@@ -305,9 +310,16 @@ void drawGoodsCentred(Screen& screen, const Art& art, int good, int count, int x
     drawGoodsRow(screen, art, good, count, x + std::max(0, (room - span) / 2), y, room, 2, inTown);
 }
 
-void drawTopLine(Screen& screen, const Art& art, const Game& game, const SaveColony& colony) {
+void drawTopLine(Screen& screen, const Art& art, const Game& game, const SaveColony& colony,
+                 const std::string& message) {
     screen.tile(art.wood, {0, 0, Screen::kWidth, 7});
     screen.fill({0, 7, Screen::kWidth, 1}, kBlack);
+    if (!message.empty()) {
+        // Measured: what is being moved, and what was, in gold.
+        screen.text(art.tiny, 160 - Screen::textWidth(art.tiny, message) / 2, 1, message,
+                    {kTopMessage, kNoColour, kNoColour});
+        return;
+    }
     const auto& save = game.state();
     const auto& nation = save.nations[static_cast<std::size_t>(game.human())];
     // Measured on the original: one space more after the name.
@@ -318,6 +330,7 @@ void drawTopLine(Screen& screen, const Art& art, const Game& game, const SaveCol
 
 constexpr int kLabelTrees = 122;         // @MISC
 constexpr int kLabelOutsideColony = 123; // @MISC
+constexpr int kLabelTons = 58;           // @MISC
 
 // Read from the original: the name of the building at a place of the town in
 // white on black, centred on the place and at its top (for the large
@@ -356,6 +369,20 @@ void drawTownLabel(Screen& screen, const Art& art, const Game& game, const SaveC
         screen.text(art.tiny, x + 1, y + 1, text, {kWhite, kNoColour, kNoColour});
         return;
     }
+}
+
+// Measured: while the pointer is on a good of the warehouse, "Lumber (158
+// Tons)" in white on black, centred on its box, at row 193.
+void drawWarehouseLabel(Screen& screen, const Art& art, const Game& game, const SaveColony& colony, int good) {
+    const auto& cargo = game.rules().cargo;
+    const std::string name =
+        static_cast<std::size_t>(good) < cargo.size() ? cargo[static_cast<std::size_t>(good)].name : std::string();
+    const std::string text = name + " (" + std::to_string(colony.stock[static_cast<std::size_t>(good)]) + " " +
+                             textLine(art.labelText, "MISC", kLabelTons, "Tons") + ")";
+    const int w = Screen::textWidth(art.tiny, text) + 1;
+    const int x = std::clamp(10 + 19 * good - w / 2, 0, Screen::kWidth - w);
+    screen.fill({x, 193, w, 7}, kBlack);
+    screen.text(art.tiny, x + 1, 194, text, {kWhite, kNoColour, kNoColour});
 }
 
 void drawTown(Screen& screen, const Art& art, const ColonyArt& colonyArt, const Game& game, const SaveColony& colony,
@@ -505,11 +532,110 @@ void drawArea(Screen& screen, const Art& art, const Game& game, const SaveColony
     }
 }
 
-void drawHarbour(Screen& screen, const Art& art) {
-    const std::string text = "No Ships In Port";
-    screen.text(art.tiny, 163 - Screen::textWidth(art.tiny, text) / 2, 132, text, {kHarbourText, kNoColour, kNoColour});
-    for (int i = 0; i < 6; ++i) {
-        blitSprite(screen, art.icons, kEmptyHold, 127 + 12 * i, 165);
+// A unit's picture shrunk the way the original does it: a running total
+// starts at 50 and grows by `scale` per pixel; a pixel is kept each time
+// the total passes 100. Centred on cx, standing on the row `bottom`.
+void drawShrunk(Screen& screen, const IndexedImage& image, int cx, int bottom, int scale) {
+    std::vector<int> columns;
+    std::vector<int> rows;
+    const auto kept = [scale](int size, std::vector<int>& out) {
+        int total = 50;
+        for (int p = 0; p < size; ++p) {
+            total += scale;
+            if (total >= 100) {
+                total -= 100;
+                out.push_back(p);
+            }
+        }
+    };
+    kept(image.width, columns);
+    kept(image.height, rows);
+    const int x0 = cx - static_cast<int>(columns.size()) / 2;
+    const int y0 = bottom - static_cast<int>(rows.size()) + 1;
+    for (std::size_t i = 0; i < rows.size(); ++i) {
+        for (std::size_t j = 0; j < columns.size(); ++j) {
+            const auto c = image.pixels[static_cast<std::size_t>(rows[i] * image.width + columns[j])];
+            if (c != kTransparent) {
+                screen.pixel(x0 + static_cast<int>(j), y0 + static_cast<int>(i), c);
+            }
+        }
+    }
+}
+
+// Read from the original: the harbour box. With no carriers there, "No
+// Ships In Port" over six shut holds. Otherwise "Loading: <type>" for the
+// chosen one, the first four carriers side by side (the chosen one framed
+// in bright green), up to sixteen more shrunk on the horizon behind them,
+// and the chosen one's holds.
+void drawHarbour(Screen& screen, const Art& art, const Game& game, const SaveColony& colony, int selected,
+                 bool harbourChosen) {
+    const auto ships = shipsInPort(game, colony);
+    if (ships.empty()) {
+        const std::string text = textLine(art.labelText, "MISC", kLabelNoShips, "No Ships In Port");
+        screen.text(art.tiny, 163 - Screen::textWidth(art.tiny, text) / 2, 132, text,
+                    {kHarbourText, kNoColour, kNoColour});
+        for (int i = 0; i < kMaxHolds; ++i) {
+            blitSprite(screen, art.icons, kEmptyHold, 127 + 12 * i, 165);
+        }
+        return;
+    }
+    selected = std::clamp(selected, 0, static_cast<int>(ships.size()) - 1);
+    const int chosen = ships[static_cast<std::size_t>(selected)];
+    const auto& rules = game.rules();
+    const auto typeOf = [&](int u) -> const UnitType* {
+        const int type = game.unit(u).type;
+        return type >= 0 && static_cast<std::size_t>(type) < rules.units.size()
+                   ? &rules.units[static_cast<std::size_t>(type)]
+                   : nullptr;
+    };
+    const auto* chosenType = typeOf(chosen);
+    const std::string title = textLine(art.labelText, "MISC", kLabelLoading, "Loading") + ": " +
+                              (chosenType != nullptr ? chosenType->name : std::string());
+    screen.text(art.tiny, 163 - Screen::textWidth(art.tiny, title) / 2, 132, title,
+                {kHarbourText, kNoColour, kNoColour});
+
+    for (std::size_t i = 0; i < ships.size() && i < 20; ++i) {
+        const int u = ships[i];
+        if (i >= 4) {
+            const int icon = unitIcon(game, u);
+            if (icon >= 0 && static_cast<std::size_t>(icon) < art.icons.sprites.size()) {
+                drawShrunk(screen, art.icons.sprites[static_cast<std::size_t>(icon)].image,
+                           125 + 5 * static_cast<int>(i - 4), 142, 25);
+            }
+            continue;
+        }
+        const int x = 130 + 18 * static_cast<int>(i);
+        // Measured: ships stand a row higher than a wagon train, and all
+        // but the first one row higher again.
+        int y = 147;
+        if (game.isShip(u)) {
+            y -= i == 0 ? 1 : 2;
+        }
+        drawUnitInColonyList(screen, art, game, u, x, y);
+        if (static_cast<int>(i) == selected) {
+            // Measured: white once the harbour has been picked (a ship
+            // clicked, or goods dropped on it).
+            screen.frame({x - 1, y - 1, 18, 18}, harbourChosen ? kWhite : kBrightGreen);
+        }
+    }
+
+    const auto& ship = game.unit(chosen);
+    const int holds = chosenType != nullptr ? chosenType->cargoSlots : 0;
+    for (int k = 0; k < kMaxHolds; ++k) {
+        const int x = 127 + 12 * k;
+        if (k >= holds) {
+            blitSprite(screen, art.icons, kEmptyHold, x, 165);
+            continue;
+        }
+        if (k >= ship.holds) {
+            continue;
+        }
+        const int good = holdGood(ship, k);
+        if (good < 0) {
+            continue;
+        }
+        const int icon = (holdAmount(ship, k) >= 100 ? kGoodsIcon : kGreyGoodsIcon) + good;
+        blitSprite(screen, art.icons, icon, x + 5 - spriteWidth(art.icons, icon) / 2, 165);
     }
 }
 
@@ -838,12 +964,37 @@ constexpr int kUnitsPanelRight = 302; // the buttons start at x 303
 
 } // namespace
 
+namespace {
+
+bool carries(const Game& game, int u) {
+    const int type = game.unit(u).type;
+    const auto& units = game.rules().units;
+    return type >= 0 && static_cast<std::size_t>(type) < units.size() &&
+           units[static_cast<std::size_t>(type)].cargoSlots > 0;
+}
+
+} // namespace
+
+// Read from the original: the Units Present panel leaves out anything with
+// cargo holds (ships and wagon trains); those are in the harbour instead.
 std::vector<int> unitsPresent(const Game& game, const SaveColony& colony) {
     std::vector<int> out;
     const auto here = game.unitsAt(colony.x, colony.y);
     for (auto it = here.rbegin(); it != here.rend(); ++it) {
-        if (!game.isShip(*it)) {
+        if (!carries(game, *it)) {
             out.push_back(*it);
+        }
+    }
+    return out;
+}
+
+std::vector<int> shipsInPort(const Game& game, const SaveColony& colony) {
+    // The last to arrive first, wagon trains and ships alike.
+    std::vector<int> out;
+    for (int i = game.unitCount() - 1; i >= 0; --i) {
+        const auto& u = game.unit(i);
+        if (u.x == colony.x && u.y == colony.y && game.onMap(i) && carries(game, i)) {
+            out.push_back(i);
         }
     }
     return out;
@@ -951,6 +1102,32 @@ OutsideMenuBox outsideMenuBox(int lines) {
     const int h = 24 + 8 * lines;
     const int y = (Screen::kHeight - h) / 2;
     return {62, y, 196, h, y + 16};
+}
+
+int harbourShipAt(int x, int y, int ships) {
+    // The first four, 18 pixels apart from x 130, with their frames.
+    if (y < 144 || y >= 164 || x < 129) {
+        return -1;
+    }
+    const int k = (x - 129) / 18;
+    return k < std::min(4, ships) ? k : -1;
+}
+
+int harbourHoldAt(int x, int y) {
+    if (y < 165 || y >= 187 || x < 127) {
+        return -1;
+    }
+    const int k = (x - 127) / 12;
+    return k < kMaxHolds && (x - 127) % 12 < 10 ? k : -1;
+}
+
+bool inHarbour(int x, int y) { return x >= 121 && x < 121 + 84 && y >= 130 && y < 130 + 48; }
+
+int warehouseGoodAt(int x, int y) {
+    if (y < 179 || x < 0 || x >= 19 * kGoodsKinds) {
+        return -1;
+    }
+    return x / 19;
 }
 
 int unitPresentAt(int x, int y) {
@@ -1350,7 +1527,7 @@ void drawColonyScreen(Screen& screen, const Art& art, const ColonyArt& colonyArt
 
     screen.resetClip();
     screen.clear(kBlack);
-    drawTopLine(screen, art, game, colony);
+    drawTopLine(screen, art, game, colony, view.topMessage);
     drawTown(screen, art, colonyArt, game, colony, production, view.selectedColonist, view.selectedOutside);
     if (view.townLabel >= 0) {
         drawTownLabel(screen, art, game, colony, view.townLabel);
@@ -1360,7 +1537,7 @@ void drawColonyScreen(Screen& screen, const Art& art, const ColonyArt& colonyArt
     screen.fill({0, kLowerTop, Screen::kWidth, 1}, kBlack);
     drawPeople(screen, art, game, colony, production, view.selectedColonist,
                nationEffects(save, colony.nation).libertyExtra(colony.nation == save.humanNation));
-    drawHarbour(screen, art);
+    drawHarbour(screen, art, game, colony, view.selectedShip, view.harbourChosen);
     if (view.panel == ColonyPanel::Make) {
         drawMakePanel(screen, art, game, colony);
     } else if (view.panel == ColonyPanel::Units) {
@@ -1370,6 +1547,9 @@ void drawColonyScreen(Screen& screen, const Art& art, const ColonyArt& colonyArt
     }
     drawPanelButtons(screen, art, view.panel);
     drawWarehouse(screen, art, colony, view.selectedGood);
+    if (view.warehouseLabel >= 0 && view.warehouseLabel < kGoodsKinds) {
+        drawWarehouseLabel(screen, art, game, colony, view.warehouseLabel);
+    }
     if (view.jobsMenu >= 0 && view.selectedColonist >= 0) {
         drawJobsMenu(screen, art, game, colony, view.selectedColonist, view.jobsMenu);
     }

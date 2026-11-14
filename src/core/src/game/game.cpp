@@ -1152,6 +1152,104 @@ int Game::freeHolds(int ship) const {
     return std::max(0, rules_.units[static_cast<std::size_t>(type)].cargoSlots - used);
 }
 
+namespace {
+
+constexpr int kTradeRouteOrders = 2; // a unit on a trade route keeps its orders when loaded
+
+// Read from the original: holds of the good are topped up first, the rest
+// takes a new hold.
+void addToHolds(SaveUnit& u, int good, int amount) {
+    for (int k = 0; k < u.holds && amount > 0; ++k) {
+        if (holdGood(u, k) == good && holdAmount(u, k) < kHoldSize) {
+            const int add = std::min(amount, kHoldSize - holdAmount(u, k));
+            setHold(u, k, good, holdAmount(u, k) + add);
+            amount -= add;
+        }
+    }
+    if (amount > 0 && u.holds < kMaxHolds) {
+        setHold(u, u.holds, good, amount);
+        ++u.holds;
+    }
+}
+
+} // namespace
+
+int Game::colonyCargoRoom(int carrier, int good) const {
+    const auto& u = unit(carrier);
+    const int type = u.type;
+    if (type < 0 || static_cast<std::size_t>(type) >= rules_.units.size()) {
+        return 0;
+    }
+    int used = u.holds;
+    if (isShip(carrier)) {
+        used += static_cast<int>(passengers(carrier).size());
+    }
+    const int free = rules_.units[static_cast<std::size_t>(type)].cargoSlots - used;
+    if (free > 0) {
+        return 100 * free;
+    }
+    int room = 0;
+    for (int k = 0; k < u.holds; ++k) {
+        if (holdGood(u, k) == good && holdAmount(u, k) < kHoldSize) {
+            room += kHoldSize - holdAmount(u, k);
+        }
+    }
+    return room;
+}
+
+int Game::loadInColony(int carrier, int colony, int good, int amount) {
+    if (colony < 0 || static_cast<std::size_t>(colony) >= save_.colonies.size() || good < 0 || good >= kGoodsKinds) {
+        return 0;
+    }
+    auto& stock = save_.colonies[static_cast<std::size_t>(colony)].stock[static_cast<std::size_t>(good)];
+    int take = std::min({amount, kHoldSize, stock, colonyCargoRoom(carrier, good)});
+    if (take <= 0) {
+        return 0;
+    }
+    stock -= take;
+    auto& u = save_.units[static_cast<std::size_t>(carrier)];
+    addToHolds(u, good, take);
+    if (u.orders != kTradeRouteOrders) {
+        u.orders = SaveUnit::kNoOrders;
+    }
+    return take;
+}
+
+int Game::colonyCargoHold(int carrier, int good) const {
+    const auto& u = unit(carrier);
+    for (int k = 0; k < u.holds; ++k) {
+        if (holdGood(u, k) == good) {
+            return holdAmount(u, k);
+        }
+    }
+    return -1;
+}
+
+int Game::unloadInColony(int carrier, int colony, int good, int amount) {
+    if (colony < 0 || static_cast<std::size_t>(colony) >= save_.colonies.size()) {
+        return 0;
+    }
+    auto& u = save_.units[static_cast<std::size_t>(carrier)];
+    int hold = -1;
+    for (int k = 0; k < u.holds && hold < 0; ++k) {
+        if (holdGood(u, k) == good) {
+            hold = k;
+        }
+    }
+    if (hold < 0) {
+        return 0;
+    }
+    const int aboard = holdAmount(u, hold);
+    const int moved = std::clamp(amount, 0, aboard);
+    removeHold(u, hold);
+    auto& stock = save_.colonies[static_cast<std::size_t>(colony)].stock[static_cast<std::size_t>(good)];
+    stock += moved;
+    if (aboard - moved > 0) {
+        addToHolds(u, good, aboard - moved); // the rest goes back aboard
+    }
+    return moved;
+}
+
 bool Game::boardInPort(int index, int ship) {
     if (isShip(index) || !isShip(ship) || europePlace(unit(index)) != EuropePlace::InPort ||
         europePlace(unit(ship)) != EuropePlace::InPort || unit(index).nation != unit(ship).nation ||

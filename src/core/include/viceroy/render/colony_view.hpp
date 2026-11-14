@@ -12,6 +12,7 @@
 #include "viceroy/render/game_view.hpp"
 
 #include <array>
+#include <string>
 #include <vector>
 
 namespace viceroy {
@@ -42,6 +43,10 @@ struct ColonyViewState {
     bool outsideFromMore = false; // that menu came from "(More)": its first line goes back
     int selectedGood = 0;         // the warehouse's framed good, as in the original (food at first)
     int townLabel = -1;           // the place in the town last pointed at, named in a label; -1 for none
+    int selectedShip = 0;         // which of the ships in the harbour is chosen (its place in the list)
+    bool harbourChosen = false;   // a ship was clicked or loaded: its frame is white
+    int warehouseLabel = -1;      // the good of the warehouse under the pointer, named in a label; -1 for none
+    std::string topMessage;       // shown in place of the top line for a while (goods moved)
 };
 
 // What is under a point of the colony screen, for clicks: a colonist (in
@@ -100,8 +105,17 @@ void drawColonyScreen(Screen& screen, const Art& art, const ColonyArt& colonyArt
 // The land units in a colony as the Units Present panel shows them: the
 // last on the square first.
 std::vector<int> unitsPresent(const Game& game, const SaveColony& colony);
+// The ships and wagon trains in a colony's harbour, in the same order.
+std::vector<int> shipsInPort(const Game& game, const SaveColony& colony);
 // Which of the five units in front of the Units Present panel is at a
 // point on the screen, or -1.
 int unitPresentAt(int x, int y);
+// The harbour: which of the first four ships is at a point (-1 for none),
+// which hold, whether a point is in the harbour box, and which good of the
+// warehouse row is there.
+int harbourShipAt(int x, int y, int ships);
+int harbourHoldAt(int x, int y);
+bool inHarbour(int x, int y);
+int warehouseGoodAt(int x, int y);
 
 } // namespace viceroy

@@ -20,8 +20,12 @@ touch controls.
 > advisors warn of a poor site and you type the name), look inside your colonies, end turns and save. The colony screen
 > shows its buildings (laid out differently in every colony, as in the
 > original), people, what they produce (with what is missing crossed out
-> and the fishermen's catch shown as fish) and the warehouse; point at a
-> building to see its name; give
+> and the fishermen's catch shown as fish), the ships and wagon trains in
+> its harbour with their cargo, and the warehouse; point at a
+> building or a good to see its name; drag goods from the warehouse onto a
+> ship or wagon train to load them and from a hold to the warehouse to
+> unload (hold Shift to choose how much); click the chosen ship again for
+> its orders or to unload everything; give
 > colonists other jobs with the jobs menu (where an expert can also be made
 > an ordinary free colonist) or by clicking a colonist and then
 > a building or field, send them out of the colony as colonists, pioneers,
@@ -228,6 +232,8 @@ saved in the first free slot, or over the savegame saved longest ago.
 | Show what the colony produces again | Click the house button | |
 | Rename the colony | Click its name on the top line, type and Enter | |
 | Choose what the custom house sells | Click the custom house, tick goods with Space, Enter | |
+| Load or unload goods in a colony | Drag them from the warehouse to the harbour, or from a hold to the warehouse (Shift: how much) | |
+| Orders for a ship in the colony's harbour, or unload all of it | Click the chosen ship again | |
 | Close the colony screen | Esc, or Enter with nobody picked, or click Exit | B |
 | Open the home port in Europe | E | Share / Capture button |
 | In Europe: move between the market, the ships, the docks and the buttons | Up / Down | D-pad up / down |

@@ -386,6 +386,21 @@ public:
     void leaveShipInPort(int unit);
     // Free places on a ship: holds not used by cargo or passengers.
     int freeHolds(int ship) const;
+
+    // --- Cargo in a colony's harbour (ships and wagon trains) -------------
+    // Read from the original. The room for a good: 100 for every free hold;
+    // with none free, what the holds of that good still take. 0 means no room.
+    int colonyCargoRoom(int carrier, int good) const;
+    // Loads up to `amount` (at most 100, at most the stock) from the
+    // colony's warehouse: holds of that good are topped up first, the rest
+    // takes a new hold. A carrier not on a trade route loses its orders.
+    // Returns how much was loaded.
+    int loadInColony(int carrier, int colony, int good, int amount);
+    // The first hold with that good: its amount, or -1 when there is none.
+    int colonyCargoHold(int carrier, int good) const;
+    // Unloads the first hold of that good into the warehouse; `amount`
+    // (when less) keeps the rest aboard. Returns how much was unloaded.
+    int unloadInColony(int carrier, int colony, int good, int amount);
     // The Recruit, Purchase and Train buttons. Each pays from the human's
     // gold and puts the new unit on the docks (a ship in port); it returns
     // the unit, or -1 when the gold is short.
