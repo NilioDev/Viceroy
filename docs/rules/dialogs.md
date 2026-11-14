@@ -32,8 +32,9 @@ braces), enhance 0x80 and shadow 0x2F.
   the box less 8 and 11 high.
 - The box ends 2 pixels below the last choice's 12-pixel line.
 - `@smallfont` (the Train list) uses `FONTTINY.FF` without shadow: text
-  lines 6 apart, choices 8 apart with a bar 7 high. The chosen line is
-  drawn in gold (0x95) instead of green (seen in Pick Music).
+  lines 6 apart, choices 8 apart with a bar 7 high.
+- Pick Music draws the tune that is playing in gold (0x95) instead of
+  green, wherever the bar is; the bar starts on it.
 - `@checkbox` (Sound Options, Colony Report Options) puts a ring before each
   choice: the font's `]` (a ring with a dot) when on, `[` (a filled ring)
   when off, in gold, then a space and the text. Space or the choice's key

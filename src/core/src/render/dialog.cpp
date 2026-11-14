@@ -23,7 +23,7 @@ constexpr std::uint8_t kBar = 0x8A;
 // font pixel values 1, 2 and 3 take the letter, enhance and shadow.
 constexpr TextColours kBasic{0x44, 0x80, 0x2F};
 constexpr TextColours kCheckColours{0x95, 0x80, 0x2F}; // seen in the Sound Options
-constexpr TextColours kSmallChosen{0x95, 0x80, 0x2F};
+constexpr TextColours kMarked{0x95, 0x80, 0x2F}; // seen in Pick Music
 constexpr TextColours kHilite{0x95, 0x80, 0x2F};
 constexpr TextColours kGrey{0x08, 0x80, 0x2F};
 constexpr std::uint8_t kGold = 0x95;
@@ -565,9 +565,8 @@ void drawDialog(Screen& screen, const Art& art, const Dialog& d) {
             screen.fill({box.x + 4 + d.indent, y - 1, box.w - 8 - d.indent, d.small ? 7 : 11}, kBar);
         }
         const bool grey = i < d.disabled.size() && d.disabled[i];
-        // In small print the chosen line is gold (seen in Pick Music).
-        const bool goldLine = d.small && static_cast<int>(i) == d.selected && !grey;
-        const TextColours& colours = grey ? kGrey : goldLine ? kSmallChosen : kBasic;
+        const bool goldLine = static_cast<int>(i) == d.marked && !grey;
+        const TextColours& colours = grey ? kGrey : goldLine ? kMarked : kBasic;
         bool optionGold = false;
         int left = box.x + d.optionLeft + d.indent;
         if (d.checkbox) {
