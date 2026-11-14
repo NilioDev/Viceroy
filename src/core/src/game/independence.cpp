@@ -153,6 +153,8 @@ void Game::declareIndependence() {
         return; // the original always has one by now
     }
     musicCues_.push_back({MusicCue::Kind::ChangeMood, kIndependenceMood});
+    // Then the leader signs the declaration (a screen of its own).
+    notices_.push_back(GameNotice{"SIGNING", {save_.players[static_cast<std::size_t>(rebels)].name}});
 
     // The power that will help: the weakest other nation by 3 x ships +
     // 2 x colonies + people, sorted the way the original sorts.

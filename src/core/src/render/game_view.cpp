@@ -696,6 +696,123 @@ std::string textLine(const TextFile& file, const char* section, int row, const c
     return fallback;
 }
 
+namespace {
+
+// Read from the original: where the pen starts, how far it goes for a
+// space, and where the flourish ends the name however long it is.
+constexpr int kPenX = 126;
+constexpr int kPenY = 148;
+constexpr int kPenGap = 3;
+constexpr int kPenEdge = 220;
+
+bool isLetter(char c) { return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'); }
+
+bool isGap(char c) {
+    // A space or a punctuation mark: the pen moves on without writing.
+    const auto u = static_cast<unsigned char>(c);
+    return (u >= 9 && u <= 13) || (u >= 0x20 && u < 0x7F && !isLetter(c) && !(c >= '0' && c <= '9'));
+}
+
+const SpriteSheet* penSheet(const Art& art, const PenStroke& stroke) {
+    const auto i = static_cast<std::size_t>(stroke.letter);
+    switch (stroke.pen) {
+    case PenStroke::Pen::Capital:
+        return i < art.penCapitals.size() ? &art.penCapitals[i] : nullptr;
+    case PenStroke::Pen::Letter:
+        return i < art.penLetters.size() ? &art.penLetters[i] : nullptr;
+    case PenStroke::Pen::Flourish:
+        return &art.penFlourish;
+    }
+    return nullptr;
+}
+
+} // namespace
+
+std::string signatureName(std::string_view name) {
+    std::string out(name);
+    bool start = true;
+    for (char& c : out) {
+        if (!isLetter(c)) {
+            start = true;
+            continue;
+        }
+        if (start && c >= 'a' && c <= 'z') {
+            c = static_cast<char>(c - 'a' + 'A');
+        }
+        start = false;
+    }
+    return out;
+}
+
+std::vector<PenStroke> signatureStrokes(std::string_view name, const std::function<int(const PenStroke&)>& width) {
+    // Read from the original: a capital takes ten pictures and lifts the
+    // line three pixels, a small letter seven and two, a space or a mark
+    // one. Anything else, or a name running past the edge, gets the
+    // flourish, which ends the signature.
+    const std::string written = signatureName(name);
+    std::vector<PenStroke> strokes;
+    int x = kPenX;
+    int y = kPenY;
+    for (const char c : written) {
+        PenStroke stroke;
+        stroke.x = x;
+        stroke.y = y;
+        if (x >= kPenEdge || (!isLetter(c) && !isGap(c))) {
+            stroke.frames = 10;
+            strokes.push_back(stroke);
+            break;
+        }
+        if (isGap(c)) {
+            x += kPenGap;
+            y -= 1;
+            continue;
+        }
+        if (c >= 'A' && c <= 'Z') {
+            stroke.pen = PenStroke::Pen::Capital;
+            stroke.letter = c - 'A';
+            stroke.frames = 10;
+            y -= 3;
+        } else {
+            stroke.pen = PenStroke::Pen::Letter;
+            stroke.letter = c - 'a';
+            stroke.frames = 7;
+            y -= 2;
+        }
+        x += width(stroke);
+        strokes.push_back(stroke);
+    }
+    return strokes;
+}
+
+std::vector<PenStroke> signatureStrokes(std::string_view name, const Art& art) {
+    return signatureStrokes(name, [&art](const PenStroke& stroke) {
+        const auto* sheet = penSheet(art, stroke);
+        return sheet && !sheet->sprites.empty() ? sheet->sprites.front().image.width : 0;
+    });
+}
+
+void drawSigning(Screen& screen, const Art& art, const std::vector<PenStroke>& strokes, std::size_t stroke, int frame) {
+    if (art.declaration.palette) {
+        screen.setColours(*art.declaration.palette, 0, 255);
+    }
+    screen.blit(art.declaration.image, 0, 0);
+    for (std::size_t s = 0; s < strokes.size() && s <= stroke; ++s) {
+        const auto* sheet = penSheet(art, strokes[s]);
+        if (!sheet) {
+            continue;
+        }
+        // The pictures of a stroke are drawn over each other, the first of
+        // the sheet left out.
+        const int shown = s < stroke ? strokes[s].frames : std::min(frame + 1, strokes[s].frames);
+        for (int f = 1; f <= shown; ++f) {
+            const auto i = static_cast<std::size_t>(f);
+            if (i < sheet->sprites.size()) {
+                screen.blit(sheet->sprites[i].image, strokes[s].x, strokes[s].y);
+            }
+        }
+    }
+}
+
 void drawCongressHall(Screen& screen, const Art& art, const std::vector<bool>& fathers) {
     // Read from the original: the hall's own colours, then the fathers
     // from the back of the hall to the front, each standing with its feet
@@ -738,6 +855,12 @@ Art loadArt(const std::filesystem::path& folder) {
     placeMenus(art, art.menus);
     art.congressHall = readPicture(readFile(folder, "CCBKGD.PIK"));
     art.congressReport = readPicture(readFile(folder, "REPORT3.PIK"));
+    art.declaration = readPicture(readFile(folder, "DECOIND.PIK"));
+    for (char c = 'A'; c <= 'Z'; ++c) {
+        art.penCapitals.push_back(readSpriteSheet(readFile(folder, std::string("DEC-UPP") + c + ".SS")));
+        art.penLetters.push_back(readSpriteSheet(readFile(folder, std::string("DEC-LOW") + c + ".SS")));
+    }
+    art.penFlourish = readSpriteSheet(readFile(folder, "DEC-SQIG.SS"));
     for (int f = 0; f < 25; ++f) {
         art.fathers.push_back(readSpriteSheet(readFile(folder, (f < 10 ? "CC-0" : "CC-") + std::to_string(f) + ".SS")));
     }

@@ -13,8 +13,10 @@
 #include "viceroy/render/screen.hpp"
 
 #include <filesystem>
+#include <functional>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -39,6 +41,10 @@ struct Art {
     Picture congressHall;               // CCBKGD.PIK
     Picture congressReport;             // REPORT3.PIK
     std::vector<SpriteSheet> fathers;   // CC-00.SS to CC-24.SS, by row of @FATHERS
+    Picture declaration;                // DECOIND.PIK: the declaration to sign
+    std::vector<SpriteSheet> penCapitals; // DEC-UPPA.SS to DEC-UPPZ.SS: a capital written
+    std::vector<SpriteSheet> penLetters;  // DEC-LOWA.SS to DEC-LOWZ.SS: a small letter written
+    SpriteSheet penFlourish;              // DEC-SQIG.SS: the flourish at the end
     Ruleset rules;
 };
 
@@ -49,6 +55,30 @@ Art loadArt(const std::filesystem::path& folder);
 // (row of @FATHERS, true when in congress), each where the original
 // stands it.
 void drawCongressHall(Screen& screen, const Art& art, const std::vector<bool>& fathers);
+
+// The signing of the declaration of independence: the leader's name is
+// written on DECOIND.PIK letter by letter, each letter a few pictures of
+// the pen at work.
+struct PenStroke {
+    enum class Pen { Capital, Letter, Flourish };
+    Pen pen = Pen::Flourish;
+    int letter = 0; // 0 for A to 25 for Z
+    int x = 0;      // where the letter's pictures stand (their top left)
+    int y = 0;
+    int frames = 0; // pictures drawn one after the other
+};
+
+// Each word of the name starts with a capital, as on the declaration.
+std::string signatureName(std::string_view name);
+
+// The letters the pen writes for the name. width gives how far the pen
+// moves on after a stroke (the width of its pictures).
+std::vector<PenStroke> signatureStrokes(std::string_view name, const std::function<int(const PenStroke&)>& width);
+std::vector<PenStroke> signatureStrokes(std::string_view name, const Art& art);
+
+// The declaration with the strokes before stroke written, and of that one
+// its first frame + 1 pictures.
+void drawSigning(Screen& screen, const Art& art, const std::vector<PenStroke>& strokes, std::size_t stroke, int frame);
 
 // The map window and the panel.
 inline constexpr int kViewColumns = 15;
