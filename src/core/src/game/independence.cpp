@@ -41,7 +41,6 @@ constexpr std::size_t kHeaderRebels = 96;        // the human's rebels in % (a w
 constexpr std::size_t kHeaderCrown = 98;         // the nation whose slot the Crown's side takes (a word)
 constexpr std::size_t kHeaderPower = 100;        // the power that helps the rebels (a word)
 constexpr std::size_t kHeaderNextPower = 102;    // the next one; also the king who offers mercenaries
-constexpr std::size_t kHeaderRoyalForce = 106;   // regulars, dragoons, men-of-war, artillery
 constexpr std::size_t kHeaderPowerForce = 114;   // the same for the power's force
 
 // Nation record.
