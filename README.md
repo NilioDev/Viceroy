@@ -124,7 +124,8 @@ touch controls.
 > in goods for your nearest colony when your forces nearby impress it, and
 > the chief's face shows how angry the tribe is. They can also attack a
 > village and burn it, for treasure, converts and the tribe's anger; a tribe
-> that loses its last settlement is extinct. Fish,
+> that loses its last settlement is extinct. Spies report raids on other
+> nations' colonies and colonies changing hands between them. Fish,
 > ore and the other resources show on the map where the original puts them
 > and add to what your colonists make there. Lost city rumours show on the
 > map too, and exploring one brings what it brings in the original: a

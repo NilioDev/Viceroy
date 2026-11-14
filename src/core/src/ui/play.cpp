@@ -1339,24 +1339,23 @@ void PlayScreen::showNotices() {
     if (dialog_) {
         // Measured: battles are told by the colonial advisor, the work of
         // pioneers by the frontiersman.
-        constexpr std::string_view kBattles[] = {"DEMOTE",     "COLONISTCAPTURE", "COLONISTCAPTURE2", "WAGONCAPTURE",
-                                                 "LOOTCAPTURE", "ARTILLERY",      "ARTILLERY2",       "VETERAN",
-                                                 "VALOR",       "CAPTURED",       "LOOT",             "LOOT2",
-                                                 "INDIANSLAVES", "INDIANWARFARE", "INDIANBURN", "TEAPARTY",
-                                                 "KINGBUY",     "REBELUP",        "REBELUP50",        "REBELDOWN",
-                                                 "MERCENARIES", "MERCS", "NOMAYORSDURINGREV",
-                                                 // The war of independence (placement not measured yet).
-                                                 "ALREADYREVOLUTION", "TOOTORY", "MULTIREV", "DECLARE",
-                                                 "INDEPENDENCE", "SEIZURE", "MOBILIZE", "MOBILIZE2", "INTERVENE",
-                                                 "INTERVENTION", "AMBUSHHINT", "CONSIDER", "NOWARSDURINGREV",
-                                                 "EUROPENOTAVAIL", "EUROPENOTLEAVE", "NOCOLONIESEITHER", "INVASION",
-                                                 "SEIZURESEA", "SEIZURELAND", "TORYUPRISING", "INDIANGRUDGE", "HOWTOWIN", "WINNING",
-                                                 "LOSING1", "LOSING2", "LOSING3", "WARN1", "WARN2", "WARN3",
-                                                 // The end of the game (placement not measured yet).
-                                                 "LOSENOCOLONIES", "SOONRETIRING0", "SOONRETIRING1", "RETIRING",
-                                                 "RETIRING2", "SCORED", "OTHERGRANTED", "OTHERMIGHT", "OTHERLESS"};
+        constexpr std::string_view kBattles[] = {
+            "DEMOTE", "COLONISTCAPTURE", "COLONISTCAPTURE2", "WAGONCAPTURE", "LOOTCAPTURE", "ARTILLERY", "ARTILLERY2",
+            "VETERAN", "VALOR", "CAPTURED", "CAPTURED3", "LOOT", "LOOT2", "INDIANWINCOLONY", "INDIANBURNCOLONY",
+            "INDIANSLAVES", "INDIANWARFARE", "INDIANBURN", "TEAPARTY", "KINGBUY", "REBELUP", "REBELUP50", "REBELDOWN",
+            "MERCENARIES", "MERCS", "NOMAYORSDURINGREV",
+            // The war of independence (placement not measured yet).
+            "ALREADYREVOLUTION", "TOOTORY", "MULTIREV", "DECLARE", "INDEPENDENCE", "SEIZURE", "MOBILIZE", "MOBILIZE2",
+            "INTERVENE", "INTERVENTION", "AMBUSHHINT", "CONSIDER", "NOWARSDURINGREV", "EUROPENOTAVAIL",
+            "EUROPENOTLEAVE", "NOCOLONIESEITHER", "INVASION", "SEIZURESEA", "SEIZURELAND", "TORYUPRISING",
+            "INDIANGRUDGE", "HOWTOWIN", "WINNING", "LOSING1", "LOSING2", "LOSING3", "WARN1", "WARN2", "WARN3",
+            // The end of the game (placement not measured yet).
+            "LOSENOCOLONIES", "SOONRETIRING0", "SOONRETIRING1", "RETIRING", "RETIRING2", "SCORED", "OTHERGRANTED",
+            "OTHERMIGHT", "OTHERLESS"};
         if (std::find(std::begin(kBattles), std::end(kBattles), notice.section) != std::end(kBattles)) {
             placeMapDialog(*dialog_);
+        } else if (notice.section == "CAPTURED2") {
+            placeForeignNewsDialog(*dialog_); // read from the original: the man in the home port
         } else if (notice.section == "LOOTCASH" || notice.section == "CASHTREASURE") {
             placeTradeDialog(*dialog_); // read from the original: the trade adviser
         } else {

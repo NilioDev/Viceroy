@@ -607,3 +607,23 @@ VCR_TEST("combat: during the war the rebels ambush the Crown in the open") {
     h.state().players[kDutch].control = 1;
     VCR_CHECK(labels(h.analyseAttack(0, 1).attacker) == (std::vector<int>{kAttackBonus, kExpeditionaryForce}));
 }
+
+VCR_TEST("combat: a taken colony is told as the original tells it") {
+    {
+        // During the war of independence, without the plunder.
+        Game g = colonyBattle(1, 0, 0);
+        g.state().header[18] |= 0x01;
+        VCR_CHECK(g.attackColony(0, 0, 0) == CombatOutcome::AttackerWon);
+        const auto notices = g.takeNotices();
+        VCR_CHECK(!notices.empty() && notices.back().section == "CAPTURED3");
+    }
+    {
+        // Between two computer players: a spies' report.
+        Game g = colonyBattle(1, 0, 0);
+        g.state().humanNation = 0;
+        VCR_CHECK(g.attackColony(0, 0, 0) == CombatOutcome::AttackerWon);
+        const auto notices = g.takeNotices();
+        VCR_CHECK(!notices.empty() && notices.back().section == "CAPTURED2");
+        VCR_CHECK(notices.back().strings.at(2) == "Martinique");
+    }
+}
