@@ -58,8 +58,10 @@ constexpr std::size_t kHeaderGoneNation = 98; // the nation gone after the War o
 constexpr std::size_t kHeaderPlayers = 17;
 constexpr std::uint8_t kSeveralHumans = 0x80;
 constexpr std::size_t kHeaderIndependence = 18;
+constexpr std::size_t kHeaderIntervention = 100; // the power that helps in the war of independence
 
 constexpr int kFranklin = 19; // rows of @FATHERS
+constexpr int kDeWitt = 4;
 constexpr int kPrivateerType = 16;
 constexpr int kFirstShip = 13;
 constexpr int kLastShip = 18;
@@ -1213,6 +1215,186 @@ bool Game::stepMeeting(Meeting& m) {
     }
     }
     return false;
+}
+
+// --- Attacks between nations ------------------------------------------------
+
+bool Game::europeanAttack(int a, int d) {
+    if (a < 0 || a >= kEuropeanNations || d < 0 || d >= kEuropeanNations || a == d) {
+        return true;
+    }
+    const auto ua = static_cast<std::size_t>(a);
+    const auto ud = static_cast<std::size_t>(d);
+    const bool humanAttacks = save_.players[ua].control == 0;
+    if (!humanAttacks && atPeace(a, d) && save_.nations[ua].raw[kRelationTimers + ud] != 0) {
+        return false;
+    }
+    if (save_.players[ud].control == 0 && (relation(d, a) & kPeace) != 0) {
+        // "Sneak attack by the treacherous French!"
+        GameNotice sneak{"SNEAK", {}};
+        sneak.adjectives = {{0, a}};
+        sneak.music = {{MusicCue::Kind::ChangeMood, kWarMood}};
+        notices_.push_back(std::move(sneak));
+    }
+    if ((relation(a, d) & kPeace) != 0 || (relation(d, a) & kPeace) != 0) {
+        if (!humanAttacks) {
+            // "The French and Spanish are now at war."
+            GameNotice news{"DECLAREWAR", {}};
+            news.adjectives = {{0, a}, {1, d}};
+            news.value = kForeignNews;
+            notices_.push_back(std::move(news));
+        } else if ((relation(d, a) & kPeace) != 0) {
+            auto& r = save_.nations[ud].raw[kRelations + ua];
+            r = static_cast<std::uint8_t>(r | kWarIntent);
+        }
+        clearRelationBits(a, d, kPeace);
+    }
+    auto& r = save_.nations[ua].raw[kRelations + ud];
+    r = static_cast<std::uint8_t>(r & ~1u);
+    return true;
+}
+
+// --- Trade with a foreign colony ---------------------------------------------
+
+int Game::startForeignTrade(int index, int colony) {
+    if (index < 0 || index >= unitCount() || colony < 0 || colony >= static_cast<int>(save_.colonies.size())) {
+        return 0;
+    }
+    auto& u = save_.units[static_cast<std::size_t>(index)];
+    u.movesUsed = movementAllowance(index);
+    const int a = u.nation;
+    const int b = save_.colonies[static_cast<std::size_t>(colony)].nation;
+    if (a < 0 || a >= kEuropeanNations || save_.players[static_cast<std::size_t>(a)].control != 0 || b < 0 ||
+        b >= kEuropeanNations) {
+        return 0;
+    }
+    if ((relation(a, b) & kPeace) == 0) {
+        // "Ships and wagon trains cannot enter the colonies of foreign
+        // powers with whom you are at war ..."
+        notices_.push_back(GameNotice{"TRADEATWAR", {}});
+        return 0;
+    }
+    GameNotice refusal;
+    refusal.leader = b;
+    if (!hasFather(a, kDeWitt)) {
+        // "In the interests of Mercantilism, the King has ordered us not to
+        // trade with foreign merchants."
+        refusal.section = "TRADEMERCANTILISM";
+        refusal.lines = {{0, false, "GREATLEADER2", b}};
+        notices_.push_back(std::move(refusal));
+        return 0;
+    }
+    if (u.holds == 0) {
+        refusal.section = "TRADENOCARGO";
+        notices_.push_back(std::move(refusal));
+        return 0;
+    }
+    return u.holds;
+}
+
+void Game::offerForeignTrade(int index, int colony, int hold) {
+    foreignTrade_.reset();
+    if (index < 0 || index >= unitCount() || colony < 0 || colony >= static_cast<int>(save_.colonies.size())) {
+        return;
+    }
+    const auto& u = unit(index);
+    if (hold < 0 || hold >= u.holds) {
+        return;
+    }
+    const auto& c = save_.colonies[static_cast<std::size_t>(colony)];
+    const int a = u.nation;
+    const int b = c.nation;
+    const auto& theirs = save_.nations[static_cast<std::size_t>(b)];
+    const int d = save_.difficulty;
+    const bool independence = (save_.header[kHeaderIndependence] & 1) != 0;
+    const int ally = headerWord(save_.header, kHeaderIntervention);
+    ForeignTradeOffer offer;
+    offer.unit = index;
+    offer.colony = colony;
+    offer.hold = hold;
+    offer.good = holdGood(u, hold);
+    offer.amount = holdAmount(u, hold);
+    // What it is worth on their market, less their tax, less a margin.
+    // The original keeps only 16 bits of each product before dividing.
+    const auto low16 = [](int v) { return static_cast<int>(static_cast<std::int16_t>(v)); };
+    const int value = low16(bidPrice(theirs, offer.good) * offer.amount);
+    int gold = value - low16(value * theirs.taxRate) / 100;
+    if (!independence && (relation(a, b) & kWarIntent) != 0) {
+        gold >>= 1;
+    }
+    if (independence && b == ally) {
+        gold += low16((-5 - d) * gold) / 100;
+    } else {
+        gold += low16(aiRandom(10, 12 * (d + 1)) * gold) / -100;
+    }
+    offer.gold = std::max(gold, 1);
+    // The goods they would give instead: as much as is worth no more than
+    // the player's, of the good that comes to most (not food, lumber, tools
+    // or muskets before independence; in the war, muskets and horses are
+    // easier to have).
+    int best = -1;
+    for (int g = 0; g < kGoodsKinds; ++g) {
+        if (g == offer.good) {
+            continue;
+        }
+        if (!independence && (g == cargo::kMuskets || g == cargo::kTools || g == cargo::kFood || g == cargo::kLumber)) {
+            continue;
+        }
+        int amount = std::min<int>(c.stock[static_cast<std::size_t>(g)], kHoldSize);
+        if (independence && (g == cargo::kMuskets || g == cargo::kHorses)) {
+            amount = b == ally ? kHoldSize : std::max(amount, kHoldSize / 2);
+        }
+        const int price = bidPrice(theirs, g);
+        int worth = price * amount;
+        while (worth > value) {
+            --amount;
+            worth -= price;
+        }
+        if (amount > 0 && worth > best) {
+            best = worth;
+            offer.giveGood = g;
+            offer.giveAmount = amount;
+        }
+    }
+    GameNotice notice;
+    notice.leader = b;
+    if (best < 0) {
+        // "We are not interested in your 100 furs."
+        notice.section = "TRADENOWANT";
+        notice.lines = {{0, true, "CARGO", offer.good}};
+        notice.numbers = {offer.amount};
+        notices_.push_back(std::move(notice));
+        return;
+    }
+    // "We will give you 100 cloth in exchange for your 100 furs. Or, if you
+    // like, we are willing to give you 450."
+    notice.section = "TRADEWITH";
+    notice.lines = {{0, true, "CARGO", offer.giveGood}, {1, true, "CARGO", offer.good}};
+    notice.numbers = {offer.giveAmount, offer.amount, offer.gold};
+    notices_.push_back(std::move(notice));
+    foreignTrade_ = offer;
+}
+
+void Game::answerForeignTrade(int choice) {
+    if (!foreignTrade_) {
+        return;
+    }
+    const ForeignTradeOffer offer = *foreignTrade_;
+    foreignTrade_.reset();
+    if (choice != 0 && choice != 1) {
+        return;
+    }
+    auto& u = save_.units[static_cast<std::size_t>(offer.unit)];
+    if (choice == 0) {
+        // The hold now carries their goods. The original takes nothing
+        // from their colony for it.
+        setHold(u, offer.hold, offer.giveGood, offer.giveAmount);
+    } else {
+        removeHold(u, offer.hold);
+        save_.nations[static_cast<std::size_t>(u.nation)].gold += offer.gold;
+    }
+    auto& stock = save_.colonies[static_cast<std::size_t>(offer.colony)].stock[static_cast<std::size_t>(offer.good)];
+    stock = static_cast<std::int16_t>(stock + offer.amount);
 }
 
 // --- The King's wars -----------------------------------------------------------

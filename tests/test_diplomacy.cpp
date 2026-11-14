@@ -2,6 +2,7 @@
 #include "test.hpp"
 
 #include "viceroy/data/savegame.hpp"
+#include "viceroy/game/europe.hpp"
 #include "viceroy/game/game.hpp"
 #include "viceroy/game/natives.hpp"
 
@@ -291,4 +292,87 @@ VCR_TEST("diplomacy: the War of the Spanish Succession hands the weakest nation 
     // Once only.
     g.spanishSuccession();
     VCR_CHECK(g.takeNotices().empty());
+}
+
+VCR_TEST("diplomacy: a computer's attack in peace is a sneak attack, unless it talked lately") {
+    SaveGame s = diplomacySave();
+    s.nations[kHuman].raw[52 + kFrench] = 0x60;
+    s.nations[kFrench].raw[52 + kHuman] = 0x60;
+    s.nations[kFrench].raw[64 + kHuman] = 3; // talked lately
+    Game g(std::move(s), diplomacyRules());
+    VCR_CHECK(!g.europeanAttack(kFrench, kHuman));
+    VCR_CHECK(g.takeNotices().empty() && g.atPeace(kFrench, kHuman));
+    SaveGame t = diplomacySave();
+    t.nations[kHuman].raw[52 + kFrench] = 0x60;
+    t.nations[kFrench].raw[52 + kHuman] = 0x60;
+    Game h(std::move(t), diplomacyRules());
+    VCR_CHECK(h.europeanAttack(kFrench, kHuman));
+    const auto notices = h.takeNotices();
+    VCR_CHECK(sections(notices) == (std::vector<std::string>{"SNEAK", "DECLAREWAR"}));
+    VCR_CHECK(!h.atPeace(kFrench, kHuman) && !h.atPeace(kHuman, kFrench));
+    // The player breaking a treaty: the victim wants revenge.
+    SaveGame u = diplomacySave();
+    u.nations[kHuman].raw[52 + kFrench] = 0x60;
+    u.nations[kFrench].raw[52 + kHuman] = 0x60;
+    Game k(std::move(u), diplomacyRules());
+    k.europeanAttack(kHuman, kFrench);
+    VCR_CHECK(k.takeNotices().empty());
+    VCR_CHECK((k.relation(kFrench, kHuman) & 0x62) == 0x22);
+}
+
+VCR_TEST("diplomacy: trade with a foreign colony needs a treaty and Jan de Witt") {
+    SaveGame s = diplomacySave();
+    SaveColony quebec;
+    quebec.x = 5;
+    quebec.y = 3;
+    quebec.name = "Quebec";
+    quebec.nation = kFrench;
+    quebec.stock[11] = 300; // cloth
+    quebec.stock[9] = 40;   // rum
+    quebec.stock[0] = 500;  // food: never offered
+    s.colonies.push_back(quebec);
+    SaveUnit wagon;
+    wagon.x = 4;
+    wagon.y = 3;
+    wagon.type = 12;
+    wagon.nation = kHuman;
+    wagon.holds = 1;
+    setHold(wagon, 0, 4, 100); // 100 furs
+    s.units.push_back(wagon);
+    for (auto& p : s.nations[kFrench].prices) {
+        p = 1;
+    }
+    s.nations[kFrench].prices[4] = 6;  // furs: bid 5
+    s.nations[kFrench].prices[11] = 8; // cloth: bid 7
+    s.nations[kFrench].prices[9] = 3;  // rum: bid 2
+    {
+        Game g(s, diplomacyRules());
+        VCR_CHECK(g.startForeignTrade(1, 0) == 0);
+        VCR_CHECK(sections(g.takeNotices()) == std::vector<std::string>{"TRADEATWAR"});
+        VCR_CHECK(g.movesLeft(1) <= 0);
+    }
+    s.nations[kHuman].raw[52 + kFrench] = 0x60;
+    s.nations[kFrench].raw[52 + kHuman] = 0x60;
+    {
+        Game g(s, diplomacyRules());
+        VCR_CHECK(g.startForeignTrade(1, 0) == 0);
+        const auto notices = g.takeNotices();
+        VCR_CHECK(sections(notices) == std::vector<std::string>{"TRADEMERCANTILISM"});
+        VCR_CHECK(notices[0].leader == kFrench);
+    }
+    s.nations[kHuman].raw[7] = 0x10; // Jan de Witt
+    Game g(std::move(s), diplomacyRules());
+    VCR_CHECK(g.startForeignTrade(1, 0) == 1);
+    g.offerForeignTrade(1, 0, 0);
+    const auto notices = g.takeNotices();
+    VCR_CHECK(sections(notices) == std::vector<std::string>{"TRADEWITH"});
+    // 500 worth: 71 cloth (497) beats 40 rum (80); the gold is 500 less a
+    // margin of 10% to 12%.
+    const auto& offer = *g.foreignTradeOffer();
+    VCR_CHECK(offer.giveGood == 11 && offer.giveAmount == 71);
+    VCR_CHECK(offer.gold >= 440 && offer.gold <= 450);
+    g.answerForeignTrade(0);
+    VCR_CHECK(holdGood(g.unit(1), 0) == 11 && holdAmount(g.unit(1), 0) == 71);
+    VCR_CHECK(g.state().colonies[0].stock[4] == 100);
+    VCR_CHECK(g.state().colonies[0].stock[11] == 300); // as in the original
 }
