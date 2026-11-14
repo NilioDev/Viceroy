@@ -1266,7 +1266,7 @@ void PlayScreen::showNotices() {
                                                  "INDEPENDENCE", "SEIZURE", "MOBILIZE", "MOBILIZE2", "INTERVENE",
                                                  "INTERVENTION", "AMBUSHHINT", "CONSIDER", "NOWARSDURINGREV",
                                                  "EUROPENOTAVAIL", "EUROPENOTLEAVE", "NOCOLONIESEITHER", "INVASION",
-                                                 "SEIZURESEA", "SEIZURELAND", "TORYUPRISING", "HOWTOWIN", "WINNING",
+                                                 "SEIZURESEA", "SEIZURELAND", "TORYUPRISING", "INDIANGRUDGE", "HOWTOWIN", "WINNING",
                                                  "LOSING1", "LOSING2", "LOSING3", "WARN1", "WARN2", "WARN3",
                                                  // The end of the game (placement not measured yet).
                                                  "LOSENOCOLONIES", "SOONRETIRING0", "SOONRETIRING1", "RETIRING",

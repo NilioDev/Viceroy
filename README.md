@@ -79,10 +79,11 @@ touch controls.
 > war is won when his army is beaten and your colonies are free, and lost
 > with your ports, your colonies or most of your people; you are warned
 > before. In battle the Crown draws on a colony's Tories and the rebels
-> on its Sons of Liberty, and veterans harden into the Continental Army.
-> Without a war the Viceroy retires in 1800 (in 1850 during it), and the
-> other nations' kings may let their colonies go. Losing all your colonies after 1600 ends the
-> game. The other nations elect their own
+> on its Sons of Liberty, veterans harden into the Continental Army, and
+> tribes you have angered may take the Tory side. Without a war the
+> Viceroy retires in 1800 (in 1850 during it), and the other nations'
+> kings may let their colonies go. Losing all your colonies after 1600
+> ends the game. The other nations elect their own
 > fathers as the original's do. A tribe you meet for the first time
 > offers you peace; refusing it angers the tribe. Missionaries can found missions,
 > which the tribe takes well or badly as in the original, pay a tribe to
