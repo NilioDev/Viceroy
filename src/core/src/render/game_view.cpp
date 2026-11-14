@@ -373,10 +373,7 @@ void drawTerrain(Screen& screen, const Art& art, const Game& game, int x, int y,
 namespace {
 
 // The small box with the unit's nation's colour and its orders letter.
-void drawOrdersBox(Screen& screen, const Art& art, const Game& game, int index, Rect box, int orders,
-                   bool listInk = false) {
-    const auto& u = game.unit(index);
-    const std::uint8_t colour = nationColour(art, game, u.nation);
+void drawOrdersBoxIn(Screen& screen, const Art& art, std::uint8_t colour, Rect box, int orders, bool listInk) {
     screen.fill(box, colour);
     screen.frame(box, kBlack);
     static constexpr const char* kLetters = "-STGLFFBPR-";
@@ -397,6 +394,11 @@ void drawOrdersBox(Screen& screen, const Art& art, const Game& game, int index, 
     screen.text(art.tiny, box.x + (box.w - w) / 2 + 1, box.y + 2, text, {ink, kNoColour, kNoColour});
 }
 
+void drawOrdersBox(Screen& screen, const Art& art, const Game& game, int index, Rect box, int orders,
+                   bool listInk = false) {
+    drawOrdersBoxIn(screen, art, nationColour(art, game, game.unit(index).nation), box, orders, listInk);
+}
+
 // A unit on its square at (px, py), as measured on the original: the sprite
 // a few pixels into the square, a black shadow two pixels left of it, then
 // the orders box, then the unit. Where the sprite and the box go depends on
@@ -407,7 +409,7 @@ struct UnitPlacement {
     int boxY;
 };
 
-UnitPlacement unitPlacement(const Game& game, int index, int icon, int width) {
+UnitPlacement typePlacement(const Ruleset& rules, int type, int icon, int width) {
     switch (icon) {
     case 6: return {3, 0, 0}; // merchantman: the box sits behind the stern
     case 14:
@@ -418,8 +420,10 @@ UnitPlacement unitPlacement(const Game& game, int index, int icon, int width) {
     case 65: return {2, 6, 2}; // damaged artillery
     default: break;
     }
-    const int type = game.unit(index).type;
-    if (isShipType(game.rules(), type)) {
+    if (type == unit_type::kCaravel) {
+        return {3, 0, 0}; // seen in the Colonizopedia: the box before the bow
+    }
+    if (isShipType(rules, type)) {
         return {2, 9, 0};
     }
     if (type == unit_type::kDragoon || type == unit_type::kScout || type == 7 || type == 8 || type == 21 ||
@@ -435,10 +439,13 @@ UnitPlacement unitPlacement(const Game& game, int index, int icon, int width) {
     return {x, x + width - 2, 7};
 }
 
+UnitPlacement unitPlacement(const Game& game, int index, int icon, int width) {
+    return typePlacement(game.rules(), game.unit(index).type, icon, width);
+}
+
 // The black shadow two pixels left of the sprite, the orders box, then the
 // sprite.
-void drawUnitParts(Screen& screen, const Art& art, const Game& game, int index, const IndexedImage& image, int x,
-                   int y, Rect box, int orders, bool listInk) {
+void drawShadow(Screen& screen, const IndexedImage& image, int x, int y) {
     for (int j = 0; j < image.height; ++j) {
         for (int i = 0; i < image.width; ++i) {
             if (image.pixels[static_cast<std::size_t>(j * image.width + i)] != kTransparent) {
@@ -446,6 +453,11 @@ void drawUnitParts(Screen& screen, const Art& art, const Game& game, int index, 
             }
         }
     }
+}
+
+void drawUnitParts(Screen& screen, const Art& art, const Game& game, int index, const IndexedImage& image, int x, int y,
+                   Rect box, int orders, bool listInk) {
+    drawShadow(screen, image, x, y);
     drawOrdersBox(screen, art, game, index, box, orders, listInk);
     screen.blit(image, x, y);
 }
@@ -462,6 +474,25 @@ void drawUnitOnSquare(Screen& screen, const Art& art, const Game& game, int inde
 }
 
 } // namespace
+
+void drawUnitTypeOnSquare(Screen& screen, const Art& art, int type, int nation, int px, int py, int icon,
+                          int spriteShift) {
+    const auto& types = art.rules.units;
+    if (type < 0 || type >= static_cast<int>(types.size())) {
+        return;
+    }
+    if (icon < 0) {
+        icon = types[static_cast<std::size_t>(type)].icon - 1;
+    }
+    const auto* image = sprite(art.icons, icon);
+    if (image == nullptr || image->width <= 0) {
+        return;
+    }
+    const auto place = typePlacement(art.rules, type, icon, image->width);
+    drawShadow(screen, *image, px + place.spriteX + spriteShift, py);
+    drawOrdersBoxIn(screen, art, nationColour(art, nation), {px + place.boxX, py + place.boxY, 7, 9}, 0, false);
+    screen.blit(*image, px + place.spriteX + spriteShift, py);
+}
 
 void drawColonyDefender(Screen& screen, const Art& art, const Game& game, int colony, int colonist, bool armed,
                         int px, int py) {

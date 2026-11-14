@@ -37,6 +37,10 @@ int pediaTerrainOf(const MapSquare& square);
 // The name of a terrain number as the index gives it ("Boreal Forest").
 std::string pediaTerrainName(const Art& art, int terrain);
 
+// The lines of a page's text as the original breaks them: the name, then
+// the paragraphs ("" for an empty line); braces mark the gold words.
+std::vector<std::string> pediaPageLines(const Art& art, int part, int id);
+
 struct PediaState {
     int part = pedia::kCargo;
     int selected = 0; // in pediaEntries
@@ -50,6 +54,7 @@ inline constexpr int kPediaRows = 24;
 inline constexpr int kPediaExit = -2;
 int pediaIndexHit(const Art& art, const PediaState& state, int x, int y);
 
-void drawPedia(Screen& screen, const Art& art, const PediaState& state);
+// nation: the player's, whose colour the units of the pages wear.
+void drawPedia(Screen& screen, const Art& art, const PediaState& state, int nation);
 
 } // namespace viceroy

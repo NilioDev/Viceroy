@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "viceroy/render/pedia_view.hpp"
 
+#include "viceroy/game/game.hpp"
 #include "viceroy/render/dialog.hpp"
 
 #include <algorithm>
-#include <cstdlib>
 
 namespace viceroy {
 
@@ -27,7 +27,6 @@ constexpr int kListY = 26;
 constexpr int kColumnStep = 100;
 constexpr int kRowStep = 7;
 constexpr int kTextX = 10;
-constexpr int kTextWidth = 300;
 
 void say(Screen& screen, const Art& art, int x, int y, const std::string& text, std::uint8_t colour) {
     screen.text(art.tiny, x, y, text, {colour, colour, colour});
@@ -96,6 +95,56 @@ int textTop(int part) {
     }
 }
 
+// Lines of a paragraph as the original breaks them, worked out from its
+// pages: a word goes on the line while the line stays within 286 pixels,
+// measured with each space one pixel wide, a word ending a sentence one
+// pixel narrower and three after it, and the paragraph's last word four
+// pixels wider.
+std::vector<std::string> wrapPage(const Art& art, const std::string& text) {
+    constexpr int kLimit = 286;
+    constexpr int kLastWordExtra = 4;
+    std::vector<std::string> words;
+    std::size_t i = 0;
+    while (i < text.size()) {
+        while (i < text.size() && (text[i] == ' ' || text[i] == '\n')) {
+            ++i;
+        }
+        const std::size_t end = std::min(text.find_first_of(" \n", i), text.size());
+        if (end > i) {
+            words.push_back(text.substr(i, end - i));
+        }
+        i = end;
+    }
+    const auto endsSentence = [](const std::string& word) {
+        const auto stop = word.find_last_not_of("}");
+        return stop != std::string::npos && word[stop] == '.';
+    };
+    std::vector<std::string> lines;
+    std::string line;
+    int width = 0;
+    int gap = 0;
+    for (std::size_t w = 0; w < words.size(); ++w) {
+        const int wordWidth = markedWidth(art.tiny, words[w]) - (endsSentence(words[w]) ? 1 : 0) +
+                              (w + 1 == words.size() ? kLastWordExtra : 0);
+        if (!line.empty() && width + gap + wordWidth > kLimit) {
+            lines.push_back(line);
+            line.clear();
+        }
+        if (line.empty()) {
+            line = words[w];
+            width = wordWidth;
+        } else {
+            line += " " + words[w];
+            width += gap + wordWidth;
+        }
+        gap = endsSentence(words[w]) ? 3 : 1;
+    }
+    if (!line.empty()) {
+        lines.push_back(line);
+    }
+    return lines;
+}
+
 // The page's text: its first line (the name, in braces) alone, then the
 // paragraphs; a line holding only ^ leaves an empty line.
 std::vector<std::string> pageLines(const Art& art, int part, int id) {
@@ -140,16 +189,126 @@ std::vector<std::string> pageLines(const Art& art, int part, int id) {
         if (i > 1 || (i == 1 && paragraphs[0].empty())) {
             lines.emplace_back(); // the empty line a ^ leaves
         }
-        for (auto& l : wrapMarkedText(art.tiny, paragraphs[i], kTextWidth)) {
+        auto wrapped = wrapPage(art, paragraphs[i]);
+        for (auto& l : wrapped) {
             lines.push_back(std::move(l));
         }
     }
     return lines;
 }
 
+std::string label(const Art& art, int row, const char* fallback) {
+    return textLine(art.labelText, "MISC", row, fallback);
+}
+
+// The free colonist's page shows every kind of colonist (seen): the
+// free colonist, servant, criminal and convert, the experts from the
+// farmer to the statesman, and the pioneer, soldier and scout.
+constexpr int kColonistPictures[] = {19, 25, 26, 24, 0,  1,  2,  3,  4,  5,  6,  7, 8,
+                                     9,  10, 11, 12, 13, 14, 15, 16, 17, 20, 21, 22};
+constexpr int kColonistsAcross = 17;
+constexpr int kPictureStep = 18;
+constexpr int kPictureRowStep = 20;
+constexpr int kPictureX = 8;
+constexpr int kPictureY = 33;
+
+int iconWidth(const Art& art, int icon) {
+    const auto i = static_cast<std::size_t>(icon);
+    return i < art.icons.sprites.size() ? art.icons.sprites[i].image.width : 0;
+}
+
+// The units that come plain and as experts, and the expert's row of @JOB.
+int expertJob(int type) {
+    switch (type) {
+    case unit_type::kSoldier:
+        return 21;
+    case unit_type::kPioneer:
+        return 20;
+    case unit_type::kMissionary:
+        return 24;
+    case unit_type::kDragoon:
+        return 23;
+    case unit_type::kScout:
+        return 22;
+    default:
+        return -1;
+    }
+}
+
+constexpr int kArtillery = 11;
+constexpr int kDamagedArtilleryIcon = 65;
+constexpr int kExpertIconsAfter = 28; // the plain picture is this many before the expert's
+
+// A unit's page: the unit as on the map, in the player's colour (with its
+// expert or damaged form beside it), its name beside them and its numbers
+// below, as seen.
+void drawUnitPage(Screen& screen, const Art& art, int type, const std::string& name, int nation) {
+    if (type < 0 || type >= static_cast<int>(art.rules.units.size())) {
+        return;
+    }
+    const auto& u = art.rules.units[static_cast<std::size_t>(type)];
+    int pictures = 1;
+    int y = kPictureY;
+    std::string title = name;
+    if (type == unit_type::kColonist) {
+        int i = 0;
+        for (const int skill : kColonistPictures) {
+            const int icon = colonistIcon(skill);
+            // Seen: the narrower people stand as far left as the others.
+            const int x = kPictureX + kPictureStep * (i % kColonistsAcross) + (iconWidth(art, icon) < 8 ? -1 : 0);
+            drawUnitTypeOnSquare(screen, art, type, nation, x, kPictureY + kPictureRowStep * (i / kColonistsAcross),
+                                 icon);
+            ++i;
+        }
+        pictures = (i - 1) % kColonistsAcross + 1;
+        y += kPictureRowStep * ((i - 1) / kColonistsAcross);
+    } else if (const int job = expertJob(type); job >= 0) {
+        const int plain = u.icon - 1 - kExpertIconsAfter;
+        // Seen: narrower people stand as far left as the others, and a
+        // scout's horse one pixel right of its box's corner.
+        const int shift = type == unit_type::kScout ? 1 : 0;
+        drawUnitTypeOnSquare(screen, art, type, nation, kPictureX + (iconWidth(art, plain) < 8 ? -1 : 0), y, plain,
+                             shift);
+        drawUnitTypeOnSquare(screen, art, type, nation,
+                             kPictureX + kPictureStep + (iconWidth(art, u.icon - 1) < 8 ? -1 : 0), y, -1, shift);
+        pictures = 2;
+        const auto j = static_cast<std::size_t>(job);
+        title +=
+            " (" + label(art, 106, "and") + " " + (j < art.rules.jobs.size() ? art.rules.jobs[j].expertName : "") + ")";
+    } else if (type == kArtillery) {
+        drawUnitTypeOnSquare(screen, art, type, nation, kPictureX, y);
+        drawUnitTypeOnSquare(screen, art, type, nation, kPictureX + kPictureStep, y, kDamagedArtilleryIcon);
+        pictures = 2;
+        title += " (" + label(art, 106, "and") + " " + label(art, 201, "Damaged") + " " + name + ")";
+    } else {
+        drawUnitTypeOnSquare(screen, art, type, nation, kPictureX, y);
+    }
+    say(screen, art, kPictureX + kPictureStep * pictures, y + 6, title, kGreen);
+
+    std::vector<std::string> items{label(art, 179, "Combat") + ": " + std::to_string(u.combat)};
+    if (type == unit_type::kSoldier || type == unit_type::kDragoon) {
+        items.push_back("(" + label(art, 65, "Veteran") + ": " + std::to_string(u.combat * 3 / 2) + ")");
+    } else if (type == kArtillery) {
+        // Seen: "(Attack: +2 Damaged: -2)".
+        items.push_back("(" + label(art, 180, "Attack") + ": +" + std::to_string(u.attack - u.combat) + " " +
+                        label(art, 201, "Damaged") + ": -2)");
+    }
+    items.push_back(label(art, 182, "Moves") + ": " + std::to_string(u.movement));
+    if (u.cargoSlots > 0) {
+        items.push_back("(" + label(art, 181, "Cargo Holds") + ": " + std::to_string(u.cargoSlots) + ")");
+    }
+    int x = kPictureX;
+    for (const auto& item : items) {
+        say(screen, art, x, y + 24, item, kGreen);
+        x += Screen::textWidth(art.tiny, item) + 6;
+    }
+}
+
 std::string partName(const Art& art, int part) { return textLine(art.pedia, "PEDIA", part, ""); }
 
 } // namespace
+
+std::vector<std::string> pediaPageLines(const Art& art, int part, int id) { return pageLines(art, part, id); }
 
 int pediaTerrainOf(const MapSquare& square) {
     if (square.mountains()) {
@@ -265,7 +424,7 @@ int pediaIndexHit(const Art& art, const PediaState& state, int x, int y) {
     return i;
 }
 
-void drawPedia(Screen& screen, const Art& art, const PediaState& state) {
+void drawPedia(Screen& screen, const Art& art, const PediaState& state, int nation) {
     if (art.woodPanel.palette) {
         screen.setColours(*art.woodPanel.palette, 16, 255);
     }
@@ -300,8 +459,14 @@ void drawPedia(Screen& screen, const Art& art, const PediaState& state) {
     }
     sayCentred(screen, art, kTitleY, title, kGold);
     sayCentred(screen, art, kSubtitleY, "(" + name + ": " + partName(art, state.part) + ")", kGold);
+    if (state.part == pedia::kUnit) {
+        drawUnitPage(screen, art, state.page, name, nation);
+    }
     bool gold = false;
     int y = textTop(state.part);
+    if (state.part == pedia::kUnit && state.page == 0) {
+        y += kPictureRowStep; // the second row of colonists
+    }
     for (const auto& line : pageLines(art, state.part, state.page)) {
         drawMarkedText(screen, art.tiny, kTextX, y, line, gold);
         y += kRowStep;
