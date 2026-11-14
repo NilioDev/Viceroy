@@ -56,7 +56,7 @@ enum class Command {
              // and P plows or clears the forest
     Purchase,
     Train,
-    Menu,           // F10: the menu bar
+    Menu,           // the menu bar (Alt, a click, the controller's Start)
     GoTo,           // G: send the unit to a colony (a ship also to Europe)
     CongressReport, // F3
     ReligionReport, // F2
@@ -66,6 +66,7 @@ enum class Command {
     NavalReport,    // F7
     ForeignReport,  // F8
     NativeReport,   // F9
+    ScoreReport,    // F10: the Colonization Score
     Disband,        // Shift+D: Disband Unit
     Dump,           // O: Dump Cargo Overboard
 };

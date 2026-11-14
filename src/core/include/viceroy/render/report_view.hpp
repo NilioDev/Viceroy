@@ -58,7 +58,12 @@ void drawForeignReport(Screen& screen, const Art& art, const Game& game, int nat
 // mood, settlements, missions, muskets and horses.
 void drawIndianReport(Screen& screen, const Art& art, const Game& game, int nation);
 
-// The report of the REPORTS menu with this function key (2 to 9), at the
+// F10: the Colonization Score, and the score alone (0 once scoring is
+// complete).
+void drawScoreReport(Screen& screen, const Art& art, const Game& game, int nation);
+int colonizationScore(const Game& game, int nation);
+
+// The report of the REPORTS menu with this function key (2 to 10), at the
 // page given for those with more than one (for F4, the profession
 // zoomed + 1, or 0).
 void drawReport(Screen& screen, const Art& art, const Game& game, int nation, int report, int page);

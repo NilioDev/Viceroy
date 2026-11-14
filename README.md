@@ -85,7 +85,9 @@ touch controls.
 > your garrisons and Sons of Liberty, the Naval Adviser (F7) your ships, their
 > cargo and where they sail, Foreign Affairs (F8) war and peace among the
 > nations, their rebels, and with Jan de Witt their strength, and the Indian
-> Adviser (F9) the tribes you have met and their mood. The King raises your taxes as he does in the
+> Adviser (F9) the tribes you have met and their mood. The Colonization Score
+> (F10) counts your citizens, founding fathers, gold, burned villages and,
+> once won, your independence, as the original does. The King raises your taxes as he does in the
 > original; you may refuse a rise with a party that boycotts the good in
 > Europe until you pay the back taxes. He builds up his army, tells you
 > when your colonists' rebel sentiment rises or falls, offers to carry your
@@ -258,9 +260,9 @@ saved in the first free slot, or over the savegame saved longest ago.
 | In Europe: Recruit, Purchase, Train | R, P, T, or click the button | D-pad up to the buttons, then A |
 | Close the Europe screen | Esc, or click Exit | B |
 | Answer a question | Up / Down and Enter | D-pad and A |
-| Open the menu bar (Game, View, Orders, Reports, Trade, Colonizopedia) | Click a title, F10, or Alt and the title's gold letter; then the arrow keys and Enter, or a gold letter | Start, then the D-pad and A |
+| Open the menu bar (Game, View, Orders, Reports, Trade, Colonizopedia) | Click a title, or Alt and the title's gold letter; then the arrow keys and Enter, or a gold letter | Start, then the D-pad and A |
 | The Continental Congress report | F3, or Reports, Continental Congress; any key or click closes it | Start, then Reports |
-| The advisers' reports | F2 and F4 to F9, or the Reports menu; a key or click turns the page or closes it (in the Labor Adviser a click on a profession zooms on it) | Start, then Reports |
+| The advisers' reports and the Colonization Score | F2 and F4 to F10, or the Reports menu; a key or click turns the page or closes it (in the Labor Adviser a click on a profession zooms on it) | Start, then Reports |
 | Save the game | Ctrl+S, or Game, Save Game | Start, then Save Game |
 | Back to the load menu | Esc | Guide |
 
