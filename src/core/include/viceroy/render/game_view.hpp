@@ -42,6 +42,8 @@ struct Art {
     Picture congressReport;             // REPORT3.PIK
     std::vector<Picture> reports;       // REPORT1.PIK to REPORT9.PIK, from 0
     Picture woodPanel;                  // WOODPANL.PIK: the score's background
+    Picture woodPanel2;                 // WOODPAN2.PIK: behind what is named after the player
+    std::vector<SpriteSheet> scorePictures; // SCORE01.SS to SCORE24.SS, by row of @SCORE
     std::vector<SpriteSheet> fathers;   // CC-00.SS to CC-24.SS, by row of @FATHERS
     Picture declaration;                // DECOIND.PIK: the declaration to sign
     std::vector<SpriteSheet> penCapitals; // DEC-UPPA.SS to DEC-UPPZ.SS: a capital written

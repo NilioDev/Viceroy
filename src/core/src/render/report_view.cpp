@@ -1342,6 +1342,146 @@ void drawScoreReport(Screen& screen, const Art& art, const Game& game, int natio
     scoreReport(&screen, &art, game, nation);
 }
 
+namespace {
+
+std::string replaceAll(std::string text, const std::string& what, const std::string& with) {
+    for (std::size_t at = text.find(what); at != std::string::npos; at = text.find(what, at + with.size())) {
+        text.replace(at, what.size(), with);
+    }
+    return text;
+}
+
+std::string trimmed(const std::string& s) {
+    const auto a = s.find_first_not_of(' ');
+    const auto b = s.find_last_not_of(' ');
+    return a == std::string::npos ? std::string() : s.substr(a, b - a + 1);
+}
+
+const TextSection* gameSection(const Art& art, const char* name) {
+    for (const auto& section : art.gameText.sections) {
+        if (section.name == name) {
+            return &section;
+        }
+    }
+    return nullptr;
+}
+
+} // namespace
+
+constexpr int kPictureColours = 16;
+constexpr int kPictureX = 33;
+constexpr int kPictureY = 40;
+
+void drawExploits(Screen& screen, const Art& art, const Game& game, int nation, const Exploits& exploits) {
+    // Read from the original: WOODPAN2.PIK, the three lines of EXPLOITS
+    // centred from y 5, the picture of what is named, its name under it
+    // and the @SCORE list up to it from the bottom right.
+    if (art.woodPanel2.palette) {
+        screen.setColours(*art.woodPanel2.palette, 16, 255);
+    }
+    screen.blit(art.woodPanel2.image, 0, 0);
+    constexpr std::uint8_t kInk = 0xFC;
+    constexpr std::uint8_t kOlderInk = 0xFE;
+    const auto& save = game.state();
+    const auto& player = save.players[static_cast<std::size_t>(nation)];
+    const int line = art.tiny.height + 1;
+    if (const auto* section = gameSection(art, "EXPLOITS")) {
+        int y = 5;
+        for (std::size_t k = 0; k < 3 && k < section->lines.size(); ++k) {
+            std::string text = replaceAll(section->lines[k], "%NUMBER0", std::to_string(exploits.rating));
+            text = replaceAll(replaceAll(text, "%STRING0", player.country), "%%", "%");
+            sayCentred(screen, art, 0, Screen::kWidth, y, text, kInk);
+            y += line;
+        }
+    }
+    // The leader's last name ("Jager" for Michiel de Jager).
+    const auto space = player.name.rfind(' ');
+    const std::string surname = space == std::string::npos ? player.name : player.name.substr(space + 1);
+    const auto* list = gameSection(art, "SCORE");
+    for (int k = 0; list != nullptr && k <= exploits.level && static_cast<std::size_t>(k) < list->lines.size(); ++k) {
+        const auto fields = splitFields(list->lines[static_cast<std::size_t>(k)]);
+        const std::string what = fields.empty() ? "" : trimmed(fields[0]);
+        const int y = 195 - (k + 1) * line;
+        sayCentred(screen, art, 160, 160, y, what, k == exploits.level ? kInk : kOlderInk);
+        if (k == exploits.level && fields.size() > 1) {
+            // The original keeps one space before the name (seen: it stands
+            // a pixel right of centre).
+            const std::string named = " " + replaceAll(trimmed(fields[1]), "%STRING0", surname);
+            sayCentred(screen, art, 34, 140, 142, named, kInk);
+        }
+    }
+    if (exploits.level >= 0 && static_cast<std::size_t>(exploits.level) < art.scorePictures.size()) {
+        const auto& sheet = art.scorePictures[static_cast<std::size_t>(exploits.level)];
+        if (sheet.palette) {
+            screen.setColours(*sheet.palette, kPictureColours, 251);
+        }
+        if (!sheet.sprites.empty()) {
+            screen.blit(sheet.sprites.front().image, kPictureX, kPictureY);
+        }
+    }
+}
+
+void drawHallOfFame(Screen& screen, const Art& art, const std::vector<HallEntry>& places, int newcomer) {
+    // Read from the original: on WOODPANL.PIK, three lines for each of the
+    // five places (the newcomer in the fifth when it came sixth), the
+    // newcomer in gold, the others in green, all with a shadow.
+    if (art.woodPanel.palette) {
+        screen.setColours(*art.woodPanel.palette, 16, 255);
+    }
+    screen.blit(art.woodPanel.image, 0, 0);
+    constexpr std::uint8_t kInk = 0x44;
+    constexpr std::uint8_t kNewInk = 0x95;
+    constexpr std::uint8_t kShadow = kBlack;
+    const auto& font = art.labels;
+    const auto shadowed = [&](int x, int y, const std::string& text, std::uint8_t ink) {
+        screen.text(font, x + 1, y, text, {kShadow, kNoColour, kNoColour});
+        screen.text(font, x, y, text, {ink, kNoColour, kNoColour});
+    };
+    const auto centred = [&](int y, const std::string& text, std::uint8_t ink) {
+        shadowed(Screen::kWidth / 2 - (Screen::textWidth(font, text) - 1) / 2, y, text, ink);
+    };
+    const auto lbl = [&](int row, const char* fallback) { return replaceAll(label(art, row, fallback), "_", " "); };
+    centred(3, lbl(192, "COLONIZATION HALL OF FAME"), kInk);
+    int y = 16;
+    for (int i = 0; i < kHallPlaces; ++i) {
+        int place = i;
+        if (i == kHallPlaces - 1 && newcomer == kHallPlaces) {
+            place = kHallPlaces;
+        }
+        if (static_cast<std::size_t>(place) >= places.size()) {
+            break;
+        }
+        const auto& e = places[static_cast<std::size_t>(place)];
+        if (e.nation < 0) {
+            continue;
+        }
+        const std::uint8_t ink = place == newcomer ? kNewInk : kInk;
+        y += 4;
+        const std::string adjective = textLine(art.names, "NATIONALITY", e.nation, "");
+        std::string first = std::to_string(place + 1) + ".  " + textLine(art.names, "DIFFICULTY", e.difficulty, "") +
+                            " " + e.name + " " + lbl(19, "of the") + " ";
+        if (e.declared) {
+            first += lbl(191, "Free") + " ";
+        }
+        shadowed(10, y, first + adjective, ink);
+        y += font.height + 2;
+        std::string second;
+        if (e.won) {
+            second = lbl(195, "President") + ", " + textLine(art.names, "INDEPENDENT", e.nation, "");
+        } else if (e.declared) {
+            second = lbl(196, "General, Continental Army");
+        } else {
+            second = lbl(197, "Leader") + ", " + adjective + " " + lbl(95, "Colonies");
+        }
+        second += " " + lbl(193, "to") + " " + lbl(194, "A.D.") + " " + std::to_string(e.year) + ".  " +
+                  lbl(198, "Score") + ": " + std::to_string(e.score);
+        shadowed(25, y, second, ink);
+        y += font.height + 2;
+        centred(y, "--- " + lbl(199, "Colonization Rating") + ": " + std::to_string(e.rating) + "% ---", ink);
+        y += font.height + 1;
+    }
+}
+
 void drawReport(Screen& screen, const Art& art, const Game& game, int nation, int report, int page) {
     switch (report) {
     case 2:

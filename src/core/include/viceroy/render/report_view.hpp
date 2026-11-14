@@ -3,6 +3,7 @@
 // The reports of the REPORTS menu, drawn as the original draws them.
 #pragma once
 
+#include "viceroy/game/hall_of_fame.hpp"
 #include "viceroy/render/game_view.hpp"
 #include "viceroy/render/screen.hpp"
 
@@ -62,6 +63,11 @@ void drawIndianReport(Screen& screen, const Art& art, const Game& game, int nati
 // complete).
 void drawScoreReport(Screen& screen, const Art& art, const Game& game, int nation);
 int colonizationScore(const Game& game, int nation);
+
+// A retirement: what the citizens name after the player, then the Hall of
+// Fame with the newcomer's place (0 to 5).
+void drawExploits(Screen& screen, const Art& art, const Game& game, int nation, const Exploits& exploits);
+void drawHallOfFame(Screen& screen, const Art& art, const std::vector<HallEntry>& places, int newcomer);
 
 // The report of the REPORTS menu with this function key (2 to 10), at the
 // page given for those with more than one (for F4, the profession

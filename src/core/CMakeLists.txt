@@ -17,6 +17,7 @@ add_library(vcr_core STATIC
     src/game/diplomacy.cpp
     src/game/independence.cpp
     src/game/game_end.cpp
+    src/game/hall_of_fame.cpp
     src/game/king.cpp
     src/game/natives.cpp
     src/game/native_trade.cpp
