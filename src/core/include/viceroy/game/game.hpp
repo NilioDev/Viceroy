@@ -236,8 +236,54 @@ public:
     std::vector<int> goToColonies(int index) const;
     void setGoTo(int index, int x, int y);
     bool goToEurope(int index);
+    bool nearestSeaLane(int index, int& x, int& y) const;
     bool goToStep(int index); // true when the unit can go on
     void moveGoToUnits();
+
+    // --- Trade routes (orders 2), read from the original ----------------
+    // Up to 12 routes, each with up to 4 stops (a colony, or Europe), and at
+    // every stop up to 6 goods to unload and 6 to load. Kept in the last
+    // 888 bytes of the savegame; see docs/rules/trade-routes.md.
+    static constexpr int kTradeRouteOrders = 2;
+    static constexpr int kMaxTradeRoutes = 12;
+    static constexpr int kMaxRouteStops = 4;
+    static constexpr int kMaxStopGoods = 6;
+    static constexpr int kEuropeStop = 999;
+    static constexpr std::size_t kRouteNameSize = 31;
+    struct TradeStop {
+        int colony = 0; // kEuropeStop for Europe
+        std::vector<int> unload;
+        std::vector<int> load;
+    };
+    struct TradeRoute {
+        std::string name;
+        bool sea = true;
+        std::vector<TradeStop> stops;
+    };
+    int tradeRouteCount() const;
+    TradeRoute tradeRoute(int route) const;
+    void setTradeRoute(int route, const TradeRoute& r);
+    // Adds a route at the end; -1 when there are 12 already.
+    int addTradeRoute(const TradeRoute& r);
+    // The routes after it move up; carriers on it lose their route (and
+    // their orders, when they were following it).
+    void deleteTradeRoute(int route);
+    // A carrier's route and the stop it heads for (byte 23 of its record).
+    int unitTradeRoute(int index) const;
+    int unitTradeStop(int index) const;
+    // Begin Trade Route: the carrier follows the route from that stop on.
+    void beginTradeRoute(int index, int route, int stop);
+    // One step on the route: at its stop the carrier unloads and loads and
+    // heads for the next one; otherwise it moves towards the stop. True
+    // when it can go on this turn.
+    bool tradeRouteStep(int index);
+    // The player's carriers on trade routes take their steps.
+    void moveTradeRouteUnits();
+    // A colony next to water, which a sea route can call at.
+    bool colonyOnCoast(int colony) const;
+    // A pick from the game's random numbers, 0 .. range - 1 (a new route's
+    // name).
+    int randomPick(int range) { return nextRandom(range); }
     bool onMap(int index) const;
     // A land unit on a water square is aboard the ship there.
     bool isAboard(int index) const;

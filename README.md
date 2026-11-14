@@ -14,7 +14,8 @@ touch controls.
 > (difficulty, nation and name, the king's audience and the departure, as
 > in the original) or load one of your savegames, move your
 > units over the original map (or send them to a colony with Go To, along
-> the original's routes), board ships and make landfall (ships keep off
+> the original's routes), set up trade routes (TRADE menu) and send ships and
+> wagon trains along them to load and unload on their own, board ships and make landfall (ships keep off
 > inland lakes, and enemy warships can hold up a passing ship), plow fields,
 > clear forests (lumber for a colony nearby) and build roads with your pioneers, found colonies (your
 > advisors warn of a poor site and you type the name), look inside your colonies, end turns and save. The colony screen
@@ -222,6 +223,8 @@ saved in the first free slot, or over the savegame saved longest ago.
 | Disband the unit | Shift+D, or the Orders menu | Start, then Orders |
 | Dump cargo overboard | O, or the Orders menu | Start, then Orders |
 | Go To: send the unit to one of your colonies (a ship also to Europe) | G, or the Orders menu | Start, then Orders |
+| Begin Trade Route (a ship or wagon train) | T, or the Orders menu | Start, then Orders |
+| Edit, create or delete a trade route | The TRADE menu; on the route screen click a stop, a cargo column or a good's icon | |
 | Pioneer: plow or clear the forest, build a road | P, R, or the Orders menu | Start, then Orders |
 | Centre the map on the unit | C | Left stick click |
 | Look around the map (view mode), back to moving | V, M | Back, B |
