@@ -37,6 +37,7 @@ add_library(vcr_core STATIC
     src/game/goto.cpp
     src/game/native_turn.cpp
     src/game/colony.cpp
+    src/game/colony_moves.cpp
     src/game/europe.cpp
     src/game/resource.cpp
     src/game/new_game.cpp

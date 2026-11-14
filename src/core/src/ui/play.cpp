@@ -1523,12 +1523,9 @@ bool PlayScreen::landBought(const LandClaim& claim, int nation, int unit) {
 }
 
 void PlayScreen::putToLandWork() {
-    if (!colonyScreen_) {
-        return;
+    if (colonyScreen_) {
+        doColonyMove(landWho_, landJob_, landSquare_);
     }
-    auto& save = game_.state();
-    auto& colony = save.colonies[static_cast<std::size_t>(colonyScreen_->colony)];
-    assignJob(colony, save.map, game_.rules(), save.colonies, landColonist_, landJob_);
 }
 
 void PlayScreen::work(int orders) {
@@ -1688,6 +1685,13 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
             putToLandWork();
         }
         landAfterBribe_ = LandAfter::Nothing;
+        return;
+    }
+    if (question == "ABANDON") {
+        // "Yes, it is God's will." The colony goes with its last colonist.
+        if (choice == 0) {
+            doColonyMove(moveWho_, moveJob_, -1);
+        }
         return;
     }
     if (question == "INDIANLAND") {
@@ -2371,6 +2375,221 @@ void PlayScreen::openBuy() {
     placeBuyDialog(*dialog_);
 }
 
+ColonyMover PlayScreen::colonyMover() const {
+    const auto& state = *colonyScreen_;
+    if (state.selectedOutside >= 0) {
+        return {-1, state.selectedOutside};
+    }
+    const auto& colony = game_.state().colonies[static_cast<std::size_t>(state.colony)];
+    if (state.selectedColonist >= 0 && state.selectedColonist < colony.population) {
+        return {state.selectedColonist, -1};
+    }
+    return {};
+}
+
+void PlayScreen::tryColonyMove(ColonyMover who, int job, int square) {
+    if (!colonyScreen_ || (who.colonist < 0 && who.unit < 0) || job < 0) {
+        return;
+    }
+    auto& state = *colonyScreen_;
+    const auto& save = game_.state();
+    const auto& colony = save.colonies[static_cast<std::size_t>(state.colony)];
+    const bool onLand = job < static_cast<int>(kSquareWorkCount);
+    const auto result = game_.checkColonyMove(state.colony, who, job);
+    if (result == ColonyMove::Same) {
+        // The same work on another square is a move all the same.
+        if (!onLand || square < 0 || who.colonist < 0 ||
+            colony.squares[static_cast<std::size_t>(square)] == who.colonist) {
+            return;
+        }
+    } else if (result == ColonyMove::Abandon) {
+        // Read from the original: ABANDON2 warns of the charter when the
+        // nation has fewer than two colonies after 1575.
+        int colonies = 0;
+        for (const auto& other : save.colonies) {
+            colonies += other.nation == colony.nation ? 1 : 0;
+        }
+        moveWho_ = who;
+        moveJob_ = job;
+        ask(colonies < 2 && save.year > 1575 ? "ABANDON2" : "ABANDON", -1, {colony.name});
+        if (dialog_) {
+            question_ = "ABANDON";
+            placeBuyDialog(*dialog_);
+        }
+        return;
+    } else if (result != ColonyMove::Allowed) {
+        tellColonyMove(result, who);
+        return;
+    }
+    if (onLand && square < 0) {
+        // From the jobs menu: the best free square for the work.
+        return;
+    }
+    if (onLand) {
+        const bool there = who.colonist >= 0 && colony.squares[static_cast<std::size_t>(square)] == who.colonist;
+        if (!there && !squareFree(colony, save.map, save.colonies, square)) {
+            return;
+        }
+        if (!there) {
+            if (const auto claim = game_.colonyClaim(state.colony, square)) {
+                // Read from the original: the tribe whose land it is asks.
+                landWho_ = who;
+                landJob_ = job;
+                landSquare_ = square;
+                askLandClaim("INDIANLAND", *claim, -1);
+                return;
+            }
+        }
+    }
+    doColonyMove(who, job, onLand ? square : -1);
+}
+
+void PlayScreen::doColonyMove(ColonyMover who, int job, int square) {
+    if (!colonyScreen_) {
+        return;
+    }
+    auto& state = *colonyScreen_;
+    const auto before = game_.state().colonies.size();
+    const int out = game_.moveColonist(state.colony, who, job, square);
+    if (game_.state().colonies.size() != before) {
+        // The last colonist left: the colony is no more.
+        colonyScreen_.reset();
+        return;
+    }
+    const auto& colony = game_.state().colonies[static_cast<std::size_t>(state.colony)];
+    if (out >= 0) {
+        // Measured: the one who went out stays picked, outside.
+        state.selectedOutside = out;
+        state.selectedColonist = -1;
+    } else if (who.unit >= 0) {
+        state.selectedOutside = -1;
+        state.selectedColonist = colony.population - 1;
+    }
+}
+
+void PlayScreen::tellColonyMove(ColonyMove result, ColonyMover who) {
+    const auto& state = *colonyScreen_;
+    const auto& colony = game_.state().colonies[static_cast<std::size_t>(state.colony)];
+    const auto& jobs = game_.rules().jobs;
+    int skill =
+        who.colonist >= 0 ? colony.skills[static_cast<std::size_t>(who.colonist)] : game_.unit(who.unit).profession;
+    const std::string profession =
+        skill >= 0 && static_cast<std::size_t>(skill) < jobs.size() ? jobs[static_cast<std::size_t>(skill)].name : "";
+    // Read from the original: most come from the woman who also offers to
+    // buy; the docks from the admiral, the siege from the colonial adviser.
+    const char* section = nullptr;
+    std::vector<std::string> strings;
+    switch (result) {
+    case ColonyMove::Full:
+        section = "FULL";
+        strings = {colony.name};
+        break;
+    case ColonyMove::Univ3:
+        section = "UNIV3";
+        break;
+    case ColonyMove::College2:
+        section = "COLLEGE2";
+        break;
+    case ColonyMove::School1:
+        section = "SCHOOL1";
+        break;
+    case ColonyMove::NoDocks:
+        section = "NODOCKS";
+        break;
+    case ColonyMove::NoTeacher:
+        section = "NOTEACHER";
+        break;
+    case ColonyMove::NeedCollege:
+        section = "NEEDCOLLEGE";
+        strings = {profession};
+        break;
+    case ColonyMove::NeedUniversity:
+        section = "NEEDUNIVERSITY";
+        strings = {profession};
+        break;
+    case ColonyMove::Siege:
+        section = "SIEGE";
+        break;
+    case ColonyMove::KeepStockade:
+        section = "KEEPSTOCKADE";
+        break;
+    case ColonyMove::MoreThanThree:
+        section = "MORETHANTHREE";
+        break;
+    default:
+        return;
+    }
+    ask(section, -1, strings);
+    if (!dialog_) {
+        return;
+    }
+    question_ = "COLONYMOVE";
+    if (result == ColonyMove::NoDocks) {
+        placeNavalDialog(*dialog_);
+    } else if (result == ColonyMove::Siege) {
+        placeMapDialog(*dialog_);
+    } else {
+        placeBuyDialog(*dialog_);
+    }
+}
+
+void PlayScreen::openOutsideMenu(bool fromMore) {
+    auto& state = *colonyScreen_;
+    const auto who = colonyMover();
+    if (who.colonist < 0 && who.unit < 0) {
+        return;
+    }
+    state.jobsMenu = -1;
+    state.outsideMenu = 0;
+    state.outsideFromMore = fromMore;
+}
+
+bool PlayScreen::handleOutsideMenu(Command command) {
+    auto& state = *colonyScreen_;
+    const auto who = colonyMover();
+    const auto choices = game_.outsideChoices(state.colony, who);
+    const int lines = static_cast<int>(choices.size()) + 1;
+    switch (command) {
+    case Command::MoveN:
+    case Command::Up:
+        state.outsideMenu = (state.outsideMenu + lines - 1) % lines;
+        break;
+    case Command::MoveS:
+    case Command::Down:
+        state.outsideMenu = (state.outsideMenu + 1) % lines;
+        break;
+    case Command::Confirm:
+    case Command::Skip: {
+        const int line = state.outsideMenu;
+        if (line == 0) {
+            // "(More)" goes back to the jobs inside; the present job keeps it.
+            state.outsideMenu = -1;
+            if (state.outsideFromMore && who.colonist >= 0) {
+                const auto& save = game_.state();
+                const auto& colony = save.colonies[static_cast<std::size_t>(state.colony)];
+                const auto inside =
+                    jobChoices(colony, save.map, game_.rules(), save.colonies, who.colonist, save.difficulty);
+                state.jobsMenu = static_cast<int>(inside.size()); // on "(More)"
+            }
+            break;
+        }
+        const auto& picked = choices[static_cast<std::size_t>(line - 1)];
+        if (!picked.affordable) {
+            break; // greyed
+        }
+        state.outsideMenu = -1;
+        tryColonyMove(who, picked.job);
+        break;
+    }
+    case Command::Cancel:
+        state.outsideMenu = -1;
+        break;
+    default:
+        break;
+    }
+    return true;
+}
+
 bool PlayScreen::handleBuildList(Command command) {
     auto& state = *colonyScreen_;
     auto& save = game_.state();
@@ -2433,8 +2652,52 @@ bool PlayScreen::clickColonyScreen(int x, int y) {
     if (state.jobsMenu >= 0) {
         return false;
     }
+    if (state.outsideMenu >= 0) {
+        const int lines = static_cast<int>(game_.outsideChoices(state.colony, colonyMover()).size()) + 1;
+        const auto box = outsideMenuBox(lines);
+        const int line = (y - (box.firstLine - 1)) / 8;
+        if (!inside(box) || y < box.firstLine - 1 || line >= lines) {
+            state.outsideMenu = inside(box) ? state.outsideMenu : -1;
+            return true;
+        }
+        state.outsideMenu = line;
+        handleOutsideMenu(Command::Confirm);
+        return true;
+    }
     if (state.foreign) {
         return !(x >= 300 && y >= 178); // only the exit button
+    }
+    {
+        // Read from the original: a click picks a colonist (or a unit
+        // outside); a click on a building, a square or the stockade then
+        // moves them there.
+        const auto& colony = game_.state().colonies[static_cast<std::size_t>(state.colony)];
+        const auto hit = colonyHitAt(game_, colony, x, y);
+        const auto who = colonyMover();
+        switch (hit.kind) {
+        case ColonyHit::Kind::Colonist:
+            state.selectedColonist = hit.colonist;
+            state.selectedOutside = -1;
+            return true;
+        case ColonyHit::Kind::Outside:
+            if (hit.unit >= 0) {
+                state.selectedOutside = hit.unit;
+                state.selectedColonist = -1;
+            } else {
+                openOutsideMenu(false);
+            }
+            return true;
+        case ColonyHit::Kind::Building:
+            tryColonyMove(who, hit.job);
+            return true;
+        case ColonyHit::Kind::Square:
+            if (who.colonist >= 0 || who.unit >= 0) {
+                tryColonyMove(who, game_.jobForSquare(state.colony, who, hit.square), hit.square);
+            }
+            return true;
+        case ColonyHit::Kind::None:
+            break;
+        }
     }
     if (inside(kPanelButtons[0])) {
         state.panel = ColonyPanel::Production;
@@ -2482,6 +2745,9 @@ bool PlayScreen::handleColonyScreen(Command command) {
     if (state.buildList >= 0) {
         return handleBuildList(command);
     }
+    if (state.outsideMenu >= 0) {
+        return handleOutsideMenu(command);
+    }
     if (state.jobsMenu >= 0) {
         const auto choices = jobChoices(colony, save.map, game_.rules(), save.colonies, state.selectedColonist, save.difficulty);
         const int lines = static_cast<int>(choices.size()) + 1; // the last line is "(More)"
@@ -2498,21 +2764,13 @@ bool PlayScreen::handleColonyScreen(Command command) {
         case Command::Skip:
             if (state.jobsMenu < static_cast<int>(choices.size())) {
                 const auto& picked = choices[static_cast<std::size_t>(state.jobsMenu)];
-                const bool there = picked.square >= 0 &&
-                                   colony.squares[static_cast<std::size_t>(picked.square)] == state.selectedColonist;
-                const auto claim =
-                    picked.square >= 0 && !there ? game_.colonyClaim(state.colony, picked.square) : std::nullopt;
-                if (claim) {
-                    // Read from the original: the tribe whose land it is asks.
-                    landColonist_ = state.selectedColonist;
-                    landJob_ = picked.job;
-                    state.jobsMenu = -1;
-                    askLandClaim("INDIANLAND", *claim, -1);
-                    return true;
-                }
-                assignJob(colony, save.map, game_.rules(), save.colonies, state.selectedColonist, picked.job);
+                state.jobsMenu = -1;
+                tryColonyMove(ColonyMover{state.selectedColonist, -1}, picked.job, picked.square);
+                return true;
             }
+            // "(More)": the jobs outside the colony.
             state.jobsMenu = -1;
+            openOutsideMenu(true);
             break;
         case Command::Cancel:
             state.jobsMenu = -1;
@@ -2535,7 +2793,9 @@ bool PlayScreen::handleColonyScreen(Command command) {
         break;
     case Command::Confirm:
     case Command::Skip:
-        if (state.selectedColonist >= 0 && state.selectedColonist < people) {
+        if (state.selectedOutside >= 0) {
+            openOutsideMenu(false);
+        } else if (state.selectedColonist >= 0 && state.selectedColonist < people) {
             // The jobs menu opens on the colonist's present job.
             const auto choices = jobChoices(colony, save.map, game_.rules(), save.colonies, state.selectedColonist, save.difficulty);
             const int current = colony.jobs[static_cast<std::size_t>(state.selectedColonist)];
@@ -2553,6 +2813,7 @@ bool PlayScreen::handleColonyScreen(Command command) {
     case Command::Down:
     case Command::NextUnit:
         if (people > 0) {
+            state.selectedOutside = -1;
             state.selectedColonist = (state.selectedColonist + 1) % people;
         }
         break;
@@ -2560,6 +2821,7 @@ bool PlayScreen::handleColonyScreen(Command command) {
     case Command::Up:
     case Command::PreviousUnit:
         if (people > 0) {
+            state.selectedOutside = -1;
             state.selectedColonist = state.selectedColonist < 0 ? people - 1
                                                                 : (state.selectedColonist + people - 1) % people;
         }

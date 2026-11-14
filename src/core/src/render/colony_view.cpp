@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "viceroy/render/colony_view.hpp"
 
+#include "viceroy/data/image.hpp"
 #include "viceroy/data/reader.hpp"
 #include "viceroy/game/colony.hpp"
 #include "viceroy/game_files.hpp"
@@ -34,6 +35,7 @@ constexpr std::uint8_t kStockText = 0x3D;
 constexpr std::uint8_t kRed = 0x0C;
 constexpr std::uint8_t kGold = 0x95;
 constexpr std::uint8_t kMenuBar = 0x8A;
+constexpr std::uint8_t kMenuGrey = 0x08;   // a job the warehouse cannot equip
 constexpr std::uint8_t kPanelInk = 0x39;   // the Make panel: words and the dark edge of buttons
 constexpr std::uint8_t kPanelLight = 0x30; // the light edge of buttons
 constexpr std::uint8_t kButtonShadow = 0x3F;
@@ -110,6 +112,42 @@ constexpr std::array<BuildingSlot, 15> kSlots{{
     {BuildingKind::Blacksmith, 56, 13, kFillerSmall, {39, 40, 41}},
 }};
 
+// The size of a building's spot, by the filler drawn when it is empty
+// (docs/rules/colony-screen.md).
+Rect slotRect(const BuildingSlot& slot) {
+    switch (slot.empty) {
+    case kFillerShore:
+        return {slot.x, slot.y, 75, 48};
+    case kNoStockade:
+        return {slot.x, slot.y, 73, 18};
+    case kFillerLarge:
+        return {slot.x, slot.y, 53, 37};
+    case kFillerWide:
+        return {slot.x, slot.y, 44, 22};
+    default:
+        return {slot.x, slot.y, 23, 27};
+    }
+}
+
+// The job done in a kind of building, or -1.
+int buildingJob(BuildingKind kind) {
+    for (int j = job::kDistiller; j <= job::kTeacher; ++j) {
+        if (buildingForJob(j) == kind) {
+            return j;
+        }
+    }
+    return -1;
+}
+
+// Measured: the units outside stand in a row 11 pixels apart over the
+// stockade's spot, centred on it.
+constexpr int kOutsideCentre = 157;
+constexpr int kOutsideStep = 11;
+constexpr int kOutsideY = 111;
+constexpr std::uint8_t kTownShadow = 0x5F;
+
+int outsideX(int k, int count) { return kOutsideCentre - kOutsideStep * (count - 1) / 2 + kOutsideStep * k; }
+
 int spriteWidth(const SpriteSheet& sheet, int index) {
     if (index < 0 || static_cast<std::size_t>(index) >= sheet.sprites.size()) {
         return 0;
@@ -170,8 +208,8 @@ void drawTopLine(Screen& screen, const Art& art, const Game& game, const SaveCol
     screen.text(art.tiny, 160 - Screen::textWidth(art.tiny, text) / 2, 1, text, {kGreen, kNoColour, kNoColour});
 }
 
-void drawTown(Screen& screen, const Art& art, const ColonyArt& colonyArt, const SaveColony& colony,
-              const ColonyProduction& production, int selected) {
+void drawTown(Screen& screen, const Art& art, const ColonyArt& colonyArt, const Game& game, const SaveColony& colony,
+              const ColonyProduction& production, int selected, int selectedOutside) {
     screen.setClip(kTown);
     screen.tile(colonyArt.parchment, kTown);
     for (const auto& slot : kSlots) {
@@ -208,6 +246,30 @@ void drawTown(Screen& screen, const Art& art, const ColonyArt& colonyArt, const 
         }
         if (good >= 0 && made > 0) {
             drawGoodsRow(screen, art, good, made, slot.x - 5, slot.y - 2, 20);
+        }
+    }
+
+    // The units outside the colony, each with its shadow two pixels left.
+    const auto outside = unitsOutside(game, colony);
+    const int count = static_cast<int>(outside.size());
+    for (int k = 0; k < count; ++k) {
+        const int u = outside[static_cast<std::size_t>(k)];
+        const int icon = unitIcon(game, u);
+        if (icon < 0 || static_cast<std::size_t>(icon) >= art.icons.sprites.size()) {
+            continue;
+        }
+        const auto& image = art.icons.sprites[static_cast<std::size_t>(icon)].image;
+        const int x = outsideX(k, count);
+        for (int j = 0; j < image.height; ++j) {
+            for (int i = 0; i < image.width; ++i) {
+                if (image.pixels[static_cast<std::size_t>(j * image.width + i)] != kTransparent) {
+                    screen.pixel(x - 2 + i, kOutsideY + j, kTownShadow);
+                }
+            }
+        }
+        screen.blit(image, x, kOutsideY);
+        if (u == selectedOutside) {
+            screen.frame({x - 1, kOutsideY - 1, image.width + 2, 18}, kSelectGreen);
         }
     }
     screen.resetClip();
@@ -418,6 +480,8 @@ constexpr int kLabelBuy = 2;        // @CTITLE
 constexpr int kLabelChange = 3;
 constexpr int kLabelSelectItem = 4;
 constexpr int kLabelNoProduction = 5;
+constexpr int kLabelMore = 6;
+constexpr int kLabelProfession = 8;
 
 // A button of the panel: a raised box with a word in it.
 void drawPanelBox(Screen& screen, const Art& art, const PanelButton& b, const std::string& word) {
@@ -443,6 +507,97 @@ std::vector<int> unitsPresent(const Game& game, const SaveColony& colony) {
         }
     }
     return out;
+}
+
+std::vector<int> unitsOutside(const Game& game, const SaveColony& colony) {
+    // Measured: only people stand there (no artillery, wagons or treasure).
+    std::vector<int> out;
+    for (const int u : unitsPresent(game, colony)) {
+        const int type = game.unit(u).type;
+        if (type >= unit_type::kColonist && type < unit_type::kTreasure) {
+            out.push_back(u);
+        }
+    }
+    return out;
+}
+
+ColonyHit colonyHitAt(const Game& game, const SaveColony& colony, int x, int y) {
+    ColonyHit hit;
+    const auto& save = game.state();
+    const auto production =
+        colonyProduction(colony, save.map, game.rules(), save.difficulty, true, nationEffects(save, colony.nation));
+    const auto inside = [&](const Rect& r) { return x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h; };
+    if (inside(kTown)) {
+        // The people first: they stand in front of the buildings.
+        for (const auto& slot : kSlots) {
+            int k = 0;
+            for (std::size_t i = 0; i < production.colonists.size(); ++i) {
+                const auto& work = production.colonists[i];
+                if (!work.building || *work.building != slot.kind) {
+                    continue;
+                }
+                if (inside(Rect{slot.x + 5 + 9 * k, slot.y + 13, 9, 16})) {
+                    hit.kind = ColonyHit::Kind::Colonist;
+                    hit.colonist = static_cast<int>(i);
+                }
+                ++k;
+            }
+        }
+        if (hit.kind != ColonyHit::Kind::None) {
+            return hit;
+        }
+        const auto outside = unitsOutside(game, colony);
+        const int count = static_cast<int>(outside.size());
+        for (int k = count - 1; k >= 0; --k) {
+            if (inside(Rect{outsideX(k, count), kOutsideY, 11, 18})) {
+                hit.kind = ColonyHit::Kind::Outside;
+                hit.unit = outside[static_cast<std::size_t>(k)];
+                return hit;
+            }
+        }
+        for (const auto& slot : kSlots) {
+            if (!inside(slotRect(slot))) {
+                continue;
+            }
+            if (slot.kind == BuildingKind::Fortification) {
+                hit.kind = ColonyHit::Kind::Outside;
+                return hit;
+            }
+            const int job = buildingJob(slot.kind);
+            if (job >= 0 && buildingLevel(colony, slot.kind) > 0) {
+                hit.kind = ColonyHit::Kind::Building;
+                hit.job = job;
+                return hit;
+            }
+        }
+        return hit;
+    }
+    const Rect area{kAreaFrame.x + 1, kAreaFrame.y + 1, 3 * kAreaSquare, 3 * kAreaSquare};
+    if (inside(area)) {
+        const int dx = (x - area.x) / kAreaSquare - 1;
+        const int dy = (y - area.y) / kAreaSquare - 1;
+        for (std::size_t s = 0; s < kColonySquares.size(); ++s) {
+            if (kColonySquares[s].dx != dx || kColonySquares[s].dy != dy) {
+                continue;
+            }
+            hit.square = static_cast<int>(s);
+            hit.kind = ColonyHit::Kind::Square;
+            for (std::size_t i = 0; i < production.colonists.size(); ++i) {
+                if (production.colonists[i].square == hit.square) {
+                    hit.kind = ColonyHit::Kind::Colonist;
+                    hit.colonist = static_cast<int>(i);
+                }
+            }
+        }
+    }
+    return hit;
+}
+
+OutsideMenuBox outsideMenuBox(int lines) {
+    // Measured: as wide as the jobs menu, 24 + 8 per line high, centred.
+    const int h = 24 + 8 * lines;
+    const int y = (Screen::kHeight - h) / 2;
+    return {62, y, 196, h, y + 16};
 }
 
 int unitPresentAt(int x, int y) {
@@ -600,13 +755,81 @@ void drawJobsMenu(Screen& screen, const Art& art, const Game& game, const SaveCo
         }
         const auto& c = choices[static_cast<std::size_t>(i)];
         screen.text(art.tiny, 75, y, nameOf(c.job, false), green);
-        const std::string value = std::to_string(c.amount) + " " + goodName(game, jobOutput(c.job));
-        screen.text(art.tiny, 245 - Screen::textWidth(art.tiny, value), y, value, green);
+        if (jobOutput(c.job) >= 0) {
+            const std::string value = std::to_string(c.amount) + " " + goodName(game, jobOutput(c.job));
+            screen.text(art.tiny, 245 - Screen::textWidth(art.tiny, value), y, value, green);
+        }
     }
     const std::string help = "(F1 for Help)";
     screen.text(art.tiny, 256 - Screen::textWidth(art.tiny, help), 171, help, {kGold, kNoColour, kNoColour});
 }
 
+// The menu of jobs outside the colony (measured): as the jobs menu, with
+// what each job takes from the warehouse in brackets, greyed when the
+// warehouse lacks it. The first line is "(More)" when the menu came from
+// the jobs menu, else the present job.
+void drawOutsideMenu(Screen& screen, const Art& art, const Game& game, const ColonyViewState& view) {
+    const auto& save = game.state();
+    const auto& colony = save.colonies[static_cast<std::size_t>(view.colony)];
+    const auto& jobs = game.rules().jobs;
+    const ColonyMover who{view.selectedOutside >= 0 ? -1 : view.selectedColonist, view.selectedOutside};
+    const auto choices = game.outsideChoices(view.colony, who);
+    const int lines = static_cast<int>(choices.size()) + 1;
+    const auto b = outsideMenuBox(lines);
+    drawWoodBox(screen, art, {b.x, b.y, b.w, b.h});
+    const TextColours green{kGreen, kNoColour, kNoColour};
+    const TextColours grey{kMenuGrey, kNoColour, kNoColour};
+    auto nameOf = [&](int row, bool expert) -> std::string {
+        if (row < 0 || static_cast<std::size_t>(row) >= jobs.size()) {
+            return {};
+        }
+        return expert ? jobs[static_cast<std::size_t>(row)].expertName : jobs[static_cast<std::size_t>(row)].name;
+    };
+    int skill = 0;
+    if (who.colonist >= 0) {
+        skill = colony.skills[static_cast<std::size_t>(who.colonist)];
+    } else if (who.unit >= 0) {
+        skill = game.unit(who.unit).profession;
+    }
+    const int skillRow = skill == skill::kFreeColonist ? skill::kFreeColonistUnit : skill;
+    const int now = game.currentJob(view.colony, who);
+    const std::string title = textLine(art.labelText, "CTITLE", kLabelProfession, "Select a Profession for") + " " +
+                              nameOf(skillRow, true) + "(" + nameOf(now, false) + "):";
+    screen.text(art.tiny, b.x + 5, b.y + 6, title, green);
+    for (int i = 0; i < lines; ++i) {
+        const int y = b.firstLine + 8 * i;
+        if (i == view.outsideMenu) {
+            screen.fill({b.x + 2, y - 1, b.w - 6, 7}, kMenuBar);
+        }
+        if (i == 0) {
+            const std::string first =
+                view.outsideFromMore ? textLine(art.labelText, "CTITLE", kLabelMore, "(More)") : nameOf(now, false);
+            screen.text(art.tiny, 75, y, first, green);
+            continue;
+        }
+        const auto& c = choices[static_cast<std::size_t>(i - 1)];
+        const auto& colours = c.affordable ? green : grey;
+        screen.text(art.tiny, 75, y, nameOf(c.job, false), colours);
+        std::string value;
+        const auto bracket = [&](int amount, int good) {
+            return "(" + std::to_string(amount) + " " + goodName(game, good) + ")";
+        };
+        if (c.job == outside_job::kPioneer) {
+            value = bracket(c.tools, cargo::kTools);
+        } else if (c.job == outside_job::kSoldier) {
+            value = bracket(50, cargo::kMuskets);
+        } else if (c.job == outside_job::kScout) {
+            value = bracket(50, cargo::kHorses);
+        } else if (c.job == outside_job::kDragoon) {
+            value = bracket(50, cargo::kMuskets) + " " + bracket(50, cargo::kHorses);
+        }
+        if (!value.empty()) {
+            screen.text(art.tiny, 245 - Screen::textWidth(art.tiny, value), y, value, colours);
+        }
+    }
+    const std::string help = "(F1 for Help)";
+    screen.text(art.tiny, 256 - Screen::textWidth(art.tiny, help), b.y + b.h - 9, help, {kGold, kNoColour, kNoColour});
+}
 
 // "Select An Item To Build": a wooden box with "(No Production)" and a line
 // per thing the colony can build, with the hammers and tools still wanted.
@@ -687,7 +910,7 @@ void drawColonyScreen(Screen& screen, const Art& art, const ColonyArt& colonyArt
     screen.resetClip();
     screen.clear(kBlack);
     drawTopLine(screen, art, game, colony);
-    drawTown(screen, art, colonyArt, colony, production, view.selectedColonist);
+    drawTown(screen, art, colonyArt, game, colony, production, view.selectedColonist, view.selectedOutside);
     drawArea(screen, art, game, colony, production, view.selectedColonist);
     screen.blit(colonyArt.background, 0, kLowerTop);
     screen.fill({0, kLowerTop, Screen::kWidth, 1}, kBlack);
@@ -705,6 +928,9 @@ void drawColonyScreen(Screen& screen, const Art& art, const ColonyArt& colonyArt
     drawWarehouse(screen, art, colony);
     if (view.jobsMenu >= 0 && view.selectedColonist >= 0) {
         drawJobsMenu(screen, art, game, colony, view.selectedColonist, view.jobsMenu);
+    }
+    if (view.outsideMenu >= 0) {
+        drawOutsideMenu(screen, art, game, view);
     }
     if (view.buildList >= 0) {
         drawBuildList(screen, art, game, colony, view.buildList);

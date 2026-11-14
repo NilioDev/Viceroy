@@ -501,19 +501,17 @@ bool squareFree(const SaveColony& colony, const SaveMap& map, const std::vector<
 
 namespace {
 
-int workersIn(const SaveColony& colony, BuildingKind kind, int except) {
+// Read from the original: three to a building, counted by job, but only
+// for the jobs after the distiller's (its house takes a fourth).
+bool buildingFull(const SaveColony& colony, int jobRow, int except) {
+    if (jobRow <= job::kDistiller) {
+        return false;
+    }
     int n = 0;
     for (int i = 0; i < colony.population; ++i) {
-        if (i == except) {
-            continue;
-        }
-        const bool outside = std::find(colony.squares.begin(), colony.squares.end(), i) != colony.squares.end();
-        const auto b = buildingForJob(colony.jobs[static_cast<std::size_t>(i)]);
-        if (!outside && b && *b == kind) {
-            ++n;
-        }
+        n += i != except && colony.jobs[static_cast<std::size_t>(i)] == jobRow ? 1 : 0;
     }
-    return n;
+    return n >= 3;
 }
 
 int currentSquare(const SaveColony& colony, int colonist) {
@@ -553,7 +551,7 @@ JobChoice choiceFor(const SaveColony& colony, const SaveMap& map, const Ruleset&
         return choice;
     }
     const auto building = buildingForJob(jobRow);
-    if (!building || buildingLevel(colony, *building) == 0 || workersIn(colony, *building, colonist) >= 3) {
+    if (!building || buildingLevel(colony, *building) == 0 || buildingFull(colony, jobRow, colonist)) {
         return choice;
     }
     const int base = buildingYield(buildingLevel(colony, *building), skillOf, jobRow, modifier);
@@ -569,11 +567,26 @@ std::vector<JobChoice> jobChoices(const SaveColony& colony, const SaveMap& map, 
     if (colonist < 0 || colonist >= colony.population) {
         return out;
     }
-    for (int j = 0; j < job::kTeacher; ++j) {
+    for (int j = 0; j <= job::kTeacher; ++j) {
         // Work in a building is offered only where the building stands.
         const auto building = buildingForJob(j);
         if (building && buildingLevel(colony, *building) == 0) {
             continue;
+        }
+        // Read from the original: teaching only for an expert the school
+        // can take (a college for level 2, a university for level 3).
+        if (j == job::kTeacher) {
+            int skill = colony.skills[static_cast<std::size_t>(colonist)];
+            if (skill == skill::kFreeColonist) {
+                skill = skill::kServant;
+            }
+            const int level = skill >= 0 && static_cast<std::size_t>(skill) < rules.jobs.size()
+                                  ? rules.jobs[static_cast<std::size_t>(skill)].skillLevel
+                                  : 4;
+            const int school = buildingLevel(colony, BuildingKind::Schoolhouse);
+            if (level >= 4 || (level == 3 && school < 3) || (level == 2 && school < 2)) {
+                continue;
+            }
         }
         out.push_back(choiceFor(colony, map, rules, colonies, colonist, j, difficulty));
     }
@@ -587,9 +600,9 @@ bool assignJob(SaveColony& colony, const SaveMap& map, const Ruleset& rules,
     }
     const JobChoice choice = choiceFor(colony, map, rules, colonies, colonist, jobRow);
     const bool onLand = jobRow < static_cast<int>(kSquareWorkCount);
-    if (onLand ? choice.square < 0 : (!buildingForJob(jobRow) ||
-                                       buildingLevel(colony, *buildingForJob(jobRow)) == 0 ||
-                                       workersIn(colony, *buildingForJob(jobRow), colonist) >= 3)) {
+    if (onLand ? choice.square < 0
+               : (!buildingForJob(jobRow) || buildingLevel(colony, *buildingForJob(jobRow)) == 0 ||
+                  buildingFull(colony, jobRow, colonist))) {
         return false;
     }
     const int here = currentSquare(colony, colonist);
@@ -599,6 +612,24 @@ bool assignJob(SaveColony& colony, const SaveMap& map, const Ruleset& rules,
     if (onLand) {
         colony.squares[static_cast<std::size_t>(choice.square)] = colonist;
     }
+    colony.jobs[static_cast<std::size_t>(colonist)] = static_cast<std::uint8_t>(jobRow);
+    return true;
+}
+
+bool assignJobAt(SaveColony& colony, const SaveMap& map, const std::vector<SaveColony>& colonies, int colonist,
+                 int jobRow, int square) {
+    if (colonist < 0 || colonist >= colony.population || jobRow < 0 || jobRow >= static_cast<int>(kSquareWorkCount) ||
+        square < 0 || square >= 8) {
+        return false;
+    }
+    const int here = currentSquare(colony, colonist);
+    if (here != square && !squareFree(colony, map, colonies, square)) {
+        return false;
+    }
+    if (here >= 0) {
+        colony.squares[static_cast<std::size_t>(here)] = -1;
+    }
+    colony.squares[static_cast<std::size_t>(square)] = colonist;
     colony.jobs[static_cast<std::size_t>(colonist)] = static_cast<std::uint8_t>(jobRow);
     return true;
 }

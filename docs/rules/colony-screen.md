@@ -87,7 +87,62 @@ on the left and below). All text is `FONTTINY.FF`:
 - "(More)" as the last line, and "(F1 for Help)" in gold (0x95)
   right-aligned to x 256 at y 171.
 
-The menu opens on the colonist's present job.
+The menu opens on the colonist's present job. Teaching is offered only
+where a school stands and only to an expert it can take (see below).
+
+## Jobs outside the colony
+
+"(More)" opens a second menu of the same make, 24 + 8 pixels a line high
+and centred on the screen (with six lines: (62, 64), 196 × 72). The title is
+the same; the lines start 16 pixels below the box's top. The first line is
+"(More)" again (back to the jobs menu); then Colonist, Pioneer "(N Tools)",
+Soldier "(50 Muskets)", Scout "(50 Horses)", Dragoon "(50 Muskets) (50
+Horses)", right-aligned as in the jobs menu, and Missionary where a church
+stands (or for a Jesuit). A job the warehouse cannot equip is greyed (colour
+0x08) and cannot be picked. The pioneer takes the tools in twenties, at
+least 20 and at most 100. What the person carries already counts as in the
+warehouse. Converts go out only as colonists. Clicking the stockade with a
+colonist picked opens the same menu, its first line then the present job
+(which leaves things as they are). Measured on Curacao; our drawing matches
+it pixel for pixel.
+
+## Units outside the colony
+
+The people standing on the colony's square (not artillery, wagon trains or
+treasure) stand in the town over the stockade's spot, in the order of the
+Units Present panel, 11 pixels apart and centred on x 157: the first at
+157 − 11 × (n − 1) / 2, at row 111, each with a shadow of colour 0x5F two
+pixels to the left. A picked one has a frame of 0x45. Measured with two and
+three units on Curacao.
+
+## Moving people
+
+A click on a colonist (in a building, on a square or outside) picks them; a
+click on a building, a free square or the stockade then moves them there. On
+a square they keep their work on the land if they had some, fish on water,
+and otherwise take the work that yields most there. Read from the original,
+in its order, a move is refused with a message (most from the woman of the
+BUY box, `MSS5`):
+
+- out of the colony: a stockade keeps three colonists (`KEEPSTOCKADE`);
+  under siege only soldiers and dragoons leave (`SIEGE`, the colonial
+  adviser): the armed units (attack 2 or more) of nations without peace on
+  the eight squares around outnumber the colony's own on its square and
+  around; the last colonist asks first (`ABANDON`, or `ABANDON2` when the
+  nation has fewer than two colonies after 1575), and the colony is gone;
+- into the colony: 32 at most (`FULL`);
+- fishing needs docks (`NODOCKS`, the admiral);
+- teaching: the schoolhouse takes one teacher, the college two, the
+  university three (`SCHOOL1`, `COLLEGE2`, `UNIV3`); only an expert teaches
+  (`NOTEACHER`), one of level 2 needs a college and one of level 3 a
+  university (`NEEDCOLLEGE`, `NEEDUNIVERSITY`);
+- three to a building (`MORETHANTHREE`), counted by job, but only for the
+  jobs after the distiller's: the distiller's house takes a fourth (seen:
+  four free colonists there made 12 rum).
+
+A colonist who goes out becomes a unit on the square and takes 50 muskets,
+50 horses or the tools from the warehouse; a unit that comes in leaves
+them there.
 
 ## Panel buttons
 
