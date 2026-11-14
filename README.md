@@ -216,8 +216,8 @@ saved in the first free slot, or over the savegame saved longest ago.
 | Action | Keyboard | Gamepad |
 | --- | --- | --- |
 | Skip the opening | Any key, or click | Any button |
-| Pick in the main menu or the load menu | Up / Down and Enter, or click | D-pad and A |
-| Back from the load menu to the main menu | Esc | B |
+| Pick in the main menu or the list of savegames | Up / Down and Enter, or click | D-pad and A |
+| Back from the list of savegames to the main menu | Esc | B |
 | New game: pick the difficulty and the nation | Arrow keys and Enter, or click and then *Click Here When Finished* | D-pad and A |
 | New game: type your name | Letters, Backspace, Enter | A keeps the leader's name |
 | Move the active unit | Numeric keypad 1-9, arrow keys, Home / PgUp / End / PgDn for diagonals, or click a square next to it | Left stick or D-pad |
@@ -265,7 +265,8 @@ saved in the first free slot, or over the savegame saved longest ago.
 | Open the menu bar (Game, View, Orders, Reports, Trade, Colonizopedia) | Click a title, or Alt and the title's gold letter; then the arrow keys and Enter, or a gold letter | Start, then the D-pad and A |
 | The Continental Congress report | F3, or Reports, Continental Congress; any key or click closes it | Start, then Reports |
 | The advisers' reports and the Colonization Score | F2 and F4 to F10, or the Reports menu; a key or click turns the page or closes it (in the Labor Adviser a click on a profession zooms on it) | Start, then Reports |
-| Save the game | Ctrl+S, or Game, Save Game | Start, then Save Game |
+| Save the game in one of eight slots | Ctrl+S, or Game, Save Game | Start, then Save Game |
+| Load another savegame while playing | Game, Load Game | Start, then Load Game |
 | Back to the load menu | Esc | Guide |
 
 The mouse pointer is the game's own arrow, drawn in the picture as the
@@ -277,8 +278,10 @@ give units their moves back, end the turn, or jump to your next colony. On a
 colony screen it adds goods, a colonist, a level to every building or Sons of
 Liberty. Nothing changes unless you pick an entry.
 
-Saving writes over the savegame you loaded, in Viceroy's library (see
-below). Your original files are never changed.
+Save Game and Load Game show the original's slots, COLONY00 to COLONY07
+for saving (COLONY08 and COLONY09 are the autosaves) and all ten for
+loading, in Viceroy's library (see below). Your original files are never
+changed.
 
 ## Add your game
 

@@ -156,6 +156,17 @@ public:
     // Writes the game to the slot it was loaded from. Returns false and
     // sets the message on failure.
     bool save();
+    // The slot the game was loaded from or last saved in.
+    const std::filesystem::path& savePath() const { return savePath_; }
+    // Writes the game to a file, the slot it is saved in from now on.
+    bool saveTo(const std::filesystem::path& path);
+    // Save Game and Load Game: the box of slots, as the original's.
+    void showSaveSlots();
+    void showLoadSlots();
+    // Just loaded: "Loaded COLONY03.SAV successfully."
+    void showLoaded();
+    // The game picked could not be read: "... is not a valid save file."
+    void loadFailed();
     // Units glide from square to square, and the game pauses a moment
     // before the next unit when one has used up its moves. Off by default
     // (tests); the app turns it on.
@@ -184,8 +195,8 @@ public:
     // Exit to DOS was picked.
     bool quitRequested() const { return quit_; }
     int ending() const { return ending_; }
-    // Load Game was picked with the mouse: back to the load menu.
-    bool loadRequested() const { return quitToLoad_; }
+    // A savegame was picked in the Load Game box: the app opens it.
+    const std::filesystem::path& loadRequested() const { return loadPath_; }
 
 private:
     struct Slide {
@@ -453,7 +464,7 @@ private:
     std::optional<Slide> slide_;
     std::optional<OpenMenu> menu_;
     bool quit_ = false;
-    bool quitToLoad_ = false;
+    std::filesystem::path loadPath_;
     struct PendingAttack {
         int attacker = -1;
         int defender = -1;
@@ -469,28 +480,46 @@ private:
     bool analysisUp_ = false; // the Combat Analysis box waits for a key
 };
 
-// One line of the load menu.
+// A game as the save and load boxes name it (read from the original):
+// "Discoverer Willem De Ruyter of the Dutch, Autumn 1653", or, in the
+// message after saving, "... of the Dutch (Autumn 1653)".
+std::string saveTitle(const SaveGame& save, const Art& art, bool brackets = false);
+
+// One slot of the save and load boxes.
 struct SaveSlot {
     std::filesystem::path path;
-    std::string label; // "COLONY03  Dutch  Spring 1632"
+    std::string label; // saveTitle(), or "(EMPTY)"
+    bool empty = true; // no savegame there that can be read
 };
 
-// The savegames in a folder, COLONY00 to COLONY09, that can be read.
-std::vector<SaveSlot> listSaves(const std::filesystem::path& folder, const Art& art);
+// The slots COLONY00 to COLONY0<count - 1> of a folder: the original saves
+// in the first eight (the last two are the autosaves) and loads from all
+// ten.
+std::vector<SaveSlot> listSaves(const std::filesystem::path& folder, const Art& art, int count = 10);
 
+// The box of slots for Save Game ("SAVEGAME") or Load Game ("LOADGAME").
+Dialog saveSlotBox(const Art& art, std::string_view section, const std::vector<SaveSlot>& slots);
+
+// Load Game from the main menu: the box of the ten slots on the wooden
+// screen, then a word on how the loading went.
 class LoadMenu {
 public:
-    explicit LoadMenu(std::vector<SaveSlot> slots) : slots_(std::move(slots)) {}
-    // Returns the chosen slot when the player confirms.
+    LoadMenu(const Art& art, std::vector<SaveSlot> slots);
+    // Returns the chosen slot once the player has read that it loaded.
     std::optional<SaveSlot> handle(Command command);
-    // A click on a row picks that savegame.
+    // A click on a row picks that savegame; a click on the message goes on.
     std::optional<SaveSlot> click(int x, int y);
     void draw(Screen& screen, const Art& art) const;
-    bool empty() const { return slots_.empty(); }
+    const Dialog& dialog() const { return list_; }
+    const Dialog* message() const { return message_ ? &*message_ : nullptr; }
 
 private:
+    std::optional<SaveSlot> pick(int row);
+    const Art* art_;
     std::vector<SaveSlot> slots_;
-    int selected_ = 0;
+    Dialog list_;
+    std::optional<Dialog> message_;
+    std::optional<SaveSlot> loaded_; // read, waiting for the message to go
 };
 
 } // namespace viceroy

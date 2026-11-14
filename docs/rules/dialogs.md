@@ -81,3 +81,31 @@ into the field on a dark mark (palette 8Ah, 2 columns wider than the text),
 with an underscore after it as the cursor; the first key replaces it,
 Backspace takes a letter back, Return takes the text (even none) and
 Escape gives up.
+
+## Saving and loading
+
+Seen and measured in the original:
+
+- **Save Game** asks "Select Save Slot" and lists the first eight slots,
+  `COLONY00.SAV` to `COLONY07.SAV`; the last two are the autosaves.
+  **Load Game** asks "Select Game To Load" and lists all ten. The bar starts
+  on the first slot.
+- A slot names its game as "Discoverer Willem De Ruyter of the Dutch,
+  Autumn 1653" (difficulty, the player's name, "of the" and the nation,
+  then the season and year); a slot without a savegame is "(EMPTY)".
+- The box uses the small letters (`FONTTINY.FF`, choices 8 apart). It is as
+  wide as `@width` or the widest slot plus 8, whichever is more, plus the
+  usual 6, and centred on the screen; an odd width leaves the spare pixel
+  on the left.
+- After saving: "Conquistador Michiel de jager of the Dutch (Spring 1727)
+  saved as COLONY00.SAV." (`SAVEGOOD`), in a box centred on the screen. The
+  game is saved in that slot from then on.
+- Picking an empty slot to load does nothing. A game that loads says
+  "Loaded COLONY09.SAV successfully." (`LOADGOOD`), one that can't be read
+  "COLONY09.SAV is not a valid save file." (`LOADNOT`).
+- From the main menu the list stands on `WOODPANL.PIK` without a box: the
+  title at (62, 67) when the box is 207 wide, the slots 6 rows apart from
+  row 75 at x + 9, the chosen one on a bar 8 high from a row above the text
+  and a pixel narrower at each end than in a box. Each slot is drawn after
+  the one above it, so its bar covers that slot's last row of pixels, and
+  the list is cut off one row before the last slot's text ends.
