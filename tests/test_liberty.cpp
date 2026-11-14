@@ -148,10 +148,13 @@ VCR_TEST("liberty: reaching 50% is reported after the turn") {
     g.endTurn();
     VCR_CHECK(g.state().colonies[0].libertyBonus == 1);
     const auto notices = g.takeNotices();
-    VCR_CHECK(notices.size() == 1);
+    VCR_CHECK(notices.size() == 2);
     VCR_CHECK(notices[0].section == "REBELMAJORITY");
     VCR_CHECK(notices[0].numbers == std::vector<int>{50});
     VCR_CHECK(notices[0].colony == 0);
+    // Then the nation's rebels, half of its people now.
+    VCR_CHECK(notices[1].section == "REBELUP50");
+    VCR_CHECK(notices[1].numbers == std::vector<int>{50});
 }
 
 VCR_TEST("resources: what they add to work on the land (measured)") {

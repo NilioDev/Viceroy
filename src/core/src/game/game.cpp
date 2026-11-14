@@ -626,6 +626,13 @@ void Game::endTurn() {
     // Seen with a debugger: the count of forces is redone when the
     // player's turn ends.
     countForces();
+    // The original starts the player's part of a round with the King, in
+    // the turn that comes; the colonies' turn follows (measured: the
+    // King's message comes before theirs).
+    {
+        const int nextYear = save_.year < 1600 || save_.season != 0 ? save_.year + 1 : save_.year;
+        kingTax(human(), save_.turn + 1, nextYear);
+    }
     // Measured: the original goes through the colonies from the last
     // founded to the first, which sets the order of its messages.
     for (std::size_t c = save_.colonies.size(); c-- > 0;) {
@@ -633,6 +640,7 @@ void Game::endTurn() {
         // Only the player's colonies lose work to tories.
         const bool tories = colony.nation >= 0 && colony.nation < kEuropeanNations &&
                             save_.players[static_cast<std::size_t>(colony.nation)].control == 0;
+        const int sonsBefore = sonsOfLibertyPercent(colony, nationEffects(save_, colony.nation).libertyExtra(true));
         const ColonyTurn turn = runColonyTurn(colony, save_.map, rules_, save_.difficulty, tories,
                                               nationEffects(save_, colony.nation));
         // Read from the original: the colony's bells go to the congress
@@ -646,6 +654,16 @@ void Game::endTurn() {
             const int percent = sonsOfLibertyPercent(colony, nationEffects(save_, colony.nation).libertyExtra(true));
             GameNotice notice{section, {colony.name}, -1, {percent}, static_cast<int>(c)};
             notices_.push_back(std::move(notice));
+        } else if (ours && (save_.header[21] & 0x01) == 0) {
+            // Read from the original: membership passing a ten up, or
+            // falling below one by more than 4, unless the colony report
+            // option for the Sons of Liberty is off.
+            const int sons = sonsOfLibertyPercent(colony, nationEffects(save_, colony.nation).libertyExtra(true));
+            if (sonsBefore / 10 < sons / 10) {
+                notices_.push_back(GameNotice{"SONSUP", {colony.name}, -1, {sons}, static_cast<int>(c)});
+            } else if ((sons + 4) / 10 < sonsBefore / 10) {
+                notices_.push_back(GameNotice{"SONSDOWN", {colony.name}, -1, {sons}, static_cast<int>(c)});
+            }
         }
         if (ours) {
             runOutNotices(turn, static_cast<int>(c));
@@ -685,6 +703,11 @@ void Game::endTurn() {
                                           {turn.toolsNeeded, have},
                                           static_cast<int>(c)});
         }
+    }
+    // After its colonies, each nation's rebels are counted (the player
+    // hears of it) and the Crown spends on its army.
+    for (int n = 0; n < kEuropeanNations; ++n) {
+        rebelSentiment(n);
     }
     gatherCrosses();
     repairShips();

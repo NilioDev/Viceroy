@@ -240,6 +240,30 @@ void addOption(Dialog& d, std::string text, std::string value, bool disabled) {
     d.disabled.push_back(disabled);
 }
 
+void addOptionsFrom(const Art& art, Dialog& d, std::string_view section, const std::vector<std::string>& strings,
+                    const std::vector<int>& numbers) {
+    const auto* found = art.gameText.find(section);
+    if (found == nullptr) {
+        return;
+    }
+    for (const auto& raw : found->lines) {
+        if (raw.empty() || raw[0] == '@' || raw.find_first_not_of(" \t") == std::string::npos) {
+            continue;
+        }
+        addOption(d, fill(raw, strings, numbers));
+    }
+}
+
+void placeKingDialog(Dialog& d) {
+    d.portrait = kKingPortrait;
+    d.overlay = kKingArm;
+    d.portraitBehind = false;
+    d.x = 105;
+    d.y = (Screen::kHeight - dialogHeight(d)) / 2;
+    d.portraitX = 20;
+    d.portraitY = 18;
+}
+
 void placeEuropeDialog(Dialog& d, bool help) {
     d.help = help;
     d.optionLeft = 13;
@@ -591,6 +615,14 @@ void drawDialog(Screen& screen, const Art& art, const Dialog& d) {
     if (hasPortrait && !d.portraitBehind) {
         screen.blit(art.portraits[static_cast<std::size_t>(d.portrait)].sprites.front().image, d.portraitX,
                     d.portraitY);
+    }
+    if (hasPortrait && d.overlay >= 0 && static_cast<std::size_t>(d.overlay) < art.portraits.size()) {
+        const auto& frames = art.portraits[static_cast<std::size_t>(d.overlay)].sprites;
+        if (!frames.empty()) {
+            const int last = static_cast<int>(frames.size()) - 1;
+            const auto frame = static_cast<std::size_t>(std::clamp(d.overlayFrame, 0, last));
+            screen.blit(frames[frame].image, d.portraitX, d.portraitY);
+        }
     }
 }
 

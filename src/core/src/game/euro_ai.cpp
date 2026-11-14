@@ -1009,6 +1009,8 @@ void Game::europeanTurn(int n) {
     if (n < 0 || n >= kEuropeanNations || save_.players[static_cast<std::size_t>(n)].control != 1) {
         return;
     }
+    // The King first, as for the player (docs/rules/king.md).
+    kingTax(n, save_.turn, save_.year);
     nationCensus(n);
     aiTallies(n);
     aiRelations(n);

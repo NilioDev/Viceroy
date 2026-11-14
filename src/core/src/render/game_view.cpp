@@ -755,6 +755,8 @@ Art loadArt(const std::filesystem::path& folder) {
                 readFile(folder, "IND" + std::to_string(tribe) + "A" + std::to_string(mood) + ".SS")));
         }
     }
+    art.portraits.push_back(readSpriteSheet(readFile(folder, "KING.SS"))); // kKingPortrait
+    art.portraits.push_back(readSpriteSheet(readFile(folder, "KING2.SS"))); // kKingArm
     art.rules = readRuleset(art.names);
     return art;
 }

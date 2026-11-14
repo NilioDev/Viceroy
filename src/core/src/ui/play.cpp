@@ -707,6 +707,12 @@ bool PlayScreen::handleDialog(Command command) {
             // father is chosen.
             return true;
         }
+        if (question_ == "TAXOPTIONS" || question_ == "KISSUP") {
+            // Escape kisses the ring, or refuses to pay: only the second
+            // choice holds a party or pays.
+            d.selected = 0;
+            break;
+        }
         if (question_ == "SAILPORT" || question_ == "TRAVELPLACE" || question_.rfind("PICK", 0) == 0) {
             // Go To has no "None": Escape leaves the unit as it was.
             // Pick Music and its lists close without a pick.
@@ -876,6 +882,16 @@ void PlayScreen::showNotices() {
             notice.strings[static_cast<std::size_t>(string)] = textLine(art_->names, "HOMEPORT", nation, "");
         }
     }
+    for (const auto& line : notice.lines) {
+        // A line of NAMES.TXT or GAME.TXT: "Viceroy", "the Ottoman Turks".
+        if (line.string >= 0) {
+            if (notice.strings.size() <= static_cast<std::size_t>(line.string)) {
+                notice.strings.resize(static_cast<std::size_t>(line.string) + 1);
+            }
+            notice.strings[static_cast<std::size_t>(line.string)] =
+                textLine(line.names ? art_->names : art_->gameText, line.section.c_str(), line.row, "");
+        }
+    }
     for (const auto& [string, row] : notice.labels) {
         if (string >= 0) {
             if (notice.strings.size() <= static_cast<std::size_t>(string)) {
@@ -907,6 +923,19 @@ void PlayScreen::showNotices() {
             const auto& u = game_.unit(notice.unit);
             centreOn(view_, game_, u.x, u.y);
         }
+    }
+    if (notice.section.rfind("KING", 0) == 0 && notice.section != "KINGBUY") {
+        // The King speaks, standing left of the box; a rise in tax may be
+        // answered with a party (read from the original).
+        ask(notice.section, -1, notice.strings, -1, notice.numbers);
+        if (dialog_) {
+            if (notice.value == Game::kTaxQuestion) {
+                addOptionsFrom(*art_, *dialog_, "TAXOPTIONS", notice.strings, notice.numbers);
+                question_ = "TAXOPTIONS";
+            }
+            placeKingDialog(*dialog_);
+        }
+        return;
     }
     if (notice.section == "CONGRESSHALL") {
         // Read from the original: the new father stands in the hall with
@@ -1085,7 +1114,8 @@ void PlayScreen::showNotices() {
         constexpr std::string_view kBattles[] = {"DEMOTE",     "COLONISTCAPTURE", "COLONISTCAPTURE2", "WAGONCAPTURE",
                                                  "LOOTCAPTURE", "ARTILLERY",      "ARTILLERY2",       "VETERAN",
                                                  "VALOR",       "CAPTURED",       "LOOT",             "LOOT2",
-                                                 "INDIANSLAVES", "INDIANWARFARE", "INDIANBURN"};
+                                                 "INDIANSLAVES", "INDIANWARFARE", "INDIANBURN", "TEAPARTY",
+                                                 "KINGBUY",     "REBELUP",        "REBELUP50",        "REBELDOWN"};
         if (std::find(std::begin(kBattles), std::end(kBattles), notice.section) != std::end(kBattles)) {
             placeMapDialog(*dialog_);
         } else {
@@ -1442,6 +1472,18 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
             say(game_.unitName(unit) + " sails for Europe.");
             advance();
         }
+    } else if (question == "KISSUP") {
+        // "Pay": unless the treasury is short (@KISSSORRY).
+        if (choice == 1 && !game_.payBackTaxes(unit)) {
+            const auto news = game_.takeNotices();
+            ask("KISSSORRY", -1, {}, -1, news.empty() ? std::vector<int>{} : news.front().numbers);
+        }
+    } else if (question == "TAXOPTIONS") {
+        // "Kiss pinky ring." or "Hold 'Boston Tea Party.'"
+        // The party's news comes at once, before the rest of the turn's.
+        game_.answerTaxRaise(choice == 1);
+        auto news = game_.takeNotices();
+        notices_.insert(notices_.begin(), std::make_move_iterator(news.begin()), std::make_move_iterator(news.end()));
     } else if (question == "SAILAWAY") {
         if (yes && game_.sailToNewWorld(unit) && europeScreen_) {
             const auto ships = unitsInEurope(game_.state(), game_.rules(), game_.human(), EuropePlace::InPort, true);
@@ -1525,6 +1567,16 @@ void PlayScreen::tellPriceMove(int good, int move) {
     choices_.clear();
     question_ = "PRICE";
     questionUnit_ = -1;
+}
+
+void PlayScreen::askBackTaxes(int good) {
+    // Read from the original: a boycotted good can be traded again once
+    // the back taxes are paid (@KISSUP).
+    const std::string name = static_cast<std::size_t>(good) < game_.rules().cargo.size()
+                                 ? game_.rules().cargo[static_cast<std::size_t>(good)].name
+                                 : "";
+    const std::string port = textLine(art_->names, "HOMEPORT", game_.human(), "");
+    ask("KISSUP", good, {name, port}, -1, {game_.backTaxes(good)});
 }
 
 void PlayScreen::openRecruit() {
@@ -1667,6 +1719,10 @@ bool PlayScreen::handleEuropeScreen(Command command) {
                 say("No ship in port.");
                 return true;
             }
+            if (game_.isBoycotted(game_.human(), state.good)) {
+                askBackTaxes(state.good);
+                return true;
+            }
             const Trade t = buyGoods(save, game_.rules(), state.ship, state.good, game_.freeHolds(state.ship));
             if (t.amount > 0) {
                 state.receipt = TradeReceipt{false, t.amount, goodName(state.good), t.price, t.gold, nation.taxRate, 0};
@@ -1690,6 +1746,10 @@ bool PlayScreen::handleEuropeScreen(Command command) {
         return true;
     case Command::Sentry: // S: sell
     case Command::BuildColony: // X on a gamepad
+        if (state.focus == EuropeFocus::Market && game_.isBoycotted(game_.human(), state.good)) {
+            askBackTaxes(state.good);
+            return true;
+        }
         if (state.focus == EuropeFocus::Market && state.ship >= 0) {
             const Trade t = sellGoods(save, game_.rules(), state.ship, state.good);
             if (t.amount > 0) {
@@ -2239,6 +2299,10 @@ void PlayScreen::tick(std::uint64_t milliseconds) {
     clock_ += milliseconds;
     playMusic(game_.takeMusicCues());
     view_.blinkOn = (clock_ / kBlinkMs) % 2 == 0;
+    if (dialog_) {
+        dialog_->shownMs += milliseconds;
+        dialog_->overlayFrame = kingArmFrame(dialog_->shownMs);
+    }
     if (slide_) {
         slide_->elapsed += milliseconds;
         const auto t = std::min(slide_->elapsed, kSlideMs);

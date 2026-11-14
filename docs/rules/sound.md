@@ -98,7 +98,7 @@ are four kinds of call:
 
 The tribe's mood is 7 for the Inca, 6 for the Aztecs and 5 for the others.
 
-Not yet in Viceroy, so not yet with music: the King's taxes and wars,
+Not yet in Viceroy, so not yet with music: the King's wars,
 independence and the War of Independence, wars between nations, the
 natives' talks and threats, colonies taken or burned by other nations, and
 the end of the game.
@@ -149,11 +149,12 @@ beaten by a ship plays 4Dh, whoever attacked.
 | A mission is lost to another nation (`HERESY1`) | 53h |
 | The chief kills the scout (`CHIEFKILL`) | 55h |
 | A unit in a colony is told to fortify (`UNITOPTIONS`) | 58h |
+| The King raises the tax and no party is possible | 3Eh |
+| A tea party (`TEAPARTY`) | 56h |
 
 Read from the original but not yet in Viceroy: 5Ch when a colonist or
 soldier takes horses and 8024h when one is blessed as a missionary (in the
-home port), 3Eh with the King's taxes (`TAXOPTIONS`), 56h at a tea party
-(`TEAPARTY`), 3Fh when mercenaries are offered (`MERCS`), 8020h near a
+home port), 3Fh when mercenaries are offered (`MERCS`), 8020h near a
 declaration of war, 21h or 25h with the final score, 39h before the
 opening, 52h for a wagon train of the player's, 8024h when a colony
 finishes some buildings, and a few calls that pass on a sound chosen

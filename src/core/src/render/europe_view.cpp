@@ -243,12 +243,34 @@ void drawPort(Screen& screen, const Art& art, const Game& game, const EuropeView
     }
 }
 
+// A boycotted good is crossed out in red, as measured on the original:
+// eight rows of an X with a darker edge.
+void drawBoycott(Screen& screen, int x, int y) {
+    struct Dot {
+        int dx;
+        int dy;
+        std::uint8_t colour;
+    };
+    static constexpr Dot kCross[] = {
+        {0, 0, 0x73}, {1, 0, 0x72}, {6, 0, 0x73}, {7, 0, 0x70}, {1, 1, 0x73}, {2, 1, 0x70}, {5, 1, 0x73},
+        {6, 1, 0x70}, {2, 2, 0x73}, {3, 2, 0x73}, {4, 2, 0x72}, {5, 2, 0x70}, {3, 3, 0x70}, {4, 3, 0x70},
+        {2, 4, 0x73}, {3, 4, 0x70}, {4, 4, 0x73}, {5, 4, 0x70}, {1, 5, 0x73}, {2, 5, 0x70}, {5, 5, 0x72},
+        {6, 5, 0x70}, {0, 6, 0x73}, {1, 6, 0x70}, {6, 6, 0x73}, {7, 6, 0x73}, {0, 7, 0x73}, {7, 7, 0x73},
+    };
+    for (const auto& d : kCross) {
+        screen.pixel(x + d.dx, y + d.dy, d.colour);
+    }
+}
+
 void drawMarket(Screen& screen, const Art& art, const Game& game, const EuropeViewState& view) {
     const auto& nation = game.state().nations[static_cast<std::size_t>(game.human())];
     for (int good = 0; good < kGoodsKinds; ++good) {
         const int centre = 10 + 19 * good;
         const int icon = kGoodsIcon + good;
         blitSprite(screen, art.icons, icon, centre - spriteWidth(art.icons, icon) / 2, 181);
+        if (game.isBoycotted(game.human(), good)) {
+            drawBoycott(screen, centre - 4, 186);
+        }
         const std::string price =
             std::to_string(bidPrice(nation, good)) + "/" + std::to_string(askPrice(game.rules(), nation, good));
         centred(screen, art.tiny, centre, 194, price, kPriceText);
