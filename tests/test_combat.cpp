@@ -459,6 +459,10 @@ VCR_TEST("combat: a sunk ship takes its passengers down") {
             sank = true;
             const auto notices = g.takeNotices();
             VCR_CHECK(notices.size() == 1 && notices[0].section == "SHIPSUNK");
+            // Read from the original: the loser's tune is sad, the winner's
+            // military.
+            VCR_CHECK(notices[0].music.size() == 1 && notices[0].music[0].kind == MusicCue::Kind::MoodEvent);
+            VCR_CHECK(notices[0].music[0].value == 1 || notices[0].music[0].value == 4);
             VCR_CHECK(g.unit(1).x == 0 && g.unit(1).y == 2);
         } else {
             VCR_CHECK(g.unitCount() == 3); // damaged: the passenger is lost

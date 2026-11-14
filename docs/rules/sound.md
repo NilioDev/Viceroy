@@ -61,3 +61,44 @@ none. With no mood set, the tune drawn sets it. An event can set the mood
 of the next tune, of the tune after it, or change the mood at once: then
 the tune playing fades out if its mood differs. Pick Music fades the tune
 playing out as well.
+
+## Music at events
+
+The game asks for music when it tells the player of an event, always the
+player's own (computer players' events never change the music). There
+are four kinds of call:
+
+- **next mood**: the mood of the next tune;
+- **mood now**: a new mood, and the tune playing fades if its mood differs;
+- **event mood**: mood now with Event Music on and Background Music off,
+  next mood otherwise;
+- **tune**: a tune of its own (a driver command), which fades the one playing.
+
+| Event | Music |
+| --- | --- |
+| A colony's food runs out (`FOOD1`, `FOOD2`) | event mood 1 |
+| A colonist starves (`STARVE1`, `STARVE2`), the colony vanishes (`VANISH`) | mood now 1 |
+| Food is running low (`FOODLOW`) | next mood 1 |
+| A cargo is ready (`CARGOREADY0` to `2`) | next mood 2 |
+| A colony finishes something (`BUILT`) | event mood 3 for an armory, magazine, printing press or newspaper, event mood 2 otherwise |
+| A tribe is met (`INDIANWELCOME`) | the tribe's mood now; in the first 20 turns with Background Music on, a tribe other than the Inca and the Aztecs as next mood |
+| A tribe visits a colony | one visit in nine: the tribe's mood next |
+| A tribe demands goods (`INDIANCITY`, `INDIANWAGONS`) | the tribe's mood now |
+| A ship sinks (`SHIPSUNK`) | event mood 1 for its owner, event mood 4 for the winner |
+| Braves are beaten off (`INDIANLOSE`) | mood now 4 |
+| Braves win an ambush or at a colony (`INDIANWIN0` to `2`, `INDIANWINCOLONY`, `INDIANBURNCOLONY`) | tune 32h ("Natives") |
+| A raid on a colony | next mood 2 when it comes to nothing, tune 32h otherwise |
+| Converts flock to the mission after an attack (`INDIANSLAVES`) | mood now 4 |
+| A burned village leaves treasure (`LOOT`) | mood now 2 |
+| Fountain of Youth, city of gold, burial mounds (`LOSTCITY1`, `2`, `4`) | tunes 37h, 3Ch and 33h |
+| An expedition vanishes (`LOSTCITY5`) | next mood 1 (and mood now without Background Music) |
+| A rumour with gold | next mood 2 (and mood now without Background Music) |
+| Treasure in burial mounds (`BURIAL3`), with no tribe angered | tune 24h |
+| The mounds were a tribe's burial ground (`SCREWED`) | tune 32h |
+
+The tribe's mood is 7 for the Inca, 6 for the Aztecs and 5 for the others.
+
+Not yet in Viceroy, so not yet with music: the King's taxes and wars,
+independence and the War of Independence, wars between nations, the
+natives' talks and threats, colonies taken or burned by other nations, and
+the end of the game.

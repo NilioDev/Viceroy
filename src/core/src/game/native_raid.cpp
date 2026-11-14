@@ -16,6 +16,9 @@ namespace viceroy {
 
 namespace {
 
+constexpr int kNativesTune = 0x32; // "Natives", a driver command
+
+
 constexpr int kBrave = 19;
 constexpr int kArmedBrave = 20;
 constexpr int kMountedBrave = 21;
@@ -168,6 +171,7 @@ CombatOutcome Game::nativeAttack(int index, int x, int y) {
         } else if (human) {
             // "Dutch Soldiers defeat Sioux near Jamestown!"
             notice.section = "INDIANLOSE";
+            notice.music = {{MusicCue::Kind::ChangeMood, 4}};
             notice.strings[2] = typeName(defenderType);
             notice.labels.push_back({4, kDefeatLabel + (defenderType < 7 ? 0 : 1)});
             notices_.push_back(std::move(notice));
@@ -244,6 +248,8 @@ CombatOutcome Game::nativeAttack(int index, int x, int y) {
         tension = (human ? save_.difficulty >> 1 : 0) - 5;
     }
     if (human) {
+        // Read from the original: the natives' own tune.
+        notice.music = {{MusicCue::Kind::Pick, kNativesTune}};
         notices_.push_back(std::move(notice));
     }
     if (tension != 0 && hasBlock && defenderNation >= 0 && defenderNation < kEuropeanNations &&
@@ -363,6 +369,10 @@ void Game::raidColony(int nation, int colonyIndex, int home, bool always) {
     notice.adjectives = {{3, owner}};
     notice.colony = colonyIndex;
     int tension = 0;
+    // Read from the original: a raid that comes to nothing makes the next
+    // tune a cheerful one; any other plays the natives' tune.
+    notice.music = {kind == kNothing ? MusicCue{MusicCue::Kind::SetMood, 2}
+                                     : MusicCue{MusicCue::Kind::Pick, kNativesTune}};
     switch (kind) {
     case kStores: {
         auto& stock = c.stock[static_cast<std::size_t>(good)];

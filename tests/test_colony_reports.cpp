@@ -131,7 +131,10 @@ VCR_TEST("colony reports: food runs low, then out (measured)") {
     // turn the food runs out.
     {
         Game g = reportGame(4, 1494, 0, [](SaveColony& c) { c.stock[cargo::kFood] = 3; });
-        VCR_CHECK(find(afterTurn(g), "FOOD1") != nullptr);
+        const auto n = afterTurn(g);
+        VCR_CHECK(find(n, "FOOD1") != nullptr);
+        // Read from the original: a sad tune at once with Event Music alone.
+        VCR_CHECK(find(n, "FOOD1")->music == std::vector<MusicCue>{{MusicCue::Kind::MoodEvent, 1}});
         VCR_CHECK(g.state().colonies[0].population == 4);
         VCR_CHECK(g.state().colonies[0].stock[cargo::kFood] == 0);
     }
@@ -224,6 +227,7 @@ VCR_TEST("colony reports: food running out this turn only warns (seen in the ori
     // The next turn begins with an empty store.
     n = afterTurn(g);
     VCR_CHECK(find(n, "STARVE1") != nullptr);
+    VCR_CHECK(find(n, "STARVE1")->music == std::vector<MusicCue>{{MusicCue::Kind::ChangeMood, 1}});
     VCR_CHECK(g.state().colonies[0].population == 2);
 }
 
@@ -254,6 +258,7 @@ VCR_TEST("colony reports: the last colonist starving ends the colony (seen in th
     const auto n = afterTurn(g);
     VCR_CHECK(find(n, "VANISH") != nullptr);
     VCR_CHECK(find(n, "VANISH")->strings == std::vector<std::string>{"New Amsterdam"});
+    VCR_CHECK(find(n, "VANISH")->music == std::vector<MusicCue>{{MusicCue::Kind::ChangeMood, 1}});
     VCR_CHECK(g.state().colonies.empty());
     VCR_CHECK((g.state().map.at(1, 1).flags & MapSquare::kHasColony) == 0);
 }

@@ -7,6 +7,7 @@
 #include "viceroy/game/europe.hpp"
 #include "viceroy/game/game.hpp"
 #include "viceroy/game/natives.hpp"
+#include "viceroy/sound/background_music.hpp"
 
 #include <algorithm>
 #include <string>
@@ -22,6 +23,13 @@ constexpr std::uint8_t kIndependence = 0x01; // header byte 18
 constexpr std::size_t kPlayerFlags = 48;
 constexpr std::uint8_t kMoundsSeen = 0x40; // the nation has met burial mounds
 constexpr int kFreeRecruits = 8;
+
+// Tunes of their own (driver commands), read from the original.
+constexpr int kFountainTune = 0x37;
+constexpr int kCibolaTune = 0x3C;
+constexpr int kMoundsTune = 0x33;
+constexpr int kTreasureTune = 0x24;
+constexpr int kNativesTune = 0x32;
 
 // The outcomes, as the numbers of the LOSTCITY sections.
 enum Outcome {
@@ -221,6 +229,27 @@ bool Game::exploreRumour(int index) {
             notice.strings = {""};
             notice.countries = {{0, nation}};
         }
+        // Read from the original: three finds have a tune of their own; an
+        // expedition lost makes the next tune a sad one, gold a cheerful
+        // one (at once without Background Music).
+        const bool background = sound::SoundOptions::fromSave(soundOptionBits()).background;
+        const auto mood = [&](int m) {
+            notice.music = {{MusicCue::Kind::SetMood, m}};
+            if (!background) {
+                notice.music.push_back({MusicCue::Kind::ChangeMood, m});
+            }
+        };
+        if (outcome == kFountain) {
+            notice.music = {{MusicCue::Kind::Pick, kFountainTune}};
+        } else if (outcome == kCibola) {
+            notice.music = {{MusicCue::Kind::Pick, kCibolaTune}};
+        } else if (outcome == kMounds) {
+            notice.music = {{MusicCue::Kind::Pick, kMoundsTune}};
+        } else if (outcome == kVanish) {
+            mood(1);
+        } else if (gold > 0) {
+            mood(2);
+        }
         notices_.push_back(std::move(notice));
     }
     if (anger != 0 && shrineTribe >= 0) {
@@ -304,6 +333,9 @@ void Game::searchBurial(const Burial& b) {
     if (human) {
         GameNotice notice{"BURIAL" + std::to_string(found), {}};
         notice.numbers = {gold, treasure * 100};
+        if (found == 3 && tribe < 0) {
+            notice.music = {{MusicCue::Kind::Pick, kTreasureTune}}; // read from the original
+        }
         notices_.push_back(std::move(notice));
     }
     if (tribe >= 0) {
@@ -311,8 +343,9 @@ void Game::searchBurial(const Burial& b) {
         // Now you must die!"
         if (human) {
             const auto t = static_cast<std::size_t>(tribe);
-            notices_.push_back(
-                GameNotice{"SCREWED", {t < rules_.tribes.size() ? rules_.tribes[t].adjective : std::string{}}});
+            GameNotice notice{"SCREWED", {t < rules_.tribes.size() ? rules_.tribes[t].adjective : std::string{}}};
+            notice.music = {{MusicCue::Kind::Pick, kNativesTune}}; // read from the original
+            notices_.push_back(std::move(notice));
         }
         changeTension(tribe, b.nation, 100);
     }

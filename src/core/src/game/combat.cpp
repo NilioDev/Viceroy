@@ -552,6 +552,14 @@ void Game::loseShip(int loser, int winner) {
         // "Dutch Frigate sunk by English Privateer!"
         GameNotice notice{"SHIPSUNK", {"", lt.name, "", wt.name}};
         notice.adjectives = {{0, nation}, {2, winnerNation}};
+        // Read from the original: a sad tune for the loser, a military one
+        // for the winner.
+        if (nation == human()) {
+            notice.music.push_back({MusicCue::Kind::MoodEvent, 1});
+        }
+        if (winnerNation == human()) {
+            notice.music.push_back({MusicCue::Kind::MoodEvent, 4});
+        }
         if (winner >= 0 || nation == human()) {
             notices_.push_back(std::move(notice));
         }

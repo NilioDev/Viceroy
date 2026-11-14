@@ -842,6 +842,7 @@ void PlayScreen::showNotices() {
     }
     GameNotice notice = notices_.front();
     notices_.erase(notices_.begin());
+    playMusic(notice.music);
     for (const auto& [string, nation] : notice.adjectives) {
         if (string >= 0) {
             if (notice.strings.size() <= static_cast<std::size_t>(string)) {
@@ -2225,6 +2226,7 @@ bool PlayScreen::save() {
 
 void PlayScreen::tick(std::uint64_t milliseconds) {
     clock_ += milliseconds;
+    playMusic(game_.takeMusicCues());
     view_.blinkOn = (clock_ / kBlinkMs) % 2 == 0;
     if (slide_) {
         slide_->elapsed += milliseconds;
@@ -2702,6 +2704,28 @@ bool PlayScreen::handleCheckboxes(Command command) {
 
 void PlayScreen::setMusic(sound::BackgroundMusic* music) {
     music_ = music;
+}
+
+void PlayScreen::playMusic(const std::vector<MusicCue>& cues) {
+    if (music_ == nullptr) {
+        return;
+    }
+    for (const auto& cue : cues) {
+        switch (cue.kind) {
+        case MusicCue::Kind::SetMood:
+            music_->setMood(cue.value);
+            break;
+        case MusicCue::Kind::ChangeMood:
+            music_->changeMood(cue.value);
+            break;
+        case MusicCue::Kind::MoodEvent:
+            music_->moodEvent(cue.value);
+            break;
+        case MusicCue::Kind::Pick:
+            music_->pick(cue.value);
+            break;
+        }
+    }
 }
 
 void PlayScreen::showSoundOptions() {
