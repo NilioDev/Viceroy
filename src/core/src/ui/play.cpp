@@ -229,6 +229,8 @@ void PlayScreen::moveActive(Step step) {
         const int defender = game_.canAttack(index) ? game_.defenderAt(tx, ty, index) : -1;
         const auto colony = game_.colonyAt(tx, ty);
         const auto settlement = game_.settlementAt(tx, ty);
+        const bool foreignColony =
+            colony && game_.state().colonies[static_cast<std::size_t>(*colony)].nation < kEuropeanNations;
         if (settlement) {
             enterVillage(index, *settlement);
         } else if (colony && game_.unit(index).type == unit_type::kScout &&
@@ -244,6 +246,11 @@ void PlayScreen::moveActive(Step step) {
                    game_.rules().units[static_cast<std::size_t>(game_.unit(index).type)].cargoSlots > 0) {
             // Read from the original: wagon trains and ships trade there.
             foreignTrade(index, *colony);
+        } else if (foreignColony && game_.independenceDeclared() &&
+                   game_.state().colonies[static_cast<std::size_t>(*colony)].nation != game_.crownNation()) {
+            // "Foreign colonies cannot be attacked during the War of
+            // Independence."
+            tell({"NOWARSDURINGREV", {}});
         } else if (defender >= 0 && !settlement) {
             startAttack(index, defender);
         } else if (colony && !game_.isShip(index) && game_.canAttack(index) && game_.colonyUndefended(*colony)) {
@@ -255,6 +262,10 @@ void PlayScreen::moveActive(Step step) {
     }
     case MoveResult::HighSeas:
         say("");
+        if (game_.independenceDeclared()) {
+            tell({"EUROPENOTLEAVE", {}}); // no sailing to Europe during the war
+            break;
+        }
         ask("SAILHOME", index);
         if (dialog_) {
             placeNavalDialog(*dialog_);
@@ -1244,7 +1255,12 @@ void PlayScreen::showNotices() {
                                                  "VALOR",       "CAPTURED",       "LOOT",             "LOOT2",
                                                  "INDIANSLAVES", "INDIANWARFARE", "INDIANBURN", "TEAPARTY",
                                                  "KINGBUY",     "REBELUP",        "REBELUP50",        "REBELDOWN",
-                                                 "MERCENARIES", "MERCS", "NOMAYORSDURINGREV"};
+                                                 "MERCENARIES", "MERCS", "NOMAYORSDURINGREV",
+                                                 // The war of independence (placement not measured yet).
+                                                 "ALREADYREVOLUTION", "TOOTORY", "MULTIREV", "DECLARE",
+                                                 "INDEPENDENCE", "SEIZURE", "MOBILIZE", "MOBILIZE2", "INTERVENE",
+                                                 "INTERVENTION", "AMBUSHHINT", "CONSIDER", "NOWARSDURINGREV",
+                                                 "EUROPENOTAVAIL", "EUROPENOTLEAVE", "NOCOLONIESEITHER"};
         if (std::find(std::begin(kBattles), std::end(kBattles), notice.section) != std::end(kBattles)) {
             placeMapDialog(*dialog_);
         } else if (notice.section == "LOOTCASH" || notice.section == "CASHTREASURE") {
@@ -1635,6 +1651,21 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
         game_.answerMeeting(choice);
         auto news = game_.takeNotices();
         notices_.insert(notices_.begin(), std::make_move_iterator(news.begin()), std::make_move_iterator(news.end()));
+    } else if (question == "MULTIREV") {
+        // "Declare independence" or "Never Mind".
+        if (choice == 0) {
+            game_.playAlone();
+            notices_.insert(notices_.begin(), game_.independenceQuestion());
+        }
+    } else if (question == "DECLARE") {
+        // "Never! ..." or "Yes! Give me liberty or give me death!": the
+        // turn ends with the declaration.
+        if (choice == 1) {
+            game_.declareIndependence();
+            auto news = game_.takeNotices();
+            notices_.insert(notices_.begin(), std::make_move_iterator(news.begin()), std::make_move_iterator(news.end()));
+            game_.setActiveUnit(-1);
+        }
     } else if (question == "MERCENARIES") {
         // "No thank you." or "Pay": they land at once.
         game_.answerMercenaries(choice == 1);
@@ -2263,6 +2294,10 @@ bool PlayScreen::handle(Command command) {
         return handleColonyScreen(command);
     }
     if (command == Command::Europe) {
+        if (game_.independenceDeclared()) {
+            tell({"EUROPENOTAVAIL", {}});
+            return true;
+        }
         openEurope();
         return true;
     }
@@ -2377,6 +2412,11 @@ bool PlayScreen::handle(Command command) {
         }
         break;
     case Command::BuildColony:
+        if (active >= 0 && game_.independenceDeclared()) {
+            // Read from the original: the first thing it checks.
+            tell({"NOCOLONIESEITHER", {}});
+            break;
+        }
         if (active >= 0) {
             const std::string name =
                 colonyNames_ != nullptr ? game_.suggestColonyName(*colonyNames_) : "New Colony";
@@ -2672,6 +2712,7 @@ constexpr int kSoundOptions = 2;
 constexpr int kPickMusic = 3;
 constexpr int kSave = 4;
 constexpr int kLoad = 5;
+constexpr int kDeclare = 6;
 constexpr int kExit = 8;
 } // namespace game_menu
 namespace view_menu {
@@ -3042,6 +3083,9 @@ bool PlayScreen::pickMenuEntry(int entry) {
             return true;
         case game_menu::kLoad:
             return false;
+        case game_menu::kDeclare:
+            tell(game_.independenceQuestion());
+            return true;
         case game_menu::kExit:
             quit_ = true;
             return true;
@@ -3100,6 +3144,10 @@ bool PlayScreen::pickMenuEntry(int entry) {
             return handle(Command::GoTo);
         case kReturnToEurope: {
             const int active = game_.activeUnit();
+            if (game_.independenceDeclared()) {
+                tell({"EUROPENOTLEAVE", {}});
+                return true;
+            }
             if (active >= 0 && game_.sailToEurope(active)) {
                 say("Sailing to Europe.");
                 advance();

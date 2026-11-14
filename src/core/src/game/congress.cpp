@@ -104,7 +104,10 @@ bool Game::independenceDeclared() const {
 
 int Game::bellsForNextFather(int nation) const {
     // Read from the original. After the declaration of independence the
-    // bells serve another end (not done yet).
+    // bells call in a foreign power instead (docs/rules/independence.md).
+    if (independenceDeclared()) {
+        return save_.difficulty * 1500 + 2000;
+    }
     const bool human = nation >= 0 && nation < kEuropeanNations &&
                        save_.players[static_cast<std::size_t>(nation)].control == 0;
     int base = human ? (save_.difficulty + 3) * 2 : 14 - save_.difficulty;
@@ -220,7 +223,8 @@ void Game::addCongressBells(int nation, int bells) {
     setWord(raw, kBells, word(raw, kBells) + bells);
     setWord(raw, kBellsToo, word(raw, kBellsToo) + bells);
     if (independenceDeclared()) {
-        return; // the bells after the declaration: not done yet
+        independenceBells(nation, bells);
+        return;
     }
     if (electionNation_ == nation) {
         return; // the player has not chosen yet

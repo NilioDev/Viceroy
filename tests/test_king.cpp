@@ -255,6 +255,9 @@ VCR_TEST("king: mercenaries are offered now and then and land in a colony") {
     s.turn = 201; // not a turn of the King's
     s.nations[kHuman].gold = 100000;
     s.colonies[0].population = 3;
+    // The ship that brings them needs the open sea next to the colony.
+    s.map.squares[2 * 6 + 3].terrain = 25;
+    s.map.squares[2 * 6 + 3].region = 1;
     Game g(std::move(s), kingRules());
     GameNotice offer;
     for (int turn = 0; turn < 400 && offer.section.empty(); ++turn) {

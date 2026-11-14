@@ -30,6 +30,7 @@ constexpr std::size_t kKingWives = 55;    // the King's weddings so far
 constexpr std::size_t kKingWar = 56;      // the country the King last fought, 1-8
 constexpr std::size_t kHumanRebels = 96;  // the human's rebels in % (16 bits)
 constexpr std::size_t kGoneNation = 98;   // the nation gone after the War of the Spanish Succession, -1 (16 bits)
+constexpr std::size_t kMercenaryKing = 102; // the nation whose king last offered mercenaries (16 bits)
 constexpr std::size_t kRebelsTold = 104;  // the human's rebels in tens of % when last told (16 bits)
 constexpr std::size_t kRoyalForce = 106;  // regulars, dragoons, men-of-war, artillery (16 bits each)
 
@@ -356,7 +357,12 @@ void Game::rebelSentiment(int nation) {
         return;
     }
     if ((save_.header[kIndependence] & 0x01) != 0) {
-        return; // the war of independence counts otherwise (not done yet)
+        // During the war the rebels are counted no more: the two sides
+        // take their turns of the war instead.
+        if (nation == this->human() || nation == crownNation()) {
+            independenceTurn(nation);
+        }
+        return;
     }
     const bool human = nation == this->human();
     if (human) {
@@ -402,6 +408,7 @@ void Game::offerMercenaries() {
     }
     const int nation = human();
     const int country = aiRandom(0, kEuropeanNations - 1);
+    setWord(save_.header, kMercenaryKing, country);
     constexpr std::size_t kRelations = 52;
     constexpr std::uint8_t kPeace = 0x40;
     if (country != nation &&
@@ -411,24 +418,24 @@ void Game::offerMercenaries() {
     }
     MercenaryOffer offer;
     offer.country = country;
-    offer.dragoons = aiRandom(1, 3);
+    offer.counts[0] = aiRandom(1, 3);
     if (aiRandom(0, 1) != 0) {
-        ++offer.dragoons;
+        ++offer.counts[0];
     } else {
-        offer.artillery = aiRandom(0, 1) != 0 ? 1 : 2;
+        offer.counts[3] = aiRandom(0, 1) != 0 ? 1 : 2;
     }
     // A gun costs as much as two dragoons.
     const int each = (aiRandom(0, 6) + 2 * (save_.difficulty + 4)) * 100;
-    offer.price = (offer.dragoons + 2 * offer.artillery) * each;
+    offer.price = (offer.counts[0] + 2 * offer.counts[3]) * each;
     if (save_.nations[static_cast<std::size_t>(nation)].gold < offer.price) {
         return;
     }
     // "3 Dragoons, 2 Artillery": the artillery's number only when more than one.
-    std::string force = std::to_string(offer.dragoons) + " " + rules_.units[unit_type::kDragoon].name;
-    if (offer.artillery > 0) {
+    std::string force = std::to_string(offer.counts[0]) + " " + rules_.units[unit_type::kDragoon].name;
+    if (offer.counts[3] > 0) {
         force += ", ";
-        if (offer.artillery > 1) {
-            force += std::to_string(offer.artillery) + " ";
+        if (offer.counts[3] > 1) {
+            force += std::to_string(offer.counts[3]) + " ";
         }
         force += rules_.units[kArtillery].name;
     }
@@ -439,48 +446,13 @@ void Game::offerMercenaries() {
 }
 
 void Game::answerMercenaries(bool pay) {
-    const MercenaryOffer offer = std::exchange(mercenaries_, {});
-    if (!pay || offer.price <= 0) {
+    if (!pay || mercenaries_.price <= 0) {
+        mercenaries_ = {};
         return;
     }
-    const int nation = human();
-    save_.nations[static_cast<std::size_t>(nation)].gold -= offer.price;
-    // They come by ship to one of the first ten coastal colonies, picked
-    // by their people, and walk in (read from the original).
-    std::vector<int> colonies;
-    int people = 0;
-    for (int c = 0; c < static_cast<int>(save_.colonies.size()) && colonies.size() < 10; ++c) {
-        const auto& colony = save_.colonies[static_cast<std::size_t>(c)];
-        if (colony.nation == nation && (colony.raw[28] & kCoastal) != 0) {
-            colonies.push_back(c);
-            people += colony.population;
-        }
-    }
-    if (colonies.empty() || people <= 0) {
-        return; // the gold is gone all the same
-    }
-    int roll = aiRandom(1, people);
-    int picked = colonies.front();
-    for (const int c : colonies) {
-        roll -= save_.colonies[static_cast<std::size_t>(c)].population;
-        if (roll <= 0) {
-            picked = c;
-            break;
-        }
-    }
-    const auto& colony = save_.colonies[static_cast<std::size_t>(picked)];
-    constexpr int kVeteranSoldier = 0x15;
-    auto land = [&](int type, int count) {
-        for (int i = 0; i < count; ++i) {
-            addBuiltUnit(colony.x, colony.y, nation, type);
-            save_.units.back().profession = kVeteranSoldier;
-        }
-    };
-    land(royalUnitType(0, nation), offer.dragoons);
-    land(royalUnitType(3, nation), offer.artillery);
-    GameNotice notice{"MERCS", {colony.name, ""}};
-    notice.adjectives.emplace_back(1, offer.country);
-    notices_.push_back(std::move(notice));
+    save_.nations[static_cast<std::size_t>(human())].gold -= mercenaries_.price;
+    forceArrives(true); // see independence.cpp
+    mercenaries_ = {};
 }
 
 void Game::treasureArrives(int index) {

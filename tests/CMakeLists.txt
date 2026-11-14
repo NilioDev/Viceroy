@@ -21,6 +21,7 @@ add_executable(vcr_tests
     test_congress.cpp
     test_king.cpp
     test_diplomacy.cpp
+    test_independence.cpp
     test_rumours.cpp
     test_routes.cpp
     test_menu.cpp
