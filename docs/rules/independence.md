@@ -163,6 +163,20 @@ a chance of d + 1 in d + 2 to be a veteran (every odd one) and to be
 mounted as dragoons (every third). Then `TORYUPRISING`. If none fits, the
 colony may rise later.
 
+## The tribes
+
+At the start of each tribe's turn during the war, a tribe that has not
+yet done so may take the Crown's side (bit 20h of its flags, byte 3). It
+is minded to when its alarm towards the player is 25 or more and a roll
+of 1 to 400 comes at or below it, or when the player has burned one of
+its villages (bit 40h). Then one turn in (5 − difficulty) × 2 + 1 it
+does: `INDIANGRUDGE` ("... nation holds War Council!"), its alarm towards
+the player rises by 100 and towards the Crown falls by 100, it throws out
+the player's missions (`INDIANBURN`), and the Tories arm it: its muskets
+(byte 7) become 4 × the larger of its village count and its muskets, its
+breeding (byte 8) the larger of the village count and itself, and its
+horses (word 10) 25 × that.
+
 ## Not yet done
 
 - The signing screen.

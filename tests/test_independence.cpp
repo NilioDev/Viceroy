@@ -338,3 +338,42 @@ VCR_TEST("independence: with nothing left to send, the Tories rise once") {
         VCR_CHECK(!has(g.takeNotices(), "TORYUPRISING"));
     }
 }
+
+VCR_TEST("independence: a tribe the player burned takes the Tory side, once") {
+    SaveGame s = warSave();
+    constexpr std::size_t kSioux = 4;
+    for (std::size_t t = 0; t < static_cast<std::size_t>(kTribes); ++t) {
+        s.tribesAndMore[t * kTribeRecordSize + 3] = t == kSioux ? 0x40 : 0x80; // only the Sioux are left
+    }
+    for (int v = 0; v < 3; ++v) { // three villages
+        SaveSettlement village;
+        village.x = 0;
+        village.y = 2 * v;
+        village.nation = 4 + static_cast<int>(kSioux);
+        village.population = 2;
+        village.raw[5] = 0xFF; // no mission
+        s.settlements.push_back(village);
+    }
+    Ruleset rules = warRules();
+    rules.tribes.resize(8);
+    rules.tribes[kSioux].name = "Sioux";
+    rules.tribes[kSioux].adjective = "Sioux";
+    Game g(std::move(s), rules);
+    g.declareIndependence();
+    g.takeNotices();
+    setForce(g, 9, 0, 0, 0);
+    bool joined = false;
+    for (int turn = 0; turn < 60 && !joined; ++turn) {
+        g.endTurn();
+        joined = has(g.takeNotices(), "INDIANGRUDGE");
+    }
+    VCR_CHECK(joined);
+    const auto* t = &g.state().tribesAndMore[kSioux * kTribeRecordSize];
+    VCR_CHECK((t[3] & 0x20) != 0);
+    VCR_CHECK(t[7] == 12 && t[8] >= 3);
+    VCR_CHECK(tribeTension(g.state(), kSioux, kHuman) >= 100);
+    for (int turn = 0; turn < 20; ++turn) {
+        g.endTurn();
+        VCR_CHECK(!has(g.takeNotices(), "INDIANGRUDGE"));
+    }
+}

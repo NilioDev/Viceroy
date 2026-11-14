@@ -26,6 +26,8 @@ constexpr int kFewerMissions = 23; // row of @FATHERS: missions calm half as fas
 // In each tribe's record.
 constexpr std::size_t kTribeFlags = 3;
 constexpr std::uint8_t kTribeGone = 0x80;
+constexpr std::uint8_t kToriesArmed = 0x20;   // it took the Crown's side in the war
+constexpr std::uint8_t kBurnedByHuman = 0x40; // the player burned one of its villages
 constexpr std::size_t kMuskets = 7;
 constexpr std::size_t kBreeding = 8;
 constexpr std::size_t kHorses = 10;    // 16 bits
@@ -102,13 +104,51 @@ void Game::nativesTurn() {
     }
 }
 
+void Game::torySide(int tribe) {
+    // Read from the original: during the war of independence a tribe the
+    // player has alarmed (25 or more, by a roll of 1 to 400 at or below its
+    // alarm) or whose village the player burned may take the Crown's side,
+    // one turn in (5 - difficulty) x 2 + 1, once. It turns against the
+    // player, makes peace with the Crown, throws out the player's missions
+    // and gets muskets and horses from the Tories.
+    auto* t = tribeBytes(save_, tribe);
+    const int alarm = tribeTension(save_, tribe, human());
+    const bool grudge = (alarm >= 25 && 1 + nextRandom(400) <= alarm) || (t[kTribeFlags] & kBurnedByHuman) != 0;
+    if (!grudge || nextRandom((5 - save_.difficulty) * 2 + 1) != 0) {
+        return;
+    }
+    const auto& tribes = rules_.tribes;
+    const auto ti = static_cast<std::size_t>(tribe);
+    // "Sioux nation holds War Council! Sioux enter the War of Independence
+    // on the Tory side!"
+    GameNotice notice{"INDIANGRUDGE",
+                      {ti < tribes.size() ? tribes[ti].adjective : "", ti < tribes.size() ? tribes[ti].name : ""}};
+    notice.value = tribe;
+    notices_.push_back(std::move(notice));
+    changeTension(tribe, human(), 100);
+    changeTension(tribe, crownNation(), -100);
+    burnMissions(tribe, human());
+    const int villages = kSettlementCounts + ti < save_.tribesAndMore.size()
+                             ? static_cast<std::int8_t>(save_.tribesAndMore[kSettlementCounts + ti])
+                             : 0;
+    // Four muskets a village (the byte wraps as the original's does), and
+    // horses for 25 times the breeding.
+    const int muskets = std::max<int>(villages, static_cast<std::int8_t>(t[kMuskets]));
+    t[kMuskets] = static_cast<std::uint8_t>(muskets << 2);
+    const int breeding = std::max<int>(villages, static_cast<std::int8_t>(t[kBreeding]));
+    t[kBreeding] = static_cast<std::uint8_t>(breeding);
+    setWord(t + kHorses, breeding * 25);
+    t[kTribeFlags] |= kToriesArmed;
+}
+
 void Game::tribeTurn(int tribe) {
     auto* t = tribeBytes(save_, tribe);
     if (t == nullptr) {
         return;
     }
-    // Not done: during the war of independence a tribe may take the
-    // Crown's side (@INDIANGRUDGE).
+    if ((save_.header[18] & 0x01) != 0 && (t[kTribeFlags] & kToriesArmed) == 0) {
+        torySide(tribe);
+    }
     if (static_cast<std::int8_t>(t[kMuskets]) < 0) {
         t[kMuskets] = 0;
     }
