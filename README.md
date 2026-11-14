@@ -78,7 +78,10 @@ touch controls.
 > your build lists, and with Paul Revere your colonists take up muskets to
 > defend a colony. The Continental Congress report (F3) shows the next
 > session, the bells toward it, the rebels and tories, the King's forces
-> and the fathers in congress. The King raises your taxes as he does in the
+> and the fathers in congress. The advisers report as in the original: the
+> Religious Adviser (F2) your crosses, the Naval Adviser (F7) your ships, their
+> cargo and where they sail, and Foreign Affairs (F8) war and peace among the
+> nations, their rebels, and with Jan de Witt their strength. The King raises your taxes as he does in the
 > original; you may refuse a rise with a party that boycotts the good in
 > Europe until you pay the back taxes. He builds up his army, tells you
 > when your colonists' rebel sentiment rises or falls, offers to carry your
@@ -253,6 +256,7 @@ saved in the first free slot, or over the savegame saved longest ago.
 | Answer a question | Up / Down and Enter | D-pad and A |
 | Open the menu bar (Game, View, Orders, Reports, Trade, Colonizopedia) | Click a title, F10, or Alt and the title's gold letter; then the arrow keys and Enter, or a gold letter | Start, then the D-pad and A |
 | The Continental Congress report | F3, or Reports, Continental Congress; any key or click closes it | Start, then Reports |
+| The Religious, Naval and Foreign Affairs reports | F2, F7 and F8, or the Reports menu; a key or click turns the page or closes it | Start, then Reports |
 | Save the game | Ctrl+S, or Game, Save Game | Start, then Save Game |
 | Back to the load menu | Esc | Guide |
 

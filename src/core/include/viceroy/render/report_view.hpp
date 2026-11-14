@@ -29,4 +29,18 @@ void drawIconGroups(Screen& screen, const Art& art, const std::vector<IconGroup>
 // F3: the Continental Congress report for the nation.
 void drawCongressReport(Screen& screen, const Art& art, const Game& game, int nation);
 
+// F2: the Religious Adviser report.
+void drawReligionReport(Screen& screen, const Art& art, const Game& game, int nation);
+
+// F7: the Naval Adviser report, seven units to a page.
+int navalReportPages(const Game& game, int nation);
+void drawNavalReport(Screen& screen, const Art& art, const Game& game, int nation, int page);
+
+// F8: the Foreign Affairs report (with Jan de Witt, each nation's figures).
+void drawForeignReport(Screen& screen, const Art& art, const Game& game, int nation);
+
+// The report of the REPORTS menu with this function key (2 to 9), at the
+// page given for those with more than one.
+void drawReport(Screen& screen, const Art& art, const Game& game, int nation, int report, int page);
+
 } // namespace viceroy

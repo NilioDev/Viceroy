@@ -684,6 +684,10 @@ void drawUnitInColonyList(Screen& screen, const Art& art, const Game& game, int 
                   orders, true);
 }
 
+void drawUnitAt(Screen& screen, const Art& art, const Game& game, int index, int px, int py) {
+    drawUnitOnSquare(screen, art, game, index, px, py);
+}
+
 std::string textLine(const TextFile& file, const char* section, int row, const char* fallback) {
     if (const auto* s = file.find(section)) {
         if (row >= 0 && static_cast<std::size_t>(row) < s->lines.size()) {
@@ -855,6 +859,9 @@ Art loadArt(const std::filesystem::path& folder) {
     placeMenus(art, art.menus);
     art.congressHall = readPicture(readFile(folder, "CCBKGD.PIK"));
     art.congressReport = readPicture(readFile(folder, "REPORT3.PIK"));
+    for (int n = 1; n <= 9; ++n) {
+        art.reports.push_back(readPicture(readFile(folder, "REPORT" + std::to_string(n) + ".PIK")));
+    }
     art.declaration = readPicture(readFile(folder, "DECOIND.PIK"));
     for (char c = 'A'; c <= 'Z'; ++c) {
         art.penCapitals.push_back(readSpriteSheet(readFile(folder, std::string("DEC-UPP") + c + ".SS")));

@@ -30,6 +30,7 @@ add_executable(vcr_tests
     test_routes.cpp
     test_ships.cpp
     test_trade_routes.cpp
+    test_reports.cpp
     test_harbour.cpp
     test_menu.cpp
     test_title.cpp

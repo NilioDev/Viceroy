@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "viceroy/render/report_view.hpp"
 
+#include "viceroy/game/europe.hpp"
 #include "viceroy/game/game.hpp"
 
 #include <algorithm>
@@ -15,6 +16,8 @@ constexpr std::uint8_t kTitleColour = 0x90;
 constexpr std::uint8_t kHeadingColour = 0x92;
 constexpr std::uint8_t kNameColour = 0x61;
 constexpr std::uint8_t kButtonFrame = 0x77;
+constexpr int kOcean = 25;
+constexpr int kSeaLane = 26;
 
 const IndexedImage* icon(const Art& art, int index) {
     if (index < 0 || static_cast<std::size_t>(index) >= art.icons.sprites.size()) {
@@ -65,6 +68,27 @@ void drawNumber(Screen& screen, const Art& art, int n, int x, int y) {
 
 std::string label(const Art& art, int row, const char* fallback) {
     return textLine(art.labelText, "MISC", row, fallback);
+}
+
+// The report's picture with its title centred at the top.
+void drawReportGround(Screen& screen, const Art& art, int picture, const std::string& title) {
+    const auto& ground = art.reports.size() >= static_cast<std::size_t>(picture)
+                             ? art.reports[static_cast<std::size_t>(picture - 1)]
+                             : art.congressReport;
+    if (ground.palette) {
+        // Measured: the picture's colours replace all but the first 16.
+        screen.setColours(*ground.palette, 16, 255);
+    }
+    screen.blit(ground.image, 0, 0);
+    sayCentred(screen, art, 0, Screen::kWidth, 5, title, kTitleColour);
+}
+
+// The OK box in the corner.
+void drawOk(Screen& screen, const Art& art) {
+    constexpr int kOkX = 286;
+    constexpr int kOkY = 184;
+    screen.frame({kOkX, kOkY, 30, 14}, kButtonFrame);
+    sayCentred(screen, art, kOkX, 30, kOkY + 7 - art.tiny.height / 2, label(art, 46, "OK"), kHeadingColour);
 }
 
 } // namespace
@@ -236,12 +260,12 @@ void drawCongressReport(Screen& screen, const Art& art, const Game& game, int na
         line = textLine(art.names, "NATIONALITY", nation, "") + " " + label(art, 85, "Expeditionary Force") + ": ";
         say(screen, art, kLeft, y, line, kHeadingColour);
         y += lineHeight;
-        constexpr int kRegular = 6, kDragoon = 8, kArtillery = 11, kManOWar = 18;
+        constexpr int kRegular = 6, kDragoon = 8;
         drawIconGroups(screen, art,
                        {{unitIcon(kRegular), regulars},
                         {unitIcon(kDragoon), dragoons},
                         {unitIcon(kArtillery), artillery},
-                        {unitIcon(kManOWar), menOfWar}},
+                        {unitIcon(unit_type::kManOWar), menOfWar}},
                        kLeft, y, kWidth, 4, true);
         y += iconHeight(art, kRebelIcon) + 14;
     }
@@ -264,11 +288,283 @@ void drawCongressReport(Screen& screen, const Art& art, const Game& game, int na
         }
     }
 
-    // The OK box in the corner.
-    constexpr int kOkX = 286;
-    constexpr int kOkY = 184;
-    screen.frame({kOkX, kOkY, 30, 14}, kButtonFrame);
-    sayCentred(screen, art, kOkX, 30, kOkY + 7 - art.tiny.height / 2, label(art, 46, "OK"), kHeadingColour);
+    drawOk(screen, art);
+}
+
+void drawReligionReport(Screen& screen, const Art& art, const Game& game, int nation) {
+    drawReportGround(screen, art, 2, label(art, 30, "RELIGIOUS ADVISER REPORT"));
+    // Read from the original: the crosses toward the next immigrant, one
+    // icon each, in a bar 300 pixels wide.
+    const auto& n = game.state().nations[static_cast<std::size_t>(nation)];
+    constexpr int kCross = 0x38;
+    drawIconBar(screen, art, kCross, n.crossesNeeded, std::min(n.crosses, n.crossesNeeded), 10, 25, 300);
+    drawOk(screen, art);
+}
+
+namespace {
+
+// Read from the original: where a unit is, as the reports name it.
+// `heading` names a sea lane as the home port (a ship bound for Europe).
+std::string placeName(const Art& art, const Game& game, int x, int y, int nation, bool heading) {
+    const auto& map = game.state().map;
+    if (x < 0 || y < 0 || x >= map.width || y >= map.height) {
+        if (nation >= 0 && nation < kEuropeanNations && x - kEuropeBase - nation == 4 * kPortStage) {
+            return textLine(art.names, "HOMEPORT", nation, "");
+        }
+        return label(art, 60, "High Seas");
+    }
+    if (heading && map.at(x, y).terrain == kSeaLane && nation >= 0 && nation < kEuropeanNations) {
+        return textLine(art.names, "HOMEPORT", nation, "");
+    }
+    if (const auto colony = game.colonyAt(x, y)) {
+        return game.state().colonies[static_cast<std::size_t>(*colony)].name;
+    }
+    return "(" + std::to_string(x) + ", " + std::to_string(y) + ")";
+}
+
+constexpr int kNavalRows = 7;
+
+// The units the Naval Adviser lists: the nation's ships, and its land
+// units at sea (aboard).
+std::vector<int> navalUnits(const Game& game, int nation) {
+    std::vector<int> out;
+    const auto& map = game.state().map;
+    for (int i = 0; i < game.unitCount(); ++i) {
+        const auto& u = game.unit(i);
+        if (u.nation != nation) {
+            continue;
+        }
+        const bool ship = u.type >= unit_type::kCaravel && u.type <= unit_type::kManOWar;
+        if (!ship) {
+            // The original looks at the terrain under the unit; units off
+            // the map (in Europe) are left out here.
+            if (u.x < 0 || u.y < 0 || u.x >= map.width || u.y >= map.height) {
+                continue;
+            }
+            const int t = map.at(u.x, u.y).terrain;
+            if (t != kOcean && t != kSeaLane) {
+                continue;
+            }
+        }
+        out.push_back(i);
+    }
+    return out;
+}
+
+} // namespace
+
+int navalReportPages(const Game& game, int nation) {
+    const int n = static_cast<int>(navalUnits(game, nation).size());
+    return std::max(1, (n + kNavalRows - 1) / kNavalRows);
+}
+
+void drawNavalReport(Screen& screen, const Art& art, const Game& game, int nation, int page) {
+    drawReportGround(screen, art, 7, label(art, 52, "NAVAL ADVISER REPORT"));
+    // Read from the original: four columns 80 pixels wide from x 2 (the
+    // last 76), heads at y 27, and a table of seven rows of 20 pixels.
+    constexpr int kLeft = 2;
+    constexpr int kColumn = 80;
+    constexpr int kTop = 42;
+    constexpr std::uint8_t kLine = 0x77;
+    constexpr std::uint8_t kInk = 0x61;
+    sayCentred(screen, art, kLeft, kColumn, 27, label(art, 61, "Ship"), kHeadingColour);
+    sayCentred(screen, art, kLeft + kColumn, kColumn, 27, label(art, 62, "Cargo"), kHeadingColour);
+    sayCentred(screen, art, kLeft + 2 * kColumn, kColumn, 27, label(art, 63, "Location"), kHeadingColour);
+    sayCentred(screen, art, kLeft + 3 * kColumn, 76, 27, label(art, 64, "Destination"), kHeadingColour);
+    for (int i = 1; i <= 3; ++i) {
+        screen.fill({kLeft + kColumn * i, 25, 1, 156}, kLine);
+    }
+    for (int i = 0; i < 8; ++i) {
+        screen.fill({kLeft, 20 * (i + 2), 313, 1}, kLine);
+    }
+    const auto units = navalUnits(game, nation);
+    const auto& rules = game.rules();
+    for (int row = 0; row < kNavalRows; ++row) {
+        const std::size_t at = static_cast<std::size_t>(page * kNavalRows + row);
+        if (at >= units.size()) {
+            break;
+        }
+        const int index = units[at];
+        const auto& u = game.unit(index);
+        const int y = kTop + 20 * row;
+        const bool ship = u.type >= unit_type::kCaravel && u.type <= unit_type::kManOWar;
+        // A land unit aboard stands in the cargo column.
+        const int x = ship ? kLeft : kLeft + 86;
+        drawUnitAt(screen, art, game, index, x, y);
+        for (int k = 0; k < u.holds; ++k) {
+            const int good = holdGood(u, k);
+            const int icon = (holdAmount(u, k) < 100 ? 0x26 : 0x16) + good;
+            drawIcon(screen, art, icon, kLeft + 86 + 12 * k, y + 3);
+        }
+        const std::string name = static_cast<std::size_t>(u.type) < rules.units.size()
+                                     ? rules.units[static_cast<std::size_t>(u.type)].name
+                                     : "";
+        say(screen, art, x + 24, y + 6, name, kInk);
+        sayCentred(screen, art, kLeft + 2 * kColumn, kColumn, y + 6, placeName(art, game, u.x, u.y, u.nation, false),
+                   kInk);
+        std::string where;
+        if (u.orders == 2 || u.orders == 3 || u.orders == 11) {
+            where = placeName(art, game, u.raw[9], u.raw[10], nation, true);
+        } else if (u.x < 0 || u.y < 0 || u.x >= game.state().map.width || u.y >= game.state().map.height) {
+            const int stage = (u.x - kEuropeBase - (u.nation & 3)) / 4;
+            if (stage == 0 || stage == 1) {
+                const auto& players = game.state().players;
+                if (static_cast<std::size_t>(nation) < players.size()) {
+                    where = players[static_cast<std::size_t>(nation)].country;
+                }
+            } else if (stage == 3 || stage == 4) {
+                where = textLine(art.names, "HOMEPORT", nation, "");
+            }
+        } else {
+            continue;
+        }
+        sayCentred(screen, art, kLeft + 3 * kColumn, 76, y + 6, where, kInk);
+    }
+    drawOk(screen, art);
+}
+
+namespace {
+
+// The figures Jan de Witt's reports give for a nation, as the original's
+// census counts them each turn (read from the original).
+struct NationFigures {
+    int colonies = 0;
+    int averageColony = 0;
+    int population = 0;
+    int military = 0; // in eighths, as the original keeps it
+    int naval = 0;
+    int merchant = 0;
+};
+
+NationFigures nationFigures(const Game& game, int nation) {
+    // The census block after the tribe records (see euro_ai.cpp).
+    constexpr std::size_t kExtra = 8 * 78;
+    constexpr std::size_t kColonyCount = kExtra + 16;
+    constexpr std::size_t kPeople = kExtra + 28;
+    constexpr std::size_t kHoldsAll = kExtra + 36;
+    constexpr std::size_t kAttack = kExtra + 44;
+    constexpr std::size_t kByType = kExtra + 64;
+    constexpr std::size_t kAveragePeople = kExtra + 556;
+    constexpr std::size_t kBlockEnd = kExtra + 727;
+    NationFigures f;
+    const auto& block = game.state().tribesAndMore;
+    if (nation < 0 || nation >= kEuropeanNations || block.size() < kBlockEnd) {
+        return f;
+    }
+    const auto n = static_cast<std::size_t>(nation);
+    const auto word = [&](std::size_t at) { return static_cast<int>(block[at] | (block[at + 1] << 8)); };
+    f.colonies = block[kColonyCount + n];
+    f.averageColony = static_cast<std::int16_t>(word(kAveragePeople + 2 * n));
+    f.population = block[kPeople + n];
+    f.military = static_cast<std::int16_t>(word(kAttack + 2 * n));
+    // Privateers and frigates, 8 each.
+    constexpr std::size_t kTypes = 19;
+    f.naval = (block[kByType + kTypes * n + 16] + block[kByType + kTypes * n + 17]) * 8;
+    f.merchant = block[kHoldsAll + n];
+    return f;
+}
+
+} // namespace
+
+void drawForeignReport(Screen& screen, const Art& art, const Game& game, int nation) {
+    drawReportGround(screen, art, 8, "");
+    sayCentred(screen, art, 0, Screen::kWidth, 2, label(art, 93, "FOREIGN AFFAIRS REPORT"), kTitleColour);
+    // Read from the original: a block 45 pixels high for each nation,
+    // ruled off at its top.
+    constexpr std::uint8_t kLine = 0x77;
+    constexpr std::uint8_t kInk = 0x91;
+    constexpr std::uint8_t kPeace = 0x0F;
+    constexpr std::uint8_t kWar = 0x0C;
+    constexpr int kLeft = 2;
+    constexpr int kTop = 13;
+    constexpr int kBlock = 45;
+    for (int n = 0; n < kEuropeanNations; ++n) {
+        screen.fill({0, kTop + kBlock * n - 3, Screen::kWidth, 1}, kLine);
+    }
+    const auto& save = game.state();
+    const int step = art.tiny.height + 1;
+    const int withdrawn = static_cast<std::int16_t>(save.header[98] | (save.header[99] << 8));
+    constexpr int kDeWitt = 4;
+    const bool figures = game.hasFather(nation, kDeWitt);
+    const auto text = [&](int x, int y, const std::string& s, std::uint8_t colour) {
+        say(screen, art, x, y, s, colour);
+        return x + Screen::textWidth(art.tiny, s);
+    };
+    for (int n = 0; n < kEuropeanNations; ++n) {
+        int y = kTop + kBlock * n;
+        const auto& nr = save.nations[static_cast<std::size_t>(n)].raw;
+        const std::string leader =
+            static_cast<std::size_t>(n) < save.players.size() ? save.players[static_cast<std::size_t>(n)].name : "";
+        int x = text(kLeft, y, leader + label(art, 94, "'s") + " ", kHeadingColour);
+        std::string people = textLine(art.names, "NATIONALITY", n, "") + ": ";
+        const bool free = (nr[0] & 0x04) != 0;
+        if (free) {
+            people = label(art, 191, "Free") + " " + people;
+        }
+        text(x, y, people, kNameColour);
+        y += step;
+        if (n == withdrawn) {
+            y += step;
+            sayCentred(screen, art, 0, Screen::kWidth, y, label(art, 190, "(Withdrawn from New World)"), kInk);
+            continue;
+        }
+        if (figures) {
+            const auto f = nationFigures(game, n);
+            const auto figure = [&](int fx, int row, int value) {
+                text(fx, y, label(art, row, "") + ": " + std::to_string(value), kInk);
+            };
+            figure(kLeft, 95, f.colonies);
+            figure(80, 97, f.averageColony);
+            figure(160, 96, f.population);
+            y += step;
+            figure(kLeft, 98, f.military >> 3);
+            figure(80, 99, f.naval);
+            figure(160, 100, f.merchant);
+        }
+        y += step;
+        // The nations it has met, with war or peace.
+        bool any = false;
+        int column = kLeft;
+        for (int m = 0; m < kEuropeanNations; ++m) {
+            if (m == n || (game.relation(n, m) & 0x20) == 0 || m == withdrawn) {
+                continue;
+            }
+            any = true;
+            const int end = text(column, y, textLine(art.names, "COUNTRY", m, "") + ": ", kInk);
+            const bool peace = (game.relation(n, m) & 0x40) != 0;
+            text(end, y, peace ? label(art, 102, "Peace") : label(art, 101, "War"), peace ? kPeace : kWar);
+            column = column < 80 ? 80 : column + 80;
+        }
+        if (any) {
+            y += step;
+        }
+        if (!free) {
+            const int population = nationFigures(game, n).population;
+            const int rebels = population * nr[0x19] / 100;
+            text(kLeft, y, label(art, 86, "Rebels") + ": " + std::to_string(rebels), kInk);
+            text(80, y, label(art, 87, "Tories") + ": " + std::to_string(population - rebels), kInk);
+        }
+    }
+    drawOk(screen, art);
+}
+
+void drawReport(Screen& screen, const Art& art, const Game& game, int nation, int report, int page) {
+    switch (report) {
+    case 2:
+        drawReligionReport(screen, art, game, nation);
+        break;
+    case 3:
+        drawCongressReport(screen, art, game, nation);
+        break;
+    case 7:
+        drawNavalReport(screen, art, game, nation, page);
+        break;
+    case 8:
+        drawForeignReport(screen, art, game, nation);
+        break;
+    default:
+        break;
+    }
 }
 
 } // namespace viceroy
