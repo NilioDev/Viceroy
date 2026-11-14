@@ -122,6 +122,53 @@ numbers count fish and corn together. Then the crosses and the bells.
 "No Ships In Port" in colour 0x39 centred on x 163 at y 132, above six empty
 holds (122) at (127 + 12k, 165).
 
+Read from the original, with ships there:
+
+- The harbour lists everything on the colony's square with cargo holds
+  (ships and wagon trains), the last to arrive first; the Units Present
+  panel leaves those out. The chosen one (the first when the screen opens)
+  is named in the title, "Loading: Frigate" (@MISC 23, ": " and the type).
+- The first four stand 18 pixels apart from x 130: a wagon train at y 147,
+  a ship a row higher, every ship after the first another row higher. The
+  chosen one has a frame from one pixel up and left, 18 square, bright
+  green (0x0A), white while the pointer is in the harbour (until it is
+  over the warehouse). Up to sixteen more stand on the horizon, shrunk to a
+  quarter (a running total from 50 grows by 25 per pixel; a pixel is kept
+  each time it passes 100), 5 pixels apart, centred on x 125 + 5k, feet on
+  row 142.
+- The chosen one's holds: a good shows centred in its hold, in colour when
+  the hold is full (`ICONS.SS` 22 + good) and grey below 100 (38 + good);
+  the holds it lacks are crates (122).
+
+Goods are dragged, measured and read from the original:
+
+- Pressing on a good of the warehouse frames it; while it is dragged the top
+  line reads "Loading Muskets" (@CMESSAGE 15) in gold (0x95). Let go in the
+  harbour (on a ship, which is then chosen, or anywhere else for the chosen
+  one), it loads up to 100: no more than the warehouse has, nor than the
+  room (100 for each free hold; with none free, what the holds of that good
+  still take). Holds of the good are topped up first; the rest takes a new
+  hold. A carrier not on a trade route (orders 2) loses its orders. The top
+  line then reads "100 Muskets moved to Frigate" (@CMESSAGE 2) for about two
+  seconds. With nothing in the warehouse: "Not enough Muskets to fill cargo
+  hold!"; without room: "No room for Muskets!".
+- Pressing on a hold and letting go on the warehouse ("Unloading Muskets",
+  @CMESSAGE 16) unloads the first hold of that good: "100 Muskets moved to
+  Curacao". Past what the warehouse keeps (food aside) WAREHOUSEFULL asks
+  first, and only "Unload anyway" unloads.
+- With Shift held when letting go, HOWMUCH1 (loading) or HOWMUCH2
+  (unloading) asks how much, up to what would have moved; when unloading,
+  the rest stays aboard.
+- Pressing the chosen ship again and letting go on it opens its options
+  (COLONYUNIT's title with @SHIPOPTIONS): "Move to front." (not for the
+  first), "Clear orders." (not without orders), "Sentry." (not when
+  sentried), "Anchor in harbor" (not when fortified, nor for a wagon train;
+  orders 5), "Unload all cargo." (not when empty; each hold as if dragged
+  ashore), "No changes.". Pressing another ship only chooses it.
+- While the pointer is on a good of the warehouse, a label such as "Lumber
+  (158 Tons)" (@MISC 58) in white on black is centred on its box at row 193,
+  as wide as the text and one pixel more.
+
 The production view (x 213, width 89) has three rows, read from the
 original:
 

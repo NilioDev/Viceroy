@@ -82,7 +82,10 @@ VCR_TEST("original files: a colony's production and screen") {
     const int which = std::getenv("VICEROY_COLONY") ? std::atoi(std::getenv("VICEROY_COLONY")) : 1;
     // VICEROY_JOBS=line opens the jobs menu on that line, for comparing.
     const int jobsLine = std::getenv("VICEROY_JOBS") ? std::atoi(std::getenv("VICEROY_JOBS")) : -1;
-    drawColonyScreen(screen, art, colonyArt, game, {which, 0, jobsLine});
+    ColonyViewState view;
+    view.colony = which;
+    view.jobsMenu = jobsLine;
+    drawColonyScreen(screen, art, colonyArt, game, view);
     VCR_CHECK(jobsLine >= 0 || screen.at(199, 50) == 0);
     if (const char* dump = std::getenv("VICEROY_DUMP_COLONY")) {
         dumpScreen(screen, art, dump);

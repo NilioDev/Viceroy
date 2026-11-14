@@ -98,6 +98,10 @@ public:
     // A click on the colony screen: the panel buttons, CHANGE, and the list
     // of things to build. Returns true when it was used.
     bool clickColonyScreen(int x, int y);
+    // The button let go on the colony screen: goods dragged from the
+    // warehouse to the harbour are loaded, from a hold to the warehouse
+    // unloaded (with Shift held, it asks how much). Returns true when used.
+    bool releaseColonyScreen(int x, int y, bool shift);
     // The pointer moved to this point (screen pixels): on the colony screen,
     // a place in the town gets its name label.
     void pointAt(int x, int y);
@@ -259,7 +263,32 @@ private:
     int goToPage_ = 0;
     // The rows of @UNITOPTIONS a unit's options box offers, top to bottom.
     enum UnitOption { kUnitFront, kUnitClear, kUnitSentry, kUnitFortify, kUnitNoChange };
+    enum ShipOption { kShipFront, kShipClear, kShipSentry, kShipAnchor, kShipUnloadAll, kShipNoChange };
     std::vector<int> unitOptions_;
+    // Goods being dragged on the colony screen, from the warehouse or from
+    // a hold of the chosen ship.
+    struct CargoDrag {
+        bool fromHold = false;
+        int good = -1;
+    };
+    std::optional<CargoDrag> cargoDrag_;
+    // A load or unload waiting on a question (how much, or a full warehouse).
+    struct CargoMove {
+        int carrier = -1;
+        int good = -1;
+        int amount = 0;
+    };
+    CargoMove cargoMove_;
+    std::vector<int> unloadAll_;    // goods still to unload for "Unload all cargo."
+    bool shipPressedAgain_ = false; // the chosen ship was pressed: let go on it, its options open
+    std::uint64_t colonyMessageMs_ = 0;
+    void setColonyMessage(std::string text);
+    void startLoad(int carrier, int good, bool ask);
+    void startUnload(int carrier, int good, bool ask);
+    void checkWarehouse(int carrier, int good, int amount);
+    void finishUnload(int carrier, int good, int amount);
+    void continueUnloadAll();
+    void openShipOptions(int carrier, bool first);
     void openUnitOptions(int unit, bool first);
     // A unit at a native settlement: what each option of the greeting does.
     enum VillageOption {
@@ -338,6 +367,8 @@ private:
     void showPurchase();
     void endTrade(const std::string& section, std::vector<std::string> strings, std::vector<int> numbers = {});
     std::string goodName(int good) const;
+    std::string unitTypeName(int unit) const;
+    std::string cargoLabel(int line) const; // a line of @CMESSAGE in LABELS.TXT
     std::vector<GameNotice> notices_; // messages still to show, first first
     const Art* art_ = nullptr;
     int lastColony_ = -1;
