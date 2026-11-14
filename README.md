@@ -113,7 +113,9 @@ touch controls.
 > before. In battle the Crown draws on a colony's Tories and the rebels
 > on its Sons of Liberty, veterans harden into the Continental Army, and
 > tribes you have angered may take the Tory side. Without a war the
-> Viceroy retires in 1800 (in 1850 during it), and the other nations'
+> Viceroy retires in 1800 (in 1850 during it), or when you choose Retire
+> in the Game menu: you are scored, the citizens name something after you
+> and you enter the Colonization Hall of Fame. The other nations'
 > kings may let their colonies go. Losing all your colonies after 1600
 > ends the game. The other nations elect their own
 > fathers as the original's do. A tribe you meet for the first time

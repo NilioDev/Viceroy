@@ -875,6 +875,11 @@ Art loadArt(const std::filesystem::path& folder) {
     }
     art.declaration = readPicture(readFile(folder, "DECOIND.PIK"));
     art.woodPanel = readPicture(readFile(folder, "WOODPANL.PIK"));
+    art.woodPanel2 = readPicture(readFile(folder, "WOODPAN2.PIK"));
+    for (int n = 1; n <= 24; ++n) {
+        const std::string file = std::string("SCORE") + (n < 10 ? "0" : "") + std::to_string(n) + ".SS";
+        art.scorePictures.push_back(readSpriteSheet(readFile(folder, file)));
+    }
     for (char c = 'A'; c <= 'Z'; ++c) {
         art.penCapitals.push_back(readSpriteSheet(readFile(folder, std::string("DEC-UPP") + c + ".SS")));
         art.penLetters.push_back(readSpriteSheet(readFile(folder, std::string("DEC-LOW") + c + ".SS")));

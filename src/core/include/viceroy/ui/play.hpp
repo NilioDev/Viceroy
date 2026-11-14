@@ -6,6 +6,7 @@
 #pragma once
 
 #include "viceroy/game/game.hpp"
+#include "viceroy/game/hall_of_fame.hpp"
 #include "viceroy/render/colony_view.hpp"
 #include "viceroy/render/dialog.hpp"
 #include "viceroy/render/europe_view.hpp"
@@ -132,7 +133,7 @@ public:
     bool clickRouteScreen(int x, int y);
     // The hall of the Continental Congress with a new father in it.
     bool congressHallUp() const { return congressHall_ >= 0; }
-    bool reportUp() const { return report_ != 0; }
+    bool reportUp() const { return report_ != 0 || ending_ != 0; }
     // The report up (its function key, 2 to 9), or 0.
     int report() const { return report_; }
     int reportPage() const { return reportPage_; }
@@ -182,6 +183,7 @@ public:
     void eraseTyped();
     // Exit to DOS was picked.
     bool quitRequested() const { return quit_; }
+    int ending() const { return ending_; }
     // Load Game was picked with the mouse: back to the load menu.
     bool loadRequested() const { return quitToLoad_; }
 
@@ -376,6 +378,18 @@ private:
     int report_ = 0;        // the report up, by its function key; shown until a key or a click
     int reportPage_ = 0;    // its page, for those with more than one
     void openReport(int report);
+    // Retirement, read from the original: the score, what the citizens
+    // name after the player, then the Hall of Fame; the program ends
+    // after it. 0 none, else the screen up (10 score, 11, 12).
+    int ending_ = 0;
+    bool retiring_ = false; // the leader's retirement was told: score the leader next
+    Exploits exploits_;
+    std::vector<HallEntry> hall_;
+    int hallPlace_ = -1;
+    bool endingQuits_ = false; // Retire in the menu ends the program after it
+    void retire();
+    void startEnding(bool thenQuit);
+    void advanceEnding();
     struct Signing {
         std::vector<PenStroke> strokes;
         std::size_t stroke = 0; // the letter being written

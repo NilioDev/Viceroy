@@ -282,3 +282,78 @@ VCR_TEST("original files: the Colonization Score's parts") {
     save->header[18] = 0x10;
     VCR_CHECK(colonizationScore(Game(*save, art.rules), human) == 0);
 }
+
+VCR_TEST("a retirement's rating and step of the @SCORE list") {
+    // Read from the original: 56 points at difficulty 2 weigh 6 × 56 / 100
+    // = 3, the second step (2 × 2 / 3 = 1 < 3, 3 × 3 / 3 = 3 is not), and
+    // a rating of half the weight.
+    const auto e = exploitsFor(56, 2);
+    VCR_CHECK(e.rating == 1 && e.level == 1);
+    VCR_CHECK(exploitsFor(0, 4).level == -1);
+    VCR_CHECK(exploitsFor(100000, 4).level == 23);
+    // Viceroy weighs 10 in a hundred, Discoverer 4.
+    VCR_CHECK(exploitsFor(1000, 4).rating == 50 && exploitsFor(1000, 0).rating == 20);
+}
+
+VCR_TEST("the Hall of Fame keeps five places, best rating first") {
+    auto places = readHallOfFame({});
+    VCR_CHECK(places.size() == 6 && places[0].nation == -1 && places[0].rating == -1);
+    HallEntry a;
+    a.name = "Michiel de Jager";
+    a.nation = 3;
+    a.year = 1727;
+    a.difficulty = 2;
+    a.score = 56;
+    a.rating = 1;
+    a.level = 1;
+    VCR_CHECK(enterHallOfFame(places, a) == 0);
+    HallEntry b = a;
+    b.rating = 1; // a tie goes after
+    VCR_CHECK(enterHallOfFame(places, b) == 1);
+    HallEntry c = a;
+    c.rating = 30;
+    VCR_CHECK(enterHallOfFame(places, c) == 0);
+    const Bytes file = writeHallOfFame(places);
+    VCR_CHECK(file.size() == 210);
+    // The original's record: the name, then words from byte 24.
+    VCR_CHECK(file[42 + 24] == 3 && file[42 + 30] == 0xBF && file[42 + 31] == 0x06 && file[42 + 36] == 56);
+    const auto back = readHallOfFame(file);
+    VCR_CHECK(back[0].rating == 30 && back[1].name == "Michiel de Jager" && back[1].year == 1727 &&
+              back[3].nation == -1);
+}
+
+VCR_TEST("original files: Retire shows the score, the honour and the Hall of Fame, then ends") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    auto save = firstSave(dir);
+    VCR_CHECK(save.has_value());
+    save->header[18] &= static_cast<std::uint8_t>(~0x10);
+    PlayScreen play(Game(*save, art.rules), {});
+    play.setArt(&art);
+    play.openMenu(0, false);
+    for (int i = 0; i < 20 && play.menu()->selected != 7; ++i) {
+        play.handle(Command::MoveS);
+    }
+    play.handle(Command::Confirm);
+    VCR_CHECK(play.dialog().has_value());
+    for (int i = 0; i < 5 && play.dialog()->selected != 0; ++i) {
+        play.handle(Command::MoveN);
+    }
+    play.handle(Command::Confirm); // "Yes"
+    VCR_CHECK(play.ending() == 10 && play.report() == 10);
+    play.handle(Command::Confirm);
+    const int honour = play.ending();
+    VCR_CHECK(honour == 11 || honour == 12);
+    Screen screen;
+    play.draw(screen, art);
+    if (honour == 11) {
+        play.handle(Command::Confirm);
+    }
+    VCR_CHECK(play.ending() == 12);
+    VCR_CHECK(!play.quitRequested());
+    play.handle(Command::Confirm);
+    VCR_CHECK(play.quitRequested());
+}

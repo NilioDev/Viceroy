@@ -1195,9 +1195,21 @@ void PlayScreen::tell(GameNotice notice) {
 }
 
 void PlayScreen::showNotices() {
+    if (ending_ != 0) {
+        return; // the rest of the news waits for the end of the scoring
+    }
     if (!dialog_ && notices_.empty() && game_.gameOver()) {
         // The game is over: as the original, the program ends.
-        quit_ = true;
+        if (ending_ == 0) {
+            quit_ = true;
+        }
+        return;
+    }
+    if (!dialog_ && retiring_) {
+        // Read from the original: the leader who retires is scored right
+        // after the retirement is told, before the rest of the news (SCORED).
+        retiring_ = false;
+        startEnding(false);
         return;
     }
     if (!dialog_ && notices_.empty()) {
@@ -1215,6 +1227,9 @@ void PlayScreen::showNotices() {
     }
     GameNotice notice = notices_.front();
     notices_.erase(notices_.begin());
+    if (notice.section == "RETIRING" || notice.section == "RETIRING2") {
+        retiring_ = true;
+    }
     // What happened before the news first (the sounds of a fight).
     playMusic(game_.takeMusicCues());
     playMusic(notice.music);
@@ -2253,6 +2268,11 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
             auto news = game_.takeNotices();
             notices_.insert(notices_.begin(), std::make_move_iterator(news.begin()), std::make_move_iterator(news.end()));
             game_.setActiveUnit(-1);
+        }
+    } else if (question == "RETIRE") {
+        // "Yes" or "No".
+        if (choice == 0) {
+            retire();
         }
     } else if (question == "SCORED") {
         // "That's all." or "Keep playing anyway."
@@ -3551,6 +3571,10 @@ bool PlayScreen::handle(Command command) {
         showNotices();
         return true;
     }
+    if (ending_ != 0) {
+        advanceEnding();
+        return true;
+    }
     if (report_ != 0) {
         // Any key turns the page, and closes the report after the last.
         const int pages = report_ == 7   ? navalReportPages(game_, game_.human())
@@ -3903,6 +3927,14 @@ void PlayScreen::draw(Screen& screen, const Art& art) const {
         drawCongressHall(screen, art, fathers);
         return;
     }
+    if (ending_ == 11) {
+        drawExploits(screen, art, game_, game_.human(), exploits_);
+        return;
+    }
+    if (ending_ == 12) {
+        drawHallOfFame(screen, art, hall_, hallPlace_);
+        return;
+    }
     if (report_ != 0) {
         drawReport(screen, art, game_, game_.human(), report_, reportPage_);
         return;
@@ -4062,6 +4094,7 @@ constexpr int kPickMusic = 3;
 constexpr int kSave = 4;
 constexpr int kLoad = 5;
 constexpr int kDeclare = 6;
+constexpr int kRetire = 7;
 constexpr int kExit = 8;
 } // namespace game_menu
 namespace view_menu {
@@ -4457,7 +4490,85 @@ void PlayScreen::openReport(int report) {
     reportPage_ = 0;
 }
 
+void PlayScreen::retire() {
+    // Read from the original: once scoring is complete the game just ends.
+    constexpr std::uint8_t kScored = 0x10;
+    if ((game_.state().header[18] & kScored) != 0) {
+        quit_ = true;
+        return;
+    }
+    startEnding(true);
+}
+
+void PlayScreen::startEnding(bool thenQuit) {
+    endingQuits_ = thenQuit;
+    menu_.reset();
+    ending_ = 10;
+    report_ = 10;
+    reportPage_ = 0;
+}
+
+void PlayScreen::advanceEnding() {
+    const auto& save = game_.state();
+    const int human = game_.human();
+    if (ending_ == 10) {
+        const int score = colonizationScore(game_, human);
+        exploits_ = exploitsFor(score, save.difficulty);
+        // The place in the Hall of Fame, kept in HALLFAME.DAT beside the
+        // saved games as the original keeps it beside its own.
+        HallEntry entry;
+        entry.name = save.players[static_cast<std::size_t>(human)].name;
+        entry.nation = human;
+        entry.declared = (save.header[18] & 0x01) != 0;
+        entry.won = (save.header[18] & 0x08) != 0;
+        entry.year = save.year;
+        entry.season = save.season;
+        entry.difficulty = save.difficulty;
+        entry.score = score;
+        entry.rating = exploits_.rating;
+        entry.level = exploits_.level;
+        const auto file = savePath_.empty() ? std::filesystem::path() : savePath_.parent_path() / "HALLFAME.DAT";
+        Bytes old;
+        if (!file.empty()) {
+            std::ifstream in(file, std::ios::binary);
+            old.assign(std::istreambuf_iterator<char>(in), {});
+        }
+        hall_ = readHallOfFame(old);
+        hallPlace_ = enterHallOfFame(hall_, entry);
+        if (!file.empty()) {
+            const Bytes bytes = writeHallOfFame(hall_);
+            std::ofstream out(file, std::ios::binary | std::ios::trunc);
+            out.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+        }
+        if (exploits_.level >= 0) {
+            ending_ = 11;
+            // Read from the original: a tune for the honour, the grandest
+            // for the last step.
+            const int tune = exploits_.level >= 23 ? 0x24 : exploits_.level > 6 ? 0x25 : 0x21;
+            playMusic({{MusicCue::Kind::Sound, tune}});
+        } else {
+            ending_ = 12;
+        }
+        report_ = 0;
+        return;
+    }
+    if (ending_ == 11) {
+        ending_ = 12;
+        return;
+    }
+    ending_ = 0;
+    if (endingQuits_) {
+        quit_ = true;
+    } else {
+        showNotices();
+    }
+}
+
 void PlayScreen::clickReport(int x, int y) {
+    if (ending_ != 0) {
+        advanceEnding();
+        return;
+    }
     if (report_ == 4 && reportPage_ == 0) {
         // Read from the original: a click on a profession zooms on it; one
         // anywhere else closes the report.
@@ -4503,6 +4614,9 @@ bool PlayScreen::pickMenuEntry(int entry) {
             return false;
         case game_menu::kDeclare:
             tell(game_.independenceQuestion());
+            return true;
+        case game_menu::kRetire:
+            ask("RETIRE", -1);
             return true;
         case game_menu::kExit:
             quit_ = true;
