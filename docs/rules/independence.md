@@ -93,6 +93,12 @@ and "Tories" where it names the people ("Tories march into ..."). Six
 places keep the nations' own names (not looked at which yet), and the
 people's form is used so far only for the capture of a colony.
 
+**Europe.** Only the Crown's men-of-war sail for Europe from the high
+seas; the rebels' ships (`EUROPENOTLEAVE`) and the Crown's other ships
+stay. The Crown's units step onto no square of a computer nation's colony
+or units: they neither attack it nor meet it (Viceroy ends the unit's
+moves there).
+
 **The Continental Army.** On the player's first turn of the war (bit 08h
 of the nation's flags marks it done), in every colony where the Sons of
 Liberty are at least half, max(1, min((Sons − 50) × people / 50, people /

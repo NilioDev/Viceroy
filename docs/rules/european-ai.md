@@ -310,7 +310,9 @@ picked at random. The odds are then multiplied by the defenders' strength
 plus one over their number, divided by the attacker's strength, tripled
 against a colony and doubled against a village; artillery weighs nothing
 outside a colony or village, and units of the role for attacks triple
-their odds in a region where their nation is the stronger. Odds of 1000 or
+their odds in a region where their nation is the stronger. A unit of the
+Crown's (header word 98) standing in a colony of its own halves its odds
+against a unit in the open. Odds of 1000 or
 more count as 1000. Under 12 a land unit turns away (999 less); otherwise
 the square gains four times the odds. An armed land unit also gains 16
 for a step onto someone else's colony.

@@ -2653,7 +2653,7 @@ int Game::aiDecide(int n, int i) {
             if (type == kArtillery && !fort) {
                 odds = 0;
             }
-            if (n == human() && !fort && inOwnColony) {
+            if (n == crownNation() && !fort && inOwnColony) {
                 odds >>= 1;
             }
             if ((roles & 0x10) != 0 && status == 4) {
@@ -2826,6 +2826,10 @@ void Game::aiAttack(int i, int x, int y) {
     // The step the direction choice made onto someone else's square. With
     // less than a full move left the original does not attack.
     if (movesLeft(i) < 3 || !canAttack(i)) {
+        aiEndMoves(i);
+        return;
+    }
+    if (crownLeavesAlone(i, x, y)) {
         aiEndMoves(i);
         return;
     }

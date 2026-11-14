@@ -109,6 +109,23 @@ int half(int value) { return value / 2; }
 
 int Game::crownNation() const { return word(save_.header, kHeaderCrown); }
 
+bool Game::crownLeavesAlone(int index, int x, int y) const {
+    // Read from the original: the square's colony, else its unit, names
+    // the nation there; a computer player's is left alone.
+    const auto& u = unit(index);
+    if (!independenceDeclared() || u.nation != crownNation()) {
+        return false;
+    }
+    int there = -1;
+    if (const auto colony = colonyAt(x, y)) {
+        there = save_.colonies[static_cast<std::size_t>(*colony)].nation;
+    } else if (const auto units = unitsAt(x, y); !units.empty()) {
+        there = unit(units.front()).nation;
+    }
+    return there >= 0 && there < kEuropeanNations && there != u.nation &&
+           save_.players[static_cast<std::size_t>(there)].control != 0;
+}
+
 GameNotice Game::independenceQuestion() const {
     // Read from the original (Game menu, "DECLARE INDEPENDENCE").
     if (independenceDeclared()) {

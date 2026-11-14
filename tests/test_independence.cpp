@@ -401,3 +401,22 @@ VCR_TEST("independence: the leader's name is written on the declaration") {
     const auto longName = signatureStrokes("Abcdefghijklmnop", ten);
     VCR_CHECK(longName.size() == 11 && longName.back().pen == PenStroke::Pen::Flourish && longName.back().x == 226);
 }
+
+VCR_TEST("independence: during the war only the Crown's men-of-war sail for Europe") {
+    SaveGame s = warSave();
+    s.header[18] = 1;
+    s.units.push_back(unitAt(0, 0, kHuman, 15));       // a galleon
+    s.units.push_back(unitAt(0, 1, kCrown, 18));       // a man-of-war
+    s.units.push_back(unitAt(0, 2, kCrown, 15));       // a galleon of the Crown's
+    s.units.push_back(unitAt(1, 1, kCrown, 1));        // a regular
+    s.units.push_back(unitAt(2, 1, kPower, 0));        // a computer player's colonist
+    s.units.push_back(unitAt(2, 2, kHuman, 0));        // a rebel
+    Game g(std::move(s), warRules());
+    VCR_CHECK(!g.sailToEurope(0));
+    VCR_CHECK(g.sailToEurope(1));
+    VCR_CHECK(!g.sailToEurope(2));
+    // The Crown leaves the other Europeans alone, not the rebels.
+    VCR_CHECK(g.crownLeavesAlone(3, 2, 1));
+    VCR_CHECK(!g.crownLeavesAlone(3, 2, 2));
+    VCR_CHECK(!g.crownLeavesAlone(5, 2, 1));
+}
