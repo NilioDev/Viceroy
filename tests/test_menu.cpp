@@ -87,6 +87,7 @@ VCR_TEST("original files: the menus are read from MENU.TXT") {
     dump(screen, art, "pedia");
 }
 
+#include "viceroy/sound/background_music.hpp"
 #include "viceroy/ui/play.hpp"
 
 VCR_TEST("original files: the menus open, move and act") {
@@ -147,4 +148,104 @@ VCR_TEST("original files: the menus open, move and act") {
     play.openMenu(2, false);
     play.menuLetter('w');
     VCR_CHECK(!play.menu().has_value());
+}
+
+VCR_TEST("original files: Sound Options turn music on and off") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
+    const Bytes bytes(std::istreambuf_iterator<char>(in), {});
+    PlayScreen play(Game(readSaveGame(bytes), art.rules), {});
+    play.setArt(&art);
+    sound::BackgroundMusic music;
+    play.setMusic(&music);
+    const auto openOptions = [&] {
+        play.openMenu(0, true);
+        play.handle(Command::MoveS);
+        play.handle(Command::MoveS);
+        play.handle(Command::Confirm);
+    };
+    openOptions();
+    VCR_CHECK(play.dialog().has_value() && play.dialog()->checkbox);
+    VCR_CHECK(play.dialog()->options.size() == 3);
+    VCR_CHECK(play.dialog()->checked == std::vector<bool>({true, true, true}));
+    // The box where the original draws it, the ring with a dot in front
+    // of each option.
+    VCR_CHECK(play.dialog()->x == 62 && play.dialog()->y == 71 && dialogHeight(*play.dialog()) == 58);
+    Screen screen;
+    drawDialog(screen, art, *play.dialog());
+    VCR_CHECK(screen.pixels()[92 * Screen::kWidth + 72] == 0x95 && screen.pixels()[93 * Screen::kWidth + 73] == 0x2F);
+    dump(screen, art, "sound");
+    // Space turns the option under the bar over; Escape drops the change.
+    play.handle(Command::Skip);
+    VCR_CHECK(!play.dialog()->checked[0]);
+    play.handle(Command::Cancel);
+    VCR_CHECK(!play.dialog().has_value() && music.options.background);
+    VCR_CHECK(play.game().soundOptionBits() == 0x9E);
+    // A letter picks its option; Return keeps the change.
+    openOptions();
+    play.dialogLetter('s');
+    VCR_CHECK(play.dialog()->selected == 2 && !play.dialog()->checked[2]);
+    play.handle(Command::Confirm);
+    VCR_CHECK(!music.options.effects && music.options.events && play.game().soundOptionBits() == 0x96);
+}
+
+VCR_TEST("original files: Pick Music plays the tune picked") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
+    const Bytes bytes(std::istreambuf_iterator<char>(in), {});
+    PlayScreen play(Game(readSaveGame(bytes), art.rules), {});
+    play.setArt(&art);
+    sound::BackgroundMusic music;
+    play.setMusic(&music);
+    music.pick(0x26); // Bonny Morn plays
+    music.update(false, false);
+    play.openMenu(0, true);
+    for (int i = 0; i < 3; ++i) {
+        play.handle(Command::MoveS);
+    }
+    play.handle(Command::Confirm);
+    // Twelve tunes and three more lists; the bar starts on the tune playing.
+    VCR_CHECK(play.dialog().has_value() && play.dialog()->options.size() == 15);
+    VCR_CHECK(play.dialog()->selected == 9);
+    Screen screen;
+    drawDialog(screen, art, *play.dialog());
+    dump(screen, art, "pick");
+    for (int i = 0; i < 3; ++i) {
+        play.handle(Command::MoveN);
+    }
+    play.handle(Command::Confirm); // Joe Clark
+    VCR_CHECK(!play.dialog().has_value());
+    VCR_CHECK(music.update(false, false) == std::vector<int>({1, 0x38})); // fade out, then the pick
+    // Military Tunes, then its third: "Morelli's Lesson".
+    play.openMenu(0, true);
+    for (int i = 0; i < 3; ++i) {
+        play.handle(Command::MoveS);
+    }
+    play.handle(Command::Confirm);
+    VCR_CHECK(play.dialog()->selected == 6);
+    for (int i = 0; i < 7; ++i) {
+        play.handle(Command::MoveS);
+    }
+    play.handle(Command::Confirm);
+    VCR_CHECK(play.dialog().has_value() && play.dialog()->options.size() == 4);
+    play.handle(Command::MoveS);
+    play.handle(Command::MoveS);
+    play.handle(Command::Confirm);
+    VCR_CHECK(music.update(false, false) == std::vector<int>({1, 0x30}));
+    // Escape closes the list without a pick.
+    play.openMenu(0, true);
+    for (int i = 0; i < 3; ++i) {
+        play.handle(Command::MoveS);
+    }
+    play.handle(Command::Confirm);
+    play.handle(Command::Cancel);
+    VCR_CHECK(!play.dialog().has_value() && music.update(true, false).empty());
 }

@@ -31,7 +31,7 @@ int BackgroundMusic::range(int lo, int hi) {
     return lo + ((hi - lo + 1) * r >> 15);
 }
 
-int BackgroundMusic::command(int tune) {
+int tuneCommand(int tune) {
     // Tunes 1-12 are the ones Pick Music names, 13-22 the independence and
     // military tunes, 23-26 the native ones.
     static constexpr int kMore[4] = {0x33, 0x32, 0x35, 0x36};
@@ -141,7 +141,7 @@ std::vector<int> BackgroundMusic::update(bool busy, bool independence) {
         int tune = lo;
         for (int tries = 0; tries < 64; ++tries) {
             tune = range(0, count - 1) + lo;
-            next = command(tune);
+            next = tuneCommand(tune);
             if (next != current_) {
                 break;
             }

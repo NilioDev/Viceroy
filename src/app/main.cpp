@@ -192,6 +192,7 @@ void beginPlay(App& app, viceroy::Game game, const std::filesystem::path& path) 
     app.play->setArt(app.art.get());
     app.mode = Mode::Play;
     app.audio.music().options = viceroy::sound::SoundOptions::fromSave(app.play->game().soundOptionBits());
+    app.play->setMusic(&app.audio.music());
     app.audio.setPlaying(true);
 }
 
@@ -788,6 +789,10 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
                         break;
                     }
                 }
+                break;
+            }
+            if (letter && app->play->dialog() && app->play->dialog()->checkbox) {
+                app->play->dialogLetter(static_cast<char>('A' + (k - SDLK_A)));
                 break;
             }
             if (letter && app->play->menu()) {

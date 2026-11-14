@@ -23,6 +23,13 @@ struct SoundOptions {
 // The tunes Pick Music lists, in its order, as driver commands.
 inline constexpr int kPickMusicTunes[12] = {0x20, 0x21, 0x22, 0x23, 0x3A, 0x3B, 0x38, 0x24, 0x25, 0x26, 0x27, 0x39};
 
+// The original numbers its tunes 1 to 26: the twelve of Pick Music, six
+// independence tunes, four military tunes and four native tunes, in the
+// order Pick Music and its three lists show them.
+inline constexpr int kTuneCount = 26;
+// A tune's driver command.
+int tuneCommand(int tune);
+
 class BackgroundMusic {
 public:
     explicit BackgroundMusic(std::uint32_t seed = 1);
@@ -47,8 +54,7 @@ public:
     int current() const { return current_; }
 
 private:
-    int range(int lo, int hi);   // lo..hi inclusive
-    static int command(int tune); // tune number 1..26 to driver command
+    int range(int lo, int hi); // lo..hi inclusive
 
     std::vector<int> out_;
     std::uint32_t seed_;

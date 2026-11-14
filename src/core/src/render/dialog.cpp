@@ -6,6 +6,7 @@
 #include "viceroy/game/natives.hpp"
 #include "viceroy/render/game_view.hpp"
 #include <algorithm>
+#include <cctype>
 #include <optional>
 #include <sstream>
 
@@ -21,6 +22,8 @@ constexpr std::uint8_t kBar = 0x8A;
 // @COLORS in NAMES.TXT: basic 68, hilite 149, enhance 128, shadow 47;
 // font pixel values 1, 2 and 3 take the letter, enhance and shadow.
 constexpr TextColours kBasic{0x44, 0x80, 0x2F};
+constexpr TextColours kCheckColours{0x95, 0x80, 0x2F}; // seen in the Sound Options
+constexpr TextColours kSmallChosen{0x95, 0x80, 0x2F};
 constexpr TextColours kHilite{0x95, 0x80, 0x2F};
 constexpr TextColours kGrey{0x08, 0x80, 0x2F};
 constexpr std::uint8_t kGold = 0x95;
@@ -176,6 +179,8 @@ Dialog makeDialog(const Art& art, std::string_view section, const std::vector<st
         if (!line.empty() && line[0] == '@') {
             if (line == "@smallfont") {
                 d.small = true;
+            } else if (line == "@checkbox") {
+                d.checkbox = true;
             } else if (line == "@options") {
                 inOptions = true;
             } else if (line.rfind("@y=", 0) == 0) {
@@ -208,8 +213,15 @@ Dialog makeDialog(const Art& art, std::string_view section, const std::vector<st
                 }
                 continue;
             }
+            if (const auto mark = line.find('~'); mark != std::string::npos && mark + 1 < line.size()) {
+                // The key letter, in gold (the Sound Options mark theirs).
+                line = line.substr(0, mark) + "{" + line[mark + 1] + "}" + line.substr(mark + 2);
+            }
             addOption(d, line);
         }
+    }
+    if (d.checkbox) {
+        d.checked.assign(d.options.size(), false);
     }
     for (const auto& paragraph : paragraphs) {
         for (auto& l : wrap(fontOf(art, d), paragraph, d.width - kTextLeft)) {
@@ -364,6 +376,24 @@ void placeTradeDialog(Dialog& d) {
 std::string countryName(const Art& art, int nation) {
     constexpr int kDutch = 3;
     return (nation == kDutch ? "the " : "") + textLine(art.names, "COUNTRY", nation, "");
+}
+
+int checkboxForLetter(const Dialog& d, char letter) {
+    if (!d.checkbox) {
+        return -1;
+    }
+    const int want = std::toupper(static_cast<unsigned char>(letter));
+    for (std::size_t i = 0; i < d.options.size(); ++i) {
+        for (const char c : d.options[i]) {
+            if (c != '{' && c != '}' && c != '"' && c != ' ') {
+                if (std::toupper(static_cast<unsigned char>(c)) == want) {
+                    return static_cast<int>(i);
+                }
+                break;
+            }
+        }
+    }
+    return -1;
 }
 
 void stepSelection(Dialog& d, int by) {
@@ -535,9 +565,18 @@ void drawDialog(Screen& screen, const Art& art, const Dialog& d) {
             screen.fill({box.x + 4 + d.indent, y - 1, box.w - 8 - d.indent, d.small ? 7 : 11}, kBar);
         }
         const bool grey = i < d.disabled.size() && d.disabled[i];
-        const TextColours& colours = grey ? kGrey : kBasic;
+        // In small print the chosen line is gold (seen in Pick Music).
+        const bool goldLine = d.small && static_cast<int>(i) == d.selected && !grey;
+        const TextColours& colours = grey ? kGrey : goldLine ? kSmallChosen : kBasic;
         bool optionGold = false;
-        drawMarkedLine(screen, font, box.x + d.optionLeft + d.indent, y, d.options[i], optionGold, colours);
+        int left = box.x + d.optionLeft + d.indent;
+        if (d.checkbox) {
+            // The font's ']' is the ring with a dot, '[' the filled ring.
+            const std::string mark = i < d.checked.size() && d.checked[i] ? "]" : "[";
+            screen.text(font, left, y, mark, kCheckColours);
+            left += Screen::textWidth(font, mark + " ");
+        }
+        drawMarkedLine(screen, font, left, y, d.options[i], optionGold, colours);
         if (i < d.values.size() && !d.values[i].empty()) {
             const int right = box.x + box.w - kValueRight;
             screen.text(font, right - Screen::textWidth(font, d.values[i]), y, d.values[i], colours);
