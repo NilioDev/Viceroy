@@ -70,6 +70,8 @@ enum class Command {
     ScoreReport,    // F10: the Colonization Score
     Disband,        // Shift+D: Disband Unit
     Dump,           // O: Dump Cargo Overboard
+    ZoomIn,         // Z
+    ZoomOut,        // X
 };
 
 // The main map screen while playing.
@@ -86,6 +88,8 @@ public:
     void clickMinimap(int x, int y);
     // Moves the view without moving anyone (the right stick).
     void scrollView(int dx, int dy);
+    // VIEW menu zoom, 0 (15 x 12 squares) to 3 (the whole map).
+    void zoomTo(int zoom);
     // Time passes: the active unit flashes.
     void tick(std::uint64_t milliseconds);
     void draw(Screen& screen, const Art& art) const;

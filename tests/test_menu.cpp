@@ -437,6 +437,59 @@ VCR_TEST("original files: the VIEW menu finds colonies, shows the hidden terrain
     VCR_CHECK(play.europeScreen().has_value());
 }
 
+VCR_TEST("original files: the VIEW menu zooms out to the whole map and back (seen in the original)") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
+    const Bytes bytes(std::istreambuf_iterator<char>(in), {});
+    PlayScreen play(Game(readSaveGame(bytes), art.rules), {});
+    play.setArt(&art);
+    const auto& map = play.game().state().map;
+    VCR_CHECK(play.view().zoom == 0);
+    play.handle(Command::ZoomIn); // already as close as it goes
+    VCR_CHECK(play.view().zoom == 0);
+    // Zoom Level 120 x 96: the whole map, centred in the window.
+    play.openMenu(1, true);
+    for (int i = 0; i < 6; ++i) {
+        play.handle(Command::MoveS);
+    }
+    play.handle(Command::Confirm);
+    VCR_CHECK(play.view().zoom == 3);
+    VCR_CHECK(play.view().originX == 1 - (120 - (map.width - 2)) / 2);
+    VCR_CHECK(play.view().originY == 1 - (96 - (map.height - 2)) / 2);
+    play.handle(Command::ZoomOut);
+    VCR_CHECK(play.view().zoom == 3);
+    // Back in, the window is centred on the active unit again.
+    play.handle(Command::ZoomIn);
+    play.handle(Command::ZoomIn);
+    VCR_CHECK(play.view().zoom == 1);
+    const int active = play.game().activeUnit();
+    VCR_CHECK(active >= 0);
+    ViewState expected;
+    expected.zoom = 1;
+    centreOn(expected, play.game(), play.game().unit(active).x, play.game().unit(active).y);
+    VCR_CHECK(play.view().originX == expected.originX && play.view().originY == expected.originY);
+    VCR_CHECK(play.view().originX >= 1 && play.view().originX + 30 <= map.width - 1);
+    // A click on the wood around the whole map does nothing.
+    play.handle(Command::ZoomOut);
+    play.handle(Command::ZoomOut);
+    const auto before = play.view().originX;
+    play.clickSquare(play.view().originX, play.view().originY);
+    VCR_CHECK(play.view().originX == before && play.view().zoom == 3);
+
+    Screen screen;
+    drawGameScreen(screen, art, play.game(), play.view());
+    // The land's name above the map, in white (measured: its top at row 24).
+    bool white = false;
+    for (int x = 60; x < 180; ++x) {
+        white = white || screen.at(x, 24) == 0x0F; // white
+    }
+    VCR_CHECK(white);
+}
+
 VCR_TEST("original files: Pick Music plays the tune picked") {
     const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
     if (!isGameFolder(dir)) {
