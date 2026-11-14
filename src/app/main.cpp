@@ -618,6 +618,10 @@ void click(App& app, float wx, float wy) {
         }
         return;
     }
+    if (app.play->view().hiddenTerrain) {
+        send(app, Command::Confirm);
+        return;
+    }
     if (app.play->reportUp() && !app.play->dialog()) {
         app.play->clickReport(static_cast<int>(x), static_cast<int>(y));
         return;

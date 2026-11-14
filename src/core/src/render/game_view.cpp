@@ -286,7 +286,7 @@ void drawResource(Screen& screen, const Art& art, const SaveMap& map, int x, int
 
 } // namespace
 
-void drawTerrain(Screen& screen, const Art& art, const Game& game, int x, int y, int px, int py) {
+void drawTerrain(Screen& screen, const Art& art, const Game& game, int x, int y, int px, int py, bool hidden) {
     const auto& map = game.state().map;
     if (!map.inside(x, y)) {
         blitSprite(screen, art.phys, kUnexplored, px, py);
@@ -310,7 +310,7 @@ void drawTerrain(Screen& screen, const Art& art, const Game& game, int x, int y,
     if (sq.flags & MapSquare::kPlowed) {
         blitSprite(screen, art.phys, kPlowed, px, py);
     }
-    if (forestShown(sq)) {
+    if (forestShown(sq) && !hidden) {
         blitSprite(screen, art.phys, kForest + neighbourMask(map, x, y, forestShown), px, py);
     }
     if (sq.river()) {
@@ -325,7 +325,7 @@ void drawTerrain(Screen& screen, const Art& art, const Game& game, int x, int y,
         blitSprite(screen, art.phys,
                    kMountains + neighbourMask(map, x, y, [](const MapSquare& n) { return n.mountains(); }), px, py);
     }
-    if ((sq.flags & MapSquare::kRoad) && !(sq.flags & MapSquare::kHasColony)) {
+    if ((sq.flags & MapSquare::kRoad) && !(sq.flags & MapSquare::kHasColony) && !hidden) {
         bool joined = false;
         for (std::size_t d = 0; d < kSteps.size(); ++d) {
             const int nx = x + kSteps[d].dx;
@@ -339,8 +339,10 @@ void drawTerrain(Screen& screen, const Art& art, const Game& game, int x, int y,
             blitSprite(screen, art.phys, kRoad, px, py);
         }
     }
-    drawResource(screen, art, map, x, y, px, py);
-    if (rumourAt(map, x, y)) {
+    if (!hidden) {
+        drawResource(screen, art, map, x, y, px, py); // seen: hidden on land, the fish stay
+    }
+    if (rumourAt(map, x, y) && !hidden) {
         blitSprite(screen, art.phys, kRumour, px, py);
     }
 }
@@ -1010,8 +1012,12 @@ void drawMap(Screen& screen, const Art& art, const Game& game, const ViewState& 
     for (int row = 0; row < kViewRows; ++row) {
         for (int col = 0; col < kViewColumns; ++col) {
             drawTerrain(screen, art, game, view.originX + col, view.originY + row, kMapArea.x + col * kSquare,
-                       kMapArea.y + row * kSquare);
+                        kMapArea.y + row * kSquare, view.hiddenTerrain);
         }
+    }
+    if (view.hiddenTerrain) {
+        screen.resetClip();
+        return;
     }
     auto visible = [&](int x, int y) {
         return save.map.inside(x, y) && save.map.at(x, y).seenBy(game.human()) && x >= view.originX &&

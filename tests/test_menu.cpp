@@ -352,6 +352,91 @@ VCR_TEST("original files: Game Options, autosave and the turn ending by itself (
     std::filesystem::remove_all(work);
 }
 
+VCR_TEST("original files: Exit to DOS asks first, the bar on No (seen in the original)") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
+    const Bytes bytes(std::istreambuf_iterator<char>(in), {});
+    PlayScreen play(Game(readSaveGame(bytes), art.rules), {});
+    play.setArt(&art);
+    const auto exitToDos = [&] {
+        play.openMenu(0, true);
+        for (int i = 0; i < 8; ++i) {
+            play.handle(Command::MoveS);
+        }
+        play.handle(Command::Confirm);
+    };
+    exitToDos();
+    VCR_CHECK(play.dialog().has_value() && play.dialog()->options.size() == 2);
+    // Measured: a section without @width is 80 wide, the box centred.
+    VCR_CHECK(play.dialog()->selected == 1 && play.dialog()->width == 80);
+    VCR_CHECK(play.dialog()->x == 117 && play.dialog()->y == 77);
+    play.handle(Command::Confirm);
+    VCR_CHECK(!play.quitRequested());
+    exitToDos();
+    play.handle(Command::MoveN);
+    play.handle(Command::Confirm);
+    VCR_CHECK(play.quitRequested());
+}
+
+VCR_TEST("original files: the VIEW menu finds colonies, shows the hidden terrain and Europe (seen in the original)") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
+    const Bytes bytes(std::istreambuf_iterator<char>(in), {});
+    PlayScreen play(Game(readSaveGame(bytes), art.rules), {});
+    play.setArt(&art);
+    const auto view = [&](int entry) {
+        play.openMenu(1, true);
+        for (int i = 0; i < entry; ++i) {
+            play.handle(Command::MoveS);
+        }
+        play.handle(Command::Confirm);
+    };
+    const auto typeIn = [&](const std::string& text) {
+        for (const char c : text) {
+            play.type(c);
+        }
+        play.handle(Command::Confirm);
+    };
+    // Find Colony: the whole name in any case; the view cursor lands on it.
+    const auto& colony = play.game().state().colonies.at(0);
+    view(3);
+    VCR_CHECK(play.dialog().has_value() && play.dialog()->input && play.dialog()->inputText.empty());
+    VCR_CHECK(play.dialog()->x == 54 && play.dialog()->y == 81); // measured
+    std::string shouted = colony.name;
+    for (auto& c : shouted) {
+        c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+    }
+    typeIn(shouted);
+    VCR_CHECK(!play.dialog().has_value());
+    VCR_CHECK(play.viewMode() && play.cursorX() == colony.x && play.cursorY() == colony.y);
+    play.handle(Command::MoveMode);
+    // Part of a name is not enough.
+    view(3);
+    typeIn(colony.name.substr(0, 3));
+    VCR_CHECK(play.dialog().has_value() && !play.dialog()->lines.empty());
+    VCR_CHECK(play.dialog()->lines[0] == "\"" + colony.name.substr(0, 3) + "\" not found.");
+    play.handle(Command::Confirm);
+    VCR_CHECK(!play.viewMode());
+
+    // Show Hidden Terrain stays until a key, which does nothing else.
+    view(10);
+    VCR_CHECK(play.view().hiddenTerrain);
+    play.handle(Command::EndTurn);
+    VCR_CHECK(!play.view().hiddenTerrain && play.game().activeUnit() >= 0);
+
+    // European Status opens the home port.
+    view(2);
+    VCR_CHECK(play.europeScreen().has_value());
+}
+
 VCR_TEST("original files: Pick Music plays the tune picked") {
     const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
     if (!isGameFolder(dir)) {

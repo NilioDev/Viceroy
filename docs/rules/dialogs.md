@@ -23,7 +23,8 @@ braces), enhance 0x80 and shadow 0x2F.
 
 ## The box
 
-- 6 pixels wider than `@width`, filled with `WOODTILE.SS` tiled from its
+- 6 pixels wider than `@width` (80 when the section gives none: "Exit to
+  DOS?", "Do you really want to quit?"), filled with `WOODTILE.SS` tiled from its
   corner, edged like the jobs menu: black, a ring of 0x86, then a sunken
   edge (0x80 above and right, 0x8A left and below).
 - Text lines start at (x + 5, y + 6), 10 pixels apart.
