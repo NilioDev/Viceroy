@@ -201,3 +201,94 @@ VCR_TEST("diplomacy: the odds of a scout caught infiltrating a colony") {
         VCR_CHECK(h.movesLeft(1) <= 0);
     }
 }
+
+VCR_TEST("diplomacy: the King declares war on a nation the player has a treaty with") {
+    SaveGame s = diplomacySave();
+    s.difficulty = 4;
+    s.turn = 140; // 6 x 140 = 840: late enough
+    for (const int e : {kEnglish, kFrench}) {
+        s.nations[kHuman].raw[52 + static_cast<std::size_t>(e)] = 0x60;
+        s.nations[static_cast<std::size_t>(e)].raw[52 + kHuman] = 0x60;
+    }
+    s.tribesAndMore[kExtra + 60 + kFrench] = 30; // the French are stronger
+    s.tribesAndMore[kExtra + 60 + kEnglish] = 30;
+    s.tribesAndMore[kExtra + 60 + kHuman] = 6;
+    {
+        SaveGame early = s;
+        early.turn = 133; // 6 x 133 = 798
+        Game g(std::move(early), diplomacyRules());
+        for (int i = 0; i < 200; ++i) {
+            g.kingDeclaresWar(kHuman, 133);
+        }
+        VCR_CHECK(g.takeNotices().empty());
+    }
+    Game g(std::move(s), diplomacyRules());
+    const long gold = g.state().nations[kHuman].gold;
+    std::vector<GameNotice> notices;
+    for (int i = 0; i < 500 && notices.empty(); ++i) {
+        g.kingDeclaresWar(kHuman, 140);
+        notices = g.takeNotices();
+    }
+    VCR_CHECK(sections(notices) == std::vector<std::string>{"KINGNEWWAR"});
+    const int enemy = notices[0].adjectives[0].second;
+    VCR_CHECK(enemy == kEnglish || enemy == kFrench);
+    // 500 at most at Viceroy, and soldiers (30 - 6) / 8 + 1 = 4, at most 2.
+    VCR_CHECK(notices[0].numbers == (std::vector<int>{500, 2}));
+    VCR_CHECK(g.state().nations[kHuman].gold == gold + 500);
+    VCR_CHECK(g.unitCount() == 3 && g.unit(2).profession == 0x15 && g.unit(1).type == 1);
+    VCR_CHECK((g.relation(kHuman, enemy) & 0x60) == 0x20);
+    VCR_CHECK((g.relation(enemy, kHuman) & 0x10) != 0);
+    VCR_CHECK(g.lastTalk(enemy) == 140);
+    // At war now: no second war.
+    for (int i = 0; i < 200; ++i) {
+        g.kingDeclaresWar(kHuman, 140);
+    }
+    VCR_CHECK(g.takeNotices().empty());
+}
+
+VCR_TEST("diplomacy: the War of the Spanish Succession hands the weakest nation to the next") {
+    constexpr int kSpanish = 2;
+    SaveGame s = diplomacySave();
+    auto& block = s.tribesAndMore;
+    block[kExtra + 40 + kEnglish] = 3; // ships: 3 x 3 = 9
+    block[kExtra + 16 + kFrench] = 1;  // a colony: 2
+    block[kExtra + 28 + kSpanish] = 3; // people: 3
+    s.map.squares[8].seen = static_cast<std::uint8_t>(0x10 << kFrench);
+    s.map.squares[9].region = static_cast<std::uint8_t>(0x03 | (kFrench << 4));
+    SaveColony quebec;
+    quebec.x = 5;
+    quebec.y = 5;
+    quebec.name = "Quebec";
+    quebec.nation = kFrench;
+    quebec.rebelDividend = 300;
+    s.colonies.push_back(quebec);
+    SaveUnit onMap;
+    onMap.x = 5;
+    onMap.y = 5;
+    onMap.nation = kFrench;
+    SaveUnit inEurope = onMap;
+    inEurope.x = 0xFF;
+    s.units.push_back(onMap);
+    s.units.push_back(inEurope);
+    SaveSettlement village;
+    village.nation = 4;
+    village.raw[5] = static_cast<std::uint8_t>(0x80 | kFrench);
+    s.settlements.push_back(village);
+    Game g(std::move(s), diplomacyRules());
+    g.spanishSuccession();
+    const auto notices = g.takeNotices();
+    VCR_CHECK(sections(notices) == std::vector<std::string>{"SUCCESSION"});
+    VCR_CHECK(notices[0].sentenceCountries == (std::vector<std::pair<int, int>>{{0, kFrench}}));
+    VCR_CHECK(notices[0].adjectives == (std::vector<std::pair<int, int>>{{2, kSpanish}, {3, kFrench}}));
+    const auto& after = g.state();
+    VCR_CHECK(after.players[kFrench].control == 2);
+    VCR_CHECK(after.header[98] == kFrench && after.header[99] == 0);
+    VCR_CHECK(after.colonies[0].nation == kSpanish && after.colonies[0].rebelDividend == 0);
+    VCR_CHECK(g.unitCount() == 2 && g.unit(1).nation == kSpanish);
+    VCR_CHECK(after.map.squares[8].seenBy(kSpanish));
+    VCR_CHECK(after.map.squares[9].region == (0x03 | (kSpanish << 4)));
+    VCR_CHECK(after.settlements[0].raw[5] == (0x80 | kSpanish));
+    // Once only.
+    g.spanishSuccession();
+    VCR_CHECK(g.takeNotices().empty());
+}

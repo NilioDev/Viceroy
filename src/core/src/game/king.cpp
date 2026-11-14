@@ -29,7 +29,7 @@ constexpr std::size_t kIndependence = 18; // bit 0: the war of independence
 constexpr std::size_t kKingWives = 55;    // the King's weddings so far
 constexpr std::size_t kKingWar = 56;      // the country the King last fought, 1-8
 constexpr std::size_t kHumanRebels = 96;  // the human's rebels in % (16 bits)
-constexpr std::size_t kFirstHalf = 98;    // the nation that first had half its people rebels, -1 (16 bits)
+constexpr std::size_t kGoneNation = 98;   // the nation gone after the War of the Spanish Succession, -1 (16 bits)
 constexpr std::size_t kRebelsTold = 104;  // the human's rebels in tens of % when last told (16 bits)
 constexpr std::size_t kRoyalForce = 106;  // regulars, dragoons, men-of-war, artillery (16 bits each)
 
@@ -291,8 +291,8 @@ int Game::nationRebelPercent(int nation) const {
 
 int Game::royalUnitType(int kind, int nation) const {
     // The unit a kind of the Crown's army is: regulars, cavalry, men-of-war
-    // and artillery. For a nation the human plays (the side that first had
-    // half its people rebels) the first two are its own.
+    // and artillery. For a nation the human plays the first two are its
+    // own.
     const bool rebels = (save_.header[kIndependence] & 0x01) != 0;
     const bool humanSide = nation >= 0 && nation < kEuropeanNations &&
                            save_.players[static_cast<std::size_t>(nation)].control == 0;
@@ -337,7 +337,9 @@ void Game::kingArmyGrowth(int nation) {
     if ((regulars + dragoons + artillery + 5) / 10 > menOfWar) {
         kind = 2;
     }
-    const int type = royalUnitType(kind, word(save_.header, kFirstHalf));
+    // The original names the unit for the nation in header word 98 (never
+    // the player's), so always the Crown's own kind.
+    const int type = royalUnitType(kind, word(save_.header, kGoneNation));
     setWord(save_.header, kRoyalForce + 2 * static_cast<std::size_t>(kind), count(kind) + 1);
     GameNotice notice{"KINGBUY", {rules_.units[static_cast<std::size_t>(type)].name}};
     notices_.push_back(std::move(notice));
@@ -366,8 +368,11 @@ void Game::rebelSentiment(int nation) {
         return;
     }
     setWord(save_.header, kHumanRebels, percent);
-    // At half the people the War of the Spanish Succession may come (not
-    // done yet).
+    // Read from the original: at half, the first time, the War of the
+    // Spanish Succession ends (docs/rules/diplomacy.md).
+    if (percent >= 50 && static_cast<std::int16_t>(word(save_.header, kGoneNation)) < 0) {
+        spanishSuccession();
+    }
     if (nationPeople(nation) < 4) {
         return;
     }

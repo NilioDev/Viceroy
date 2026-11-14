@@ -92,6 +92,8 @@ struct GameNotice {
     std::vector<std::pair<int, int>> labels{};
     // %STRINGs that are a nation's country ("England", "the Netherlands").
     std::vector<std::pair<int, int>> countries{};
+    // The same at the start of a sentence ("The Netherlands").
+    std::vector<std::pair<int, int>> sentenceCountries{};
     // %STRINGs that are a nation's home port ("London").
     std::vector<std::pair<int, int>> ports{};
     // %STRINGs that are a line of a section of NAMES.TXT (names true) or of
@@ -606,6 +608,14 @@ public:
     // the scout's turn is over.
     void scoutMeetMayor(int unit, int colony);
     bool infiltrateColony(int unit, int colony);
+    // At the start of the player's turn when the King left the tax alone:
+    // he may declare war on a nation the player has a treaty with
+    // (KINGNEWWAR), with gold and veteran soldiers to fight it.
+    void kingDeclaresWar(int nation, int turn);
+    // When the player's rebels first reach half: the weakest computer
+    // nation hands all it has in the New World to the next weakest and
+    // withdraws (SUCCESSION).
+    void spanishSuccession();
     // The chance in 36 that a scout infiltrating the colony is caught.
     int infiltrationRisk(int unit, int colony) const;
 
