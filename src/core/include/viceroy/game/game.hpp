@@ -336,6 +336,9 @@ public:
     // Planters and trappers who learn their job by doing it (in the colony
     // turn, after the lessons).
     void learnByDoing(int colony);
+    void renameColony(int colony, const std::string& name) {
+        save_.colonies[static_cast<std::size_t>(colony)].name = name.substr(0, 23);
+    }
     // Mines that wear out: silver deposits and minerals (DEPLETION).
     void wearMines(int colony);
 
@@ -1167,6 +1170,8 @@ private:
     void answerDemand(const BraveVisitState& v, bool give);
     // The messages about a colony's warehouse after its turn.
     void storageNotices(const ColonyTurn& turn, int colony);
+    // The lumber a cleared forest gives the nearest colony (CLEARCUT).
+    void clearCutLumber(int unit);
     void foodNotices(const ColonyTurn& turn, int colony);
     // A colony out of food may lose a colonist; returns true when it had
     // only one and is gone.

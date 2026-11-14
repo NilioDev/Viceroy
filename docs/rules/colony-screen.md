@@ -144,6 +144,13 @@ A colonist who goes out becomes a unit on the square and takes 50 muskets,
 50 horses or the tools from the warehouse; a unit that comes in leaves
 them there.
 
+## Renaming
+
+Read from the original: a click on the top line (y 0 to 6, the whole
+width) asks `@RENAMECOLONY` with a line to type in (23 letters at most) that
+offers the colony's name. Return takes the new name, unless nothing was
+typed; Escape keeps the old one.
+
 ## Panel buttons
 
 Right of the panel stand three buttons, `ICONS.SS` 67 (production), 68

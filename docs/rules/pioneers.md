@@ -15,6 +15,12 @@ Orders menu, then turn after turn ended until the work was done.
   Arctic can.
 - Each job uses 20 of the pioneer's tools. A pioneer whose tools run out is
   a colonist again, and the player is told (`@USEDUPTOOLS` of `GAME.TXT`).
+- Clearing a forest brings lumber (read from the original) to the
+  nation's nearest colony, when that is within 3 squares (the longer side
+  plus half the shorter; of colonies as near, the last listed): 20 for
+  each point of the forest's lumber yield plus one, but just 20 without a
+  lumber mill, twice as much for a hardy pioneer, and no more than the
+  warehouse still holds. The player hears `@CLEARCUT`.
 - On a plowed square or one with a road, the entries are still there;
   picking them says "That land has already been plowed." (`@NOPLOW`) or
   "There is already a road here, Your Excellency." (`@NOROAD`).
@@ -58,7 +64,5 @@ each end of turn, back to 0 when the work is done.
 
 ## Not yet
 
-- Clearing a forest next to a colony brings it lumber (`@CLEARCUT`); how
-  much is still to be measured.
 - Natives may object to a road or a cleared forest near them
   (`@INDIANROAD`, `@INDIANFOREST`); that comes with the natives.
