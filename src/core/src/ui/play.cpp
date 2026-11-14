@@ -8,6 +8,7 @@
 #include "viceroy/render/report_view.hpp"
 #include "viceroy/data/text_table.hpp"
 #include "viceroy/game_files.hpp"
+#include "viceroy/sound/background_music.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -678,6 +679,9 @@ void PlayScreen::ask(std::string_view section, int unit, std::vector<std::string
 
 bool PlayScreen::handleDialog(Command command) {
     auto& d = *dialog_;
+    if (d.checkbox) {
+        return handleCheckboxes(command);
+    }
     const int count = std::max(1, static_cast<int>(d.options.size()));
     const bool list = !choices_.empty();
     switch (command) {
@@ -698,8 +702,9 @@ bool PlayScreen::handleDialog(Command command) {
             // father is chosen.
             return true;
         }
-        if (question_ == "SAILPORT" || question_ == "TRAVELPLACE") {
+        if (question_ == "SAILPORT" || question_ == "TRAVELPLACE" || question_.rfind("PICK", 0) == 0) {
             // Go To has no "None": Escape leaves the unit as it was.
+            // Pick Music and its lists close without a pick.
             dialog_.reset();
             choices_.clear();
             question_.clear();
@@ -1201,6 +1206,33 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
                                                                                  : -1;
     }();
     choices_.clear();
+    if (question == "PICKMUSIC") {
+        // The twelve tunes, then three more lists.
+        static constexpr const char* kLists[3] = {"PICKINDEPENDENCE", "PICKMILITARY", "PICKINDIAN"};
+        static constexpr int kFirstTune[3] = {13, 19, 23};
+        if (picked >= 0 && picked < 12) {
+            pickTune(picked + 1);
+        } else if (picked >= 12 && picked < 15) {
+            const int list = picked - 12;
+            ask(kLists[list], -1);
+            if (dialog_) {
+                const int playing = music_ != nullptr ? music_->current() : 0;
+                for (int i = 0; i < static_cast<int>(dialog_->options.size()); ++i) {
+                    choices_.push_back(kFirstTune[list] + i);
+                    if (sound::tuneCommand(kFirstTune[list] + i) == playing) {
+                        dialog_->selected = i;
+                    }
+                }
+            }
+        }
+        return;
+    }
+    if (question.rfind("PICK", 0) == 0 && question != "PICKMUSIC") {
+        if (picked > 0) {
+            pickTune(picked);
+        }
+        return;
+    }
     const auto showOnDocks = [&](int made) {
         if (made >= 0 && europeScreen_) {
             europeScreen_->focus = EuropeFocus::Docks;
@@ -2388,6 +2420,8 @@ namespace {
 
 // Rows of the menus in MENU.TXT that Viceroy acts on.
 namespace game_menu {
+constexpr int kSoundOptions = 2;
+constexpr int kPickMusic = 3;
 constexpr int kSave = 4;
 constexpr int kLoad = 5;
 constexpr int kExit = 8;
@@ -2611,6 +2645,101 @@ void PlayScreen::menuLetter(char letter) {
     }
 }
 
+void PlayScreen::dialogLetter(char letter) {
+    if (!dialog_ || !dialog_->checkbox) {
+        return;
+    }
+    // Seen: the letter moves the bar to its option and turns it over.
+    const int option = checkboxForLetter(*dialog_, letter);
+    if (option >= 0) {
+        dialog_->selected = option;
+        handleCheckboxes(Command::Skip);
+    }
+}
+
+bool PlayScreen::handleCheckboxes(Command command) {
+    auto& d = *dialog_;
+    switch (command) {
+    case Command::MoveN:
+    case Command::Up:
+        stepSelection(d, -1);
+        return true;
+    case Command::MoveS:
+    case Command::Down:
+        stepSelection(d, 1);
+        return true;
+    case Command::Skip: {
+        // Space turns the option under the bar on or off.
+        const auto at = static_cast<std::size_t>(d.selected);
+        if (at < d.checked.size()) {
+            d.checked[at] = !d.checked[at];
+        }
+        return true;
+    }
+    case Command::Confirm:
+        // Return keeps the changes (seen); Escape drops them.
+        if (question_ == "SOUNDOPTIONS") {
+            sound::SoundOptions options;
+            options.background = d.checked.size() > 0 && d.checked[0];
+            options.events = d.checked.size() > 1 && d.checked[1];
+            options.effects = d.checked.size() > 2 && d.checked[2];
+            game_.setSoundOptionBits(options.toSave(game_.soundOptionBits()));
+            if (music_ != nullptr) {
+                music_->options = options;
+            }
+        }
+        break;
+    case Command::Cancel:
+        break;
+    default:
+        return true;
+    }
+    dialog_.reset();
+    question_.clear();
+    showNotices();
+    return true;
+}
+
+void PlayScreen::setMusic(sound::BackgroundMusic* music) {
+    music_ = music;
+}
+
+void PlayScreen::showSoundOptions() {
+    ask("SOUNDOPTIONS", -1);
+    if (!dialog_) {
+        return;
+    }
+    const auto options = sound::SoundOptions::fromSave(game_.soundOptionBits());
+    dialog_->checked = {options.background, options.events, options.effects};
+    dialog_->checked.resize(dialog_->options.size());
+}
+
+void PlayScreen::showPickMusic() {
+    // Seen: the bar starts on the tune that is playing.
+    ask("PICKMUSIC", -1);
+    if (!dialog_) {
+        return;
+    }
+    choices_.clear();
+    for (int i = 0; i < static_cast<int>(dialog_->options.size()); ++i) {
+        choices_.push_back(i);
+    }
+    const int playing = music_ != nullptr ? music_->current() : 0;
+    for (int tune = 1; tune <= sound::kTuneCount; ++tune) {
+        if (sound::tuneCommand(tune) == playing) {
+            dialog_->selected = tune <= 12 ? tune - 1 : tune <= 18 ? 12 : tune <= 22 ? 13 : 14;
+            break;
+        }
+    }
+    dialog_->selected = std::min(dialog_->selected, static_cast<int>(dialog_->options.size()) - 1);
+}
+
+void PlayScreen::pickTune(int tune) {
+    if (music_ != nullptr) {
+        music_->pick(sound::tuneCommand(tune));
+    }
+}
+
 void PlayScreen::notYet() {
     say("Not in Viceroy yet.");
 }
@@ -2624,6 +2753,12 @@ bool PlayScreen::pickMenuEntry(int entry) {
     menu_.reset();
     if (section == "GAME") {
         switch (entry) {
+        case game_menu::kSoundOptions:
+            showSoundOptions();
+            return true;
+        case game_menu::kPickMusic:
+            showPickMusic();
+            return true;
         case game_menu::kSave:
             if (save()) {
                 say("Game saved.");

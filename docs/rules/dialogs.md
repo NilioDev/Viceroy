@@ -32,7 +32,13 @@ braces), enhance 0x80 and shadow 0x2F.
   the box less 8 and 11 high.
 - The box ends 2 pixels below the last choice's 12-pixel line.
 - `@smallfont` (the Train list) uses `FONTTINY.FF` without shadow: text
-  lines 6 apart, choices 8 apart with a bar 7 high.
+  lines 6 apart, choices 8 apart with a bar 7 high. The chosen line is
+  drawn in gold (0x95) instead of green (seen in Pick Music).
+- `@checkbox` (Sound Options, Colony Report Options) puts a ring before each
+  choice: the font's `]` (a ring with a dot) when on, `[` (a filled ring)
+  when off, in gold, then a space and the text. Space or the choice's key
+  letter turns it over; Return keeps the changes, Escape drops them. A `~`
+  in a choice makes the next letter gold, as in the menus.
 - Lists of things to buy put the choices at x + 13 and a value such as
   "(Cost: 1000)" right-aligned to end at x + width − 13. Choices that can't
   be had are grey: letters 0x08, with the same enhance and shadow.

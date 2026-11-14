@@ -19,6 +19,10 @@ struct Dialog {
     std::vector<std::string> options; // the choices, top to bottom
     std::vector<std::string> values;  // beside a choice, on the right: "(Cost: 600)"
     std::vector<bool> disabled;       // greyed choices the cursor skips
+    // @checkbox: every choice is an option that is on or off, marked by a
+    // ring with a dot (on) or a filled ring (off) in front of it.
+    bool checkbox = false;
+    std::vector<bool> checked;
     int selected = 0;
     bool small = false; // @smallfont: FONTTINY, for long lists
     bool help = false;  // "(F1 for Help)" in the corner
@@ -101,6 +105,8 @@ void drawWoodBox(Screen& screen, const Art& art, Rect box);
 void drawCombatAnalysis(Screen& screen, const Art& art, const Game& game, const CombatAnalysis& analysis);
 
 // Moves the bar to the next choice that is not greyed, by +1 or -1.
+// In a checkbox box: the choice whose first letter is `letter`, or -1.
+int checkboxForLetter(const Dialog& dialog, char letter);
 void stepSelection(Dialog& dialog, int by);
 
 // The box's height in pixels.

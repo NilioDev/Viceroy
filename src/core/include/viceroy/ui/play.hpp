@@ -20,6 +20,9 @@
 #include <vector>
 
 namespace viceroy {
+namespace sound {
+class BackgroundMusic;
+} // namespace sound
 
 enum class Command {
     MoveN,
@@ -106,6 +109,9 @@ public:
     bool reportUp() const { return congressReport_; }
     // Set by the app after loading Art: needed for message boxes.
     void setArt(const Art* art) { art_ = art; }
+    // The music the Sound Options and Pick Music change (none: they only
+    // change the savegame).
+    void setMusic(sound::BackgroundMusic* music);
     // The colony opened last, or -1.
     int lastColony() const { return lastColony_; }
     // A line in the panel, as the game's own messages.
@@ -133,6 +139,9 @@ public:
     // A letter typed while a menu is open picks the entry with that gold
     // letter.
     void menuLetter(char letter);
+    // A letter typed while a box of options is open turns that option on
+    // or off.
+    void dialogLetter(char letter);
     // Exit to DOS was picked.
     bool quitRequested() const { return quit_; }
     // Load Game was picked with the mouse: back to the load menu.
@@ -152,6 +161,10 @@ private:
     bool pickMenuEntry(int entry); // false: back to the load menu
     void stepMenu(int delta);
     void notYet();
+    bool handleCheckboxes(Command command);
+    void showSoundOptions();
+    void showPickMusic();
+    void pickTune(int tune);
     void moveActive(Step step);
     void activate(int index);
     void advance(); // to the next unit that needs orders
@@ -195,6 +208,7 @@ private:
     std::optional<ColonyViewState> colonyScreen_;
     std::optional<EuropeViewState> europeScreen_;
     std::optional<Dialog> dialog_;
+    sound::BackgroundMusic* music_ = nullptr;
     std::string question_; // the GAME.TXT section the dialog asks
     int questionUnit_ = -1;
     std::vector<int> choices_; // what each choice of a list stands for
