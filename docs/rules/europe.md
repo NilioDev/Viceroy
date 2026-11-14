@@ -79,7 +79,8 @@ The original also keeps the gold and tons traded per good (at 124 and at
 **Not yet known:** a sale of 100 sugar added 107 to the volume, but 100
 furs added exactly 100; we add the amount itself. Also not yet known are
 how the volume recovers each turn (the `attrition` column), what
-`volatility` does, how other nations' trade moves prices, and boycotts.
+`volatility` does and how other nations' trade moves prices. Boycotts are
+in [king.md](king.md).
 
 ### The trade note
 

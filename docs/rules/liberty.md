@@ -69,8 +69,10 @@ the player's colonies lose work to tories; the computer nations' never do.
   17 with a penalty of 1, 13 with 2).
 - The colony's own square gets the bonus but not the penalty.
 
-**Not yet done:** the nation-wide messages about rebel sentiment
-(`@REBELUP`, `@REBELUP50`, `@REBELDOWN`), `@SONSUP`/`@SONSDOWN` and the
+The nation-wide messages about rebel sentiment (`@REBELUP`, `@REBELUP50`,
+`@REBELDOWN`) and `@SONSUP`/`@SONSDOWN` are in [king.md](king.md).
+
+**Not yet done:** the
 inefficient government message (`@INEFFICIENT`, `@EFFICIENT`). Founding
 fathers that add bells (Jefferson, Paine) come with the Continental
 Congress.

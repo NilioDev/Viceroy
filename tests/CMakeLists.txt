@@ -19,6 +19,7 @@ add_executable(vcr_tests
     test_natives.cpp
     test_euro_ai.cpp
     test_congress.cpp
+    test_king.cpp
     test_rumours.cpp
     test_routes.cpp
     test_menu.cpp

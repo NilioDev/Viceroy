@@ -8,6 +8,7 @@
 
 #include "viceroy/render/game_view.hpp"
 
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -37,6 +38,11 @@ struct Dialog {
     int unit = -1;     // the unit whose picture stands there (drawn by the screen)
     int portraitX = 0;
     int portraitY = 0;
+    // A second sheet drawn over the portrait at the same corner, one frame
+    // at a time: the King's arm (KING2.SS). The screen moves the frame on.
+    int overlay = -1;
+    int overlayFrame = 0;
+    std::uint64_t shownMs = 0; // how long the box has been up
 };
 
 // Portraits in Art::portraits.
@@ -47,6 +53,20 @@ inline constexpr int kReligiousAdvisor = 3; // MSS4.SS: immigration
 inline constexpr int kColonialAdvisor = 4;  // MSS1.SS: Sons of Liberty
 inline constexpr int kBuyAdvisor = 5;       // MSS5.SS: buying a construction
 inline constexpr int kNativePortraits = 6;  // IND0A0.SS to IND7A3.SS: four moods per tribe
+inline constexpr int kKingPortrait = kNativePortraits + 32; // KING.SS
+inline constexpr int kKingArm = kKingPortrait + 1;          // KING2.SS: his arm, eight frames
+
+// The King's arm: still for about four seconds, then it rises through
+// frames 1 to 7, about a sixth of a second each, and stays up (measured).
+constexpr int kingArmFrame(std::uint64_t shownMs) {
+    constexpr std::uint64_t kStill = 4100;
+    constexpr std::uint64_t kStep = 170;
+    if (shownMs < kStill) {
+        return 0;
+    }
+    const auto frame = 1 + (shownMs - kStill) / kStep;
+    return frame > 7 ? 7 : static_cast<int>(frame);
+}
 
 // The box for a GAME.TXT section, with %STRING0, %STRING1, ... and
 // %NUMBER0, ... filled in. Text is joined and wrapped to the section's
@@ -58,6 +78,10 @@ Dialog makeDialog(const Art& art, std::string_view section, const std::vector<st
 
 // Adds a choice; a value goes on the right.
 void addOption(Dialog& dialog, std::string text, std::string value = {}, bool disabled = false);
+// Every line of a GAME.TXT section that holds only choices (@TAXOPTIONS)
+// becomes a choice of the box, with %STRINGs and %NUMBERs filled in.
+void addOptionsFrom(const Art& art, Dialog& dialog, std::string_view section, const std::vector<std::string>& strings,
+                    const std::vector<int>& numbers = {});
 
 // The questions asked in the home port: the agent stands behind the box,
 // which is centred on the harbour (or on the screen when it is too tall).
@@ -95,6 +119,9 @@ void placeCentredDialog(Dialog& dialog);
 void placeNativeDialog(Dialog& dialog, int tribe, int mood = 0, int chiefWidth = 0, int chiefHeight = 0);
 // The naval advisor over the left end of the box (sea matters).
 void placeNavalDialog(Dialog& dialog);
+// The King speaks: he stands left of the box (measured once, with a box
+// 196 wide and 126 high centred on the screen's rows).
+void placeKingDialog(Dialog& dialog);
 // The tutorial's hints: the naval advisor, his hands over the box.
 void placeTutorialDialog(Dialog& dialog);
 // The name of a European nation as the messages use it ("the Netherlands").

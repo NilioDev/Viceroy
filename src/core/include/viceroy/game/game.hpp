@@ -93,6 +93,15 @@ struct GameNotice {
     std::vector<std::pair<int, int>> countries{};
     // %STRINGs that are a nation's home port ("London").
     std::vector<std::pair<int, int>> ports{};
+    // %STRINGs that are a line of a section of NAMES.TXT (names true) or of
+    // GAME.TXT: which string, the section and the row.
+    struct TextLine {
+        int string = 0;
+        bool names = true;
+        std::string section;
+        int row = 0;
+    };
+    std::vector<TextLine> lines{};
     // The music that goes with it, when the box shows.
     std::vector<MusicCue> music{};
 };
@@ -524,6 +533,31 @@ public:
     const std::array<int, kFatherCategories>& fatherCandidates() const { return fatherCandidates_; }
     void chooseFather(int category);
 
+    // --- The King (docs/rules/king.md) ---------------------------------------
+    // A good the nation may not trade in Europe since a tea party.
+    bool isBoycotted(int nation, int good) const;
+    // What the human must pay to end a boycott (@KISSUP): 500 times the
+    // good's price in Europe.
+    int backTaxes(int good) const;
+    // Pays the back taxes and ends the boycott; false (notice KISSSORRY)
+    // when the treasury is short.
+    bool payBackTaxes(int good);
+    // A rise in tax the player may answer with a party (TAXOPTIONS): the
+    // notice that asks has kTaxQuestion as its value.
+    static constexpr int kTaxQuestion = 1;
+    bool taxRaiseWaiting() const { return taxRaise_.amount > 0; }
+    // The second choice ("Hold 'Boston Tea Party.'"): the rise is undone,
+    // up to 100 of the good go into the sea and the good is boycotted
+    // (notice TEAPARTY).
+    void answerTaxRaise(bool party);
+    // Changes the nation's tax by `amount` (within 0 and 75). The human is
+    // told with `notice` (KINGTAX, KINGWAR, ...), and a rise may be met
+    // with a party.
+    void changeTax(int nation, int amount, GameNotice notice);
+    // The nation's rebels: its colonies' Sons of Liberty, weighted by their
+    // people.
+    int nationRebelPercent(int nation) const;
+
     // --- Map -----------------------------------------------------------------
     void reveal(int x, int y, int radius, int nation);
     // What a chief's tales show: the land of the same landmass within the
@@ -729,6 +763,22 @@ private:
     };
     Burial burial_;
     void searchBurial(const Burial& b);
+    // The King (king.cpp).
+    struct TaxRaise {
+        int amount = 0; // 0: none waiting
+        int good = -1;
+        int colony = -1;
+        int nation = -1;
+    };
+    TaxRaise taxRaise_;
+    // A nation's turn starts: the King may change its tax. `turn` and
+    // `year` are those of the turn that starts.
+    bool kingTax(int nation, int turn, int year);
+    // After the nation's colonies: its rebels are counted, and the King
+    // spends on his army.
+    void rebelSentiment(int nation);
+    void kingArmyGrowth(int nation);
+    int royalUnitType(int kind, int nation) const;
     // The Continental Congress.
     int fatherEra() const;
     int fathersAvailable(int nation, int category) const;

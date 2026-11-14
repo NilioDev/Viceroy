@@ -183,6 +183,7 @@ private:
     void ask(std::string_view section, int unit, std::vector<std::string> strings = {}, int nation = -1,
              std::vector<int> numbers = {});
     void tellPriceMove(int good, int move);
+    void askBackTaxes(int good);
     void openRecruit();
     void openPurchase();
     void openTrain();

@@ -56,7 +56,10 @@ touch controls.
 > your build lists, and with Paul Revere your colonists take up muskets to
 > defend a colony. The Continental Congress report (F3) shows the next
 > session, the bells toward it, the rebels and tories, the King's forces
-> and the fathers in congress. The other nations elect their own
+> and the fathers in congress. The King raises your taxes as he does in the
+> original; you may refuse a rise with a party that boycotts the good in
+> Europe until you pay the back taxes. He builds up his army, and he tells
+> you when your colonists' rebel sentiment rises or falls. The other nations elect their own
 > fathers as the original's do. A tribe you meet for the first time
 > offers you peace; refusing it angers the tribe. Missionaries can found missions,
 > which the tribe takes well or badly as in the original, pay a tribe to
