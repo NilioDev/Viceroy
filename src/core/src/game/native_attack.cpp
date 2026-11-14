@@ -89,14 +89,37 @@ void Game::attackVillageWar(int index, int settlement) {
     // Measured: the war bit on both sides, the tribe's tension up by 10
     // and twice the difficulty level (10, 14, 18 on levels 0, 2, 4, from 0
     // and from 40 alike), and the high byte of the village's alarm one up.
-    auto& relation = save_.nations[static_cast<std::size_t>(nation)].raw[kNationRelations + static_cast<std::size_t>(s.nation)];
+    makeWarOnTribe(nation, tribe);
+    // Read from the original: three times that at the tribe's capital.
+    const int amount = kAttackTension + 2 * save_.difficulty;
+    changeTension(tribe, nation, (s.raw[3] & kSettlementCapital) != 0 ? 3 * amount : amount);
+    addAlarm(s, nation, kAttackAlarm);
+}
+
+void Game::makeWarOnTribe(int nation, int tribe) {
+    if (nation < 0 || nation >= kEuropeanNations || tribe < 0 || tribe >= kTribes) {
+        return;
+    }
+    auto& relation = save_.nations[static_cast<std::size_t>(nation)]
+                         .raw[kNationRelations + static_cast<std::size_t>(kEuropeanNations + tribe)];
     relation = static_cast<std::uint8_t>(relation | kWar);
     if (save_.tribesAndMore.size() >= tribeByte(tribe, kTribeRecordSize)) {
         auto& back = save_.tribesAndMore[tribeByte(tribe, kTribeRelations + static_cast<std::size_t>(nation))];
         back = static_cast<std::uint8_t>(back | kWar);
     }
-    changeTension(tribe, nation, kAttackTension + 2 * save_.difficulty);
-    addAlarm(s, nation, kAttackAlarm);
+}
+
+bool Game::asksBeforeAttackingTribe(int index, int tribe) const {
+    // Read from the original: the player is asked before attacking braves
+    // of a tribe that is not at war with the nation and whose tension is
+    // under 75.
+    const int nation = unit(index).nation;
+    if (nation != human() || tribe < 0 || tribe >= kTribes) {
+        return false;
+    }
+    const auto relation = save_.nations[static_cast<std::size_t>(nation)]
+                              .raw[kNationRelations + static_cast<std::size_t>(kEuropeanNations + tribe)];
+    return (relation & kWar) == 0 && tribeTension(save_, tribe, nation) < 75;
 }
 
 int Game::villageDefenderUnit(int settlement, int attacker) const {

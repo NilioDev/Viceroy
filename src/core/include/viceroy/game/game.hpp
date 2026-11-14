@@ -461,6 +461,13 @@ public:
     // tribe 10 and twice the difficulty level more tense, and the
     // village's alarm up.
     void attackVillageWar(int unit, int settlement);
+    // "Shall we attack the Sioux?" (WHACKINDIANS) before the player's unit
+    // attacks braves of a tribe at peace with it; Yes makes war on it.
+    bool asksBeforeAttackingTribe(int unit, int tribe) const;
+    void makeWarOnTribe(int nation, int tribe);
+    // At the end of the turn: converts alone outside a colony for more than
+    // eight turns return to their tribe (DEADCONVERTS).
+    void loseFaith();
     // Who defends the village: a native unit on its square, or else -1 and
     // one of its people stands up as a brave (armed when the tribe has
     // muskets, mounted when it has 25 horses).

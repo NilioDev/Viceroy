@@ -727,6 +727,7 @@ void Game::endTurn() {
     offerMercenaries();
     gatherCrosses();
     repairShips();
+    loseFaith();
     sailOn();
     for (int i = 0; i < unitCount(); ++i) {
         auto& u = save_.units[static_cast<std::size_t>(i)];
