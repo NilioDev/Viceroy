@@ -118,11 +118,13 @@ touch controls.
 > ask for the goods they lack, put their colonists to work, choose what
 > to build, teach in their schools, train farmers and fishermen, and plow,
 > clear and lay roads on their own land. Wagon trains and ships can trade with the
-> natives: sell, haggle, give and buy at the original's prices. Soldiers,
+> natives: sell, haggle, give and buy at the original's prices, unless an angry
+> tribe turns them away or makes a wagon train disappear. Soldiers,
 > scouts and other armed units can demand tribute, which a village pays
 > in goods for your nearest colony when your forces nearby impress it, and
 > the chief's face shows how angry the tribe is. They can also attack a
-> village and burn it, for treasure, converts and the tribe's anger. Fish,
+> village and burn it, for treasure, converts and the tribe's anger; a tribe
+> that loses its last settlement is extinct. Fish,
 > ore and the other resources show on the map where the original puts them
 > and add to what your colonists make there. Lost city rumours show on the
 > map too, and exploring one brings what it brings in the original: a

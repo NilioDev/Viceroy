@@ -718,7 +718,11 @@ at (4, 18) in `COLONY00.SAV` (easiest level):
   there (unit byte 6 is their home) are gone, the other natives' home
   numbers above it move down, the tribe's settlement count (byte 581 +
   tribe of the block after the tribe records) drops by one, and the
-  nation's count of burned villages (its byte 24) goes up. A human
+  nation's count of burned villages (its byte 24) goes up. The settlement
+  takes its share of the tribe's breeding (byte 8) and horses (word 10)
+  with it: each drops by its value divided by the settlements there were.
+  When the last settlement burns the tribe is gone (bit 0x80 of byte 3)
+  and everyone hears that it is extinct (`@EXTINCT`). A human
   player's burning sets bit 0x40 of the tribe's byte 3. The attacker's
   own mission sends its missionary out onto the settlement's square (a
   Jesuit for an expert mission).
@@ -749,6 +753,19 @@ at (4, 18) in `COLONY00.SAV` (easiest level):
 A wagon train, or a ship sailing into a coastal settlement, of a nation
 that has met the tribe is offered **Trade With Village**. Trading uses up
 the unit's moves.
+
+**Refusals** (read from the original). A ship that comes to the village
+of a tribe that has not met the nation's men on land (bit 0x20 of the
+tribe's relation byte 58 + nation) is turned back before the menu: "We
+must contact the Indians on land first" (`@DONTKNOWSHIPS`). One that comes
+while the tribe's tension is 75 or more, or the settlement's alarm 64 or
+more, hears that the tribe does not trust the men in the ships
+(`@MADATSHIPS`, from the tribe's figure). A wagon train that chooses to
+trade with a tribe at tension 75 or more meets a roll of 0 to 500: at or
+under the tension the wagon train disappears without a trace, cargo and
+all (`@KILLWAGONS`); at or under twice the tension the tribe will not trade
+(`@MADATWAGONS`); above that it receives the wagons grudgingly
+(`@GRUDGEWAGONS`) and the trade goes on.
 
 **Selling.** With more than one hold the player picks the cargo
 (`@TRADEWHICH`). The village's wants are its economy's, less the three

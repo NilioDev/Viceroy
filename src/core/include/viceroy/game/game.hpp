@@ -204,6 +204,9 @@ public:
     // (SaveUnit::kPlow), or builds a road (SaveUnit::kRoad). Each job uses
     // 20 tools; a pioneer without tools is a colonist again. The timings
     // are measured: docs/rules/pioneers.md.
+    // The settlement is gone with the braves who live there; a tribe left
+    // without settlements is wiped out (notice EXTINCT).
+    void burnSettlement(int settlement);
     // The natives' land (native_land.cpp).
     // What the tribe of the settlement asks the nation for the square.
     int landPrice(int settlement, int nation, int x, int y) const;
@@ -364,6 +367,14 @@ public:
     // Trade with a settlement: a wagon train or a ship of a nation that has
     // met the tribe. Read from the original; see docs/rules/natives.md.
     bool canTradeWithVillage(int unit, int settlement) const;
+    // Before a ship's menu at the village: DONTKNOWSHIPS when the tribe has
+    // not met the nation on land, MADATSHIPS when it is too tense or the
+    // settlement too alarmed; empty: the menu follows.
+    std::string shipTradeRefusal(int unit, int settlement) const;
+    // A wagon train offered to trade with a tense tribe: KILLWAGONS (the
+    // wagon train is gone), MADATWAGONS (no trade) or GRUDGEWAGONS (the trade
+    // goes on); empty when the tribe is calm enough.
+    std::string wagonTradeWelcome(int unit, int settlement);
     struct VillageSale {
         std::string refusal;        // BADCARGO or BADHAGGLE1; empty: an offer
         std::array<int, 3> wants{}; // what the village asks for instead
@@ -1068,7 +1079,6 @@ private:
     int settlementQuarters(int settlement) const;
     void loseNative(int loser);
     void winAgainstVillage(int attacker, int settlement);
-    void burnSettlement(int settlement);
     // What a tribe's raiding party does to a colony after its fight there.
     void raidColony(int nation, int colony, int home, bool always);
     int villageTreasure(int nation, int tribe, bool capital);
