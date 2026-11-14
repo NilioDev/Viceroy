@@ -211,6 +211,14 @@ VCR_TEST("original files: the OPL3 driver's effects and recordings") {
     const Piece* church = driver->piece(0x8024);
     VCR_CHECK(church != nullptr && church->starts.size() == 3 && !church->onlyIfIdle);
     VCR_CHECK(driver->piece(0x5E) == nullptr && driver->piece(0x8027) == nullptr);
+    // Two independence tunes share one piece with drums on voice 3; the
+    // city of gold's tune starts three voices after a random rest.
+    const Piece* march = driver->piece(0x2B);
+    VCR_CHECK(march != nullptr && march->starts.size() == 6 && march->drumVoice == 3 && driver->piece(0x2C) != nullptr);
+    const Piece* gold = driver->piece(0x3C);
+    VCR_CHECK(gold != nullptr && gold->starts.size() == 4 && !gold->stopFirst);
+    VCR_CHECK(gold->starts[0].randomRest == 14 && gold->starts[1].randomRest == 28 &&
+              gold->starts[2].randomRest == 42 && gold->starts[3].randomRest == -1);
 
     // Without samples the FM version plays on an effect voice.
     MusicPlayer fmPlayer(*driver);

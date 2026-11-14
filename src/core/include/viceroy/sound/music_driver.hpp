@@ -23,6 +23,9 @@ struct Piece {
     struct Start {
         int voice = 0;
         std::uint16_t stream = 0;
+        // Some pieces wait a random while first: the stream's first note
+        // (a rest) lasts this many ticks plus a random 0 to 7. -1: as written.
+        int randomRest = -1;
     };
     std::vector<Start> starts;
     int drumVoice = -1;

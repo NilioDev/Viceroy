@@ -120,6 +120,7 @@ std::optional<MusicDriver> MusicDriver::load(std::span<const std::uint8_t> file)
     struct Raw {
         std::uint16_t state;
         std::uint16_t stream;
+        int randomRest = -1;
     };
     std::array<std::vector<Raw>, 0x45> raw{};
     const auto parse = [&](int index, std::size_t at) {
@@ -159,6 +160,28 @@ std::optional<MusicDriver> MusicDriver::load(std::span<const std::uint8_t> file)
                 if (last) {
                     break;
                 }
+            } else if (op == 0xE8 && code[at + 3] == 0x25 && le16(code, at + 4) == 7 && code[at + 6] == 0x05 &&
+                       code[at + 9] == 0x8D && code[at + 10] == 0x1E && code[at + 13] == 0x88 &&
+                       code[at + 14] == 0x47 && code[at + 15] == 0x01 && code[at + 16] == 0x8B &&
+                       code[at + 17] == 0xCB && (code[at + 18] == 0xE8 || code[at + 18] == 0xE9)) {
+                // "random number, and 7, add n; lea bx, stream; mov [bx+1], al;
+                // mov cx, bx; call start_voice_n": the first note's length.
+                const std::size_t call = at + 18;
+                const std::size_t target =
+                    (call + 3 + static_cast<std::size_t>(static_cast<std::int16_t>(le16(code, call + 1)))) & 0xFFFF;
+                const std::uint16_t state = voiceStub(code, target);
+                if (state == 0) {
+                    ok = false;
+                    break;
+                }
+                raw[static_cast<std::size_t>(index)].push_back({state, le16(code, at + 11), le16(code, at + 7)});
+                firstVoice = std::min(firstVoice, state);
+                at = call + 3;
+                if (code[call] == 0xE9) {
+                    break;
+                }
+            } else if (op == 0x83 && code[at + 1] == 0x3E) { // cmp word [x], n: nothing follows from it
+                at += 5;
             } else if (op == 0xE8) { // a call: the "fade every voice" routine
                 const std::size_t target =
                     (at + 3 + static_cast<std::size_t>(static_cast<std::int16_t>(le16(code, at + 1)))) & 0xFFFF;
@@ -261,7 +284,7 @@ std::optional<MusicDriver> MusicDriver::load(std::span<const std::uint8_t> file)
         for (const Raw& r : raw[i]) {
             const int voice = toVoice(r.state);
             if (voice >= 0 && voice < 9) {
-                d.pieces_[i].starts.push_back({voice, r.stream});
+                d.pieces_[i].starts.push_back({voice, r.stream, r.randomRest});
             }
         }
         d.known_[i] = !d.pieces_[i].starts.empty() || d.pieces_[i].sample >= 0 || !d.pieces_[i].effectStreams.empty();
@@ -499,6 +522,10 @@ bool MusicPlayer::command(int command) {
         stop();
     }
     for (const Piece::Start& s : p->starts) {
+        if (s.randomRest >= 0) {
+            mem_[static_cast<std::uint16_t>(s.stream + 1)] =
+                static_cast<std::uint8_t>(((random() & 7) + s.randomRest) & 0xFF);
+        }
         startVoice(s.voice, s.stream);
     }
     return true;
