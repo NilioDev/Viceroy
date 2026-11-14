@@ -516,6 +516,9 @@ VCR_TEST("original files: the Colonizopedia's index and pages (seen in the origi
     const auto braves = pediaPageLines(art, pedia::kUnit, 21);
     VCR_CHECK(braves.size() > 2 && braves[1].ends_with("brought them"));
     VCR_CHECK(braves[2].starts_with("in the late"));
+    // A line of the file without a trailing space counts 3 pixels more.
+    const auto sugar = pediaPageLines(art, pedia::kCargo, 1);
+    VCR_CHECK(sugar.size() > 2 && sugar[1].ends_with("profit or converted"));
 
     std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
     const Bytes bytes(std::istreambuf_iterator<char>(in), {});

@@ -131,14 +131,15 @@ Seen in the original (PEDIA.TXT holds the pages, `@PEDIA` the parts):
   the text of `@CARGOn`, `@UNITn`, `@TERRAINn`, `@JOBn`, `@BUILDINGn` or
   `@FATHERn` from x 10, 7 rows a line: its first line (the name) alone,
   the rest wrapped, a line with only `^` leaving an empty line, braces in
-  gold. The text starts at y 83 for goods, 69 for units (89 for the free
+  gold. The text starts at y 43 plus 20 for each row of goods, 69 for units (89 for the free
   colonist), 85 for terrain, 119 for skills, 67 for buildings and 33 for
   founding fathers, below the pictures of the page.
-- **Wrapping**, worked out from the breaks of 53 lines on ten pages: the
-  line breaks of PEDIA.TXT do not count; a word goes on the line while the
-  line stays within 286 pixels, measuring each space as 1 pixel, a word
-  that ends a sentence 1 pixel narrower and the space after it as 3, and
-  the paragraph's last word 4 pixels wider.
+- **Wrapping**, worked out from the breaks of 170 lines on 44 pages: a
+  word goes on the line while the line stays within 286 pixels, measuring
+  each space as 1 pixel, a word that ends a sentence 1 pixel narrower and
+  the space after it as 2, 3 more where a line of PEDIA.TXT ends without a
+  trailing space, and the paragraph's last word 4 pixels wider. Three of
+  the 170 breaks do not follow this (Continental Cavalry, Furs, Tools).
 - **A unit's page:** the unit in the player's colour at (8, 33), with its
   orders box showing "-", and its name in green 6 rows lower, 18 pixels
   right of the last picture. Units with an expert (soldier, dragoon,
@@ -150,5 +151,12 @@ Seen in the original (PEDIA.TXT holds the pages, `@PEDIA` the parts):
   soldiers and dragoons (half as much again), "(Attack: +n Damaged: -2)"
   for artillery, "Moves: n" and "(Cargo Holds: n)" for units that carry.
   The caravel's box is before its bow.
+- **A good's page:** one row for each good of its chain, 20 apart from y
+  33: food and fish; sugar and rum; tobacco and cigars; cotton and cloth;
+  furs and coats; lumber and hammers; ore, tools and muskets; silver alone.
+  Each row: the expert at (10, y - 2), one load at x 24, six loads from x
+  40 four apart, and "Cloth (With Master Weavers)" in green at (76, y + 4).
+  Horses and trade goods have no expert: their row starts 14 further left
+  and has only the name. The text starts at y 43 + 20 per row.
 - F1 on the map opens the page of the active unit's square (its mountains
   or hills, else its forest or ground); a key goes back to the map.

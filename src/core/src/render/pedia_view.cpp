@@ -95,23 +95,32 @@ int textTop(int part) {
     }
 }
 
-// Lines of a paragraph as the original breaks them, worked out from its
-// pages: a word goes on the line while the line stays within 286 pixels,
-// measured with each space one pixel wide, a word ending a sentence one
-// pixel narrower and three after it, and the paragraph's last word four
-// pixels wider.
+// Lines of a paragraph as the original breaks them, worked out from the
+// line breaks of 44 pages: a word goes on the line while the line stays
+// within 286 pixels, measured with each space one pixel wide, a word ending
+// a sentence one pixel narrower and two after it, a line of PEDIA.TXT that
+// ends without a space three more before the next word, and the
+// paragraph's last word four pixels wider. Three of the 170 breaks seen do
+// not follow this. kBareBreak marks where a line of the file ended without a
+// space.
+constexpr char kBareBreak = '\v';
+
 std::vector<std::string> wrapPage(const Art& art, const std::string& text) {
     constexpr int kLimit = 286;
     constexpr int kLastWordExtra = 4;
     std::vector<std::string> words;
+    std::vector<bool> afterBare;
     std::size_t i = 0;
     while (i < text.size()) {
-        while (i < text.size() && (text[i] == ' ' || text[i] == '\n')) {
+        bool bare = false;
+        while (i < text.size() && (text[i] == ' ' || text[i] == '\n' || text[i] == kBareBreak)) {
+            bare = bare || text[i] == kBareBreak;
             ++i;
         }
-        const std::size_t end = std::min(text.find_first_of(" \n", i), text.size());
+        const std::size_t end = std::min(text.find_first_of(" \n\v", i), text.size());
         if (end > i) {
             words.push_back(text.substr(i, end - i));
+            afterBare.push_back(bare);
         }
         i = end;
     }
@@ -126,6 +135,9 @@ std::vector<std::string> wrapPage(const Art& art, const std::string& text) {
     for (std::size_t w = 0; w < words.size(); ++w) {
         const int wordWidth = markedWidth(art.tiny, words[w]) - (endsSentence(words[w]) ? 1 : 0) +
                               (w + 1 == words.size() ? kLastWordExtra : 0);
+        if (afterBare[w]) {
+            gap += 3;
+        }
         if (!line.empty() && width + gap + wordWidth > kLimit) {
             lines.push_back(line);
             line.clear();
@@ -137,7 +149,7 @@ std::vector<std::string> wrapPage(const Art& art, const std::string& text) {
             line += " " + words[w];
             width += gap + wordWidth;
         }
-        gap = endsSentence(words[w]) ? 3 : 1;
+        gap = endsSentence(words[w]) ? 2 : 1;
     }
     if (!line.empty()) {
         lines.push_back(line);
@@ -155,9 +167,14 @@ std::vector<std::string> pageLines(const Art& art, int part, int id) {
     }
     std::vector<std::string> paragraphs;
     bool title = true;
+    bool previousBare = false; // the last line of text ended without a space
     for (const auto& raw : section->lines) {
         std::string line = raw;
-        while (!line.empty() && (line.back() == ' ' || line.back() == '\r')) {
+        while (!line.empty() && line.back() == '\r') {
+            line.pop_back();
+        }
+        const bool bare = !line.empty() && line.back() != ' ';
+        while (!line.empty() && line.back() == ' ') {
             line.pop_back();
         }
         if (!line.empty() && line[0] == '@') {
@@ -169,6 +186,8 @@ std::vector<std::string> pageLines(const Art& art, int part, int id) {
         if (line.empty()) {
             continue;
         }
+        const bool joinAfterBare = previousBare;
+        previousBare = bare;
         if (line[0] == '^') {
             paragraphs.push_back(line.substr(1));
             title = paragraphs.size() == 1;
@@ -183,7 +202,8 @@ std::vector<std::string> pageLines(const Art& art, int part, int id) {
             title = false;
             continue;
         }
-        paragraphs.back() += "\n" + line;
+        paragraphs.back() += joinAfterBare ? kBareBreak : '\n';
+        paragraphs.back() += line;
     }
     for (std::size_t i = 0; i < paragraphs.size(); ++i) {
         if (i > 1 || (i == 1 && paragraphs[0].empty())) {
@@ -302,6 +322,80 @@ void drawUnitPage(Screen& screen, const Art& art, int type, const std::string& n
         say(screen, art, x, y + 24, item, kGreen);
         x += Screen::textWidth(art.tiny, item) + 6;
     }
+}
+
+// A goods page: a row for each good of its chain, the expert who makes it,
+// one load and six loads, then "Cloth (With Master Weavers)" (seen).
+struct GoodsRow {
+    int good;
+    int job;        // the expert's row of @JOB, -1 for none
+    int label = -1; // a MISC row naming the row instead of the good
+    int icon = -1;  // a picture other than the good's
+};
+
+constexpr int kFishLabel = 177;
+constexpr int kFishIcon = 57;
+constexpr int kHammers = 16;
+constexpr int kHammersIcon = 54;
+
+std::vector<GoodsRow> goodsRows(int good) {
+    // The chains as seen: what is grown or dug and what is made of it.
+    switch (good) {
+    case 0:
+        return {{0, 0}, {0, 8, kFishLabel, kFishIcon}}; // food, and fish
+    case 1:
+    case 9:
+        return {{1, 1}, {9, 9}}; // sugar, rum
+    case 2:
+    case 10:
+        return {{2, 2}, {10, 10}}; // tobacco, cigars
+    case 3:
+    case 11:
+        return {{3, 3}, {11, 11}}; // cotton, cloth
+    case 4:
+    case 12:
+        return {{4, 4}, {12, 12}}; // furs, coats
+    case 5:
+        return {{5, 5}, {kHammers, 13, -1, kHammersIcon}}; // lumber, hammers
+    case 6:
+    case 14:
+    case 15:
+        return {{6, 6}, {14, 14}, {15, 15}}; // ore, tools, muskets
+    case 7:
+        return {{7, 7}};
+    default:
+        return {{good, -1}}; // horses, trade goods: no expert
+    }
+}
+
+constexpr int kGoodsIcon = 22;
+constexpr int kGoodsRowStep = 20;
+
+// Returns the number of rows.
+int drawGoodsPage(Screen& screen, const Art& art, int good) {
+    int y = kPictureY;
+    const auto rows = goodsRows(good);
+    for (const auto& row : rows) {
+        const auto j = static_cast<std::size_t>(row.job);
+        // Without an expert the row starts where the expert would stand.
+        const int dx = row.job >= 0 ? 0 : -14;
+        if (row.job >= 0) {
+            blitSprite(screen, art.icons, colonistIcon(row.job), 10, y - 2);
+        }
+        const int icon = row.icon >= 0 ? row.icon : kGoodsIcon + row.good;
+        blitSprite(screen, art.icons, icon, 24 + dx, y);
+        for (int k = 0; k < 6; ++k) {
+            blitSprite(screen, art.icons, icon, 40 + dx + 4 * k, y);
+        }
+        std::string text =
+            row.label >= 0 ? label(art, row.label, "Fish") : firstField(textLine(art.names, "CARGO", row.good, ""));
+        if (row.job >= 0 && j < art.rules.jobs.size()) {
+            text += " (" + label(art, 178, "With") + " " + art.rules.jobs[j].expertName + ")";
+        }
+        say(screen, art, 76 + dx, y + 4, text, kGreen);
+        y += kGoodsRowStep;
+    }
+    return static_cast<int>(rows.size());
 }
 
 std::string partName(const Art& art, int part) { return textLine(art.pedia, "PEDIA", part, ""); }
@@ -464,6 +558,10 @@ void drawPedia(Screen& screen, const Art& art, const PediaState& state, int nati
     }
     bool gold = false;
     int y = textTop(state.part);
+    if (state.part == pedia::kCargo) {
+        // Seen: the text starts 23 rows below the last row of goods.
+        y = kPictureY + kGoodsRowStep * drawGoodsPage(screen, art, state.page) + 10;
+    }
     if (state.part == pedia::kUnit && state.page == 0) {
         y += kPictureRowStep; // the second row of colonists
     }
