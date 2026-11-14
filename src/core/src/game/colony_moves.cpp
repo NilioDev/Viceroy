@@ -336,6 +336,7 @@ int Game::moveColonist(int c, ColonyMover who, int job, int square) {
         const auto at = static_cast<std::size_t>(colonist);
         colony.skills[at] = static_cast<std::uint8_t>(colonySkill(unit(who.unit).profession));
         colony.jobs[at] = static_cast<std::uint8_t>(job::kStatesman);
+        setJobTurns(colony, colonist, 0);
         ++colony.population;
         joinLiberty(colony, save_.map, rules_, save_.difficulty);
         removeUnit(who.unit);
@@ -347,6 +348,127 @@ int Game::moveColonist(int c, ColonyMover who, int job, int square) {
         assignJob(colony, save_.map, rules_, save_.colonies, colonist, job);
     }
     return -1;
+}
+
+void Game::teach(int c) {
+    // Read from the original. Every colonist's turns at their job go up by
+    // one (to 15 at most). A teacher finishes a lesson after 4, 6 or 8
+    // turns (by the level of their skill), three lessons at most a turn,
+    // and starts again. Each lesson goes to one of the colony's criminals,
+    // servants and free colonists, picked at random: a criminal becomes a
+    // servant, a servant a free colonist, a free colonist learns the
+    // teacher's skill.
+    auto& colony = save_.colonies[static_cast<std::size_t>(c)];
+    std::vector<int> students;
+    std::vector<int> lessons;
+    for (int i = 0; i < colony.population; ++i) {
+        const auto ui = static_cast<std::size_t>(i);
+        int turns = jobTurns(colony, i) + 1;
+        const int skill = colony.skills[ui];
+        if (skill == skill::kCriminal || skill == skill::kServant || skill == skill::kFreeColonist ||
+            skill == skill::kFreeColonistUnit) {
+            students.push_back(i);
+        }
+        if (colony.jobs[ui] == job::kTeacher && lessons.size() < 3) {
+            const int row = skill == skill::kFreeColonist ? skill::kServant : skill;
+            const int level = row >= 0 && static_cast<std::size_t>(row) < rules_.jobs.size()
+                                  ? rules_.jobs[static_cast<std::size_t>(row)].skillLevel
+                                  : 4;
+            const int need = level == 1 ? 4 : level == 2 ? 6 : 8;
+            if (level < 4 && turns >= need) {
+                lessons.push_back(skill);
+                turns = 0;
+            }
+        }
+        setJobTurns(colony, i, turns);
+    }
+    const bool told = colony.nation == human() && colonyReportOn(colony_report::kTraining);
+    for (const int lesson : lessons) {
+        if (students.empty()) {
+            if (told) {
+                notices_.push_back(GameNotice{"TRAINFAIL", {colony.name}, -1, {}, c});
+            }
+            break;
+        }
+        const auto pick = static_cast<std::size_t>(nextRandom(static_cast<int>(students.size())));
+        auto& skill = colony.skills[static_cast<std::size_t>(students[pick])];
+        GameNotice notice{"", {colony.name}, -1, {}, c};
+        if (skill == skill::kCriminal) {
+            skill = static_cast<std::uint8_t>(skill::kServant);
+            notice.section = "TRAINCRIMINAL";
+        } else if (skill == skill::kServant) {
+            skill = static_cast<std::uint8_t>(skill::kFreeColonist);
+            notice.section = "TRAININDENTURED";
+        } else {
+            skill = static_cast<std::uint8_t>(lesson);
+            notice.section = "TRAINPROFESSION";
+            notice.strings.push_back(static_cast<std::size_t>(lesson) < rules_.jobs.size()
+                                         ? rules_.jobs[static_cast<std::size_t>(lesson)].name
+                                         : std::string());
+        }
+        if (told) {
+            notices_.push_back(std::move(notice));
+        }
+        students.erase(students.begin() + static_cast<std::ptrdiff_t>(pick));
+    }
+}
+
+void Game::learnByDoing(int c) {
+    // Read from the original. A colonist who is not an expert (and no
+    // convert) and works as a sugar, tobacco or cotton planter or a fur
+    // trapper may learn that job, but only while the nation has no expert
+    // of it: no colonist in its colonies and no colonist, soldier, pioneer,
+    // missionary, dragoon or scout of it holds the skill. The chance a turn
+    // is 1 in 100 for a free colonist, 1 in 200 for a servant and 1 in 300
+    // for a criminal.
+    auto& colony = save_.colonies[static_cast<std::size_t>(c)];
+    std::array<int, 32> experts{};
+    auto count = [&experts](int skill) {
+        if (skill >= 0 && static_cast<std::size_t>(skill) < experts.size()) {
+            ++experts[static_cast<std::size_t>(skill)];
+        }
+    };
+    for (const auto& u : save_.units) {
+        // The unit types that are people (an unarmed colonist up to the
+        // Continental army); ships, wagons, artillery and natives are not.
+        static constexpr std::array<bool, 10> kPeople{true, true, true, true, true, true, false, true, false, true};
+        if (u.nation == colony.nation && u.type >= 0 && u.type < static_cast<int>(kPeople.size()) &&
+            kPeople[static_cast<std::size_t>(u.type)]) {
+            count(u.profession);
+        }
+    }
+    for (const auto& other : save_.colonies) {
+        if (other.nation == colony.nation) {
+            for (int i = 0; i < other.population; ++i) {
+                count(other.skills[static_cast<std::size_t>(i)]);
+            }
+        }
+    }
+    const bool told = colony.nation == human() && colonyReportOn(colony_report::kTraining);
+    for (int i = 0; i < colony.population; ++i) {
+        const auto ui = static_cast<std::size_t>(i);
+        const int job = colony.jobs[ui];
+        auto& skill = colony.skills[ui];
+        if (job < job::kSugarPlanter || job > job::kFurTrapper || skill == skill::kConvert || isExpert(skill) ||
+            experts[static_cast<std::size_t>(job)] != 0) {
+            continue;
+        }
+        const int range = skill == skill::kServant ? 200 : skill == skill::kCriminal ? 300 : 100;
+        if (nextRandom(range) != 0) {
+            continue;
+        }
+        ++experts[static_cast<std::size_t>(job)];
+        skill = static_cast<std::uint8_t>(job);
+        if (told) {
+            notices_.push_back(GameNotice{"TRAINPROFESSION",
+                                          {colony.name, static_cast<std::size_t>(job) < rules_.jobs.size()
+                                                            ? rules_.jobs[static_cast<std::size_t>(job)].name
+                                                            : std::string()},
+                                          -1,
+                                          {},
+                                          c});
+        }
+    }
 }
 
 } // namespace viceroy

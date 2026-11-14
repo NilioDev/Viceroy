@@ -3335,6 +3335,7 @@ namespace {
 
 // Rows of the menus in MENU.TXT that Viceroy acts on.
 namespace game_menu {
+constexpr int kColonyReport = 1;
 constexpr int kSoundOptions = 2;
 constexpr int kPickMusic = 3;
 constexpr int kSave = 4;
@@ -3603,6 +3604,16 @@ bool PlayScreen::handleCheckboxes(Command command) {
             if (music_ != nullptr) {
                 music_->options = options;
             }
+        } else if (question_ == "COLONYOPTIONS") {
+            // Read from the original: the ten options are set anew, the
+            // other bits of the two bytes kept.
+            int bits = game_.colonyReportBits() & ~0x3FF;
+            for (std::size_t i = 0; i < std::size(colony_report::kOrder); ++i) {
+                if (i >= d.checked.size() || !d.checked[i]) {
+                    bits |= colony_report::kOrder[i];
+                }
+            }
+            game_.setColonyReportBits(bits);
         }
         break;
     case Command::Cancel:
@@ -3655,6 +3666,18 @@ void PlayScreen::showSoundOptions() {
     dialog_->checked.resize(dialog_->options.size());
 }
 
+void PlayScreen::showColonyReportOptions() {
+    // Read from the original: a ticked option is one whose bit is clear.
+    ask("COLONYOPTIONS", -1);
+    if (!dialog_) {
+        return;
+    }
+    dialog_->checked.assign(dialog_->options.size(), false);
+    for (std::size_t i = 0; i < dialog_->checked.size() && i < std::size(colony_report::kOrder); ++i) {
+        dialog_->checked[i] = game_.colonyReportOn(colony_report::kOrder[i]);
+    }
+}
+
 void PlayScreen::showPickMusic() {
     // Seen: the bar starts on the tune that is playing.
     ask("PICKMUSIC", -1);
@@ -3697,6 +3720,9 @@ bool PlayScreen::pickMenuEntry(int entry) {
     menu_.reset();
     if (section == "GAME") {
         switch (entry) {
+        case game_menu::kColonyReport:
+            showColonyReportOptions();
+            return true;
         case game_menu::kSoundOptions:
             showSoundOptions();
             return true;

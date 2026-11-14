@@ -193,6 +193,40 @@ VCR_TEST("original files: Sound Options turn music on and off") {
     VCR_CHECK(!music.options.effects && music.options.events && play.game().soundOptionBits() == 0x96);
 }
 
+VCR_TEST("original files: Colony Report Options set the report bits (read from the original)") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
+    const Bytes bytes(std::istreambuf_iterator<char>(in), {});
+    PlayScreen play(Game(readSaveGame(bytes), art.rules), {});
+    play.setArt(&art);
+    const int before = play.game().colonyReportBits();
+    play.openMenu(0, true);
+    play.handle(Command::MoveS);
+    play.handle(Command::Confirm);
+    VCR_CHECK(play.dialog().has_value() && play.dialog()->checkbox);
+    VCR_CHECK(play.dialog()->options.size() == 10);
+    for (std::size_t i = 0; i < 10; ++i) {
+        VCR_CHECK(play.dialog()->checked[i] == ((before & colony_report::kOrder[i]) == 0));
+    }
+    // Turn over the reports of trained colonists and of rebel majorities.
+    VCR_CHECK(play.dialog()->selected == 0);
+    play.handle(Command::MoveS);
+    play.handle(Command::MoveS);
+    play.handle(Command::Skip);
+    for (int i = 0; i < 7; ++i) {
+        play.handle(Command::MoveS);
+    }
+    VCR_CHECK(play.dialog()->selected == 9);
+    play.handle(Command::Skip);
+    play.handle(Command::Confirm);
+    VCR_CHECK(!play.dialog().has_value());
+    VCR_CHECK(play.game().colonyReportBits() == (before ^ colony_report::kTraining ^ colony_report::kRebels));
+}
+
 VCR_TEST("original files: Pick Music plays the tune picked") {
     const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
     if (!isGameFolder(dir)) {

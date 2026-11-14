@@ -291,3 +291,49 @@ square (water squares need docks, and a square a neighbouring colony works is
 taken). Work in a building needs the building and room for up to three.
 The menu lists only the buildings the colony has (Isabella, without an armory
 or a church, shows 16 jobs), then "(More)".
+
+## Teachers
+
+Read from the original. Each colony keeps, for every colonist, the turns
+they have been at their job (half a byte each from colony byte 96, at most
+15); a new job starts again from 0, and at the end of every turn all of
+them go up by one. A teacher finishes a lesson after 4 turns when their
+skill is of level 1, 6 for level 2 and 8 for level 3 (the level column of
+`@JOB`), and starts again; at most three lessons a turn in a colony. Each
+lesson goes to one of the colony's petty criminals, indentured servants and
+free colonists, drawn at random (each once a turn): a criminal becomes a
+servant (`TRAINCRIMINAL`), a servant a free colonist (`TRAININDENTURED`)
+and a free colonist learns the teacher's skill (`TRAINPROFESSION`). A
+lesson with nobody left to teach brings `TRAINFAIL`. The messages are the
+player's, unless the colony report option for trained colonists hides them.
+
+## Learning by doing
+
+Read from the original, in the colony turn right after the lessons. A
+colonist working as a sugar planter, tobacco planter, cotton planter or fur
+trapper (jobs 1 to 4) who is a free colonist, servant or criminal (not a
+convert, not an expert) may learn that job, but only while the nation has
+no expert of it at all: the skills of every colonist in its colonies and of
+its colonists, soldiers, pioneers, missionaries, dragoons, scouts and
+Continental units on the map count. The chance each turn is 1 in 100 for a
+free colonist, 1 in 200 for a servant and 1 in 300 for a criminal. The new
+expert counts at once, so a second colonist does not learn the same job in
+that turn. The player hears `TRAINPROFESSION`, unless the report option for
+trained colonists is off.
+
+## Colony Report Options
+
+Read from the original. The box `COLONYOPTIONS` (Game menu) keeps its ten
+options in header bytes 20 and 21; a set bit turns that one off. In the
+order of the box: labels on buildings (byte 20, bit 1), labels on cargo and
+terrain (bit 0), trained colonists (bit 7, the `TRAIN*` news), food
+shortages (bit 6, only `FOODLOW`), raw materials (bit 5, the seven run-out
+reports such as `LUMBER`), tools needed (bit 4, `NEEDTOOLS`), inefficient
+government (bit 3), new cargos (bit 2, `CARGOREADY*` and the hint after the
+first; thrown-away goods are still told), Sons of Liberty membership (byte
+21, bit 0, `SONSUP`/`SONSDOWN`) and rebel majorities (byte 21, bit 1, the
+four `REBEL*`/`TORY*` reports; while one of them is due the Sons of Liberty
+news stays quiet too). On OK the ten bits are set anew and the others
+kept. The two label options and inefficient government are kept but not yet
+used by Viceroy.
+
