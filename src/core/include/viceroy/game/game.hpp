@@ -557,6 +557,22 @@ public:
     // The nation's rebels: its colonies' Sons of Liberty, weighted by their
     // people.
     int nationRebelPercent(int nation) const;
+    // A European king offers mercenaries (MERCENARIES): the notice that asks
+    // has kMercenaryQuestion as its value.
+    static constexpr int kMercenaryQuestion = 2;
+    static constexpr int kTreasureQuestion = 3;
+    bool mercenariesWaiting() const { return mercenaries_.price > 0; }
+    // "Pay": the gold goes and the mercenaries land at one of the player's
+    // coastal colonies (notice MERCS).
+    void answerMercenaries(bool pay);
+    // Treasure that enters a coastal colony when the player has no galleon
+    // (or has Cortes): the King offers to carry it home for a share
+    // (KINGGALLEON2, KINGGALLEON3). After independence it is sold at once
+    // (CASHTREASURE).
+    bool treasureWaiting() const { return treasure_ >= 0; }
+    // "Very well": the Crown takes its share, the rest is the player's
+    // (LOOTCASH) and the treasure is gone.
+    void answerTreasure(bool ship);
 
     // --- Map -----------------------------------------------------------------
     void reveal(int x, int y, int radius, int nation);
@@ -771,6 +787,18 @@ private:
         int nation = -1;
     };
     TaxRaise taxRaise_;
+    struct MercenaryOffer {
+        int price = 0; // 0: none waiting
+        int dragoons = 0;
+        int artillery = 0;
+        int country = -1; // the nation whose king offers them
+    };
+    MercenaryOffer mercenaries_;
+    int treasure_ = -1; // the treasure the King has offered to carry
+    void treasureArrives(int index);
+    void cashTreasure(int index, int crownPercent);
+    // At the start of the player's turn, before independence.
+    void offerMercenaries();
     // A nation's turn starts: the King may change its tax. `turn` and
     // `year` are those of the turn that starts.
     bool kingTax(int nation, int turn, int year);

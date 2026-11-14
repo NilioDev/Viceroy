@@ -707,10 +707,14 @@ bool PlayScreen::handleDialog(Command command) {
             // father is chosen.
             return true;
         }
-        if (question_ == "TAXOPTIONS" || question_ == "KISSUP") {
+        if (question_ == "TAXOPTIONS" || question_ == "KISSUP" || question_ == "MERCENARIES") {
             // Escape kisses the ring, or refuses to pay: only the second
             // choice holds a party or pays.
             d.selected = 0;
+            break;
+        }
+        if (question_.rfind("KINGGALLEON", 0) == 0) {
+            d.selected = 1; // the ring again: the treasure stays
             break;
         }
         if (question_ == "SAILPORT" || question_ == "TRAVELPLACE" || question_.rfind("PICK", 0) == 0) {
@@ -1115,9 +1119,12 @@ void PlayScreen::showNotices() {
                                                  "LOOTCAPTURE", "ARTILLERY",      "ARTILLERY2",       "VETERAN",
                                                  "VALOR",       "CAPTURED",       "LOOT",             "LOOT2",
                                                  "INDIANSLAVES", "INDIANWARFARE", "INDIANBURN", "TEAPARTY",
-                                                 "KINGBUY",     "REBELUP",        "REBELUP50",        "REBELDOWN"};
+                                                 "KINGBUY",     "REBELUP",        "REBELUP50",        "REBELDOWN",
+                                                 "MERCENARIES", "MERCS"};
         if (std::find(std::begin(kBattles), std::end(kBattles), notice.section) != std::end(kBattles)) {
             placeMapDialog(*dialog_);
+        } else if (notice.section == "LOOTCASH" || notice.section == "CASHTREASURE") {
+            placeTradeDialog(*dialog_); // read from the original: the trade adviser
         } else {
             placeFrontiersmanDialog(*dialog_);
         }
@@ -1478,6 +1485,16 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
             const auto news = game_.takeNotices();
             ask("KISSSORRY", -1, {}, -1, news.empty() ? std::vector<int>{} : news.front().numbers);
         }
+    } else if (question.rfind("KINGGALLEON", 0) == 0) {
+        // "Very well, and let the Crown claim its rightful share."
+        game_.answerTreasure(choice == 0);
+        auto news = game_.takeNotices();
+        notices_.insert(notices_.begin(), std::make_move_iterator(news.begin()), std::make_move_iterator(news.end()));
+    } else if (question == "MERCENARIES") {
+        // "No thank you." or "Pay": they land at once.
+        game_.answerMercenaries(choice == 1);
+        auto news = game_.takeNotices();
+        notices_.insert(notices_.begin(), std::make_move_iterator(news.begin()), std::make_move_iterator(news.end()));
     } else if (question == "TAXOPTIONS") {
         // "Kiss pinky ring." or "Hold 'Boston Tea Party.'"
         // The party's news comes at once, before the rest of the turn's.

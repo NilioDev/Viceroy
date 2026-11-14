@@ -154,7 +154,8 @@ beaten by a ship plays 4Dh, whoever attacked.
 
 Read from the original but not yet in Viceroy: 5Ch when a colonist or
 soldier takes horses and 8024h when one is blessed as a missionary (in the
-home port), 3Fh when mercenaries are offered (`MERCS`), 8020h near a
+home port), 3Fh when a foreign power lands troops to help in the war of independence
+(`INTERVENE`), 8020h near a
 declaration of war, 21h or 25h with the final score, 39h before the
 opening, 52h for a wagon train of the player's, 8024h when a colony
 finishes some buildings, and a few calls that pass on a sound chosen

@@ -232,6 +232,9 @@ MoveResult Game::move(int index, Step step) {
         return MoveResult::Lost;
     }
     meetNeighbours(index);
+    if (colony && u.type == unit_type::kTreasure) {
+        treasureArrives(index);
+    }
     if (ship && target.terrain == kSeaLane && !isNative(u.nation)) {
         return MoveResult::HighSeas;
     }
@@ -709,6 +712,7 @@ void Game::endTurn() {
     for (int n = 0; n < kEuropeanNations; ++n) {
         rebelSentiment(n);
     }
+    offerMercenaries();
     gatherCrosses();
     repairShips();
     sailOn();

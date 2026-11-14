@@ -388,4 +388,175 @@ void Game::rebelSentiment(int nation) {
     setWord(save_.header, kRebelsTold, percent / 10);
 }
 
+void Game::offerMercenaries() {
+    // Read from the original: one turn in 21 a European king (perhaps the
+    // player's own) offers a few veteran dragoons and an artillery or two,
+    // if the player has met his nation and can pay.
+    if ((save_.header[kIndependence] & 0x01) != 0 || aiRandom(0, 20) != 0) {
+        return;
+    }
+    const int nation = human();
+    const int country = aiRandom(0, kEuropeanNations - 1);
+    constexpr std::size_t kRelations = 52;
+    constexpr std::uint8_t kMet = 0x40;
+    if (country != nation &&
+        (save_.nations[static_cast<std::size_t>(country)].raw[kRelations + static_cast<std::size_t>(nation)] & kMet) ==
+            0) {
+        return;
+    }
+    MercenaryOffer offer;
+    offer.country = country;
+    offer.dragoons = aiRandom(1, 3);
+    if (aiRandom(0, 1) != 0) {
+        ++offer.dragoons;
+    } else {
+        offer.artillery = aiRandom(0, 1) != 0 ? 1 : 2;
+    }
+    // A gun costs as much as two dragoons.
+    const int each = (aiRandom(0, 6) + 2 * (save_.difficulty + 4)) * 100;
+    offer.price = (offer.dragoons + 2 * offer.artillery) * each;
+    if (save_.nations[static_cast<std::size_t>(nation)].gold < offer.price) {
+        return;
+    }
+    // "3 Dragoons, 2 Artillery": the artillery's number only when more than one.
+    std::string force = std::to_string(offer.dragoons) + " " + rules_.units[unit_type::kDragoon].name;
+    if (offer.artillery > 0) {
+        force += ", ";
+        if (offer.artillery > 1) {
+            force += std::to_string(offer.artillery) + " ";
+        }
+        force += rules_.units[kArtillery].name;
+    }
+    GameNotice notice{"MERCENARIES", {"", force}, kMercenaryQuestion, {offer.price}};
+    notice.countries.emplace_back(0, country);
+    notices_.push_back(std::move(notice));
+    mercenaries_ = offer;
+}
+
+void Game::answerMercenaries(bool pay) {
+    const MercenaryOffer offer = std::exchange(mercenaries_, {});
+    if (!pay || offer.price <= 0) {
+        return;
+    }
+    const int nation = human();
+    save_.nations[static_cast<std::size_t>(nation)].gold -= offer.price;
+    // They come by ship to one of the first ten coastal colonies, picked
+    // by their people, and walk in (read from the original).
+    std::vector<int> colonies;
+    int people = 0;
+    for (int c = 0; c < static_cast<int>(save_.colonies.size()) && colonies.size() < 10; ++c) {
+        const auto& colony = save_.colonies[static_cast<std::size_t>(c)];
+        if (colony.nation == nation && (colony.raw[28] & kCoastal) != 0) {
+            colonies.push_back(c);
+            people += colony.population;
+        }
+    }
+    if (colonies.empty() || people <= 0) {
+        return; // the gold is gone all the same
+    }
+    int roll = aiRandom(1, people);
+    int picked = colonies.front();
+    for (const int c : colonies) {
+        roll -= save_.colonies[static_cast<std::size_t>(c)].population;
+        if (roll <= 0) {
+            picked = c;
+            break;
+        }
+    }
+    const auto& colony = save_.colonies[static_cast<std::size_t>(picked)];
+    constexpr int kVeteranSoldier = 0x15;
+    auto land = [&](int type, int count) {
+        for (int i = 0; i < count; ++i) {
+            addBuiltUnit(colony.x, colony.y, nation, type);
+            save_.units.back().profession = kVeteranSoldier;
+        }
+    };
+    land(royalUnitType(0, nation), offer.dragoons);
+    land(royalUnitType(3, nation), offer.artillery);
+    GameNotice notice{"MERCS", {colony.name, ""}};
+    notice.adjectives.emplace_back(1, offer.country);
+    notices_.push_back(std::move(notice));
+}
+
+void Game::treasureArrives(int index) {
+    // Read from the original: when the player's treasure enters a colony by
+    // the sea and there is no galleon to carry it (or Cortes is in
+    // congress), the King offers to; after independence foreign agents buy
+    // it outright.
+    const auto& u = save_.units[static_cast<std::size_t>(index)];
+    const int nation = u.nation;
+    if (nation < 0 || nation >= kEuropeanNations || save_.players[static_cast<std::size_t>(nation)].control != 0) {
+        return;
+    }
+    const auto colony = colonyAt(u.x, u.y);
+    if (!colony || (save_.colonies[static_cast<std::size_t>(*colony)].raw[28] & kCoastal) == 0) {
+        return;
+    }
+    constexpr int kCortes = 10;
+    constexpr int kGalleon = 15;
+    const bool independence = (save_.header[kIndependence] & 0x01) != 0;
+    bool galleon = false;
+    for (const auto& other : save_.units) {
+        galleon = galleon || (other.nation == nation && other.type == kGalleon);
+    }
+    const bool cortes = hasFather(nation, kCortes);
+    if (galleon && !independence && !cortes) {
+        return;
+    }
+    const int amount = u.profession * 100;
+    if (independence) {
+        GameNotice notice{"CASHTREASURE", {}, -1, {amount}};
+        notice.music = {MusicCue{MusicCue::Kind::MoodEvent, 2}};
+        notices_.push_back(std::move(notice));
+        cashTreasure(index, 0);
+        return;
+    }
+    GameNotice notice{cortes ? "KINGGALLEON3" : "KINGGALLEON2",
+                      {"", save_.players[static_cast<std::size_t>(nation)].name, ""},
+                      kTreasureQuestion,
+                      {save_.nations[static_cast<std::size_t>(nation)].taxRate}};
+    notice.lines.push_back({0, true, "DIFFICULTY", save_.difficulty});
+    notice.countries.emplace_back(2, nation);
+    notice.music = {MusicCue{MusicCue::Kind::Sound, sounds::kKing}};
+    notices_.push_back(std::move(notice));
+    treasure_ = index;
+}
+
+void Game::answerTreasure(bool ship) {
+    const int index = std::exchange(treasure_, -1);
+    if (!ship || index < 0 || index >= unitCount() || unit(index).type != unit_type::kTreasure) {
+        return;
+    }
+    const int nation = unit(index).nation;
+    // The Crown's share: the tax rate with Cortes, otherwise twice the tax
+    // but at least 50% (5% more each level), never more than 90%.
+    int share = save_.nations[static_cast<std::size_t>(nation)].taxRate;
+    if (!hasFather(nation, 10)) {
+        share = std::max(5 * (save_.difficulty + 10), 2 * share);
+    }
+    share = std::min(share, 90);
+    const int amount = unit(index).profession * 100;
+    const int crown = static_cast<int>(static_cast<long>(amount) * share / 100);
+    GameNotice notice{"LOOTCASH", {"", ""}, -1, {amount, share, amount - crown}};
+    notice.adjectives.emplace_back(0, nation);
+    notice.ports.emplace_back(1, nation);
+    notice.music = {MusicCue{MusicCue::Kind::MoodEvent, 2}};
+    notices_.push_back(std::move(notice));
+    auto& raw = save_.nations[static_cast<std::size_t>(nation)].raw;
+    setLong32(raw, kCrownFund, long32(raw, kCrownFund) + crown);
+    cashTreasure(index, share);
+}
+
+void Game::cashTreasure(int index, int crownPercent) {
+    const int nation = unit(index).nation;
+    const int amount = unit(index).profession * 100;
+    const int mine = amount - static_cast<int>(static_cast<long>(amount) * crownPercent / 100);
+    auto& n = save_.nations[static_cast<std::size_t>(nation)];
+    n.gold += mine;
+    // The original also counts it at byte 38 (32 bits), next to the gold.
+    constexpr std::size_t kTreasureTotal = 0x26;
+    setLong32(n.raw, kTreasureTotal, long32(n.raw, kTreasureTotal) + mine);
+    removeUnit(index);
+}
+
 } // namespace viceroy
