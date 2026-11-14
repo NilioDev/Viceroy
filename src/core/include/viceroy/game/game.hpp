@@ -130,9 +130,22 @@ struct GameNotice {
 enum class FoundResult {
     Founded,
     NotAColonist,
-    NotOnLand,
-    Mountains,
-    TooClose, // another colony is next to this square
+    NotOnLand, // aboard, or not on the map
+    AtSea,     // SEACOLONY
+    Mountains, // TOOMOUNTAIN
+    TooClose,  // another colony is next to this square (TOONEAR)
+    TooMany,   // TOOMANYCOLONIES
+    InColony,  // the square holds a colony already
+};
+
+// What the player is warned of before founding a colony there (read from
+// the original): no way to the ocean (NOPORT), and below the third
+// difficulty level few productive squares (TUTNOSPACES) or no forest
+// (TUTNOLUMBER).
+struct FoundAdvice {
+    bool noPort = false;
+    bool fewSquares = false;
+    bool noForest = false;
 };
 
 class Game {
@@ -229,11 +242,15 @@ public:
 
     // --- Colonies ----------------------------------------------------------
     FoundResult canFoundColony(int index) const;
+    FoundAdvice foundAdvice(int index) const;
+    // The colony next to the unit that keeps it from founding one, or -1.
+    int colonyNextTo(int index) const;
     FoundResult foundColony(int index, const std::string& name);
     // A name for the next colony from COLONY.TXT, not yet in use.
-    std::string suggestColonyName(const TextFile& colonyNames) const;
     // COLONY.TXT, for the names the computer's nations give their colonies.
     void setColonyNames(const TextFile& colonyNames);
+    // The name offered for the nation's next colony (COLONY.TXT).
+    std::string nextColonyName(int nation);
 
     // --- Turns -------------------------------------------------------------
     // Ends the human's turn: everyone gets their moves back, and the
@@ -895,7 +912,6 @@ private:
     void aiEndMoves(int unit);
     void aiJoinColony(int unit, int colony);
     void aiBoard(int unit, int ship);
-    std::string aiColonyName(int nation) const;
     std::array<std::vector<std::string>, 4> colonyNames_{};
 
     SaveGame save_;

@@ -369,29 +369,95 @@ void Game::finishWork(int index) {
 // --- Colonies --------------------------------------------------------------
 
 FoundResult Game::canFoundColony(int index) const {
+    // Read from the original's Build Colony, in its order.
     const auto& u = unit(index);
     if (isShip(index) || u.type == unit_type::kTreasure || u.type == unit_type::kWagonTrain ||
         u.type >= unit_type::kFirstNative || u.type == 11 /* artillery */) {
         return FoundResult::NotAColonist;
     }
+    if (!save_.map.inside(u.x, u.y)) {
+        return FoundResult::NotOnLand;
+    }
+    const auto colony = colonyAt(u.x, u.y);
+    if (!colony && u.nation >= 0 && u.nation < kEuropeanNations) {
+        // 48 colonies in the game, or 38 of the nation's own.
+        int own = 0;
+        for (const auto& c : save_.colonies) {
+            own += c.nation == u.nation ? 1 : 0;
+        }
+        if (save_.colonies.size() >= 48 || own >= 38) {
+            return FoundResult::TooMany;
+        }
+    }
+    if (colony) {
+        return FoundResult::InColony;
+    }
+    const auto& sq = save_.map.at(u.x, u.y);
+    if (!sq.isLand()) {
+        return FoundResult::AtSea;
+    }
     if (!onMap(index) || isAboard(index)) {
         return FoundResult::NotOnLand;
     }
-    const auto& sq = save_.map.at(u.x, u.y);
-    if (sq.terrain == kTerrainArctic || !sq.isLand()) {
-        return FoundResult::NotOnLand;
+    if (colonyNextTo(index) >= 0) {
+        return FoundResult::TooClose;
     }
     if (sq.mountains()) {
         return FoundResult::Mountains;
     }
-    for (int dy = -1; dy <= 1; ++dy) {
-        for (int dx = -1; dx <= 1; ++dx) {
-            if (colonyAt(u.x + dx, u.y + dy) || settlementAt(u.x + dx, u.y + dy)) {
-                return FoundResult::TooClose;
-            }
+    return FoundResult::Founded;
+}
+
+int Game::colonyNextTo(int index) const {
+    const auto& u = unit(index);
+    for (const auto& s : kSteps) {
+        if (const auto c = colonyAt(u.x + s.dx, u.y + s.dy)) {
+            return *c;
         }
     }
-    return FoundResult::Founded;
+    return -1;
+}
+
+FoundAdvice Game::foundAdvice(int index) const {
+    // Read from the original: the way to port is a water square next to
+    // the site that belongs to the open sea. The nine squares of the site
+    // count as productive unless they are water, arctic or desert or hold
+    // a native settlement, and once more for a resource; forest is any of
+    // the forest terrains.
+    const auto& u = unit(index);
+    const auto& map = save_.map;
+    FoundAdvice advice;
+    advice.noPort = true;
+    for (const auto& s : kSteps) {
+        const int x = u.x + s.dx;
+        const int y = u.y + s.dy;
+        if (map.inside(x, y) && map.at(x, y).isWater() && (map.at(x, y).region & 0x0F) == 1) {
+            advice.noPort = false;
+        }
+    }
+    int productive = 0;
+    bool forest = false;
+    for (int k = 0; k <= 8; ++k) {
+        const int x = u.x + (k < 8 ? kSteps[static_cast<std::size_t>(k)].dx : 0);
+        const int y = u.y + (k < 8 ? kSteps[static_cast<std::size_t>(k)].dy : 0);
+        if (!map.inside(x, y)) {
+            continue;
+        }
+        const auto& sq = map.at(x, y);
+        const int kind = sq.mountains() ? 27 : sq.hills() ? 28 : sq.terrain;
+        if (kind != 25 && kind != 26 && kind != 1 && kind != kTerrainArctic && !settlementAt(x, y)) {
+            ++productive;
+        }
+        if (map.resourceSeed != 0 && resourceAt(map, x, y) != Resource::None) {
+            ++productive;
+        }
+        forest = forest || (kind >= 8 && kind < 24);
+    }
+    if (save_.difficulty < 2) {
+        advice.fewSquares = productive < 4;
+        advice.noForest = !forest;
+    }
+    return advice;
 }
 
 FoundResult Game::foundColony(int index, const std::string& name) {
@@ -581,27 +647,6 @@ void Game::markTutorialShown(int bit) {
         static_cast<std::uint8_t>(save_.header[static_cast<std::size_t>(byte)] | (1 << (bit % 8)));
 }
 
-std::string Game::suggestColonyName(const TextFile& colonyNames) const {
-    // COLONY.TXT: a section per nation, one "name,year" per line.
-    static constexpr const char* kSections[] = {"ENGLISH", "FRENCH", "SPANISH", "DUTCH"};
-    const auto* section = colonyNames.find(kSections[human() & 3]);
-    if (section != nullptr) {
-        for (const auto& line : section->lines) {
-            const auto fields = splitFields(line);
-            if (fields.empty() || fields[0].empty()) {
-                continue;
-            }
-            const std::string& name = fields[0];
-            const bool used = std::any_of(save_.colonies.begin(), save_.colonies.end(),
-                                          [&](const SaveColony& c) { return c.name == name; });
-            if (!used) {
-                return name;
-            }
-        }
-    }
-    return "Colony " + std::to_string(save_.colonies.size() + 1);
-}
-
 void Game::setColonyNames(const TextFile& colonyNames) {
     static constexpr const char* kSections[] = {"ENGLISH", "FRENCH", "SPANISH", "DUTCH"};
     for (std::size_t n = 0; n < colonyNames_.size(); ++n) {
@@ -619,16 +664,27 @@ void Game::setColonyNames(const TextFile& colonyNames) {
     }
 }
 
-std::string Game::aiColonyName(int nation) const {
-    // The first name of the nation's list that no colony has yet.
-    for (const auto& name : colonyNames_[static_cast<std::size_t>(nation & 3)]) {
-        const bool used = std::any_of(save_.colonies.begin(), save_.colonies.end(),
-                                      [&](const SaveColony& c) { return c.name == name; });
-        if (!used) {
-            return name;
-        }
+std::string Game::nextColonyName(int nation) {
+    // Read from the original: the nation's count of names given (word 50
+    // of its player record) picks the line of its list in COLONY.TXT, and
+    // goes up by one, even when the player then gives another name or none.
+    // Past the end of the list the first name comes again, and the count
+    // stays.
+    if (nation < 0 || nation >= kEuropeanNations) {
+        return {};
     }
-    return "Colony " + std::to_string(save_.colonies.size() + 1);
+    const auto& list = colonyNames_[static_cast<std::size_t>(nation & 3)];
+    if (list.empty()) {
+        return "Colony " + std::to_string(save_.colonies.size() + 1);
+    }
+    auto& raw = save_.players[static_cast<std::size_t>(nation)].raw;
+    const int count = raw[50] | (raw[51] << 8);
+    if (count >= static_cast<int>(list.size())) {
+        return list.front().substr(0, 23);
+    }
+    raw[50] = static_cast<std::uint8_t>((count + 1) & 0xFF);
+    raw[51] = static_cast<std::uint8_t>((count + 1) >> 8);
+    return list[static_cast<std::size_t>(count)].substr(0, 23);
 }
 
 // --- Turns -------------------------------------------------------------------

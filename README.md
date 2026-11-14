@@ -15,7 +15,8 @@ touch controls.
 > in the original) or load one of your savegames, move your
 > units over the original map (or send them to a colony with Go To, along
 > the original's routes), board ships and make landfall, plow fields,
-> clear forests and build roads with your pioneers, found colonies, look inside your colonies, end turns and save. The colony screen
+> clear forests and build roads with your pioneers, found colonies (your
+> advisors warn of a poor site and you type the name), look inside your colonies, end turns and save. The colony screen
 > shows its buildings, people, what they produce and the warehouse; give
 > colonists other jobs with the jobs menu, and choose what the colony builds
 > on its Make panel or pay to finish it there; the musket button lists the

@@ -43,6 +43,14 @@ struct Dialog {
     int overlay = -1;
     int overlayFrame = 0;
     std::uint64_t shownMs = 0; // how long the box has been up
+    // A line to type in (the section's last line is its label, "Name:"):
+    // what has been typed, and whether it is still the offered text, shown
+    // marked, which the first key replaces.
+    bool input = false;
+    std::string inputLabel;
+    std::string inputText;
+    bool inputFresh = true;
+    int inputMax = 23;
 };
 
 // Portraits in Art::portraits.
@@ -79,6 +87,12 @@ Dialog makeDialog(const Art& art, std::string_view section, const std::vector<st
 
 // Adds a choice; a value goes on the right.
 void addOption(Dialog& dialog, std::string text, std::string value = {}, bool disabled = false);
+// Turns the box into one to type in, read from the original: the label
+// and a field for maxLength letters below the text, with text offered.
+void makeInput(const Art& art, Dialog& dialog, std::string text, int maxLength = 23);
+// A letter typed into the field, or the last one taken back.
+void typeInto(Dialog& dialog, char letter);
+void eraseInput(Dialog& dialog);
 // Every line of a GAME.TXT section that holds only choices (@TAXOPTIONS)
 // becomes a choice of the box, with %STRINGs and %NUMBERs filled in.
 void addOptionsFrom(const Art& art, Dialog& dialog, std::string_view section, const std::vector<std::string>& strings,
@@ -106,6 +120,8 @@ void placeMapDialog(Dialog& dialog);
 // The same woman for the warehouse and food reports about a colony: the box
 // centred across the screen and on row 130.
 void placeTradeDialog(Dialog& d);
+// The name of a new colony: the woman of the buy box above it (measured).
+void placeNameDialog(Dialog& d);
 void placeBuyDialog(Dialog& dialog);
 // Options for a unit in a colony: the unit's picture at the top left, the
 // text beside it, the box centred on the screen.

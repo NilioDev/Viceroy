@@ -755,6 +755,15 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
             showTitle(*app);
             break;
         }
+        if (app->mode == Mode::Play && app->play->typing()) {
+            if (event->key.key == SDLK_BACKSPACE) {
+                app->play->eraseTyped();
+                break;
+            }
+            if (event->key.key != SDLK_RETURN && event->key.key != SDLK_KP_ENTER && event->key.key != SDLK_ESCAPE) {
+                break; // the letters come as text
+            }
+        }
         if (app->mode == Mode::NewGame && app->newGame->typing() && event->key.key == SDLK_BACKSPACE) {
             app->newGame->backspace();
             break;
@@ -816,6 +825,11 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
         if (app->mode == Mode::NewGame && event->text.text != nullptr) {
             for (const char* c = event->text.text; *c != '\0'; ++c) {
                 app->newGame->type(*c);
+            }
+        }
+        if (app->mode == Mode::Play && app->play->typing() && event->text.text != nullptr) {
+            for (const char* c = event->text.text; *c != '\0'; ++c) {
+                app->play->type(*c);
             }
         }
         break;

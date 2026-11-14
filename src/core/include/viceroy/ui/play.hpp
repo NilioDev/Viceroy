@@ -144,6 +144,11 @@ public:
     // A letter typed while a box of options is open turns that option on
     // or off.
     void dialogLetter(char letter);
+    // A box to type in is open: letters go to it as text (Backspace takes
+    // one back).
+    bool typing() const { return dialog_ && dialog_->input; }
+    void type(char letter);
+    void eraseTyped();
     // Exit to DOS was picked.
     bool quitRequested() const { return quit_; }
     // Load Game was picked with the mouse: back to the load menu.
@@ -248,6 +253,13 @@ private:
     };
     std::vector<int> villageOptions_;
     int village_ = -1;
+    // Build Colony between its warnings and the name.
+    struct Founding {
+        int unit = -1;
+        FoundAdvice advice;
+    };
+    std::optional<Founding> founding_;
+    std::string typed_;     // what was typed into the last box to type in
     int welcomeTribe_ = -1; // the tribe whose welcome is up
     int scoutColony_ = -1;  // the colony a scout has reached (SCOUTCOLONY)
     int foreignTradeColony_ = -1; // the foreign colony a wagon train or ship trades with
@@ -293,6 +305,9 @@ private:
     };
     std::optional<VillageTrade> trade_;
     void tradeWithVillage(int unit);
+    void buildColony(int unit);
+    void nextFoundingStep();
+    void foundNamedColony(int unit, const std::string& name);
     void startTrade(int unit);
     void offerHold(int hold);
     void showSale();

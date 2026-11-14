@@ -65,3 +65,19 @@ Reports about a colony (Sons of Liberty) are described in
 
 Portraits bring their own colours: palette entries 152 to 251 come from
 the portrait's sheet while it is shown.
+
+## Boxes to type in
+
+Read from the original and compared pixel by pixel with "What shall we
+name this colony?" (`@COLONY`). A section whose only choice ends in a colon
+("Name:", "Amount:") asks for text: the label stands at the text's left
+edge, 6 rows below the last text line, and a field framed in the text
+colour (palette 44h) follows it 3 columns to the right: 14 rows tall,
+7 columns a letter and 6 more wide (167 for the 23 letters of a name),
+3 rows above the label's top. The box is as wide as it needs to be for the
+label and the field and 5 columns more, centred with the odd column to the
+right; it ends 3 rows below the field. The offered text is drawn 3 columns
+into the field on a dark mark (palette 8Ah, 2 columns wider than the text),
+with an underscore after it as the cursor; the first key replaces it,
+Backspace takes a letter back, Return takes the text (even none) and
+Escape gives up.

@@ -1220,7 +1220,7 @@ void Game::aiExecute(int n, int i) {
     auto& u = save_.units[static_cast<std::size_t>(i)];
     switch (u.orders) {
     case kOrdersBuild:
-        if (foundColony(i, aiColonyName(n)) != FoundResult::Founded) {
+        if (foundColony(i, nextColonyName(n)) != FoundResult::Founded) {
             save_.units[static_cast<std::size_t>(i)].orders = SaveUnit::kNoOrders;
             aiEndMoves(i);
         }

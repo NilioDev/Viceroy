@@ -142,6 +142,20 @@ int boxWidth(const Dialog& d) {
     return d.width + 6 + d.indent;
 }
 
+// The field to type in, measured in the original's "What shall we name
+// this colony?": 7 columns a letter and 6 more, 14 rows, 6 rows below the
+// text; the label stands left of it.
+constexpr int kFieldHeight = 14;
+constexpr int kFieldGap = 3; // between the label and the field
+constexpr std::uint8_t kFieldFrame = 0x44;
+constexpr std::uint8_t kFieldMark = 0x8A;
+
+int fieldWidth(const Dialog& d) { return 7 * d.inputMax + 6; }
+
+int inputRow(const Dialog& d) {
+    return kTextTop + (d.small ? kSmallLineStep : kLineStep) * static_cast<int>(d.lines.size()) + 6;
+}
+
 } // namespace
 
 int markedWidth(const Font& font, const std::string& text) {
@@ -238,6 +252,49 @@ void addOption(Dialog& d, std::string text, std::string value, bool disabled) {
     d.options.push_back(std::move(text));
     d.values.push_back(std::move(value));
     d.disabled.push_back(disabled);
+}
+
+void makeInput(const Art& art, Dialog& d, std::string text, int maxLength) {
+    d.input = true;
+    if (!d.options.empty()) {
+        d.inputLabel = d.options.back();
+        d.options.clear();
+        d.values.clear();
+        d.disabled.clear();
+    }
+    d.inputMax = std::max(1, maxLength);
+    d.inputText = text.substr(0, static_cast<std::size_t>(d.inputMax));
+    d.inputFresh = true;
+    d.selected = 0;
+    const Font& font = fontOf(art, d);
+    const int needed = kTextLeft + Screen::textWidth(font, d.inputLabel) + kFieldGap + fieldWidth(d) + 5;
+    d.width = std::max(d.width, needed - 6);
+    // Centred, half a column to the right (measured: 207 wide at 57).
+    d.x = (Screen::kWidth - boxWidth(d) + 1) / 2;
+    d.y = (Screen::kHeight - dialogHeight(d) + 1) / 2;
+}
+
+void typeInto(Dialog& d, char letter) {
+    if (!d.input || letter < ' ' || static_cast<unsigned char>(letter) >= 0x7F) {
+        return;
+    }
+    if (d.inputFresh) {
+        d.inputText.clear();
+        d.inputFresh = false;
+    }
+    if (static_cast<int>(d.inputText.size()) < d.inputMax) {
+        d.inputText += letter;
+    }
+}
+
+void eraseInput(Dialog& d) {
+    if (!d.input) {
+        return;
+    }
+    d.inputFresh = false;
+    if (!d.inputText.empty()) {
+        d.inputText.pop_back();
+    }
 }
 
 void addOptionsFrom(const Art& art, Dialog& d, std::string_view section, const std::vector<std::string>& strings,
@@ -418,6 +475,15 @@ void placeTradeDialog(Dialog& d) {
     d.portraitY = d.y - 62;
 }
 
+void placeNameDialog(Dialog& d) {
+    d.portrait = kBuyAdvisor;
+    d.portraitBehind = false;
+    d.x = (Screen::kWidth - boxWidth(d) + 1) / 2;
+    d.y = (263 - dialogHeight(d)) / 2;
+    d.portraitX = 130;
+    d.portraitY = d.y - 62;
+}
+
 std::string countryName(const Art& art, int nation) {
     constexpr int kDutch = 3;
     return (nation == kDutch ? "the " : "") + textLine(art.names, "COUNTRY", nation, "");
@@ -457,6 +523,9 @@ int dialogHeight(const Dialog& d) {
     const int optionStep = d.small ? kSmallOptionStep : kOptionStep;
     const int textBottom = kTextTop + lineStep * static_cast<int>(d.lines.size());
     const int helpRoom = d.help ? (d.small ? 6 : 3) : 0;
+    if (d.input) {
+        return inputRow(d) + kFieldHeight + 3;
+    }
     if (d.options.empty()) {
         return textBottom + kOptionGap + 2 + helpRoom;
     }
@@ -603,6 +672,20 @@ void drawDialog(Screen& screen, const Art& art, const Dialog& d) {
     for (const auto& line : d.lines) {
         drawMarkedLine(screen, font, box.x + kTextLeft + d.indent, y, line, gold);
         y += d.small ? kSmallLineStep : kLineStep;
+    }
+    if (d.input) {
+        const int row = box.y + inputRow(d);
+        bool labelGold = false;
+        drawMarkedLine(screen, font, box.x + kTextLeft, row, d.inputLabel, labelGold);
+        const Rect field{box.x + kTextLeft + Screen::textWidth(font, d.inputLabel) + kFieldGap, row - 3, fieldWidth(d),
+                         kFieldHeight};
+        screen.frame(field, kFieldFrame);
+        const int w = Screen::textWidth(font, d.inputText);
+        if (d.inputFresh && !d.inputText.empty()) {
+            screen.fill({field.x + 2, field.y + 2, w + 2, field.h - 4}, kFieldMark);
+        }
+        screen.text(font, field.x + 3, row, d.inputText, kBasic);
+        screen.text(font, field.x + 3 + w, row, "_", kBasic);
     }
     y += kOptionGap;
     for (std::size_t i = 0; i < d.options.size(); ++i) {
