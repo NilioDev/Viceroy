@@ -149,7 +149,8 @@ spaces its icons evenly, at most one pixel more than an icon apart.
 - After the original's `@FREEDOM` and the hall it opens the
   Colonizopedia page of the new father; the Colonizopedia is not built
   yet.
-- What the bells do after the declaration of independence.
+- After the declaration of independence the bells call in a foreign
+  power instead (see [independence.md](independence.md)).
 - The report's lines after the declaration of independence (the
   intervention force) and its line for the cheat mode.
 - Peter Minuit (the natives' land for nothing), Benjamin Franklin (the

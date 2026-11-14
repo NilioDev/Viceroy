@@ -351,7 +351,7 @@ namespace {
 void drawOrdersBox(Screen& screen, const Art& art, const Game& game, int index, Rect box, int orders,
                    bool listInk = false) {
     const auto& u = game.unit(index);
-    const std::uint8_t colour = nationColour(art, u.nation);
+    const std::uint8_t colour = nationColour(art, game, u.nation);
     screen.fill(box, colour);
     screen.frame(box, kBlack);
     static constexpr const char* kLetters = "-STGLFFBPR-";
@@ -459,7 +459,7 @@ void drawColonyDefender(Screen& screen, const Art& art, const Game& game, int co
         }
     }
     const Rect box{px + x + image->width - 2, py + 7, 7, 9};
-    screen.fill(box, nationColour(art, c.nation));
+    screen.fill(box, nationColour(art, game, c.nation));
     screen.frame(box, kBlack);
     const int w = Screen::textWidth(art.tiny, "-");
     screen.text(art.tiny, box.x + (box.w - w) / 2 + 1, box.y + 2, "-", {kBlack, kNoColour, kNoColour});
@@ -792,7 +792,8 @@ void centreOn(ViewState& view, const Game& game, int x, int y) {
 
 std::uint8_t nationColour(const Art& art, int nation) {
     // Measured on the original (orders boxes, the small map, missions):
-    // French 0x09, Spanish 0x0E, Dutch 0x0D. The English red is a guess.
+    // French 0x09, Spanish 0x0E, Dutch 0x0D; the English 0x0C is read from
+    // its table of the four.
     static constexpr std::uint8_t kNations[kEuropeanNations] = {0x0C, 0x09, 0x0E, 0x0D};
     if (nation >= 0 && nation < kEuropeanNations) {
         return kNations[nation];
@@ -802,6 +803,15 @@ std::uint8_t nationColour(const Art& art, int nation) {
         return static_cast<std::uint8_t>(art.rules.tribes[tribe].colour);
     }
     return kWhite;
+}
+
+std::uint8_t nationColour(const Art& art, const Game& game, int nation) {
+    // Read from the original: during the war of independence the Crown's
+    // side flies white.
+    if (game.independenceDeclared() && nation == game.crownNation()) {
+        return kWhite;
+    }
+    return nationColour(art, nation);
 }
 
 int unitIcon(const Game& game, int index) {

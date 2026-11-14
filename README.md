@@ -70,7 +70,12 @@ touch controls.
 > spy on the colony; with Jan de Witt your wagon trains and ships can
 > trade with other nations' colonies. The King may drag you into his wars in Europe, and
 > when your rebels reach half, the War of the Spanish Succession hands the
-> weakest nation's colonies to another. The other nations elect their own
+> weakest nation's colonies to another. With a majority of rebels you can
+> declare independence from the Game menu: the other nations leave, your
+> ships in Europe are seized, your veterans join the Continental Army,
+> mercenaries are offered, and enough liberty bells bring a foreign power
+> and its force to your side. The King's campaign and the end of the war
+> are still to come. The other nations elect their own
 > fathers as the original's do. A tribe you meet for the first time
 > offers you peace; refusing it angers the tribe. Missionaries can found missions,
 > which the tribe takes well or badly as in the original, pay a tribe to

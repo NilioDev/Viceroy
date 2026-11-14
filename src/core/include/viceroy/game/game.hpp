@@ -634,6 +634,19 @@ public:
     // nation hands all it has in the New World to the next weakest and
     // withdraws (SUCCESSION).
     void spanishSuccession();
+
+    // --- The war of independence (independence.cpp) ----------------------
+    // The nation whose slot the Crown's side takes in the war (header word
+    // 98: the nation gone after the succession), -1 for none yet.
+    int crownNation() const;
+    // What the Game menu's "DECLARE INDEPENDENCE" asks or says first:
+    // ALREADYREVOLUTION, TOOTORY (too few rebels), MULTIREV (a game of
+    // several human players) or DECLARE (the question itself).
+    GameNotice independenceQuestion() const;
+    // "Declare independence" to MULTIREV: the game goes on for one player.
+    void playAlone();
+    // "Yes! Give me liberty or give me death!": the war begins.
+    void declareIndependence();
     // The chance in 36 that a scout infiltrating the colony is caught.
     int infiltrationRisk(int unit, int colony) const;
 
@@ -864,8 +877,9 @@ private:
     TaxRaise taxRaise_;
     struct MercenaryOffer {
         int price = 0; // 0: none waiting
-        int dragoons = 0;
-        int artillery = 0;
+        // Of each kind of the Crown's army (royalUnitType): regulars or
+        // dragoons, cavalry, -, artillery.
+        std::array<int, 4> counts{};
         int country = -1; // the nation whose king offers them
     };
     MercenaryOffer mercenaries_;
@@ -938,6 +952,12 @@ private:
     // After the nation's colonies: its rebels are counted, and the King
     // spends on his army.
     void rebelSentiment(int nation);
+    void independenceTurn(int nation);
+    void mobilize(int nation);
+    void setInterventionForce();
+    void forceArrives(bool mercenaries);
+    void interventionDeclared();
+    void independenceBells(int nation, int bells);
     void kingArmyGrowth(int nation);
     int royalUnitType(int kind, int nation) const;
     // The Continental Congress.

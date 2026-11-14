@@ -108,6 +108,8 @@ void drawTerrain(Screen& screen, const Art& art, const Game& game, int x, int y,
 // Draws a sprite of a sheet if it exists.
 void blitSprite(Screen& screen, const SpriteSheet& sheet, int index, int x, int y);
 std::uint8_t nationColour(const Art& art, int nation);
+// The same with the game: the Crown's side is white during the war.
+std::uint8_t nationColour(const Art& art, const Game& game, int nation);
 // The box with the nation's colour and the orders letter beside a unit
 // drawn at (px, py).
 void drawUnitOrders(Screen& screen, const Art& art, const Game& game, int index, int px, int py);

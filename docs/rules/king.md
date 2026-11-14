@@ -87,10 +87,14 @@ more dragoon, or 1 or 2 artillery. Each dragoon costs (0 to 6 + 2 ×
 (difficulty + 4)) × 100, the same for all of them, and a gun twice that.
 The offer only comes when the player has the gold.
 
+The king's nation is kept in header word 102.
+
 Paying takes the gold at once. The mercenaries, veteran soldiers by
 profession, come by ship to one of the player's first ten coastal colonies,
-picked by their people, and walk in (`MERCS`). Without a coastal colony the
-gold is gone and nobody comes.
+picked by their people, and walk in (`MERCS`). The ship takes the best open
+sea next to the colony, as for the power's force in the war (see
+[independence.md](independence.md)), and sails home. Without a coastal
+colony or such sea the gold is gone and nobody comes.
 
 ## Treasure
 
@@ -133,7 +137,6 @@ vertically. His arm (`KING2.SS`, eight frames over him at the same corner)
 stays still for about four seconds, then rises through frames 1 to 7 at
 about a sixth of a second each and stays up.
 
-**Not yet done:** the mercenaries offered during the war of independence, the audience at the start (the King
-lowering or raising the tax on request), the War of the Spanish Succession and the
-King's wars between nations (see the European notes), and everything about
-independence.
+**Not yet done:** the audience at the start (the King lowering or raising
+the tax on request). The mercenaries during the war of independence are in
+[independence.md](independence.md).

@@ -296,6 +296,7 @@ SaveGame newAmericaGame(std::span<const std::uint8_t> mapFile, const Ruleset& ru
         put16(h + 88 + 2 * n, -1);
     }
     put16(h + 98, -1);
+    put16(h + 100, -1); // no power to help in the war of independence yet (as in every save)
 
     // The market is drawn once and shared by all.
     std::array<int, kGoodsKinds> prices{};
