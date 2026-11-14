@@ -27,12 +27,14 @@ Viceroy is an independent, from-scratch implementation.
 | `src/core` | Engine core. Platform independent, no SDL, fully unit-testable. |
 | `src/app` | Platform layer and game executable (SDL3). |
 | `tests` | Unit tests for the core. |
+| `third_party` | Code by others, copied unchanged with its license: Nuked OPL3 (LGPL 2.1+), the FM chip emulator for the music. Not game code. |
 | `docs` | Our own documentation: the file formats in `docs/formats`, and how the engine is built in `docs/architecture.md`. |
 
 ## Code style
 
 C++20. Warnings are errors in CI (`-DVCR_WARNINGS_AS_ERRORS=ON`). Every source
-file starts with `// SPDX-License-Identifier: GPL-3.0-or-later`.
+file starts with `// SPDX-License-Identifier: GPL-3.0-or-later` (except the
+unchanged files in `third_party`).
 
 ## Building
 

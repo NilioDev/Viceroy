@@ -46,8 +46,17 @@ add_library(vcr_core STATIC
     src/ui/title.cpp
     src/ui/new_game_flow.cpp
     src/ui/debug_menu.cpp
+    src/sound/music_driver.cpp
+    src/sound/music_stream.cpp
 )
 add_library(viceroy::core ALIAS vcr_core)
+
+# Nuked OPL3 (LGPL 2.1+), the FM chip emulator. Third-party code: built
+# without our warning settings.
+add_library(vcr_opl3 STATIC "${PROJECT_SOURCE_DIR}/third_party/nuked-opl3/opl3.c")
+target_include_directories(vcr_opl3 PUBLIC "${PROJECT_SOURCE_DIR}/third_party/nuked-opl3")
+set_target_properties(vcr_opl3 PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_link_libraries(vcr_core PRIVATE vcr_opl3)
 
 target_include_directories(vcr_core PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/include"

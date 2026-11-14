@@ -215,4 +215,5 @@ can also give a folder or zip when starting it: `./Viceroy path/to/col.zip`.
 
 ## License
 
-GPL-3.0-or-later. See [LICENSE](LICENSE).
+GPL-3.0-or-later. See [LICENSE](LICENSE). Viceroy includes Nuked OPL3
+(LGPL-2.1-or-later, `third_party/nuked-opl3`) to play the music.
