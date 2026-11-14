@@ -12,6 +12,7 @@
 
 #include <array>
 #include <cstdint>
+#include <deque>
 #include <optional>
 #include <string>
 #include <utility>
@@ -100,10 +101,14 @@ struct GameNotice {
         bool names = true;
         std::string section;
         int row = 0;
+        std::string after{}; // text that follows the line ("Viceroy" + " Peter Minuit")
     };
     std::vector<TextLine> lines{};
     // The music that goes with it, when the box shows.
     std::vector<MusicCue> music{};
+    // A European nation whose leader speaks (his portrait stands over the
+    // box), or -1.
+    int leader = -1;
 };
 
 enum class FoundResult {
@@ -258,6 +263,9 @@ public:
     int defenderAt(int x, int y, int attacker) const;
     // European nations at peace (the treaty bit of their relations).
     bool atPeace(int nation, int other) const;
+    // The nation's relation byte toward another nation or a tribe (4 + the
+    // tribe): 0x20 met, 0x40 peace, see docs/rules/diplomacy.md.
+    int relation(int nation, int other) const;
     // Breaks the treaty both ways: the two nations are at war.
     void declareWar(int nation, int other);
     // The Sound Options as the save keeps them (header byte 22).
@@ -574,6 +582,23 @@ public:
     // (LOOTCASH) and the treasure is gone.
     void answerTreasure(bool ship);
 
+    // --- Other Europeans (diplomacy.cpp) --------------------------------------
+    // A foreign leader talks with the player (docs/rules/diplomacy.md): his
+    // notices have `leader` set, and those that ask have kMeetingQuestion
+    // as their value. The answer (the choice from 0) goes to answerMeeting.
+    static constexpr int kMeetingQuestion = 4;
+    // News of a treaty or war between two other nations (SIGNTREATY,
+    // DECLAREWAR), told by the man of the home port.
+    static constexpr int kForeignNews = 5;
+    bool meetingWaiting() const;
+    void answerMeeting(int choice);
+    // The nations and tribes the player may ask a leader to fight (the
+    // MILITARY list): the nation or 4 + tribe, and a tribe's name (a
+    // nation's is its adjective, which the screen knows).
+    std::vector<std::pair<int, std::string>> allianceChoices() const;
+    // The turn the player last talked with the nation (-1 never).
+    int lastTalk(int nation) const;
+
     // --- Map -----------------------------------------------------------------
     void reveal(int x, int y, int radius, int nation);
     // What a chief's tales show: the land of the same landmass within the
@@ -795,6 +820,63 @@ private:
     };
     MercenaryOffer mercenaries_;
     int treasure_ = -1; // the treasure the King has offered to carry
+    // Talks with foreign leaders (diplomacy.cpp).
+    struct Meeting {
+        enum class Stage {
+            Target, TargetAnswer, Piracy, PiracyAnswer, Sieges, SiegesAnswer, Tribute, TributeAnswer,
+            Stuff, StuffAnswer, Threats, PartitionAnswer, GiftAnswer, War, Peace, PeaceAnswer,
+            WithdrawAnswer, AllianceChoice, AllianceAnswer
+        };
+        Stage stage = Stage::Target;
+        bool waiting = false;
+        int answer = 0; // from 1, as the original counts
+        int a = -1; // the player
+        int b = -1; // the leader
+        bool forced = false;
+        bool insulted = false;
+        bool usa = false;
+        bool firstMeeting = false;
+        bool shipMover = false;
+        bool warIntent = false;
+        bool hostile = false;
+        bool wasHostile = false;
+        bool manly = false;
+        bool grudge = false;
+        bool withdrew = false;
+        bool old = false;
+        bool forcesNear = false;
+        int forces = 0;
+        int threat = 0;
+        int amount = 0;
+        int gift = 0;
+        int price = 0;
+        int target = -1;
+        int ally = -1;
+        int good = -1;
+        int goodAmount = 0;
+        int homeColony = -1;
+        int targetColony = -1;
+        std::string section; // the last text the original kept: the peace menu is it + MEEK or MANLY
+        std::vector<std::pair<int, std::string>> allies;
+    };
+    static constexpr int kPaidTribute = 999; // the original's mark after a tribute was asked
+    std::deque<Meeting> meetings_;
+    void addRelationBits(int nation, int other, std::uint8_t bits);
+    void clearRelationBits(int nation, int other, std::uint8_t bits);
+    int strongestNation() const;
+    void unfortifyNear(int owner, int nation);
+    bool wantsWar(int a, int b) const;
+    void computerDiplomacy(int a, int b);
+    void meetEuropean(int a, int b, int mover, int dir, bool& met);
+    void endMeeting(int a, int b);
+    bool startMeeting(int a, int b, int mover, int dir, bool forced);
+    GameNotice leaderNotice(const Meeting& m, std::string section) const;
+    void sendHome(int index, int nation);
+    void withdrawFrom(int owner, int nation, bool soldiersOnly);
+    void runMeeting();
+    void askMeeting(Meeting& m, GameNotice notice);
+    bool stepMeeting(Meeting& m);
+    bool askWithdrawal(Meeting& m);
     void treasureArrives(int index);
     void cashTreasure(int index, int crownPercent);
     // At the start of the player's turn, before independence.

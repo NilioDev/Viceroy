@@ -61,7 +61,12 @@ touch controls.
 > Europe until you pay the back taxes. He builds up his army, tells you
 > when your colonists' rebel sentiment rises or falls, offers to carry your
 > treasure home for the Crown's share, and now and then a European king
-> offers you mercenaries. The other nations elect their own
+> offers you mercenaries. When your men meet another European nation, its
+> leader comes to talk: offering a treaty, demanding tribute, goods or the
+> withdrawal of your troops, declaring war, or, at peace, hearing your
+> requests for withdrawal, gifts or an alliance against a third party.
+> The computer nations make peace and war among themselves, and you hear
+> of it. The other nations elect their own
 > fathers as the original's do. A tribe you meet for the first time
 > offers you peace; refusing it angers the tribe. Missionaries can found missions,
 > which the tribe takes well or badly as in the original, pay a tribe to

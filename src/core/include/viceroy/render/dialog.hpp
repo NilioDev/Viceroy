@@ -55,6 +55,7 @@ inline constexpr int kBuyAdvisor = 5;       // MSS5.SS: buying a construction
 inline constexpr int kNativePortraits = 6;  // IND0A0.SS to IND7A3.SS: four moods per tribe
 inline constexpr int kKingPortrait = kNativePortraits + 32; // KING.SS
 inline constexpr int kKingArm = kKingPortrait + 1;          // KING2.SS: his arm, eight frames
+inline constexpr int kLeaderPortraits = kKingArm + 1;       // MYR0.SS to MYR3.SS: the European leaders
 
 // The King's arm: still for about four seconds, then it rises through
 // frames 1 to 7, about a sixth of a second each, and stays up (measured).
@@ -122,6 +123,13 @@ void placeNavalDialog(Dialog& dialog);
 // The King speaks: he stands left of the box (measured once, with a box
 // 196 wide and 126 high centred on the screen's rows).
 void placeKingDialog(Dialog& dialog);
+// A foreign leader speaks (docs/rules/diplomacy.md): the box centred
+// across the screen and on row 139, the leader's portrait centred over it
+// and behind it, 78 rows above its top (measured).
+void placeLeaderDialog(const Art& art, Dialog& dialog, int nation);
+// News of treaties and wars between other nations: the man of the home
+// port tells it.
+void placeForeignNewsDialog(Dialog& dialog);
 // The tutorial's hints: the naval advisor, his hands over the box.
 void placeTutorialDialog(Dialog& dialog);
 // The name of a European nation as the messages use it ("the Netherlands").

@@ -264,6 +264,20 @@ void placeKingDialog(Dialog& d) {
     d.portraitY = 18;
 }
 
+void placeLeaderDialog(const Art& art, Dialog& d, int nation) {
+    d.portrait = kLeaderPortraits + nation;
+    d.portraitBehind = true;
+    d.x = (Screen::kWidth - boxWidth(d)) / 2;
+    d.y = (278 - dialogHeight(d)) / 2;
+    int width = 0;
+    const auto at = static_cast<std::size_t>(d.portrait);
+    if (at < art.portraits.size() && !art.portraits[at].sprites.empty()) {
+        width = art.portraits[at].sprites.front().image.width;
+    }
+    d.portraitX = Screen::kWidth / 2 - width / 2;
+    d.portraitY = d.y - 78;
+}
+
 void placeEuropeDialog(Dialog& d, bool help) {
     d.help = help;
     d.optionLeft = 13;
@@ -314,6 +328,13 @@ void placeMapDialog(Dialog& d) {
     placeColonialDialog(d);
     d.x = 54;
     d.portraitX = 195;
+}
+
+void placeForeignNewsDialog(Dialog& d) {
+    // To be measured: for now as the colonial adviser's news on the map,
+    // with the man of the home port.
+    placeMapDialog(d);
+    d.portrait = kEuropeAgent;
 }
 
 void placeBuyDialog(Dialog& d) {

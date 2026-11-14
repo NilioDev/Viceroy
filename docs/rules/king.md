@@ -81,8 +81,8 @@ The Continental Congress report shows the army (see [congress.md](congress.md)).
 
 At the start of the player's turn, before independence, one turn in 21
 a European king offers mercenaries (`MERCENARIES`). The king is picked from
-the four nations at random; another nation's king only offers once the
-player has met that nation. The force is 1 to 3 dragoons, then a coin: one
+the four nations at random; another nation's king only offers while that
+nation is at peace with the player. The force is 1 to 3 dragoons, then a coin: one
 more dragoon, or 1 or 2 artillery. Each dragoon costs (0 to 6 + 2 ×
 (difficulty + 4)) × 100, the same for all of them, and a gun twice that.
 The offer only comes when the player has the gold.

@@ -290,6 +290,12 @@ SaveGame newAmericaGame(std::span<const std::uint8_t> mapFile, const Ruleset& ru
     auto* h = save.header.data();
     std::memcpy(h, "COLONIZE", 9);
     put16(h + 40, save.humanNation);
+    // As in the original's new games: no talks with the other nations yet
+    // (the turn of the last, 88 + 2 × nation) and no royal side (98).
+    for (int n = 0; n < kEuropeanNations; ++n) {
+        put16(h + 88 + 2 * n, -1);
+    }
+    put16(h + 98, -1);
 
     // The market is drawn once and shared by all.
     std::array<int, kGoodsKinds> prices{};
