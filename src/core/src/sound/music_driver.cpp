@@ -90,7 +90,16 @@ std::optional<MusicDriver> MusicDriver::load(std::span<const std::uint8_t> file)
     const std::size_t entry = le16(code, 0x34);
     std::size_t tunes = 0;
     std::size_t effects = 0;
+    std::size_t specials = 0;
     for (std::size_t at = entry; at + 8 < code.size() && at < entry + 0x80; ++at) {
+        if (code[at] == 0x81 && code[at + 1] == 0xEB && le16(code, at + 2) == 0x8020) { // sub bx, 8020h
+            for (std::size_t k = at + 4; k + 5 < code.size() && k < at + 20; ++k) {
+                if (code[k] == 0x2E && code[k + 1] == 0xFF && code[k + 2] == 0x97) {
+                    specials = le16(code, k + 3);
+                    break;
+                }
+            }
+        }
         if (code[at] == 0x83 && code[at + 1] == 0xEB) {
             const int base = code[at + 2];
             for (std::size_t k = at + 3; k + 5 < code.size() && k < at + 20; ++k) {
@@ -112,7 +121,7 @@ std::optional<MusicDriver> MusicDriver::load(std::span<const std::uint8_t> file)
         std::uint16_t state;
         std::uint16_t stream;
     };
-    std::array<std::vector<Raw>, 0x3E> raw{};
+    std::array<std::vector<Raw>, 0x45> raw{};
     const auto parse = [&](int index, std::size_t at) {
         Piece& p = d.pieces_[static_cast<std::size_t>(index)];
         bool ok = true;
@@ -173,6 +182,13 @@ std::optional<MusicDriver> MusicDriver::load(std::span<const std::uint8_t> file)
     if (effects != 0) {
         for (int i = 0; i < 0x1E; ++i) {
             parse(0x20 + i, le16(code, effects + static_cast<std::size_t>(i) * 2));
+        }
+    }
+    // Commands 8020h-8026h: short pieces built like the tunes, which the
+    // game plays for a few events.
+    if (specials != 0) {
+        for (int i = 0; i < kSpecialPieces; ++i) {
+            parse(0x3E + i, le16(code, specials + static_cast<std::size_t>(i) * 2));
         }
     }
     // Sound effects: "mov ax, n; call play_sample" tries recording n first
@@ -350,7 +366,10 @@ std::optional<MusicDriver::Shuffle> MusicDriver::routine(std::uint16_t address) 
 }
 
 const Piece* MusicDriver::piece(int command) const {
-    const int i = command - 0x20;
+    const int i = command >= 0x8020 ? command - 0x8020 + 0x3E : command - 0x20;
+    if (command >= 0x8020 + kSpecialPieces || (command > 0x5D && command < 0x8020)) {
+        return nullptr;
+    }
     if (i < 0 || i >= static_cast<int>(pieces_.size()) || !known_[static_cast<std::size_t>(i)]) {
         return nullptr;
     }

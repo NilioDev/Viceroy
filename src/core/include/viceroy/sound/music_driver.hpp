@@ -55,6 +55,9 @@ struct Sample {
 };
 
 // The data of one FM driver file.
+// Commands 0x8020 and up: a few more pieces built like the tunes.
+inline constexpr int kSpecialPieces = 7;
+
 class MusicDriver {
 public:
     // Reads a driver file (ASOUND.COL or PSOUND.COL). Empty when the file is
@@ -62,7 +65,7 @@ public:
     static std::optional<MusicDriver> load(std::span<const std::uint8_t> file);
 
     // The piece a driver command starts: 0x20-0x3F are tunes, 0x40-0x5D sound
-    // effects. Null when the command starts nothing this player can play.
+    // effects, 0x8020-0x8026 more pieces. Null when the command starts nothing this player can play.
     const Piece* piece(int command) const;
 
     // True for the OPL3 driver (four-operator voices on two register sets).
@@ -99,8 +102,9 @@ public:
 private:
     std::vector<std::uint8_t> data_;           // the data segment, 64 KiB
     std::vector<std::uint8_t> code_;
-    std::array<Piece, 0x3E> pieces_{};         // commands 0x20..0x5D
-    std::array<bool, 0x3E> known_{};
+    // Commands 0x20..0x5D, then 0x8020..0x8026 (kSpecialPieces).
+    std::array<Piece, 0x45> pieces_{};
+    std::array<bool, 0x45> known_{};
     std::vector<Sample> samples_;
     bool opl3_ = false;
 };

@@ -5,6 +5,7 @@
 // debugger and checked against its answers; see docs/rules/natives.md.
 #include "viceroy/game/game.hpp"
 #include "viceroy/game/natives.hpp"
+#include "viceroy/game/sounds.hpp"
 
 #include <algorithm>
 #include <array>
@@ -217,6 +218,9 @@ bool Game::denounceHeresy(int index, int settlement) {
     const bool won = 1 + nextRandom(ours + theirs) <= ours;
     GameNotice notice{won ? "HERESY0" : "HERESY1", {"", "", t < tribes.size() ? tribes[t].adjective : ""}};
     notice.adjectives = {{0, us}, {1, them}};
+    // Read from the original: church music for the mission won, fire for
+    // the one lost.
+    notice.music = {{MusicCue::Kind::Sound, won ? sounds::kChurch : sounds::kFire}};
     notices_.push_back(std::move(notice));
     if (won) {
         here.raw[5] = static_cast<std::uint8_t>(us | (expert ? kExpertMission : 0));

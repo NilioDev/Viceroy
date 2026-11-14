@@ -20,7 +20,7 @@ game's commands:
 | 0–8 | Control: reset, stop (fade out) all or some voices, "is music playing?" |
 | 0x20–0x3F | Tunes |
 | 0x40–0x5D | Sound effects |
-| 0x8020–0x8026 | A few special pieces |
+| 0x8020–0x8026 | Short pieces built like the tunes: Viceroy plays 8020h to 8025h |
 
 Each tune command fades out what is playing. Then it starts some of the six
 music voices, each on its own stream in the data segment. It can also name

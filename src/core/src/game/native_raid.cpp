@@ -8,6 +8,7 @@
 #include "viceroy/game/europe.hpp"
 #include "viceroy/game/game.hpp"
 #include "viceroy/game/natives.hpp"
+#include "viceroy/game/sounds.hpp"
 
 #include <algorithm>
 #include <cstdlib>
@@ -129,6 +130,8 @@ CombatOutcome Game::nativeAttack(int index, int x, int y) {
         againstArtillery = true;
     }
 
+    fightStartSound(nation, attackerType, defenderNation, defenderType);
+
     // The nearest colony names the place ("near Jamestown"); the fight was
     // at it when it is no squares away.
     const int nearest = nearestColony(save_, x, y, -1);
@@ -187,6 +190,18 @@ CombatOutcome Game::nativeAttack(int index, int x, int y) {
         hs.raw[static_cast<std::size_t>(10 + 2 * defenderNation)] = 0;
         hs.raw[static_cast<std::size_t>(11 + 2 * defenderNation)] = 0;
     }
+    if (human) {
+        // Read from the original: the sound of the win, and when the braves
+        // stay at the colony another after it.
+        if (defender >= 0) {
+            fightWonSound(index, x, y);
+        } else {
+            sound(sounds::kBurned);
+        }
+        if (colony && (defender >= 0 || save_.colonies[static_cast<std::size_t>(*colony)].population > 1)) {
+            sound(sounds::kBravesWin);
+        }
+    }
     if (defender < 0) {
         // Nobody under arms: one of the colony's people dies, or the colony
         // burns with its last.
@@ -223,6 +238,7 @@ CombatOutcome Game::nativeAttack(int index, int x, int y) {
                 }
             }
             notice.section = "INDIANBURNCOLONY";
+            notice.music.push_back({MusicCue::Kind::Sound, sounds::kFire});
             tension = -50;
         }
     } else {
@@ -249,7 +265,7 @@ CombatOutcome Game::nativeAttack(int index, int x, int y) {
     }
     if (human) {
         // Read from the original: the natives' own tune.
-        notice.music = {{MusicCue::Kind::Pick, kNativesTune}};
+        notice.music.push_back({MusicCue::Kind::Pick, kNativesTune});
         notices_.push_back(std::move(notice));
     }
     if (tension != 0 && hasBlock && defenderNation >= 0 && defenderNation < kEuropeanNations &&
@@ -385,6 +401,7 @@ void Game::raidColony(int nation, int colonyIndex, int home, bool always) {
         amount = std::max(1, std::min(stock, amount));
         stock -= amount;
         notice.section = "RAIDSTORES";
+        notice.music.push_back({MusicCue::Kind::Sound, sounds::kRaidStores});
         notice.strings[2] = good < static_cast<int>(rules_.cargo.size())
                                 ? rules_.cargo[static_cast<std::size_t>(good)].name
                                 : std::string();
@@ -408,6 +425,7 @@ void Game::raidColony(int nation, int colonyIndex, int home, bool always) {
                                                                  : std::string();
         };
         notice.section = "RAIDBURN";
+        notice.music.push_back({MusicCue::Kind::Sound, sounds::kFire});
         notice.strings[2] = nameOf(row);
         if (row == kWarehouseRow || row == kCapitolRow) {
             // These keep their level in a byte of their own.
@@ -437,6 +455,8 @@ void Game::raidColony(int nation, int colonyIndex, int home, bool always) {
     }
     case kShip:
         notice.section = "RAIDSHIP";
+        notice.music.push_back({MusicCue::Kind::Sound, sounds::kColonyTaken});
+        notice.music.push_back({MusicCue::Kind::Sound, sounds::kShipBeaten});
         notice.strings[2] = rules_.units[static_cast<std::size_t>(unit(ship).type)].name;
         if (human) {
             notices_.push_back(notice);
@@ -448,12 +468,14 @@ void Game::raidColony(int nation, int colonyIndex, int home, bool always) {
     case kGold:
         save_.nations[static_cast<std::size_t>(owner)].gold -= gold;
         notice.section = "RAIDGOLD";
+        notice.music.push_back({MusicCue::Kind::Sound, sounds::kRaidGold});
         notice.numbers = {gold};
         tension = -8;
         break;
     default:
         // "Sioux raiding party wiped out in Jamestown! Colonists jubilant!"
         notice.section = "RAIDNOTHING";
+        notice.music.push_back({MusicCue::Kind::Sound, sounds::kRaidNothing});
         break;
     }
     if (human && !notice.section.empty()) {

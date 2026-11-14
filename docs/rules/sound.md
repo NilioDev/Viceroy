@@ -102,3 +102,60 @@ Not yet in Viceroy, so not yet with music: the King's taxes and wars,
 independence and the War of Independence, wars between nations, the
 natives' talks and threats, colonies taken or burned by other nations, and
 the end of the game.
+
+## Sound effects at events
+
+The game sends an effect (driver commands 40h–5Dh, see [the driver
+format](../formats/sound-driver.md)) or one of the short pieces from 8020h
+at once, when the player's unit, colony or mission is in the event. An
+effect needs Sound Effects; a piece from 8020h needs Event Music, like the
+tunes.
+
+A fight starts with:
+
+- when braves attack the player's men, first a war cry: 3Bh plus the
+  brave's unit type (4Eh to 51h);
+- 42h when the attacker is a ship or artillery, or the defender artillery;
+- else 4Ch when the attacker is mounted (dragoon, scout, cavalry);
+- else 41h when either side has an attack above 1;
+- else 40h.
+
+When the attacker wins:
+
+| What it beat | Effect |
+| --- | --- |
+| A unit, beaten by a ship or artillery | 43h |
+| A unit in a colony or a village | 49h |
+| A unit in the open | 40h |
+| A colony's colonist, beaten by Europeans (the colony is taken) | 4Bh |
+| A colony's colonist, beaten by braves (one dies, or the colony burns with its last) | 4Ah |
+| A village's brave (the village loses a person) | 48h |
+| A village's last brave (the village burns) | 4Ah |
+
+After that, braves who win at a colony and stay there play 45h, and a ship
+beaten by a ship plays 4Dh, whoever attacked.
+
+| Event | Sound |
+| --- | --- |
+| A ship sinks (`SHIPSUNK`) | 57h |
+| Braves burn a colony (`INDIANBURNCOLONY`) | 53h |
+| A raid takes stores (`RAIDSTORES`) | 4Fh |
+| A raid burns a building (`RAIDBURN`) | 53h |
+| A raid hits a ship in the harbour (`RAIDSHIP`) | 4Bh, then 4Dh |
+| A raid takes gold (`RAIDGOLD`) | 4Eh |
+| A raid comes to nothing (`RAIDNOTHING`) | 5Bh |
+| A mission is founded (`MISSION0` to `3`) | 8024h |
+| A mission is won from another nation (`HERESY0`) | 8024h |
+| A mission is lost to another nation (`HERESY1`) | 53h |
+| The chief kills the scout (`CHIEFKILL`) | 55h |
+| A unit in a colony is told to fortify (`UNITOPTIONS`) | 58h |
+
+Read from the original but not yet in Viceroy: 5Ch when a colonist or
+soldier takes horses and 8024h when one is blessed as a missionary (in the
+home port), 3Eh with the King's taxes (`TAXOPTIONS`), 56h at a tea party
+(`TEAPARTY`), 3Fh when mercenaries are offered (`MERCS`), 8020h near a
+declaration of war, 21h or 25h with the final score, 39h before the
+opening, 52h for a wagon train of the player's, 8024h when a colony
+finishes some buildings, and a few calls that pass on a sound chosen
+elsewhere. Still to be placed: 54h in three places (one of them as a
+player's turn begins) and 58h in one more.

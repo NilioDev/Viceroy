@@ -5,6 +5,7 @@
 #include "viceroy/game/colony.hpp"
 #include "viceroy/game/europe.hpp"
 #include "viceroy/game/natives.hpp"
+#include "viceroy/game/sounds.hpp"
 #include "viceroy/render/report_view.hpp"
 #include "viceroy/data/text_table.hpp"
 #include "viceroy/game_files.hpp"
@@ -447,6 +448,7 @@ void PlayScreen::foundMission(int unit) {
     const auto& tribes = game_.rules().tribes;
     const std::string people =
         static_cast<std::size_t>(tribe) < tribes.size() ? tribes[static_cast<std::size_t>(tribe)].adjective : "";
+    playMusic({{MusicCue::Kind::Sound, sounds::kChurch}}); // read from the original
     ask("MISSION" + std::to_string(news.reaction), -1, {church, place, seasonName(*art_, save.season), people}, -1,
         {save.year});
     if (dialog_) {
@@ -659,6 +661,9 @@ void PlayScreen::showChiefAnswer() {
     const int tribe = village_ >= 0 && village_ < static_cast<int>(save.settlements.size())
                           ? tribeOf(save.settlements[static_cast<std::size_t>(village_)])
                           : 0;
+    if (c.section == "CHIEFKILL") {
+        playMusic({{MusicCue::Kind::Sound, sounds::kChiefKill}}); // read from the original
+    }
     ask(c.section, c.unit, c.strings, -1, c.numbers);
     if (dialog_) {
         placeNative(tribe);
@@ -842,6 +847,8 @@ void PlayScreen::showNotices() {
     }
     GameNotice notice = notices_.front();
     notices_.erase(notices_.begin());
+    // What happened before the news first (the sounds of a fight).
+    playMusic(game_.takeMusicCues());
     playMusic(notice.music);
     for (const auto& [string, nation] : notice.adjectives) {
         if (string >= 0) {
@@ -1475,7 +1482,10 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
         }
         case kUnitClear: game_.setOrders(unit, SaveUnit::kNoOrders); break;
         case kUnitSentry: game_.setOrders(unit, SaveUnit::kSentry); break;
-        case kUnitFortify: game_.setOrders(unit, SaveUnit::kFortify); break; // measured: orders 5
+        case kUnitFortify:
+            game_.setOrders(unit, SaveUnit::kFortify); // measured: orders 5
+            playMusic({{MusicCue::Kind::Sound, sounds::kFortify}}); // read from the original
+            break;
         default: break;
         }
     } else if (question == "BUYME1") {
@@ -2724,6 +2734,9 @@ void PlayScreen::playMusic(const std::vector<MusicCue>& cues) {
             break;
         case MusicCue::Kind::Pick:
             music_->pick(cue.value);
+            break;
+        case MusicCue::Kind::Sound:
+            music_->sound(cue.value);
             break;
         }
     }

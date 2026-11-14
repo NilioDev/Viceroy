@@ -6,6 +6,7 @@
 // docs/rules/natives.md.
 #include "viceroy/game/game.hpp"
 #include "viceroy/game/natives.hpp"
+#include "viceroy/game/sounds.hpp"
 
 #include <algorithm>
 
@@ -194,8 +195,21 @@ CombatOutcome Game::attackVillage(int attacker, int settlement) {
     const int roll = 1 + nextRandom(s.attack + s.defense);
     const bool won = s.attack + s.defense > 0 && attackerWins(s.attack, s.defense, roll);
     save_.units[static_cast<std::size_t>(attacker)].movesUsed = movementAllowance(attacker);
+    const auto& v = save_.settlements[static_cast<std::size_t>(settlement)];
+    const bool shown = unit(attacker).nation == human();
+    fightStartSound(unit(attacker).nation, unit(attacker).type, kEuropeanNations + tribeOf(v),
+                    defender >= 0 ? unit(defender).type : villageBrave(settlement).type);
     if (won) {
         int a = attacker;
+        if (shown) {
+            // Read from the original: a beaten defender, a village that
+            // loses a person, or one that burns.
+            if (defender >= 0) {
+                fightWonSound(attacker, v.x, v.y);
+            } else {
+                sound(v.population > 1 ? sounds::kVillageHit : sounds::kBurned);
+            }
+        }
         if (defender >= 0) {
             loseBattle(defender, attacker);
             a = defender < attacker ? attacker - 1 : attacker;

@@ -65,9 +65,10 @@ enum class WorkResult {
 
 // Music the original asks for with an event (see docs/rules/sound.md): a
 // mood for the next tune, a mood now, a mood that only changes the tune at
-// once with Event Music alone, or a tune of its own (a driver command).
+// once with Event Music alone, a tune of its own (a driver command), or a
+// driver command sent at once: a sound effect, or one of the short pieces.
 struct MusicCue {
-    enum class Kind { SetMood, ChangeMood, MoodEvent, Pick };
+    enum class Kind { SetMood, ChangeMood, MoodEvent, Pick, Sound };
     Kind kind = Kind::SetMood;
     int value = 0;
     bool operator==(const MusicCue&) const = default;
@@ -759,6 +760,12 @@ private:
     int nextRandom(int range); // 0 .. range - 1
     // True when the loser is gone (unit numbers after it move down).
     bool loseBattle(int loser, int winner);
+    // The sounds of a fight, read from the original (docs/rules/sound.md):
+    // sent at once, when the player's unit or colony is in it.
+    void sound(int command) { musicCues_.push_back({MusicCue::Kind::Sound, command}); }
+    void fightStartSound(int attackerNation, int attackerType, int defenderNation, int defenderType);
+    // A beaten unit: the sound of the attacker's win over it.
+    void fightWonSound(int attacker, int x, int y);
     CombatStrengths strengthsAgainst(int attacker, const SaveUnit& defender, bool defenderShip, bool defenderDamaged,
                                      int defenderExtra, bool beforeLevels = false) const;
     // The defender's part of it alone: its strength with the bonus of where
