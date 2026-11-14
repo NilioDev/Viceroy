@@ -233,6 +233,9 @@ public:
     bool atPeace(int nation, int other) const;
     // Breaks the treaty both ways: the two nations are at war.
     void declareWar(int nation, int other);
+    // The Sound Options as the save keeps them (header byte 22).
+    std::uint8_t soundOptionBits() const { return save_.header[22]; }
+    void setSoundOptionBits(std::uint8_t bits) { save_.header[22] = bits; }
     // The game option "Combat Analysis" (header byte 19, bit 1).
     bool combatAnalysisShown() const;
     CombatAnalysis analyseAttack(int attacker, int defender) const;

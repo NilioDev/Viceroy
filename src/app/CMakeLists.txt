@@ -1,5 +1,6 @@
 set(VCR_APP_SOURCES
     main.cpp
+    audio.cpp
 )
 
 if(ANDROID)

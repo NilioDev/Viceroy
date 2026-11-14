@@ -141,3 +141,14 @@ With a card that plays samples, the drum voice plays recorded drums from
 samples 0–4. Sample commands play other recordings from that file.
 `COLDIG.BIN` is raw 8-bit sound with no header. The table of sample offsets
 and lengths is in the driver.
+
+## Pieces that follow one another
+
+One tune command (25h, "Northfire") does not fade out what plays. It keeps
+a clock of its own that counts down 192 ticks and starts over. When the
+command comes and the clock is at zero or no music voice plays, the chip is
+reset and the first block of streams starts at once. When one of two named
+streams of another piece is playing, a second block is queued instead;
+otherwise the first block is queued, unless it is already playing. A queued
+block starts when the clock next runs out, so it lands on the beat of what
+is playing. The clock steps after the voices and before the fading voices.

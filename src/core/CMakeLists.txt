@@ -46,6 +46,7 @@ add_library(vcr_core STATIC
     src/ui/title.cpp
     src/ui/new_game_flow.cpp
     src/ui/debug_menu.cpp
+    src/sound/background_music.cpp
     src/sound/music_driver.cpp
     src/sound/music_stream.cpp
 )
