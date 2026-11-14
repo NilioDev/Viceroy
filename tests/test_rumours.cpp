@@ -96,6 +96,23 @@ VCR_TEST("original files: a unit explores a lost city rumour (read from the orig
             VCR_CHECK(n.numbers[0] > 0);
             VCR_CHECK(game.state().nations[kDutch].gold == gold + n.numbers[0]);
         }
+        // Read from the original: the music each find asks for.
+        using K = MusicCue::Kind;
+        if (n.section == "LOSTCITY1") {
+            VCR_CHECK(n.music == std::vector<MusicCue>{{K::Pick, 0x37}});
+        }
+        if (n.section == "LOSTCITY2") {
+            VCR_CHECK(n.music == std::vector<MusicCue>{{K::Pick, 0x3C}});
+        }
+        if (n.section == "LOSTCITY4") {
+            VCR_CHECK(n.music == std::vector<MusicCue>{{K::Pick, 0x33}});
+        }
+        if (n.section == "LOSTCITY5") {
+            VCR_CHECK(n.music == std::vector<MusicCue>{{K::SetMood, 1}});
+        }
+        if (n.section == "LOSTCITY3" || n.section == "LOSTCITY7") {
+            VCR_CHECK(n.music == std::vector<MusicCue>{{K::SetMood, 2}});
+        }
         if (n.section == "LOSTCITY2") {
             VCR_CHECK(game.unitCount() == units + 1);
             VCR_CHECK(game.unit(units).type == 10 && game.unit(units).profession * 100 == n.numbers[1]);

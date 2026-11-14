@@ -6,6 +6,7 @@
 // docs/rules/natives.md.
 #include "viceroy/game/game.hpp"
 #include "viceroy/game/natives.hpp"
+#include "viceroy/sound/background_music.hpp"
 
 #include <algorithm>
 #include <array>
@@ -135,6 +136,13 @@ bool Game::meetNeighbours(int index) {
         notice.value = tribe;
         notice.numbers = {settlements};
         notice.unit = index;
+        // Read from the original: the tribe's tune now, but in the first 20
+        // turns with Background Music on the other tribes' tune waits for
+        // the next.
+        const int mood = tribeMood(tribe);
+        const bool background = sound::SoundOptions::fromSave(soundOptionBits()).background;
+        const bool wait = save_.turn < 20 && background && tribe >= 2;
+        notice.music = {{wait ? MusicCue::Kind::SetMood : MusicCue::Kind::ChangeMood, mood}};
         notices_.push_back(std::move(notice));
         asked = true;
     }
