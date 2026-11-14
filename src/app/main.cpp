@@ -463,6 +463,8 @@ std::optional<Command> keyCommand(const SDL_KeyboardEvent& key) {
         return Command::Train;
     case SDLK_TAB:
         return (key.mod & SDL_KMOD_SHIFT) ? Command::PreviousUnit : Command::NextUnit;
+    case SDLK_F1:
+        return Command::TerrainHelp;
     case SDLK_F2:
         return Command::ReligionReport;
     case SDLK_F3:
@@ -624,6 +626,10 @@ void click(App& app, float wx, float wy) {
     }
     if (app.play->view().hiddenTerrain) {
         send(app, Command::Confirm);
+        return;
+    }
+    if (app.play->pedia()) {
+        app.play->clickPedia(static_cast<int>(x), static_cast<int>(y));
         return;
     }
     if (app.play->reportUp() && !app.play->dialog()) {

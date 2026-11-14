@@ -49,6 +49,7 @@ add_library(vcr_core STATIC
     src/render/europe_view.cpp
     src/render/dialog.cpp
     src/render/menu_bar.cpp
+    src/render/pedia_view.cpp
     src/render/report_view.cpp
     src/render/trade_route_view.cpp
     src/ui/play.cpp

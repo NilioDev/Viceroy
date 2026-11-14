@@ -3633,6 +3633,9 @@ bool PlayScreen::handle(Command command) {
         advanceEnding();
         return true;
     }
+    if (pedia_) {
+        return handlePedia(command);
+    }
     if (report_ != 0) {
         // Any key turns the page, and closes the report after the last.
         const int pages = report_ == 7   ? navalReportPages(game_, game_.human())
@@ -3683,6 +3686,9 @@ bool PlayScreen::handle(Command command) {
     switch (command) {
     case Command::ReligionReport:
         openReport(2);
+        return true;
+    case Command::TerrainHelp:
+        openTerrainPage();
         return true;
     case Command::CongressReport:
         openReport(3);
@@ -4099,6 +4105,10 @@ void PlayScreen::draw(Screen& screen, const Art& art) const {
     }
     if (ending_ == 12) {
         drawHallOfFame(screen, art, hall_, hallPlace_);
+        return;
+    }
+    if (pedia_) {
+        drawPedia(screen, art, *pedia_);
         return;
     }
     if (report_ != 0) {
@@ -4822,6 +4832,99 @@ void PlayScreen::clickReport(int x, int y) {
     handle(Command::Confirm);
 }
 
+void PlayScreen::openPedia(int part) {
+    pedia_ = PediaState{};
+    pedia_->part = part;
+    pediaFromMap_ = false;
+}
+
+void PlayScreen::openTerrainPage() {
+    // Seen: F1 shows the page of the active unit's square.
+    int x = -1;
+    int y = -1;
+    if (viewMode_) {
+        x = cursorX_;
+        y = cursorY_;
+    } else if (const int active = game_.activeUnit(); active >= 0 && game_.onMap(active)) {
+        x = game_.unit(active).x;
+        y = game_.unit(active).y;
+    }
+    const auto& map = game_.state().map;
+    if (!map.inside(x, y)) {
+        return;
+    }
+    pedia_ = PediaState{};
+    pedia_->part = pedia::kTerrain;
+    pedia_->page = pediaTerrainOf(map.at(x, y));
+    pediaFromMap_ = true;
+}
+
+bool PlayScreen::handlePedia(Command command) {
+    auto& p = *pedia_;
+    if (p.page >= 0) {
+        // Seen: any key goes back to the index, or to the map after F1.
+        if (pediaFromMap_) {
+            pedia_.reset();
+        } else {
+            p.page = -1;
+        }
+        return true;
+    }
+    const int count = art_ != nullptr ? static_cast<int>(pediaEntries(*art_, p.part).size()) : 0;
+    const auto move = [&](int by) {
+        if (p.selected + by >= 0 && p.selected + by < count) {
+            p.selected += by;
+        }
+    };
+    switch (command) {
+    case Command::MoveN:
+    case Command::Up:
+        move(-1);
+        break;
+    case Command::MoveS:
+    case Command::Down:
+        move(1);
+        break;
+    case Command::MoveW:
+    case Command::Left:
+        move(-kPediaRows);
+        break;
+    case Command::MoveE:
+    case Command::Right:
+        move(kPediaRows);
+        break;
+    case Command::Confirm:
+        if (art_ != nullptr && p.selected < count) {
+            p.page = pediaEntries(*art_, p.part)[static_cast<std::size_t>(p.selected)].id;
+        }
+        break;
+    case Command::Cancel:
+    case Command::Menu:
+        pedia_.reset();
+        break;
+    default:
+        break;
+    }
+    return true;
+}
+
+void PlayScreen::clickPedia(int x, int y) {
+    if (!pedia_ || art_ == nullptr) {
+        return;
+    }
+    if (pedia_->page >= 0) {
+        handlePedia(Command::Confirm);
+        return;
+    }
+    const int hit = pediaIndexHit(*art_, *pedia_, x, y);
+    if (hit == kPediaExit) {
+        pedia_.reset();
+    } else if (hit >= 0) {
+        pedia_->selected = hit;
+        handlePedia(Command::Confirm);
+    }
+}
+
 void PlayScreen::notYet() {
     say("Not in Viceroy yet.");
 }
@@ -4902,6 +5005,14 @@ bool PlayScreen::pickMenuEntry(int entry) {
             notYet();
             return true;
         }
+    }
+    if (section == "PEDIA") {
+        if (entry >= 0 && entry < pedia::kParts) {
+            openPedia(entry);
+        } else {
+            notYet();
+        }
+        return true;
     }
     if (section == "REPORTS") {
         switch (entry) {

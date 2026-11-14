@@ -891,6 +891,7 @@ Art loadArt(const std::filesystem::path& folder) {
     art.colonyNames = parseTextFile(readFile(folder, "COLONY.TXT"));
     art.labelText = parseTextFile(readFile(folder, "LABELS.TXT"));
     art.gameText = parseTextFile(readFile(folder, "GAME.TXT"));
+    art.pedia = parseTextFile(readFile(folder, "PEDIA.TXT"));
     art.menus = readMenus(parseTextFile(readFile(folder, "MENU.TXT")));
     placeMenus(art, art.menus);
     art.congressHall = readPicture(readFile(folder, "CCBKGD.PIK"));

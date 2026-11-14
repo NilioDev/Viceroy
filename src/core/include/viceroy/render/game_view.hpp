@@ -36,6 +36,7 @@ struct Art {
     TextFile colonyNames; // COLONY.TXT
     TextFile labelText;   // LABELS.TXT: words on the screens
     TextFile gameText;    // GAME.TXT: the messages
+    TextFile pedia;       // PEDIA.TXT: the Colonizopedia's pages
     std::vector<MenuDef> menus; // MENU.TXT: the menu bar
     std::vector<SpriteSheet> portraits; // advisors: MSS0.SS, ...
     Picture congressHall;               // CCBKGD.PIK
