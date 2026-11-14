@@ -482,6 +482,8 @@ constexpr int kLabelSelectItem = 4;
 constexpr int kLabelNoProduction = 5;
 constexpr int kLabelMore = 6;
 constexpr int kLabelProfession = 8;
+constexpr int kLabelClearSpecialty = 44; // @MISC
+constexpr int kJobsTitleWidth = 186;     // the box less its edges
 
 // A button of the panel: a raised box with a word in it.
 void drawPanelBox(Screen& screen, const Art& art, const PanelButton& b, const std::string& word) {
@@ -613,6 +615,14 @@ int unitPresentAt(int x, int y) {
     return k < 5 ? k : -1;
 }
 
+// 1 when the jobs menu starts with "(CLEAR SPECIALTY)": the colonist is an expert.
+int jobsMenuClearLine(const SaveColony& colony, int colonist) {
+    if (colonist < 0 || colonist >= colony.population) {
+        return 0;
+    }
+    return Game::isExpert(colony.skills[static_cast<std::size_t>(colonist)]) ? 1 : 0;
+}
+
 namespace {
 
 void drawUnitsPanel(Screen& screen, const Art& art, const Game& game, const SaveColony& colony, int selected) {
@@ -730,10 +740,6 @@ void drawJobsMenu(Screen& screen, const Art& art, const Game& game, const SaveCo
     const auto& save = game.state();
     const auto& jobs = game.rules().jobs;
     const auto choices = jobChoices(colony, save.map, game.rules(), save.colonies, colonist, save.difficulty);
-    const Rect box{62, 20, 196, 160};
-    drawWoodBox(screen, art, box);
-
-    const TextColours green{kGreen, kNoColour, kNoColour};
     auto nameOf = [&](int row, bool expert) -> std::string {
         if (row < 0 || static_cast<std::size_t>(row) >= jobs.size()) {
             return {};
@@ -745,19 +751,53 @@ void drawJobsMenu(Screen& screen, const Art& art, const Game& game, const SaveCo
     const int skillRow = skillOf == skill::kFreeColonist ? 19 : skillOf;
     const std::string title = "Select a Profession for " + nameOf(skillRow, true) + "(" +
                               nameOf(colony.jobs[static_cast<std::size_t>(colonist)], false) + "):";
-    screen.text(art.tiny, 67, 26, title, green);
+    // Measured: a title too wide for the box goes on to a second line 6
+    // pixels lower, and the box grows to hold every line, centred.
+    std::vector<std::string> titleLines{""};
+    {
+        std::string word;
+        for (std::size_t i = 0; i <= title.size(); ++i) {
+            const char ch = i < title.size() ? title[i] : ' ';
+            if (ch != ' ') {
+                word.push_back(ch);
+                continue;
+            }
+            auto& line = titleLines.back();
+            const std::string next = line.empty() ? word : line + " " + word;
+            if (!line.empty() && Screen::textWidth(art.tiny, next) > kJobsTitleWidth) {
+                titleLines.push_back(word);
+            } else {
+                line = next;
+            }
+            word.clear();
+        }
+    }
+    const int clear = jobsMenuClearLine(colony, colonist);
+    const int lines = clear + static_cast<int>(choices.size()) + 1;
+    const int extra = 6 * (static_cast<int>(titleLines.size()) - 1);
+    const int h = 24 + 8 * lines + extra;
+    const Rect box{62, (200 - h) / 2, 196, h};
+    drawWoodBox(screen, art, box);
 
-    const int lines = static_cast<int>(choices.size()) + 1;
+    const TextColours green{kGreen, kNoColour, kNoColour};
+    for (std::size_t t = 0; t < titleLines.size(); ++t) {
+        screen.text(art.tiny, 67, box.y + 6 + 6 * static_cast<int>(t), titleLines[t], green);
+    }
     for (int i = 0; i < lines; ++i) {
-        const int y = 36 + 8 * i;
+        const int y = box.y + 16 + extra + 8 * i;
         if (i == highlighted) {
             screen.fill({64, y - 1, 190, 7}, kMenuBar);
+        }
+        if (i < clear) {
+            screen.text(art.tiny, 75, y, textLine(art.labelText, "MISC", kLabelClearSpecialty, "(CLEAR SPECIALTY)"),
+                        green);
+            continue;
         }
         if (i == lines - 1) {
             screen.text(art.tiny, 75, y, "(More)", green);
             break;
         }
-        const auto& c = choices[static_cast<std::size_t>(i)];
+        const auto& c = choices[static_cast<std::size_t>(i - clear)];
         screen.text(art.tiny, 75, y, nameOf(c.job, false), green);
         if (jobOutput(c.job) >= 0) {
             const std::string value = std::to_string(c.amount) + " " + goodName(game, jobOutput(c.job));
@@ -765,7 +805,8 @@ void drawJobsMenu(Screen& screen, const Art& art, const Game& game, const SaveCo
         }
     }
     const std::string help = "(F1 for Help)";
-    screen.text(art.tiny, 256 - Screen::textWidth(art.tiny, help), 171, help, {kGold, kNoColour, kNoColour});
+    screen.text(art.tiny, 256 - Screen::textWidth(art.tiny, help), box.y + box.h - 9, help,
+                {kGold, kNoColour, kNoColour});
 }
 
 // The menu of jobs outside the colony (measured): as the jobs menu, with

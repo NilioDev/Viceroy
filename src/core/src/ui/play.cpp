@@ -1944,6 +1944,10 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
         } else {
             founding_.reset();
         }
+    } else if (question == "LOBOTOMIZE") {
+        if (choice == 0 && colonyScreen_) {
+            game_.clearSpecialty(colonyScreen_->colony, colonyScreen_->selectedColonist);
+        }
     } else if (question == "RENAMECOLONY") {
         // An empty name keeps the old one (read from the original).
         if (choice == 0 && !typed_.empty() && colonyScreen_) {
@@ -2596,7 +2600,8 @@ bool PlayScreen::handleOutsideMenu(Command command) {
                 const auto& colony = save.colonies[static_cast<std::size_t>(state.colony)];
                 const auto inside =
                     jobChoices(colony, save.map, game_.rules(), save.colonies, who.colonist, save.difficulty);
-                state.jobsMenu = static_cast<int>(inside.size()); // on "(More)"
+                state.jobsMenu =
+                    jobsMenuClearLine(colony, who.colonist) + static_cast<int>(inside.size()); // on "(More)"
             }
             break;
         }
@@ -2797,7 +2802,9 @@ bool PlayScreen::handleColonyScreen(Command command) {
     }
     if (state.jobsMenu >= 0) {
         const auto choices = jobChoices(colony, save.map, game_.rules(), save.colonies, state.selectedColonist, save.difficulty);
-        const int lines = static_cast<int>(choices.size()) + 1; // the last line is "(More)"
+        // An expert's menu starts with "(CLEAR SPECIALTY)"; the last line is "(More)".
+        const int clear = jobsMenuClearLine(colony, state.selectedColonist);
+        const int lines = clear + static_cast<int>(choices.size()) + 1;
         switch (command) {
         case Command::MoveN:
         case Command::Up:
@@ -2809,8 +2816,20 @@ bool PlayScreen::handleColonyScreen(Command command) {
             break;
         case Command::Confirm:
         case Command::Skip:
-            if (state.jobsMenu < static_cast<int>(choices.size())) {
-                const auto& picked = choices[static_cast<std::size_t>(state.jobsMenu)];
+            if (state.jobsMenu < clear) {
+                // Read from the original: it asks first, naming the specialty.
+                state.jobsMenu = -1;
+                const int skillOf = colony.skills[static_cast<std::size_t>(state.selectedColonist)];
+                const auto& jobs = game_.rules().jobs;
+                const std::string expert = skillOf >= 0 && static_cast<std::size_t>(skillOf) < jobs.size()
+                                               ? jobs[static_cast<std::size_t>(skillOf)].expertName
+                                               : std::string{};
+                ask("LOBOTOMIZE", -1, {expert});
+                placeBuyDialog(*dialog_);
+                return true;
+            }
+            if (state.jobsMenu < clear + static_cast<int>(choices.size())) {
+                const auto& picked = choices[static_cast<std::size_t>(state.jobsMenu - clear)];
                 state.jobsMenu = -1;
                 tryColonyMove(ColonyMover{state.selectedColonist, -1}, picked.job, picked.square);
                 return true;
@@ -2846,10 +2865,11 @@ bool PlayScreen::handleColonyScreen(Command command) {
             // The jobs menu opens on the colonist's present job.
             const auto choices = jobChoices(colony, save.map, game_.rules(), save.colonies, state.selectedColonist, save.difficulty);
             const int current = colony.jobs[static_cast<std::size_t>(state.selectedColonist)];
-            state.jobsMenu = 0;
+            const int clear = jobsMenuClearLine(colony, state.selectedColonist);
+            state.jobsMenu = clear;
             for (std::size_t i = 0; i < choices.size(); ++i) {
                 if (choices[i].job == current) {
-                    state.jobsMenu = static_cast<int>(i);
+                    state.jobsMenu = clear + static_cast<int>(i);
                 }
             }
         } else {

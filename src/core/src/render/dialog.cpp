@@ -74,19 +74,20 @@ int plainWidth(const Font& font, const std::string& s) {
 }
 
 std::vector<std::string> wrap(const Font& font, const std::string& text, int limit) {
-    // The lines are drawn with one space between words. Measured: where
-    // the text file breaks a line the original measures two spaces, so
-    // "Your Excellency. Our fur traders" + "cannot" (one pixel short of
-    // the limit with one space) goes onto the next line; spaces inside a
-    // line count once.
+    // The lines are drawn with one space between words, but measured with
+    // the spaces as the text file has them, a line break counting as one:
+    // "Your Excellency.  Our fur traders" (two spaces after the full stop)
+    // + "cannot" goes onto the next line though it would fit with one, and
+    // "specialty" + line break + "(Master Gunsmiths) and make" stays on
+    // one line (both measured).
     std::vector<std::string> lines;
     std::string line;     // as drawn
-    std::string measured; // with the line breaks as two spaces
+    std::string measured; // with the spaces of the text file
     std::size_t i = 0;
     while (i < text.size()) {
-        bool lineBreak = false;
+        std::size_t gap = 0;
         while (i < text.size() && (text[i] == ' ' || text[i] == '\n')) {
-            lineBreak = lineBreak || text[i] == '\n';
+            ++gap;
             ++i;
         }
         std::size_t end = text.find_first_of(" \n", i);
@@ -103,7 +104,7 @@ std::vector<std::string> wrap(const Font& font, const std::string& text, int lim
             measured = word;
             continue;
         }
-        const std::string candidate = measured + (lineBreak ? "  " : " ") + word;
+        const std::string candidate = measured + std::string(std::max<std::size_t>(gap, 1), ' ') + word;
         if (plainWidth(font, candidate) > limit) {
             lines.push_back(line);
             line = word;
