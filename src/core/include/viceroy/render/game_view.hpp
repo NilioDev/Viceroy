@@ -192,6 +192,12 @@ void drawSmallUnit(Screen& screen, const Art& art, const Game& game, int index, 
 // A unit as the map draws it, on the square at (px, py); with `listInk` its
 // orders letter is inked as in the colony's list of units.
 void drawUnitAt(Screen& screen, const Art& art, const Game& game, int index, int px, int py, bool listInk = false);
+// A unit of a type with no orders, as on a map square at (px, py), in a
+// nation's colour (the Colonizopedia's pictures); icon replaces the type's
+// picture (a colonist's profession, damaged artillery); spriteShift moves
+// the picture (not its box) to the right.
+void drawUnitTypeOnSquare(Screen& screen, const Art& art, int type, int nation, int px, int py, int icon = -1,
+                          int spriteShift = 0);
 // The first field of a row of a section of a text file, or `fallback`.
 std::string textLine(const TextFile& file, const char* section, int row, const char* fallback);
 

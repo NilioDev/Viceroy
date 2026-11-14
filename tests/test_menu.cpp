@@ -512,6 +512,10 @@ VCR_TEST("original files: the Colonizopedia's index and pages (seen in the origi
     VCR_CHECK(pediaEntries(art, pedia::kTerrain)[1].name == "Boreal Forest");
     VCR_CHECK(pediaEntries(art, pedia::kSkill).front().name == "Blacksmith");
     VCR_CHECK(pediaEntries(art, pedia::kFather).front().name == "Adam Smith");
+    // Lines break as in the original: "in" does not fit after "them".
+    const auto braves = pediaPageLines(art, pedia::kUnit, 21);
+    VCR_CHECK(braves.size() > 2 && braves[1].ends_with("brought them"));
+    VCR_CHECK(braves[2].starts_with("in the late"));
 
     std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
     const Bytes bytes(std::istreambuf_iterator<char>(in), {});
