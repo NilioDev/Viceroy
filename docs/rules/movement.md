@@ -76,3 +76,11 @@ game waits a moment before the next unit starts blinking. The timings
 
 Not yet matched: on loading `COLONY00.SAV` the original starts with the
 frigate (unit 51) although the header's active unit is 88.
+
+## Disband and Dump Cargo Overboard
+
+Read from the original: Disband Unit (Shift+D, or the Orders menu) asks
+SUREDISBAND with the unit's type ("Really disband Colonists?"); a ship with
+units aboard is not disbanded (DISBANDSHIP). Dump Cargo Overboard (O) asks
+OVERBOARD with "Nothing" first and then each hold ("100 Muskets"); the hold
+picked is emptied and the holds after it move up.

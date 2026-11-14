@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "test.hpp"
 
+#include "viceroy/game/europe.hpp"
 #include "viceroy/game_files.hpp"
 #include "viceroy/ui/play.hpp"
 
@@ -163,4 +164,54 @@ VCR_TEST("original files: enemy warships hold up a passing ship or it slips past
     }
     VCR_CHECK(slowed > 0 && slipped > 0);
     VCR_CHECK(slowed + slipped == 40);
+}
+
+VCR_TEST("original files: disbanding a unit, and a ship with people aboard") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    Game game(shipSave(), art.rules);
+    game.setActiveUnit(0);
+    PlayScreen play(std::move(game), dir / "unused.sav");
+    play.setArt(&art);
+
+    play.handle(Command::Disband); // the caravel carries a colonist
+    VCR_CHECK(firstLine(play).find("We cannot disband a ship") == 0);
+    play.handle(Command::Confirm);
+    VCR_CHECK(play.game().unitCount() == 2);
+
+    play.game().setActiveUnit(1);
+    play.handle(Command::Disband);
+    VCR_CHECK(firstLine(play).find("Really {disband} Colonists?") == 0);
+    play.handle(Command::Confirm); // "Yes"
+    VCR_CHECK(play.game().unitCount() == 1);
+    VCR_CHECK(play.game().unit(0).type == unit_type::kCaravel);
+}
+
+VCR_TEST("original files: dumping cargo overboard") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    auto save = shipSave();
+    save.units[0].holds = 2;
+    setHold(save.units[0], 0, 15, 100); // muskets
+    setHold(save.units[0], 1, 14, 30);  // tools
+    Game game(save, art.rules);
+    game.setActiveUnit(0);
+    PlayScreen play(std::move(game), dir / "unused.sav");
+    play.setArt(&art);
+
+    play.handle(Command::Dump);
+    VCR_CHECK(firstLine(play).find("What cargo shall we throw overboard") == 0);
+    VCR_CHECK(play.dialog()->options.size() == 3);
+    VCR_CHECK(play.dialog()->options[0] == "Nothing");
+    VCR_CHECK(play.dialog()->options[1] == "100 Muskets");
+    play.handle(Command::Down);
+    play.handle(Command::Confirm);
+    VCR_CHECK(play.game().unit(0).holds == 1);
+    VCR_CHECK(holdGood(play.game().unit(0), 0) == 14 && holdAmount(play.game().unit(0), 0) == 30);
 }

@@ -201,7 +201,11 @@ VCR_TEST("original files: a ship sails to Europe, trades and comes back") {
     play.draw(screen, art);
 
     play.handle(Command::Up); // to the ship
-    play.handle(Command::Confirm);
+    play.handle(Command::Confirm); // "European harbor options for Caravel:"
+    VCR_CHECK(play.dialog().has_value());
+    VCR_CHECK(play.dialog()->options.size() == 4);
+    play.handle(Command::Down);
+    play.handle(Command::Confirm); // "Set sail for the New World."
     VCR_CHECK(play.dialog().has_value());
     play.handle(Command::Confirm); // sail
     VCR_CHECK(europePlace(g.unit(0)) == EuropePlace::ToNewWorld);
@@ -378,4 +382,48 @@ VCR_TEST("original files: selling moves the market as in the original") {
     // Buying pushes the other way.
     VCR_CHECK(moveMarket(game.rules(), dutch, 1, -500) == 1);
     VCR_CHECK(dutch.prices[1] == 7);
+}
+
+VCR_TEST("original files: arming and equipping colonists on the docks") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    Game game = loadSave(art, "COLONY00.SAV");
+    for (const int u : {56, 85}) {
+        setEuropeStage(game.state().units[static_cast<std::size_t>(u)], kPortStage);
+    }
+    game.leaveShipInPort(85);
+    const int type = game.unit(85).type;
+    VCR_CHECK(type == unit_type::kColonist);
+    auto& nation = game.state().nations[3];
+    nation.gold = 5000;
+    const int musketPrice = 50 * askPrice(game.rules(), nation, 15);
+    const int musketBid = 50 * bidPrice(nation, 15);
+    PlayScreen play(std::move(game), dir / "unused.sav");
+    play.setArt(&art);
+    const auto firstLine = [&play] {
+        return play.dialog() && !play.dialog()->lines.empty() ? play.dialog()->lines.front() : std::string();
+    };
+    play.handle(Command::Europe);
+    play.handle(Command::Up);
+    play.handle(Command::Up); // the docks
+    play.handle(Command::Confirm);
+    VCR_CHECK(firstLine().find("European dock options") == 0);
+    // Board next ship, Arm, Equip with tools, Equip with horses, Bless, No changes.
+    VCR_CHECK(play.dialog()->options.size() == 6);
+    VCR_CHECK(play.dialog()->options[1].find("Arm with {Muskets} (costs {" + std::to_string(musketPrice) + "$})") == 0);
+    play.handle(Command::Down);
+    play.handle(Command::Confirm);
+    VCR_CHECK(play.game().unit(85).type == unit_type::kSoldier);
+    VCR_CHECK(play.game().state().nations[3].gold == 5000 - musketPrice);
+
+    // Soldiers: sell the muskets (no tax), or take horses.
+    play.handle(Command::Confirm);
+    VCR_CHECK(play.dialog()->options[1].find("Sell {Muskets} (save {" + std::to_string(musketBid) + "$})") == 0);
+    play.handle(Command::Down);
+    play.handle(Command::Confirm);
+    VCR_CHECK(play.game().unit(85).type == unit_type::kColonist);
+    VCR_CHECK(play.game().state().nations[3].gold == 5000 - musketPrice + musketBid);
 }

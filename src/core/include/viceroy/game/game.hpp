@@ -387,6 +387,24 @@ public:
     // Free places on a ship: holds not used by cargo or passengers.
     int freeHolds(int ship) const;
 
+    // Disband Unit: the unit is gone (its square's flags follow).
+    void disband(int index);
+    // Dump Cargo Overboard: a hold is emptied and the holds after it move up.
+    void dumpHold(int carrier, int hold);
+
+    // --- The docks in Europe (ARMOPTIONS), read from the original -----------
+    // What arming or equipping a unit on the docks costs, or what selling
+    // its gear brings: 50 muskets, 100 tools or 50 horses at the asking
+    // (buying) or bidding (selling) price, no tax.
+    enum class DockGear { Muskets, Tools, Horses };
+    int dockGearPrice(DockGear gear, bool buying) const;
+    // Buys or sells the gear: the unit changes type (a scout armed becomes
+    // dragoons, a soldier given horses dragoons, ...), the gold and the
+    // market follow. Returns the market's price move (as moveMarket).
+    int equipOnDocks(int unit, DockGear gear, bool buying);
+    // Blessing as missionaries, or cancelling it: only the type changes.
+    void setUnitType(int unit, int type) { save_.units[static_cast<std::size_t>(unit)].type = type; }
+
     // --- Cargo in a colony's harbour (ships and wagon trains) -------------
     // Read from the original. The room for a good: 100 for every free hold;
     // with none free, what the holds of that good still take. 0 means no room.

@@ -48,7 +48,9 @@ touch controls.
 > hunger. Ships sail to Europe from
 > the high seas, sell and buy goods there (prices move as you trade), take colonists from the docks and
 > sail back. In Europe you can recruit colonists, buy artillery and ships,
-> and have specialists trained. Crosses made in your colonies and churches
+> have specialists trained, arm or equip the colonists on the docks with
+> muskets, tools or horses (or sell their gear), and bless them as
+> missionaries. Crosses made in your colonies and churches
 > bring colonists over from the docks for free. Liberty bells win colonists
 > for the Sons of Liberty: at 50% and 100% membership a colony works
 > better, and too many tories slow it down. Soldiers, dragoons and
@@ -217,6 +219,8 @@ saved in the first free slot, or over the savegame saved longest ago.
 | Sentry | S | B |
 | Fortify | F | Right stick click |
 | Build colony | B | X |
+| Disband the unit | Shift+D, or the Orders menu | Start, then Orders |
+| Dump cargo overboard | O, or the Orders menu | Start, then Orders |
 | Go To: send the unit to one of your colonies (a ship also to Europe) | G, or the Orders menu | Start, then Orders |
 | Pioneer: plow or clear the forest, build a road | P, R, or the Orders menu | Start, then Orders |
 | Centre the map on the unit | C | Left stick click |
@@ -238,7 +242,7 @@ saved in the first free slot, or over the savegame saved longest ago.
 | Open the home port in Europe | E | Share / Capture button |
 | In Europe: move between the market, the ships, the docks and the buttons | Up / Down | D-pad up / down |
 | In Europe: pick a good, ship or colonist | Left / Right | D-pad left / right |
-| In Europe: buy 100 of the good, send the ship to the New World, put the colonist aboard | Enter | A |
+| In Europe: buy 100 of the good; the ship's options (set sail, unload all); the colonist's options (board, arm, equip, bless) | Enter | A |
 | In Europe: sell the good from the ship | S | X |
 | In Europe: everyone aboard goes back to the docks | Space | |
 | In Europe: Recruit, Purchase, Train | R, P, T, or click the button | D-pad up to the buttons, then A |

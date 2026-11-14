@@ -24,6 +24,7 @@ inline constexpr int kChiefKill = 0x55;
 inline constexpr int kShipSunk = 0x57;
 inline constexpr int kFortify = 0x58;
 inline constexpr int kRaidNothing = 0x5B;
+inline constexpr int kSaddle = 0x5C; // horses bought for a unit on the docks
 inline constexpr int kKing = 0x3E;   // the King changes the tax
 inline constexpr int kParty = 0x56;  // a party throws goods into the sea
 inline constexpr int kWarCry = 0x3B;   // plus the brave's unit type: braves fall on the player's men

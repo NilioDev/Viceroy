@@ -34,6 +34,7 @@ constexpr int kLabelSells = 47; // @MISC "sells"
 constexpr int kLabelFor = 48;   // @MISC "for"
 constexpr int kLabelTax = 17;   // @CMESSAGE "% Tax:"
 constexpr int kLabelNet = 18;   // @CMESSAGE ". Net:"
+constexpr int kLabelNothingToDump = 32; // @MISC "Nothing"
 // Rows of @CMESSAGE for goods moved on the colony screen.
 constexpr int kLabelMovedTo = 2;
 constexpr int kLabelNoRoom = 4;
@@ -2044,6 +2045,87 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
         } else {
             unloadAll_.clear();
         }
+    } else if (question == "SUREDISBAND") {
+        if (choice == 0 && unit >= 0 && unit < game_.unitCount()) {
+            const bool wasActive = unit == game_.activeUnit();
+            game_.disband(unit);
+            if (wasActive) {
+                game_.setActiveUnit(-1);
+                advance();
+            }
+        }
+    } else if (question == "OVERBOARD") {
+        // The first line, "Nothing", keeps everything.
+        if (choice >= 1 && unit >= 0 && unit < game_.unitCount()) {
+            game_.dumpHold(unit, choice - 1);
+        }
+    } else if (question == "EUROPESHIPCLICK") {
+        const int option = choice >= 0 && choice < static_cast<int>(unitOptions_.size())
+                               ? unitOptions_[static_cast<std::size_t>(choice)]
+                               : kEuroShipNoChange;
+        if (option == kEuroShipFront) {
+            const int moved = game_.moveToFront(unit);
+            if (europeScreen_) {
+                europeScreen_->ship = moved;
+            }
+        } else if (option == kEuroShipSail) {
+            ask("SAILAWAY", unit);
+        } else if (option == kEuroShipUnloadAll) {
+            unloadAllInEurope(unit);
+        }
+    } else if (question == "EUROPEARM") {
+        const int option = choice >= 0 && choice < static_cast<int>(unitOptions_.size())
+                               ? unitOptions_[static_cast<std::size_t>(choice)]
+                               : kDockNoChange;
+        using Gear = Game::DockGear;
+        int move = 0;
+        switch (option) {
+        case kDockStayOff:
+            game_.setOrders(unit, SaveUnit::kNoOrders);
+            break;
+        case kDockBoard:
+            if (europeScreen_ && (europeScreen_->ship < 0 || !game_.boardInPort(unit, europeScreen_->ship))) {
+                say("No room aboard.");
+            }
+            break;
+        case kDockFront:
+            game_.moveToFront(unit);
+            if (europeScreen_) {
+                europeScreen_->dock = 0;
+            }
+            break;
+        case kDockArm:
+            move = game_.equipOnDocks(unit, Gear::Muskets, true);
+            playMusic({{MusicCue::Kind::Sound, sounds::kFortify}}); // read from the original
+            tellPriceMove(cargo::kMuskets, move);
+            break;
+        case kDockSellMuskets:
+            tellPriceMove(cargo::kMuskets, game_.equipOnDocks(unit, Gear::Muskets, false));
+            break;
+        case kDockTools:
+            tellPriceMove(cargo::kTools, game_.equipOnDocks(unit, Gear::Tools, true));
+            break;
+        case kDockSellTools:
+            tellPriceMove(cargo::kTools, game_.equipOnDocks(unit, Gear::Tools, false));
+            break;
+        case kDockHorses:
+            move = game_.equipOnDocks(unit, Gear::Horses, true);
+            playMusic({{MusicCue::Kind::Sound, sounds::kSaddle}}); // read from the original
+            tellPriceMove(cargo::kHorses, move);
+            break;
+        case kDockSellHorses:
+            tellPriceMove(cargo::kHorses, game_.equipOnDocks(unit, Gear::Horses, false));
+            break;
+        case kDockBless:
+            game_.setUnitType(unit, unit_type::kMissionary);
+            playMusic({{MusicCue::Kind::Sound, sounds::kChurch}}); // read from the original
+            break;
+        case kDockUnbless:
+            game_.setUnitType(unit, unit_type::kColonist);
+            break;
+        default:
+            break;
+        }
     } else if (question == "COLONYSHIP") {
         const int option = choice >= 0 && choice < static_cast<int>(unitOptions_.size())
                                ? unitOptions_[static_cast<std::size_t>(choice)]
@@ -2432,15 +2514,13 @@ bool PlayScreen::handleEuropeScreen(Command command) {
             }
         } else if (state.focus == EuropeFocus::Ships) {
             if (state.ship >= 0) {
-                ask("SAILAWAY", state.ship);
+                openEuropeShipOptions(state.ship);
             }
         } else if (state.focus == EuropeFocus::Buttons) {
             state.button == 0 ? openRecruit() : state.button == 1 ? openPurchase() : openTrain();
-        } else if (!docks.empty() && state.ship >= 0) {
-            const int who = docks[static_cast<std::size_t>(state.dock)];
-            if (!game_.boardInPort(who, state.ship)) {
-                say("No room aboard.");
-            }
+        } else if (!docks.empty()) {
+            state.dock = std::clamp(state.dock, 0, static_cast<int>(docks.size()) - 1);
+            openDockOptions(docks[static_cast<std::size_t>(state.dock)], state.dock == 0);
         }
         return true;
     case Command::Sentry: // S: sell
@@ -3120,6 +3200,168 @@ void PlayScreen::openShipOptions(int carrier, bool first) {
     placeUnitDialog(*dialog_, carrier);
 }
 
+// Read from the original: a ship with units aboard is not disbanded
+// (DISBANDSHIP); anything else asks first, naming its type (SUREDISBAND).
+void PlayScreen::disbandActive() {
+    const int active = game_.activeUnit();
+    if (active < 0) {
+        return;
+    }
+    if (game_.isShip(active) && !game_.passengers(active).empty()) {
+        tell({"DISBANDSHIP", {}});
+        return;
+    }
+    ask("SUREDISBAND", active, {unitTypeName(active)});
+}
+
+// Read from the original: "What cargo shall we throw overboard" lists
+// "Nothing" and then each hold, "100 Muskets"; the hold picked is emptied.
+void PlayScreen::dumpCargo() {
+    const int active = game_.activeUnit();
+    if (active < 0 || art_ == nullptr || game_.unit(active).holds <= 0) {
+        return;
+    }
+    ask("OVERBOARD", active);
+    if (!dialog_) {
+        return;
+    }
+    addOption(*dialog_, textLine(art_->labelText, "MISC", kLabelNothingToDump, "Nothing"));
+    const auto& u = game_.unit(active);
+    for (int k = 0; k < u.holds; ++k) {
+        addOption(*dialog_, std::to_string(holdAmount(u, k)) + " " + goodName(holdGood(u, k)));
+    }
+}
+
+// Read from the original: a ship in port clicked, "European harbor options
+// for Frigate:". "Set sail" is left out for a damaged ship (under repair),
+// "Unload all cargo." when nothing is aboard.
+void PlayScreen::openEuropeShipOptions(int ship) {
+    if (art_ == nullptr) {
+        return;
+    }
+    const auto& u = game_.unit(ship);
+    ask("EUROPESHIPCLICK", ship, {unitTypeName(ship)});
+    if (!dialog_) {
+        return;
+    }
+    unitOptions_.clear();
+    for (int option = kEuroShipFront; option <= kEuroShipNoChange; ++option) {
+        if ((option == kEuroShipSail && (u.raw[4] & SaveUnit::kDamaged) != 0) ||
+            (option == kEuroShipUnloadAll && u.holds == 0)) {
+            continue;
+        }
+        addOption(*dialog_, textLine(art_->gameText, "EUROPESHIPOPTIONS", option, ""));
+        unitOptions_.push_back(option);
+    }
+    placeEuropeDialog(*dialog_);
+}
+
+// Read from the original: "Unload all cargo." in Europe sells the holds,
+// the last first, leaving the boycotted goods aboard.
+void PlayScreen::unloadAllInEurope(int ship) {
+    auto& save = game_.state();
+    const auto& nation = save.nations[static_cast<std::size_t>(game_.human())];
+    for (int k = game_.unit(ship).holds - 1; k >= 0; --k) {
+        const int good = holdGood(game_.unit(ship), k);
+        if (game_.isBoycotted(game_.human(), good)) {
+            continue;
+        }
+        const Trade t = sellGoods(save, game_.rules(), ship, good);
+        if (t.amount > 0 && europeScreen_) {
+            europeScreen_->receipt =
+                TradeReceipt{true, t.amount, goodName(good), t.price, t.gold + t.tax, nation.taxRate, t.tax};
+            tellPriceMove(good, t.priceMove);
+        }
+        k = std::min(k, game_.unit(ship).holds);
+    }
+}
+
+// Read from the original: a unit on the docks clicked, "European dock
+// options:". Arming, equipping and selling are offered by the unit's type
+// (not to converts), not for boycotted goods, and greyed when the gold is
+// short; the prices are 50 muskets, 100 tools or 50 horses.
+void PlayScreen::openDockOptions(int unit, bool first) {
+    if (art_ == nullptr) {
+        return;
+    }
+    const auto& u = game_.unit(unit);
+    ask("EUROPEARM", unit);
+    if (!dialog_) {
+        return;
+    }
+    using Gear = Game::DockGear;
+    using namespace unit_type;
+    constexpr int kConvert = 27; // the skill of Indian converts
+    constexpr int kJesuit = 24;  // Jesuit missionaries keep their calling
+    const bool convert = u.profession == kConvert;
+    const int gold = game_.state().nations[static_cast<std::size_t>(game_.human())].gold;
+    const auto boycotted = [&](int good) { return game_.isBoycotted(game_.human(), good); };
+    const int muskets = (u.type == kSoldier || u.type == kDragoon) ? game_.dockGearPrice(Gear::Muskets, false)
+                                                                   : game_.dockGearPrice(Gear::Muskets, true);
+    const int tools =
+        u.type == kPioneer ? game_.dockGearPrice(Gear::Tools, false) : game_.dockGearPrice(Gear::Tools, true);
+    const int horses = (u.type == kScout || u.type == kDragoon) ? game_.dockGearPrice(Gear::Horses, false)
+                                                                : game_.dockGearPrice(Gear::Horses, true);
+    unitOptions_.clear();
+    for (int option = kDockStayOff; option <= kDockNoChange; ++option) {
+        bool shown = false;
+        int cost = 0;
+        switch (option) {
+        case kDockStayOff:
+            shown = u.orders == SaveUnit::kSentry;
+            break;
+        case kDockBoard:
+            shown = u.orders != SaveUnit::kSentry;
+            break;
+        case kDockFront:
+            shown = !first;
+            break;
+        case kDockArm:
+            shown = (u.type == kColonist || u.type == kScout) && !convert && !boycotted(cargo::kMuskets);
+            cost = muskets;
+            break;
+        case kDockSellMuskets:
+            shown = (u.type == kSoldier || u.type == kDragoon) && !boycotted(cargo::kMuskets);
+            break;
+        case kDockTools:
+            shown = u.type == kColonist && !convert && !boycotted(cargo::kTools);
+            cost = tools;
+            break;
+        case kDockSellTools:
+            shown = u.type == kPioneer && !boycotted(cargo::kTools);
+            break;
+        case kDockHorses:
+            shown = (u.type == kColonist || u.type == kSoldier) && !convert && !boycotted(cargo::kHorses);
+            cost = horses;
+            break;
+        case kDockSellHorses:
+            shown = (u.type == kScout || u.type == kDragoon) && !boycotted(cargo::kHorses);
+            break;
+        case kDockBless:
+            shown = u.type == kColonist && !convert;
+            break;
+        case kDockUnbless:
+            shown = u.type == kMissionary && u.profession != kJesuit;
+            break;
+        default:
+            shown = true;
+            break;
+        }
+        if (!shown) {
+            continue;
+        }
+        std::string text = textLine(art_->gameText, "ARMOPTIONS", option, "");
+        for (const auto& [key, value] : {std::pair{"%NUMBER0", muskets}, {"%NUMBER1", tools}, {"%NUMBER2", horses}}) {
+            if (const auto at = text.find(key); at != std::string::npos) {
+                text.replace(at, std::string(key).size(), std::to_string(value));
+            }
+        }
+        addOption(*dialog_, text, {}, cost > gold);
+        unitOptions_.push_back(option);
+    }
+    placeEuropeDialog(*dialog_);
+}
+
 bool PlayScreen::handleColonyScreen(Command command) {
     auto& state = *colonyScreen_;
     if (state.foreign) {
@@ -3437,6 +3679,12 @@ bool PlayScreen::handle(Command command) {
             game_.setOrders(active, SaveUnit::kSentry);
             advance();
         }
+        break;
+    case Command::Disband:
+        disbandActive();
+        break;
+    case Command::Dump:
+        dumpCargo();
         break;
     case Command::Fortify:
         if (active >= 0 && !game_.isShip(active)) {
@@ -3786,7 +4034,7 @@ constexpr int kTradeRoute = 15;
 constexpr int kReturnToEurope = 16;
 constexpr int kNoOrders = 17;
 constexpr int kDump = 18;
-// 19 is Disband, not handled yet.
+constexpr int kDisband = 19;
 } // namespace orders_menu
 constexpr int kHiddenPedia = 6; // Miscellaneous and Complete are not shown
 constexpr std::uint8_t kSeaLaneTerrain = 26;
@@ -4215,6 +4463,10 @@ bool PlayScreen::pickMenuEntry(int entry) {
         case kGoToPort:
         case kGoToPlace:
             return handle(Command::GoTo);
+        case kDump:
+            return handle(Command::Dump);
+        case kDisband:
+            return handle(Command::Disband);
         case kReturnToEurope: {
             const int active = game_.activeUnit();
             if (game_.independenceDeclared()) {

@@ -1174,6 +1174,61 @@ void addToHolds(SaveUnit& u, int good, int amount) {
 
 } // namespace
 
+namespace {
+
+int gearGood(Game::DockGear gear) {
+    return gear == Game::DockGear::Muskets ? cargo::kMuskets
+           : gear == Game::DockGear::Tools ? cargo::kTools
+                                           : cargo::kHorses;
+}
+
+int gearAmount(Game::DockGear gear) { return gear == Game::DockGear::Tools ? 100 : 50; }
+
+} // namespace
+
+int Game::dockGearPrice(DockGear gear, bool buying) const {
+    const auto& nation = save_.nations[static_cast<std::size_t>(human())];
+    const int good = gearGood(gear);
+    return gearAmount(gear) * (buying ? askPrice(rules_, nation, good) : bidPrice(nation, good));
+}
+
+int Game::equipOnDocks(int index, DockGear gear, bool buying) {
+    auto& u = save_.units[static_cast<std::size_t>(index)];
+    auto& nation = save_.nations[static_cast<std::size_t>(u.nation)];
+    const int price = dockGearPrice(gear, buying);
+    using namespace unit_type;
+    switch (gear) {
+    case DockGear::Muskets:
+        u.type = buying ? (u.type == kScout ? kDragoon : kSoldier) : (u.type == kDragoon ? kScout : kColonist);
+        break;
+    case DockGear::Tools:
+        u.type = buying ? kPioneer : kColonist;
+        u.tools = buying ? 100 : 0;
+        break;
+    case DockGear::Horses:
+        u.type = buying ? (u.type == kSoldier ? kDragoon : kScout) : (u.type == kDragoon ? kSoldier : kColonist);
+        break;
+    }
+    nation.gold += buying ? -price : price;
+    const int amount = gearAmount(gear);
+    return moveMarket(rules_, nation, gearGood(gear), buying ? -amount : amount);
+}
+
+void Game::disband(int index) {
+    if (index < 0 || index >= unitCount()) {
+        return;
+    }
+    removeUnit(index);
+    refreshUnitFlags();
+}
+
+void Game::dumpHold(int carrier, int hold) {
+    if (carrier < 0 || carrier >= unitCount()) {
+        return;
+    }
+    removeHold(save_.units[static_cast<std::size_t>(carrier)], hold);
+}
+
 int Game::colonyCargoRoom(int carrier, int good) const {
     const auto& u = unit(carrier);
     const int type = u.type;

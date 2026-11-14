@@ -433,6 +433,10 @@ std::optional<Command> keyCommand(const SDL_KeyboardEvent& key) {
         return ctrl ? Command::Save : Command::Sentry;
     case SDLK_F:
         return Command::Fortify;
+    case SDLK_D:
+        return (key.mod & SDL_KMOD_SHIFT) ? std::optional<Command>(Command::Disband) : std::nullopt;
+    case SDLK_O:
+        return Command::Dump;
     case SDLK_B:
         return Command::BuildColony;
     case SDLK_C:
