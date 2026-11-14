@@ -1113,6 +1113,20 @@ void PlayScreen::showNotices() {
         }
         return;
     }
+    if (notice.section == "SIGNING") {
+        // Read from the original: the leader's name is written on the
+        // declaration, then the map comes back at once.
+        if (!notice.strings.empty()) {
+            auto strokes = signatureStrokes(notice.strings[0], *art_);
+            if (!strokes.empty()) {
+                signing_ = Signing{std::move(strokes)};
+            }
+        }
+        if (!signing_) {
+            showNotices();
+        }
+        return;
+    }
     if (notice.section == "CONGRESSHALL") {
         // Read from the original: the new father stands in the hall with
         // the others until a key is pressed.
@@ -2312,6 +2326,16 @@ bool PlayScreen::handle(Command command) {
         // Input waits until the unit has arrived.
         return true;
     }
+    if (signing_) {
+        // Read from the original: a key finishes the letter at once.
+        ++signing_->stroke;
+        signing_->frame = 0;
+        signing_->elapsed = 0;
+        if (signing_->stroke >= signing_->strokes.size()) {
+            endSigning();
+        }
+        return true;
+    }
     if (congressHall_ >= 0) {
         // Any key leaves the hall.
         congressHall_ = -1;
@@ -2561,6 +2585,22 @@ void PlayScreen::tick(std::uint64_t milliseconds) {
         dialog_->shownMs += milliseconds;
         dialog_->overlayFrame = kingArmFrame(dialog_->shownMs);
     }
+    if (signing_) {
+        // Read from the original: each picture of the pen stays at least
+        // five ticks of the game's clock (1,193,182 / 1,960 Hz), about
+        // 8 ms.
+        constexpr std::uint64_t kPenFrameMs = 9;
+        signing_->elapsed += milliseconds;
+        while (signing_ && signing_->elapsed >= kPenFrameMs) {
+            signing_->elapsed -= kPenFrameMs;
+            if (++signing_->frame >= signing_->strokes[signing_->stroke].frames) {
+                signing_->frame = 0;
+                if (++signing_->stroke >= signing_->strokes.size()) {
+                    endSigning();
+                }
+            }
+        }
+    }
     if (slide_) {
         slide_->elapsed += milliseconds;
         const auto t = std::min(slide_->elapsed, kSlideMs);
@@ -2572,6 +2612,11 @@ void PlayScreen::tick(std::uint64_t milliseconds) {
             finishSlide();
         }
     }
+}
+
+void PlayScreen::endSigning() {
+    signing_.reset();
+    showNotices();
 }
 
 void PlayScreen::finishSlide() {
@@ -2598,6 +2643,10 @@ void PlayScreen::finishSlide() {
 }
 
 void PlayScreen::draw(Screen& screen, const Art& art) const {
+    if (signing_) {
+        drawSigning(screen, art, signing_->strokes, signing_->stroke, signing_->frame);
+        return;
+    }
     if (congressHall_ >= 0) {
         std::vector<bool> fathers(static_cast<std::size_t>(Game::kFoundingFathers));
         for (int f = 0; f < Game::kFoundingFathers; ++f) {

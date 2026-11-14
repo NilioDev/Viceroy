@@ -25,9 +25,8 @@ counted in bytes from the start of the savegame.
 - If the War of the Spanish Succession has not happened, it happens now
   (see [diplomacy.md](diplomacy.md)). The Crown's side of the war takes
   the slot of the nation that left then (header word 98).
-- The music: mood now 3. Then the signing of the declaration (the screen,
-  `DECOIND.PIK` with letters from `DEC-UPP*.SS` and `DEC-LOW*.SS`, is not
-  built yet).
+- The music: mood now 3. Then the leader signs the declaration (see
+  below).
 - The power that will help (header word 100) and the next one (header
   word 102): the nations are sorted from the weakest by 3 × ships + 2 ×
   colonies + people, the same sort as for the succession, and the first
@@ -59,6 +58,29 @@ counted in bytes from the start of the savegame.
 - `INDEPENDENCE`, with the player's leader as the general. All the
   player's units have used their moves. A word of both nation records
   (offset 16h) is cleared, and bit 04h of the Crown side's flags.
+
+## The signing
+
+`DECOIND.PIK` is shown and the leader's name (the player's name) is
+written on it with a pen, each word starting with a capital. The pen
+starts at x 126, y 148 (the top left of a letter's pictures). For each
+character in turn:
+
+- a capital is written with the 10 pictures 1 to 10 of `DEC-UPPx.SS` (x
+  the letter), and the line climbs 3 pixels;
+- a small letter with the 7 pictures 1 to 7 of `DEC-LOWx.SS`, the line
+  climbing 2;
+- a space or a punctuation mark writes nothing: the pen moves 3 on and
+  the line climbs 1;
+- anything else (a digit) gets the flourish, the 10 pictures of
+  `DEC-SQIG.SS`, and the name ends there.
+
+After a letter the pen moves on by the width of its pictures. Once it has
+reached x 220 the next character is not written: the flourish is, and
+the name ends. The pictures of a letter are drawn over each other, each
+staying at least 5 ticks of the game's clock (the timer runs at
+1,193,182 / 1,960 Hz, so about 8 ms); a key finishes the letter at once.
+When the name is written the map comes back without waiting.
 
 ## During the war
 
@@ -185,7 +207,6 @@ horses (word 10) 25 × that.
 
 ## Not yet done
 
-- The signing screen.
 - How the Crown's units move once landed (for now they move as any
   computer nation's). How they fight is in [combat.md](combat.md), the end
   of the war in [the-end.md](the-end.md).

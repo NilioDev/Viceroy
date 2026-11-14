@@ -71,7 +71,8 @@ touch controls.
 > trade with other nations' colonies. The King may drag you into his wars in Europe, and
 > when your rebels reach half, the War of the Spanish Succession hands the
 > weakest nation's colonies to another. With a majority of rebels you can
-> declare independence from the Game menu: the other nations leave, your
+> declare independence from the Game menu and sign the declaration with
+> your leader's name, letter by letter: the other nations leave, your
 > ships in Europe are seized, your veterans join the Continental Army,
 > mercenaries are offered, and enough liberty bells bring a foreign power
 > and its force to your side. The King's men-of-war land his army next to

@@ -5,6 +5,7 @@
 #include "viceroy/game/europe.hpp"
 #include "viceroy/game/game.hpp"
 #include "viceroy/game/natives.hpp"
+#include "viceroy/render/game_view.hpp"
 
 #include <algorithm>
 #include <array>
@@ -178,6 +179,8 @@ VCR_TEST("independence: the declaration clears the field for the war") {
     const auto* seized = find(news, "SEIZURE");
     VCR_CHECK(seized != nullptr && seized->strings == std::vector<std::string>{"Galleon"});
     VCR_CHECK(std::count_if(news.begin(), news.end(), [](const GameNotice& n) { return n.section == "SEIZURE"; }) == 1);
+    // The leader signs first.
+    VCR_CHECK(!news.empty() && news[0].section == "SIGNING" && news[0].strings == std::vector<std::string>{"Peter Minuit"});
     const auto* told = find(news, "INDEPENDENCE");
     VCR_CHECK(told != nullptr && told->strings == std::vector<std::string>{"Peter Minuit"});
     // The Crown knows what the rebels know (and the original's mask with
@@ -376,4 +379,25 @@ VCR_TEST("independence: a tribe the player burned takes the Tory side, once") {
         g.endTurn();
         VCR_CHECK(!has(g.takeNotices(), "INDIANGRUDGE"));
     }
+}
+
+VCR_TEST("independence: the leader's name is written on the declaration") {
+    VCR_CHECK(signatureName("peter minuit") == "Peter Minuit");
+    VCR_CHECK(signatureName("jean-baptiste de LA salle") == "Jean-Baptiste De LA Salle");
+    // Every letter 10 pixels wide: capitals of ten pictures lift the line
+    // by 3, small letters of seven by 2, a space moves 3 on and 1 up.
+    const auto ten = [](const PenStroke&) { return 10; };
+    const auto strokes = signatureStrokes("al b", ten);
+    VCR_CHECK(strokes.size() == 3);
+    VCR_CHECK(strokes[0].pen == PenStroke::Pen::Capital && strokes[0].letter == 0 && strokes[0].frames == 10);
+    VCR_CHECK(strokes[0].x == 126 && strokes[0].y == 148);
+    VCR_CHECK(strokes[1].pen == PenStroke::Pen::Letter && strokes[1].letter == 11 && strokes[1].frames == 7);
+    VCR_CHECK(strokes[1].x == 136 && strokes[1].y == 145);
+    VCR_CHECK(strokes[2].pen == PenStroke::Pen::Capital && strokes[2].letter == 1);
+    VCR_CHECK(strokes[2].x == 149 && strokes[2].y == 142);
+    // A digit, or a name past x 220, ends with the flourish.
+    const auto digit = signatureStrokes("Ab1cd", ten);
+    VCR_CHECK(digit.size() == 3 && digit[2].pen == PenStroke::Pen::Flourish && digit[2].frames == 10);
+    const auto longName = signatureStrokes("Abcdefghijklmnop", ten);
+    VCR_CHECK(longName.size() == 11 && longName.back().pen == PenStroke::Pen::Flourish && longName.back().x == 226);
 }

@@ -107,6 +107,8 @@ public:
     // The hall of the Continental Congress with a new father in it.
     bool congressHallUp() const { return congressHall_ >= 0; }
     bool reportUp() const { return congressReport_; }
+    // The leader signing the declaration of independence.
+    bool signingUp() const { return signing_.has_value(); }
     // Set by the app after loading Art: needed for message boxes.
     void setArt(const Art* art) { art_ = art; }
     // The music the Sound Options and Pick Music change (none: they only
@@ -239,6 +241,14 @@ private:
     int foreignTradeColony_ = -1; // the foreign colony a wagon train or ship trades with
     int congressHall_ = -1; // the father just come into the hall, shown until a key
     bool congressReport_ = false; // F3, shown until a key or a click
+    struct Signing {
+        std::vector<PenStroke> strokes;
+        std::size_t stroke = 0; // the letter being written
+        int frame = 0;          // its picture
+        std::uint64_t elapsed = 0;
+    };
+    std::optional<Signing> signing_;
+    void endSigning();
     int inciteTarget_ = -1; // the nation a missionary would have the tribe attack
     void startIncite(int unit);
     void scoutColony(int unit, int colony, int choice);
