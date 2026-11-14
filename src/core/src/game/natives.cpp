@@ -95,6 +95,16 @@ constexpr int kScoutJob = 22;
 
 } // namespace
 
+std::uint32_t gameSeed(const SaveGame& save) {
+    std::uint32_t seed = 0;
+    if (save.tail.size() >= 612) {
+        for (int i = 3; i >= 0; --i) {
+            seed = (seed << 8) | save.tail[static_cast<std::size_t>(608 + i)];
+        }
+    }
+    return seed;
+}
+
 int OriginalRandom::next() {
     state_ = state_ * 214013U + 2531011U;
     return static_cast<int>((state_ >> 16) & 0x7FFF);
@@ -398,13 +408,7 @@ int villageSkill(const SaveGame& save, int settlement) {
     const int level = tribeLevel(save, tribeOf(s));
     // The pick is seeded with the square and the game's own seed, so a
     // village always teaches the same skill.
-    std::uint32_t gameSeed = 0;
-    if (save.tail.size() >= 612) {
-        for (int i = 3; i >= 0; --i) {
-            gameSeed = (gameSeed << 8) | save.tail[static_cast<std::size_t>(608 + i)];
-        }
-    }
-    OriginalRandom random((static_cast<std::uint32_t>((s.y << 8) | s.x) + gameSeed) & 0x7FFF);
+    OriginalRandom random((static_cast<std::uint32_t>((s.y << 8) | s.x) + gameSeed(save)) & 0x7FFF);
     weights[kHorses] = 0;
     if (level < 1) {
         weights[kCoats] = 0;

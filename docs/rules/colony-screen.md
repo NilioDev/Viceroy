@@ -8,32 +8,62 @@ All positions are on the 320×200 screen.
 | Part | Where | What |
 | --- | --- | --- |
 | Top line | y 0-6, black line at 7 | `WOODTILE` tiled; "Name.  Season, Year.  Gold: N$" centred on x 160 in `FONTTINY`, colour 0x44 |
-| Town | x 0-199, y 8-127 | `PARCH.SS` tiled from the screen origin; black line at x 200 |
-| Side | x 201-319, y 8-127 | `WOODTILE` tiled; the area view in a black frame at (223, 31), 74×74 |
+| Town | x 0-198, y 8-127 | `PARCH.SS` tiled from the screen origin; black line at x 199 |
+| Side | x 200-319, y 8-127 | `WOODTILE` tiled; the area view in a black frame at (223, 31), 74×74 |
 | Lower part | from y 128 | `COLONY.PIK` (320×72), with a black line at y 128 |
 
 ## Town (`BUILDING.SS`)
 
-Every kind of building has a fixed spot. An empty spot shows trees or a
-shore instead (sprites 42-45, by the spot's size). The fortification's spot
-shows a rail fence (16) when there is none. The warehouse and the stable
-share a spot: barn (15), corral (46) or both (47).
+The town has fifteen spots (read from the original): seven small (23×27),
+four wide (44×22), two large (53×37), the stockade's (73×18) and the docks'
+(75×48).
 
-| Spot | Size | Buildings |
-| --- | --- | --- |
-| (123, 55) | 75×48 | docks 6-8, else shore 45 |
-| (123, 106) | 73×18 | stockade, fort, fortress 0-2 |
-| (87, 11), (66, 87) | 53×37 | town hall 9, church 37-38 |
-| (6, 14), (10, 76), (15, 102), (128, 53) | 44×22 | warehouse/stable, carpenter 35-36, school 12-14, armory 3-5 |
-| seven spots of 23×27 | | the craft houses, printing press, custom house |
+| Spots | Where |
+| --- | --- |
+| small | (56, 13), (145, 15), (173, 18), (8, 41), (37, 45), (67, 54), (96, 53) |
+| wide | (6, 14), (128, 53), (10, 76), (15, 102) |
+| large | (87, 11), (66, 87) |
+| stockade, docks | (123, 106), (123, 55) |
 
-**Still unknown:** the spots of buildings of the same size are shuffled from
-colony to colony (in Isabella the town hall is at (87, 11), in Jamestown at
-(66, 87)). We use the arrangement of Isabella for every colony until we know
-the rule.
+Each kind of building has a place among the spots of its size, counted in
+the order the kinds first appear in `@BUILDING`: small custom house,
+printing press, weaver, tobacconist, distiller, fur trader, blacksmith; wide
+armory, schoolhouse, warehouse (with the stable), carpenter; large town
+hall, church. Every colony shuffles the spots of each size among those
+places, so that no two colonies look alike, but one colony always looks the
+same: the C library's random numbers are seeded with the colony's square
+(y × 256 + x) plus the game's seed, kept to 15 bits, and spot by spot, in
+the order above, a free place of the spot's size is drawn at random (a
+taken place is drawn again). Isabella in our test game comes out with the
+identity, which is how it was first measured.
 
-People working in a building stand at (x + 5 + 9k, y + 13); what they make is
-shown as a row of icons at (x − 5, y − 2).
+An empty spot shows trees or a shore instead (sprites 42-45, by its size).
+The fortification's spot shows a rail fence (16) when there is none. The
+warehouse and the stable share a spot: barn (15), corral (46) or both (47).
+
+### People at work and what they make
+
+Read from the original, by the size of the spot:
+
+| Size | People at (x, y) | Their space | Row at (x, y) | Row width |
+| --- | --- | --- | --- | --- |
+| small | +3, +13 | 17 | −5, −2 | 20 |
+| wide | +20, +9 | 21 | +0, +2 | 22 |
+| large | +25, +23 | 25 | +0, +2 | 30 |
+
+The people share their space centred in it. Each counts as wide as the
+figure of an expert at the job (`ICONS.SS` 81 + job) plus 2 for the shadow;
+they stand (space − width) / (n − 1) apart but at most one pixel more than
+that width. A figure is drawn 2 pixels right of its place with its shadow
+(colour 0x5F) on the place itself, one figure after the other. The selected
+one has a bright green frame (colour 10) from 1 pixel left of its place to
+1 pixel right of the figure, and from its second row to its last.
+
+The row of what they make is drawn first, centred in its width, its number
+3 pixels in from where the row starts. Nobody is drawn in a building that
+is not there. The town hall's row shows the colony's bells but the printing
+press's share, which the printing press shows; the church shows all the
+crosses, its own included.
 
 ## Rows of goods
 

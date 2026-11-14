@@ -471,11 +471,8 @@ ColonyProduction colonyProduction(const SaveColony& colony, const SaveMap& map, 
         bells += (population + 3) / 5;
     }
     const int press = buildingLevel(colony, BuildingKind::PrintingPress);
-    if (press >= 2) {
-        bells *= 2;
-    } else if (press == 1) {
-        bells += bells / 2;
-    }
+    p.pressBells = press >= 2 ? bells : press == 1 ? bells / 2 : 0;
+    bells += p.pressBells;
     p.foodEaten = 2 * population;
     return p;
 }

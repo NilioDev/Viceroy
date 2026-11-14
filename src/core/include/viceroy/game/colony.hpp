@@ -155,6 +155,7 @@ struct ColonyProduction {
     // Totals per turn, by cargo:: index.
     std::array<int, cargo::kCount> produced{}; // made from the land or by people
     std::array<int, cargo::kCount> needed{};   // raw goods the workshops want
+    int pressBells = 0;                        // of the bells, the printing press's share
     int foodEaten = 0;
 };
 

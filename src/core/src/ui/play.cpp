@@ -2713,7 +2713,7 @@ bool PlayScreen::clickColonyScreen(int x, int y) {
         // outside); a click on a building, a square or the stockade then
         // moves them there.
         const auto& colony = game_.state().colonies[static_cast<std::size_t>(state.colony)];
-        const auto hit = colonyHitAt(game_, colony, x, y);
+        const auto hit = colonyHitAt(game_, colony, x, y, art_);
         const auto who = colonyMover();
         switch (hit.kind) {
         case ColonyHit::Kind::Colonist:

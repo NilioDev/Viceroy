@@ -4,6 +4,7 @@
 #include "viceroy/data/image.hpp"
 #include "viceroy/data/reader.hpp"
 #include "viceroy/game/colony.hpp"
+#include "viceroy/game/natives.hpp"
 #include "viceroy/game_files.hpp"
 
 #include <algorithm>
@@ -30,6 +31,8 @@ constexpr std::uint8_t kBlack = 0x00;
 constexpr std::uint8_t kWhite = 0x0F;
 constexpr std::uint8_t kGreen = 0x44;
 constexpr std::uint8_t kSelectGreen = 0x45;
+constexpr std::uint8_t kBrightGreen = 0x0A;
+constexpr int kExpertIcons = 81;
 constexpr std::uint8_t kHarbourText = 0x39;
 constexpr std::uint8_t kStockText = 0x3D;
 constexpr std::uint8_t kRed = 0x0C;
@@ -43,8 +46,8 @@ constexpr std::uint8_t kUnitFrame = 0x0A;     // bright green
 constexpr std::uint8_t kSelectedFrame = 0x0F; // white: the unit clicked
 
 // Screen areas.
-constexpr Rect kTown{0, 8, 200, 120};
-constexpr Rect kSide{201, 8, 119, 120};
+constexpr Rect kTown{0, 8, 199, 120};
+constexpr Rect kSide{200, 8, 120, 120};
 constexpr Rect kAreaFrame{223, 31, 74, 74};
 constexpr int kAreaSquare = 24;
 constexpr int kLowerTop = 128;
@@ -75,14 +78,17 @@ int goodIcon(int good) {
     return kGoodsIcon + good;
 }
 
-// Where each kind of building stands in the town, and the sprites of
-// BUILDING.SS for "nothing built here" and each level.
+// Each kind of building, its place among the spots of its size, and the
+// sprites of BUILDING.SS for "nothing built here" and each level. The places
+// count in the order the kinds first appear in NAMES.TXT's @BUILDING.
 struct BuildingSlot {
     BuildingKind kind;
-    int x;
-    int y;
+    int place;
     int empty;
     std::array<int, 3> levels;
+    int x = 0; // where this colony puts it
+    int y = 0;
+    int size = 0; // 0 small, 1 wide, 2 large, 3 the stockade's, 4 the docks'
 };
 
 constexpr int kFillerLarge = 42;
@@ -95,22 +101,95 @@ constexpr int kStables = 46;
 constexpr int kWarehouseAndStables = 47;
 
 constexpr std::array<BuildingSlot, 15> kSlots{{
-    {BuildingKind::Docks, 123, 55, kFillerShore, {6, 7, 8}},
-    {BuildingKind::Armory, 128, 53, kFillerWide, {3, 4, 5}},
-    {BuildingKind::Fortification, 123, 106, kNoStockade, {0, 1, 2}},
-    {BuildingKind::TownHall, 87, 11, kFillerLarge, {9, 9, 9}},
-    {BuildingKind::Schoolhouse, 15, 102, kFillerWide, {12, 13, 14}},
-    {BuildingKind::Warehouse, 6, 14, kFillerWide, {kWarehouse, kWarehouse, kWarehouse}},
-    {BuildingKind::CustomHouse, 96, 53, kFillerSmall, {18, 18, 18}},
-    {BuildingKind::PrintingPress, 145, 15, kFillerSmall, {19, 20, 20}},
-    {BuildingKind::Weaver, 67, 54, kFillerSmall, {21, 22, 23}},
-    {BuildingKind::Tobacconist, 37, 45, kFillerSmall, {24, 25, 26}},
-    {BuildingKind::Distiller, 173, 18, kFillerSmall, {27, 28, 29}},
-    {BuildingKind::FurTrader, 8, 41, kFillerSmall, {32, 33, 34}},
-    {BuildingKind::Carpenter, 10, 76, kFillerWide, {35, 36, 36}},
-    {BuildingKind::Church, 66, 87, kFillerLarge, {37, 38, 38}},
-    {BuildingKind::Blacksmith, 56, 13, kFillerSmall, {39, 40, 41}},
+    {BuildingKind::Docks, 14, kFillerShore, {6, 7, 8}},
+    {BuildingKind::Armory, 7, kFillerWide, {3, 4, 5}},
+    {BuildingKind::Fortification, 13, kNoStockade, {0, 1, 2}},
+    {BuildingKind::TownHall, 11, kFillerLarge, {9, 9, 9}},
+    {BuildingKind::Schoolhouse, 8, kFillerWide, {12, 13, 14}},
+    {BuildingKind::Warehouse, 9, kFillerWide, {kWarehouse, kWarehouse, kWarehouse}},
+    {BuildingKind::CustomHouse, 0, kFillerSmall, {18, 18, 18}},
+    {BuildingKind::PrintingPress, 1, kFillerSmall, {19, 20, 20}},
+    {BuildingKind::Weaver, 2, kFillerSmall, {21, 22, 23}},
+    {BuildingKind::Tobacconist, 3, kFillerSmall, {24, 25, 26}},
+    {BuildingKind::Distiller, 4, kFillerSmall, {27, 28, 29}},
+    {BuildingKind::FurTrader, 5, kFillerSmall, {32, 33, 34}},
+    {BuildingKind::Carpenter, 10, kFillerWide, {35, 36, 36}},
+    {BuildingKind::Church, 12, kFillerLarge, {37, 38, 38}},
+    {BuildingKind::Blacksmith, 6, kFillerSmall, {39, 40, 41}},
 }};
+
+// The fifteen spots of the town (read from the original): seven small,
+// four wide, two large, the stockade's and the docks'.
+constexpr std::array<std::array<int, 2>, 15> kSpots{{{56, 13},
+                                                     {145, 15},
+                                                     {173, 18},
+                                                     {8, 41},
+                                                     {37, 45},
+                                                     {67, 54},
+                                                     {96, 53},
+                                                     {6, 14},
+                                                     {128, 53},
+                                                     {10, 76},
+                                                     {15, 102},
+                                                     {87, 11},
+                                                     {66, 87},
+                                                     {123, 106},
+                                                     {123, 55}}};
+
+// Read from the original: every colony shuffles the spots of each size
+// among the kinds of that size, with the C library's random numbers seeded
+// by its square and the game's seed, so a colony always looks the same.
+// Spot by spot, a free place of the spot's size is drawn at random.
+std::array<BuildingSlot, 15> townSlots(const SaveGame& save, const SaveColony& colony) {
+    constexpr std::array<int, 5> count{7, 4, 2, 1, 1};
+    constexpr std::array<int, 5> first{0, 7, 11, 13, 14};
+    OriginalRandom random((static_cast<std::uint32_t>((colony.y << 8) | colony.x) + gameSeed(save)) & 0x7FFF);
+    std::array<int, 15> spotOf{};
+    spotOf.fill(-1);
+    for (int spot = 0, size = 0; spot < 15; ++spot) {
+        while (spot >= first[static_cast<std::size_t>(size)] + count[static_cast<std::size_t>(size)]) {
+            ++size;
+        }
+        const auto s = static_cast<std::size_t>(size);
+        for (;;) {
+            const int place = random.between(0, count[s] - 1) + first[s];
+            if (spotOf[static_cast<std::size_t>(place)] < 0) {
+                spotOf[static_cast<std::size_t>(place)] = spot;
+                break;
+            }
+        }
+    }
+    auto slots = kSlots;
+    for (auto& slot : slots) {
+        const auto& at = kSpots[static_cast<std::size_t>(spotOf[static_cast<std::size_t>(slot.place)])];
+        slot.x = at[0];
+        slot.y = at[1];
+        slot.size = slot.place < 7 ? 0 : slot.place < 11 ? 1 : slot.place < 13 ? 2 : slot.place - 10;
+    }
+    return slots;
+}
+
+// Read from the original, by the size of the spot: where the people at work
+// stand and how wide a space they share, and where the row of what they make
+// goes and how wide it is.
+constexpr std::array<int, 5> kWorkersX{3, 20, 25, 5, 0};
+constexpr std::array<int, 5> kWorkersY{12, 8, 22, 5, 0};
+constexpr std::array<int, 5> kWorkersWidth{17, 21, 25, 65, 0};
+constexpr std::array<int, 5> kMadeX{-5, 0, 0, 0, 0};
+constexpr std::array<int, 5> kMadeY{-3, 1, 1, 1, 1};
+constexpr std::array<int, 5> kMadeWidth{20, 22, 30, 20, 20};
+
+// The k-th of n people at work: they share the space, centred in it, each
+// counted as wide as the figure of an expert at the job plus its shadow, and
+// at most one pixel more apart.
+std::array<int, 2> workerAt(const BuildingSlot& slot, int k, int n, int figure) {
+    const int kFigure = figure + 2;
+    const auto s = static_cast<std::size_t>(slot.size);
+    const int space = kWorkersWidth[s];
+    const int step = n > 1 ? std::clamp((space - kFigure) / (n - 1), 1, kFigure + 1) : 1;
+    const int span = (n - 1) * step + kFigure;
+    return {slot.x + kWorkersX[s] + (space - span) / 2 + step * k, slot.y + kWorkersY[s] + 1};
+}
 
 // The size of a building's spot, by the filler drawn when it is empty
 // (docs/rules/colony-screen.md).
@@ -155,11 +234,34 @@ int spriteWidth(const SpriteSheet& sheet, int index) {
     return sheet.sprites[static_cast<std::size_t>(index)].image.width;
 }
 
+// Read from the original: people at work are spaced by the figure of the
+// expert at their job (ICONS.SS 81 + the job).
+int figureWidth(const Art* art, int job) { return art == nullptr ? 8 : spriteWidth(art->icons, kExpertIcons + job); }
+
+// The shadow of a figure in the town, two pixels to its left.
+void drawShadow(Screen& screen, const IndexedImage& image, int x, int y) {
+    for (int j = 0; j < image.height; ++j) {
+        for (int i = 0; i < image.width; ++i) {
+            if (image.pixels[static_cast<std::size_t>(j * image.width + i)] != kTransparent) {
+                screen.pixel(x - 2 + i, y + j, kTownShadow);
+            }
+        }
+    }
+}
+
+void blitWithShadow(Screen& screen, const IndexedImage& image, int x, int y) {
+    drawShadow(screen, image, x, y);
+    screen.blit(image, x, y);
+}
+
 // A number in white on a black box, laid over the first of a row of icons.
-void drawCount(Screen& screen, const Art& art, int iconX, int iconY, int iconW, int count, int dy = 2) {
+// `inTown`: read from the original, the town's rows put the number three
+// pixels in from where the row starts, whatever the icon.
+void drawCount(Screen& screen, const Art& art, int iconX, int iconY, int iconW, int count, int dy = 2,
+               bool inTown = false) {
     const std::string text = std::to_string(count);
     const int w = Screen::textWidth(art.tiny, text);
-    const int tx = iconX + (iconW - w + 1) / 2 + 1;
+    const int tx = inTown ? iconX + 3 : iconX + (iconW - w + 1) / 2 + 1;
     const int ty = iconY + dy;
     screen.fill({tx - 1, ty - 1, w + 1, 7}, kBlack);
     screen.text(art.tiny, tx, ty, text, {kWhite, kWhite, kWhite});
@@ -167,7 +269,8 @@ void drawCount(Screen& screen, const Art& art, int iconX, int iconY, int iconW, 
 
 // A row of `count` icons of a good starting at x, squeezed into `room`
 // pixels when there are many. Returns the x where the row ends.
-int drawGoodsRow(Screen& screen, const Art& art, int good, int count, int x, int y, int room, int countDy = 2) {
+int drawGoodsRow(Screen& screen, const Art& art, int good, int count, int x, int y, int room, int countDy = 2,
+                 bool inTown = false) {
     if (count <= 0) {
         return x;
     }
@@ -180,12 +283,13 @@ int drawGoodsRow(Screen& screen, const Art& art, int good, int count, int x, int
     for (int i = 0; i < count; ++i) {
         blitSprite(screen, art.icons, icon, x + i * step, y);
     }
-    drawCount(screen, art, x, y, w, count, countDy);
+    drawCount(screen, art, x, y, w, count, countDy, inTown);
     return x + (count - 1) * step + w;
 }
 
 // A row of icons centred in a box `room` pixels wide.
-void drawGoodsCentred(Screen& screen, const Art& art, int good, int count, int x, int y, int room) {
+void drawGoodsCentred(Screen& screen, const Art& art, int good, int count, int x, int y, int room,
+                      bool inTown = false) {
     if (count <= 0) {
         return;
     }
@@ -195,7 +299,7 @@ void drawGoodsCentred(Screen& screen, const Art& art, int good, int count, int x
         step = std::max(1, (room - w) / (count - 1));
     }
     const int span = (count - 1) * step + w;
-    drawGoodsRow(screen, art, good, count, x + std::max(0, (room - span) / 2), y, room);
+    drawGoodsRow(screen, art, good, count, x + std::max(0, (room - span) / 2), y, room, 2, inTown);
 }
 
 void drawTopLine(Screen& screen, const Art& art, const Game& game, const SaveColony& colony) {
@@ -212,7 +316,8 @@ void drawTown(Screen& screen, const Art& art, const ColonyArt& colonyArt, const 
               const ColonyProduction& production, int selected, int selectedOutside) {
     screen.setClip(kTown);
     screen.tile(colonyArt.parchment, kTown);
-    for (const auto& slot : kSlots) {
+    const auto slots = townSlots(game.state(), colony);
+    for (const auto& slot : slots) {
         int level = buildingLevel(colony, slot.kind);
         int sprite = level > 0 ? slot.levels[static_cast<std::size_t>(level - 1)] : slot.empty;
         if (slot.kind == BuildingKind::Warehouse) {
@@ -223,29 +328,61 @@ void drawTown(Screen& screen, const Art& art, const ColonyArt& colonyArt, const 
     }
 
     // People at work inside, and what they make there.
-    for (const auto& slot : kSlots) {
-        int k = 0;
+    for (const auto& slot : slots) {
+        // Measured: nobody is drawn in a building that is not there.
+        if (buildingLevel(colony, slot.kind) <= 0) {
+            continue;
+        }
+        int n = 0;
+        for (const auto& work : production.colonists) {
+            n += work.building && *work.building == slot.kind ? 1 : 0;
+        }
+        // Read from the original: the row of what they make comes first,
+        // then the people over it, one by one, each two pixels right of its
+        // place with its shadow on the place itself.
         int good = -1;
         int made = 0;
+        std::vector<std::size_t> who;
         for (std::size_t i = 0; i < production.colonists.size(); ++i) {
             const auto& work = production.colonists[i];
-            if (!work.building || *work.building != slot.kind) {
-                continue;
+            if (work.building && *work.building == slot.kind) {
+                who.push_back(i);
+                good = work.good;
+                made += work.amount;
             }
-            const int x = slot.x + 5 + 9 * k;
-            const int y = slot.y + 13;
-            const int icon = colonistIcon(colony.skills[i]);
-            blitSprite(screen, art.icons, icon, x, y);
-            if (static_cast<int>(i) == selected) {
-                const int w = spriteWidth(art.icons, icon);
-                screen.frame({x - 1, y - 1, w + 2, 18}, kSelectGreen);
-            }
-            good = work.good;
-            made += work.amount;
-            ++k;
+        }
+        // Read from the original: the town hall shows the colony's bells
+        // but the printing press's share, which the press shows itself; the
+        // church shows all the crosses.
+        if (slot.kind == BuildingKind::TownHall) {
+            good = cargo::kBells;
+            made = production.produced[cargo::kBells] - production.pressBells;
+        } else if (slot.kind == BuildingKind::PrintingPress) {
+            good = cargo::kBells;
+            made = production.pressBells;
+        } else if (slot.kind == BuildingKind::Church) {
+            good = cargo::kCrosses;
+            made = production.produced[cargo::kCrosses];
         }
         if (good >= 0 && made > 0) {
-            drawGoodsRow(screen, art, good, made, slot.x - 5, slot.y - 2, 20);
+            const auto z = static_cast<std::size_t>(slot.size);
+            drawGoodsCentred(screen, art, good, made, slot.x + kMadeX[z], slot.y + kMadeY[z] + 1, kMadeWidth[z], true);
+        }
+        const int figure = who.empty() ? 0 : figureWidth(&art, colony.jobs[who.front()]);
+        for (std::size_t k = 0; k < who.size(); ++k) {
+            const auto i = who[k];
+            const auto [x, y] = workerAt(slot, static_cast<int>(k), n, figure);
+            const int icon = colonistIcon(colony.skills[i]);
+            if (icon < 0 || static_cast<std::size_t>(icon) >= art.icons.sprites.size()) {
+                continue;
+            }
+            const auto& image = art.icons.sprites[static_cast<std::size_t>(icon)].image;
+            blitWithShadow(screen, image, x + 2, y);
+            if (static_cast<int>(i) == selected) {
+                // Read from the original: a bright green frame (colour 10)
+                // from one row below the figure's top to its foot.
+                screen.frame({x - 1, y + 1, image.width + 4, image.height}, kBrightGreen);
+            }
         }
     }
 
@@ -260,20 +397,13 @@ void drawTown(Screen& screen, const Art& art, const ColonyArt& colonyArt, const 
         }
         const auto& image = art.icons.sprites[static_cast<std::size_t>(icon)].image;
         const int x = outsideX(k, count);
-        for (int j = 0; j < image.height; ++j) {
-            for (int i = 0; i < image.width; ++i) {
-                if (image.pixels[static_cast<std::size_t>(j * image.width + i)] != kTransparent) {
-                    screen.pixel(x - 2 + i, kOutsideY + j, kTownShadow);
-                }
-            }
-        }
-        screen.blit(image, x, kOutsideY);
+        blitWithShadow(screen, image, x, kOutsideY);
         if (u == selectedOutside) {
             screen.frame({x - 1, kOutsideY - 1, image.width + 2, 18}, kSelectGreen);
         }
     }
     screen.resetClip();
-    screen.fill({200, 8, 1, 120}, kBlack);
+    screen.fill({199, 8, 1, 120}, kBlack);
 }
 
 void drawArea(Screen& screen, const Art& art, const Game& game, const SaveColony& colony,
@@ -523,7 +653,7 @@ std::vector<int> unitsOutside(const Game& game, const SaveColony& colony) {
     return out;
 }
 
-ColonyHit colonyHitAt(const Game& game, const SaveColony& colony, int x, int y) {
+ColonyHit colonyHitAt(const Game& game, const SaveColony& colony, int x, int y, const Art* art) {
     ColonyHit hit;
     const auto& save = game.state();
     const auto production =
@@ -531,14 +661,23 @@ ColonyHit colonyHitAt(const Game& game, const SaveColony& colony, int x, int y) 
     const auto inside = [&](const Rect& r) { return x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h; };
     if (inside(kTown)) {
         // The people first: they stand in front of the buildings.
-        for (const auto& slot : kSlots) {
+        const auto slots = townSlots(save, colony);
+        for (const auto& slot : slots) {
+            if (buildingLevel(colony, slot.kind) <= 0) {
+                continue;
+            }
+            int n = 0;
+            for (const auto& work : production.colonists) {
+                n += work.building && *work.building == slot.kind ? 1 : 0;
+            }
             int k = 0;
             for (std::size_t i = 0; i < production.colonists.size(); ++i) {
                 const auto& work = production.colonists[i];
                 if (!work.building || *work.building != slot.kind) {
                     continue;
                 }
-                if (inside(Rect{slot.x + 5 + 9 * k, slot.y + 13, 9, 16})) {
+                const auto [wx, wy] = workerAt(slot, k, n, figureWidth(art, colony.jobs[i]));
+                if (inside(Rect{wx, wy, 10, 16})) {
                     hit.kind = ColonyHit::Kind::Colonist;
                     hit.colonist = static_cast<int>(i);
                 }
@@ -557,7 +696,7 @@ ColonyHit colonyHitAt(const Game& game, const SaveColony& colony, int x, int y) 
                 return hit;
             }
         }
-        for (const auto& slot : kSlots) {
+        for (const auto& slot : slots) {
             if (!inside(slotRect(slot))) {
                 continue;
             }
@@ -613,6 +752,15 @@ int unitPresentAt(int x, int y) {
     }
     const int k = (x - 212) / 18;
     return k < 5 ? k : -1;
+}
+
+std::array<int, 2> townSpot(const SaveGame& save, const SaveColony& colony, BuildingKind kind) {
+    for (const auto& slot : townSlots(save, colony)) {
+        if (slot.kind == kind) {
+            return {slot.x, slot.y};
+        }
+    }
+    return {-1, -1};
 }
 
 // 1 when the jobs menu starts with "(CLEAR SPECIALTY)": the colonist is an expert.

@@ -90,6 +90,11 @@ inline constexpr std::uint8_t kSettlementVisited = 0x08;
 // Settlement flag: it has paid tribute.
 inline constexpr std::uint8_t kSettlementTribute = 0x10;
 
+// The game's own seed (in the savegame's tail), which the original adds to
+// a square to seed choices that must stay the same, such as what a village
+// teaches or where a colony's buildings stand.
+std::uint32_t gameSeed(const SaveGame& save);
+
 // The random numbers of the original's C library: the same seed gives the
 // same numbers.
 class OriginalRandom {

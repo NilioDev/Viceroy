@@ -7,9 +7,11 @@
 // docs/rules/colony-screen.md.
 #pragma once
 
+#include "viceroy/game/colony.hpp"
 #include "viceroy/game/game.hpp"
 #include "viceroy/render/game_view.hpp"
 
+#include <array>
 #include <vector>
 
 namespace viceroy {
@@ -52,7 +54,7 @@ struct ColonyHit {
     int square = -1; // 0-7
     int unit = -1;   // a unit outside
 };
-ColonyHit colonyHitAt(const Game& game, const SaveColony& colony, int x, int y);
+ColonyHit colonyHitAt(const Game& game, const SaveColony& colony, int x, int y, const Art* art = nullptr);
 
 // The units standing outside the colony in its town, left to right.
 std::vector<int> unitsOutside(const Game& game, const SaveColony& colony);
@@ -66,6 +68,9 @@ OutsideMenuBox outsideMenuBox(int lines);
 // The jobs menu of a colonist: its first line is "(CLEAR SPECIALTY)" for an
 // expert (read from the original), then the jobs, then "(More)".
 int jobsMenuClearLine(const SaveColony& colony, int colonist);
+// Where a kind of building stands in a colony's town (each colony shuffles
+// the spots of each size, read from the original).
+std::array<int, 2> townSpot(const SaveGame& save, const SaveColony& colony, BuildingKind kind);
 
 // Where the panel's parts are, for clicks.
 struct PanelButton {
