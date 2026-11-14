@@ -600,6 +600,71 @@ int Game::evasion(int ship) const {
     return std::max(1, v);
 }
 
+void Game::slowByWarships(int ship) {
+    static constexpr std::array<int, 8> kDx{0, 1, 1, 1, 0, -1, -1, -1};
+    static constexpr std::array<int, 8> kDy{-1, -1, 0, 1, 1, 1, 0, -1};
+    const auto& map = save_.map;
+    const int mover = unit(ship).nation;
+    const int x = unit(ship).x;
+    const int y = unit(ship).y;
+    if (!map.inside(x, y) || !map.at(x, y).isWater()) {
+        return;
+    }
+    const auto name = [&](int u) { return rules_.units[static_cast<std::size_t>(unit(u).type)].name; };
+    for (std::size_t k = 0; k < kDx.size(); ++k) {
+        const int nx = x + kDx[k];
+        const int ny = y + kDy[k];
+        if (!map.inside(nx, ny) || !map.at(nx, ny).isWater()) {
+            continue;
+        }
+        const auto there = unitsAt(nx, ny);
+        if (there.empty()) {
+            continue;
+        }
+        const int other = unit(there.front()).nation;
+        if (other == mover || (unit(ship).type != kPrivateer && (relation(mover, other) & 0x40) != 0)) {
+            continue;
+        }
+        for (const int enemy : there) {
+            if (movesLeft(ship) <= 0) {
+                return;
+            }
+            // Read from the original: a privateer holds up a ship for 4
+            // thirds of a move, a frigate 6 and a man-o-war 8; the ship gets
+            // past if a roll of its speed against the warship's (plus 2) is
+            // below its own, and loses half when it is equal.
+            const int type = unit(enemy).type;
+            int lost = type == kPrivateer ? 4 : type == kFrigate ? 6 : type == kManOWar ? 8 : 0;
+            if (lost == 0) {
+                continue;
+            }
+            const int own = evasion(ship);
+            const int roll = 1 + nextRandom(own + evasion(enemy) + 2);
+            if (roll < own) {
+                lost = 0;
+            } else if (roll == own) {
+                lost /= 2;
+            }
+            if (lost == 0) {
+                if (mover == human() || other == human()) {
+                    // "Dutch Merchantman slips past French Privateer!"
+                    GameNotice notice{"SHIPRUN", {name(ship), "", "", name(enemy)}};
+                    notice.adjectives = {{2, mover}, {1, other}};
+                    notices_.push_back(std::move(notice));
+                }
+                continue;
+            }
+            save_.units[static_cast<std::size_t>(ship)].movesUsed += lost;
+            if (mover == human()) {
+                // "Merchantman's progress slowed by presence of French Privateer."
+                GameNotice notice{"SHIPSLOW", {name(ship), "", name(enemy)}};
+                notice.adjectives = {{1, other}};
+                notices_.push_back(std::move(notice));
+            }
+        }
+    }
+}
+
 void Game::loseShip(int loser, int winner) {
     // Read from the original and checked in six fights: the winner's guns
     // against the loser's hull decide between damaged and sunk, but a

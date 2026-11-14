@@ -42,6 +42,7 @@ SaveGame sampleSave() {
         for (int x = 0; x < 6; ++x) {
             auto& sq = s.map.at(x, y);
             sq.terrain = x < 2 ? 25 : 2; // ocean, then plains
+            sq.region = x < 2 ? 1 : 0;   // the main body of water
         }
     }
     s.map.at(4, 1).terrain = 10; // forest
