@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdlib>
 #include <string>
 
 namespace viceroy {
@@ -41,7 +42,9 @@ constexpr std::size_t kHeaderRebels = 96;        // the human's rebels in % (a w
 constexpr std::size_t kHeaderCrown = 98;         // the nation whose slot the Crown's side takes (a word)
 constexpr std::size_t kHeaderPower = 100;        // the power that helps the rebels (a word)
 constexpr std::size_t kHeaderNextPower = 102;    // the next one; also the king who offers mercenaries
+constexpr std::size_t kHeaderRoyalForce = 106;   // regulars, dragoons, men-of-war, artillery
 constexpr std::size_t kHeaderPowerForce = 114;   // the same for the power's force
+constexpr std::uint8_t kRisen = 0x01;            // colony byte 28: its Tories have risen
 
 // Nation record.
 constexpr std::size_t kNationFlags = 0;
@@ -66,6 +69,8 @@ constexpr int kFrigates = 17;
 constexpr int kManOWar = 18;
 constexpr int kFirstShip = 13;
 constexpr int kLastShip = 18;
+constexpr int kArtillery = 11;
+constexpr int kMuskets = 15;   // row of @CARGO
 constexpr int kVeteran = 0x15; // the veteran soldier's profession
 
 constexpr int kIndependenceMood = 3;
@@ -90,6 +95,11 @@ void setWord(std::array<std::uint8_t, N>& raw, std::size_t at, int value) {
     const auto v = static_cast<std::uint16_t>(value);
     raw[at] = static_cast<std::uint8_t>(v & 0xFF);
     raw[at + 1] = static_cast<std::uint8_t>(v >> 8);
+}
+
+int unitsStanding(const SaveGame& save, int x, int y) {
+    return static_cast<int>(
+        std::count_if(save.units.begin(), save.units.end(), [&](const SaveUnit& u) { return u.x == x && u.y == y; }));
 }
 
 // The original halves with a signed division: towards zero.
@@ -282,8 +292,17 @@ void Game::independenceTurn(int nation) {
     // campaign.
     if (nation == crownNation()) {
         // The Crown's army grows no more during the war (the original
-        // calls for it and returns at once).
-        return; // the campaign itself: not done yet
+        // calls for it and returns at once). While it has land units to
+        // send it lands them; then the Tories rise.
+        const auto force = [&](int kind) {
+            return word(save_.header, kHeaderRoyalForce + 2 * static_cast<std::size_t>(kind));
+        };
+        if (force(0) + (force(1) > 0 ? 1 : 0) + (force(3) > 0 ? 1 : 0) != 0) {
+            crownLands();
+        } else {
+            toryUprising();
+        }
+        return;
     }
     auto& flags = save_.nations[static_cast<std::size_t>(nation)].raw[kNationFlags];
     if ((flags & kMobilized) == 0) {
@@ -491,6 +510,423 @@ void Game::forceArrives(bool mercenaries) {
         removeUnit(ship); // the mercenaries' ship sails home
     }
     refreshUnitFlags();
+}
+
+int Game::colonyStrength(int colony) const {
+    // How many men the Crown thinks it needs against a colony: one per
+    // hundred muskets in store (rounded), one more, half the defence of the
+    // men standing there, all of it doubled behind a fortress or half as
+    // much again behind a fort.
+    const auto& c = save_.colonies[static_cast<std::size_t>(colony)];
+    int need = (c.stock[kMuskets] + 50) / 100 + 1;
+    for (int i = 0; i < unitCount(); ++i) {
+        const auto& u = unit(i);
+        if (u.x != c.x || u.y != c.y || (u.type >= kFirstShip && u.type <= kLastShip) || u.type < 0 ||
+            u.type >= static_cast<int>(rules_.units.size())) {
+            continue;
+        }
+        int v = rules_.units[static_cast<std::size_t>(u.type)].combat;
+        if (u.type == kArtillery && (u.raw[4] & 0x80) != 0) {
+            v -= 2; // damaged
+        }
+        v = std::max(0, v) * 8;
+        if ((u.type == kSoldiers || u.type == kDragoons) && u.profession == kVeteran) {
+            v += v >> 1;
+        }
+        need += v >> 4;
+    }
+    const int level = buildingLevel(c, BuildingKind::Fortification);
+    if (level >= 2) {
+        need *= 2;
+    } else if (level == 1) {
+        need = need * 3 / 2;
+    }
+    return std::max(1, need);
+}
+
+void Game::seizeAt(int x, int y) {
+    // Everyone not of the Crown on the square is lost; the rebels hear of
+    // their men on land and of their ships.
+    const int crown = crownNation();
+    const bool water = save_.map.inside(x, y) && save_.map.at(x, y).isWater();
+    for (int i = unitCount() - 1; i >= 0; --i) {
+        const auto& u = unit(i);
+        if (u.x != x || u.y != y || u.nation == crown) {
+            continue;
+        }
+        const bool told = u.nation < kEuropeanNations && save_.players[static_cast<std::size_t>(u.nation)].control == 0;
+        const bool ship = u.type >= kFirstShip && u.type <= kLastShip;
+        if (told && (!water || ship) && u.type >= 0 && u.type < static_cast<int>(rules_.units.size())) {
+            notices_.push_back(GameNotice{water ? "SEIZURESEA" : "SEIZURELAND",
+                                          {rules_.units[static_cast<std::size_t>(u.type)].name}});
+        }
+        removeUnit(i);
+    }
+}
+
+void Game::placeCrownUnit(int x, int y, int type) {
+    const int crown = crownNation();
+    addBuiltUnit(x, y, crown, type);
+    auto& u = save_.units.back();
+    u.movesUsed = movementAllowance(unitCount() - 1);
+    u.raw[3] = static_cast<std::uint8_t>(u.raw[3] | (0x10 << human())); // the rebels see it
+    auto& square = save_.map.squares[static_cast<std::size_t>(y) * static_cast<std::size_t>(save_.map.width) +
+                                     static_cast<std::size_t>(x)];
+    square.region = static_cast<std::uint8_t>((square.region & 0x0F) | (crown << 4));
+}
+
+void Game::crownLands() {
+    // The Crown's turn of the war while it has land units at home: a
+    // man-of-war lands them next to one of the rebels' coastal colonies.
+    const int rebels = human();
+    const int crown = crownNation();
+    const auto forceAt = [&](int kind) { return kHeaderRoyalForce + 2 * static_cast<std::size_t>(kind); };
+    const auto force = [&](int kind) { return word(save_.header, forceAt(kind)); };
+    const auto take = [&](int kind) { setWord(save_.header, forceAt(kind), force(kind) - 1); };
+    bool givesUp = false;
+    const auto end = [&]() {
+        if (givesUp) {
+            for (int kind = 0; kind < 4; ++kind) {
+                setWord(save_.header, forceAt(kind), 0);
+            }
+        }
+    };
+    if (force(2) == 0) {
+        // No man-of-war left at home: one more if none is out either.
+        if (byteAt(save_.tribesAndMore, kByType + static_cast<std::size_t>(crown) * 19 + kManOWar) == 0) {
+            setWord(save_.header, forceAt(2), 1);
+        }
+        return;
+    }
+    const int total = force(0) + force(1) + force(3) + force(2);
+    if (total <= 4 || total == force(2)) {
+        givesUp = true; // the last of it, should nothing land this turn
+    }
+    if (total == force(2)) {
+        end();
+        return;
+    }
+    // The candidates: the first ten coastal colonies, sorted by Tories
+    // times people less their armed men.
+    const int extra = nationEffects(save_, rebels).libertyExtra(true);
+    std::vector<int> keys;
+    std::vector<int> picks;
+    for (int c = 0; c < static_cast<int>(save_.colonies.size()) && keys.size() < 10; ++c) {
+        const auto& colony = save_.colonies[static_cast<std::size_t>(c)];
+        if (colony.nation != rebels || (colony.raw[28] & kCoastal) == 0) {
+            continue;
+        }
+        const int tories = 100 - sonsOfLibertyPercent(colony, extra);
+        int armed = 0;
+        for (const auto& u : save_.units) {
+            if (u.x == colony.x && u.y == colony.y && !(u.type >= kFirstShip && u.type <= kLastShip) && u.type >= 0 &&
+                u.type < static_cast<int>(rules_.units.size()) &&
+                rules_.units[static_cast<std::size_t>(u.type)].combat > 1) {
+                ++armed;
+            }
+        }
+        keys.push_back(std::max(colony.population * (tories + 25) - 75 * armed, tories));
+        picks.push_back(c);
+    }
+    sortLikeTheOriginal(keys, picks);
+    std::vector<int> strength;
+    for (const int c : picks) {
+        strength.push_back(colonyStrength(c));
+    }
+    // From the highest key: the first the force at home can take, then the
+    // same with at most a shipload, then the first.
+    const int count = static_cast<int>(picks.size());
+    const int shipload = rules_.units.size() > static_cast<std::size_t>(kManOWar)
+                             ? rules_.units[static_cast<std::size_t>(kManOWar)].cargoSlots
+                             : 6;
+    int chosen = -1;
+    int need = 0;
+    int wanted = 0;
+    for (int round = 0; round < 3 && chosen < 0; ++round) {
+        for (int i = 0; i < count; ++i) {
+            const int k = count - 1 - i;
+            wanted = strength[static_cast<std::size_t>(k)];
+            need = std::max(1, wanted);
+            int each = std::max(1, need >> 3);
+            if (force(1) + force(3) <= force(0)) {
+                each = 1;
+            }
+            const int dragoons = std::min(force(1), each);
+            const int guns = std::min(force(3), each);
+            if (round != 0) {
+                need = std::min(need, shipload);
+            }
+            if (round >= 2 || force(0) + dragoons + guns >= need) {
+                chosen = k;
+                break;
+            }
+        }
+    }
+    if (chosen < 0) {
+        end();
+        return;
+    }
+    need = std::min(need, shipload);
+    const int colonyIndex = picks[static_cast<std::size_t>(chosen)];
+    const auto& colony = save_.colonies[static_cast<std::size_t>(colonyIndex)];
+    const int colonyX = colony.x;
+    const int colonyY = colony.y;
+    const auto& map = save_.map;
+    const auto landRegion = [&](int x, int y) {
+        return map.inside(x, y) && map.at(x, y).isLand() ? map.at(x, y).region & 0x0F : -1;
+    };
+    const auto water = [&](int x, int y) { return !map.inside(x, y) || map.at(x, y).isWater(); };
+    const int region = landRegion(colonyX, colonyY);
+    // The open sea next to it with the most free land of the colony's own
+    // around; a square with a rebel man-of-war counts as one.
+    int best = 0;
+    int sx = -1;
+    int sy = -1;
+    for (std::size_t d = 0; d < kDx.size(); ++d) {
+        const int x = colonyX + kDx[d];
+        const int y = colonyY + kDy[d];
+        if (!map.inside(x, y) || !map.at(x, y).isWater() || (map.at(x, y).region & 0x0F) != 1) {
+            continue;
+        }
+        int score = 0;
+        for (std::size_t e = 0; e < kDx.size(); ++e) {
+            const int ax = x + kDx[e];
+            const int ay = y + kDy[e];
+            if (!water(ax, ay) && landRegion(ax, ay) == region && !colonyAt(ax, ay)) {
+                ++score;
+            }
+        }
+        if (score == 0) {
+            continue;
+        }
+        bool ours = false;
+        bool manOWar = false;
+        bool anyone = false;
+        for (const auto& u : save_.units) {
+            if (u.x == x && u.y == y) {
+                anyone = true;
+                ours = ours || u.nation == crown;
+                manOWar = manOWar || u.type == kManOWar;
+            }
+        }
+        if (anyone && !ours && manOWar) {
+            score = 1;
+        }
+        if (score > best) {
+            best = score;
+            sx = x;
+            sy = y;
+        }
+    }
+    if (best <= 0) {
+        end();
+        return;
+    }
+    const std::string colonyName = colony.name;
+    seizeAt(sx, sy);
+    take(2);
+    placeCrownUnit(sx, sy, kManOWar);
+    // "Royal Expeditionary Force lands near Boston!"
+    GameNotice invasion{"INVASION", {colonyName}};
+    invasion.colony = colonyIndex;
+    invasion.music = {{MusicCue::Kind::ChangeMood, kIndependenceMood}};
+    notices_.push_back(std::move(invasion));
+    givesUp = false;
+    int each = std::max(1, wanted >> 3);
+    if (force(0) >= 2) {
+        each = std::min(each, 2);
+    }
+    if (force(1) + force(3) <= force(0)) {
+        each = 1;
+    }
+    need = std::max(need, 3);
+    // Onto the land next to both the ship and the colony: first where the
+    // fewest stand (whose men are taken), then next to the men already
+    // landed, a few dragoons and guns among the regulars.
+    int fewest = 99;
+    bool found = false;
+    bool second = false;
+    int dragoons = 0;
+    int guns = 0;
+    while (need > 0) {
+        bool landed = false;
+        for (std::size_t d = 0; d < kDx.size(); ++d) {
+            const int lx = sx + kDx[d];
+            const int ly = sy + kDy[d];
+            if (water(lx, ly) || colonyAt(lx, ly) || std::abs(lx - colonyX) > 1 || std::abs(ly - colonyY) > 1 ||
+                landRegion(lx, ly) != region || need <= 0) {
+                continue;
+            }
+            int kind = 0;
+            bool attack = false;
+            const int last = map.at(lx, ly).region >> 4;
+            if (last != crown) {
+                const int here = unitsStanding(save_, lx, ly);
+                if (!second) {
+                    if (here < fewest) {
+                        found = true;
+                        fewest = here;
+                    }
+                    continue;
+                }
+                if (here > fewest) {
+                    continue;
+                }
+                attack = true;
+            } else if (each > dragoons && force(1) > 0) {
+                ++dragoons;
+                kind = 1;
+            } else if (each > guns && force(3) > 0) {
+                ++guns;
+                kind = 3;
+            }
+            if (force(kind) <= 0) {
+                continue;
+            }
+            if (attack) {
+                seizeAt(lx, ly);
+            }
+            placeCrownUnit(lx, ly, royalUnitType(kind, crown));
+            take(kind);
+            --need;
+            landed = true;
+        }
+        if (landed) {
+            second = false;
+            found = false;
+            fewest = 99;
+        } else if (found && !second) {
+            second = true;
+        } else {
+            need = 0;
+        }
+    }
+    refreshUnitFlags();
+    end();
+}
+
+void Game::toryUprising() {
+    // The Crown has no more land units to send: now and then the Tories of
+    // a colony rise, once in each colony, as soldiers and dragoons of the
+    // Crown on the free land around it.
+    const int rebels = human();
+    const int crown = crownNation();
+    const int d = save_.difficulty;
+    if (aiRandom(0, d + 1) == 0) {
+        return;
+    }
+    const int extra = nationEffects(save_, rebels).libertyExtra(true);
+    int best = 0;
+    int picked = -1;
+    for (int c = 0; c < static_cast<int>(save_.colonies.size()); ++c) {
+        const auto& colony = save_.colonies[static_cast<std::size_t>(c)];
+        if (colony.nation != rebels || (colony.raw[28] & kRisen) != 0) {
+            continue;
+        }
+        int score = (100 - sonsOfLibertyPercent(colony, extra)) * 2 * colony.population / 100 + d + 1;
+        for (const auto& u : save_.units) {
+            if (u.x == colony.x && u.y == colony.y && u.type >= 0 && u.type < static_cast<int>(rules_.units.size())) {
+                score -= rules_.units[static_cast<std::size_t>(u.type)].combat;
+            }
+        }
+        int open = 0;
+        for (std::size_t k = 0; k < kDx.size(); ++k) {
+            const int x = colony.x + kDx[k];
+            const int y = colony.y + kDy[k];
+            if (!save_.map.inside(x, y) || save_.map.at(x, y).isWater() || colonyAt(x, y)) {
+                continue;
+            }
+            bool crownHere = false;
+            for (const auto& u : save_.units) {
+                crownHere = crownHere || (u.x == x && u.y == y && u.nation == crown);
+            }
+            if (crownHere) {
+                score = -1;
+            } else {
+                ++open;
+            }
+        }
+        if (open == 0) {
+            score = -1;
+        }
+        if (score > best) {
+            best = score;
+            picked = c;
+        }
+    }
+    if (picked < 0) {
+        return;
+    }
+    int tories = best;
+    auto& colony = save_.colonies[static_cast<std::size_t>(picked)];
+    colony.raw[28] = static_cast<std::uint8_t>(colony.raw[28] | kRisen);
+    const int cx = colony.x;
+    const int cy = colony.y;
+    bool any = false;
+    while (tories > 0) {
+        bool placed = false;
+        for (std::size_t k = 0; k < kDx.size() && tories > 0; ++k) {
+            const int x = cx + kDx[k];
+            const int y = cy + kDy[k];
+            if (!save_.map.inside(x, y) || save_.map.at(x, y).isWater() || colonyAt(x, y)) {
+                continue;
+            }
+            const int last = save_.map.at(x, y).region >> 4;
+            if (unitsStanding(save_, x, y) > 0 && last != crown) {
+                continue;
+            }
+            placeCrownUnit(x, y, kSoldiers);
+            any = true;
+            placed = true;
+            auto& u = save_.units.back();
+            if ((tories & 1) != 0 && aiRandom(0, d + 1) != 0) {
+                u.profession = kVeteran;
+            }
+            if (tories % 3 == 0 && aiRandom(0, d + 1) != 0) {
+                u.type = kDragoons;
+            }
+            --tories;
+        }
+        if (!placed) {
+            tories = 0;
+        }
+    }
+    auto& risen = save_.colonies[static_cast<std::size_t>(picked)];
+    if (!any) {
+        risen.raw[28] = static_cast<std::uint8_t>(risen.raw[28] & ~kRisen);
+        return;
+    }
+    refreshUnitFlags();
+    // "Tory uprising near Boston! Parliament arms Tory Militia!"
+    GameNotice notice{"TORYUPRISING", {risen.name}};
+    notice.colony = picked;
+    notices_.push_back(std::move(notice));
+}
+
+void Game::sortLikeTheOriginal(std::vector<int>& keys, std::vector<int>& values) {
+    // The original's sort: from the smallest; an out-of-order key goes
+    // before its equals.
+    for (;;) {
+        std::size_t i = 0;
+        while (i + 1 < keys.size() && keys[i + 1] >= keys[i]) {
+            ++i;
+        }
+        if (i + 1 >= keys.size()) {
+            break;
+        }
+        const int key = keys[i + 1];
+        const int value = values[i + 1];
+        std::size_t j = 0;
+        while (j < i + 1 && key > keys[j]) {
+            ++j;
+        }
+        for (std::size_t k = i + 1; k > j; --k) {
+            keys[k] = keys[k - 1];
+            values[k] = values[k - 1];
+        }
+        keys[j] = key;
+        values[j] = value;
+    }
 }
 
 void Game::interventionDeclared() {

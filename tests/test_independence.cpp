@@ -259,3 +259,82 @@ VCR_TEST("independence: bells bring the power in and its force lands") {
     VCR_CHECK(ships == 1 && types[9] == 2 && types[7] == 2 && types[11] == 2);
     VCR_CHECK(headerWord(g, 114) == 3 && headerWord(g, 116) == 1 && headerWord(g, 118) == 3 && headerWord(g, 120) == 2);
 }
+
+namespace {
+
+void setForce(Game& g, int regulars, int dragoons, int menOfWar, int artillery) {
+    auto& h = g.state().header;
+    const int values[4] = {regulars, dragoons, menOfWar, artillery};
+    for (std::size_t k = 0; k < 4; ++k) {
+        h[106 + 2 * k] = static_cast<std::uint8_t>(values[k]);
+        h[107 + 2 * k] = 0;
+    }
+}
+
+} // namespace
+
+VCR_TEST("independence: the Crown lands next to a colony and takes who stands there") {
+    SaveGame s = warSave();
+    s.units.push_back(unitAt(4, 1, kHuman, 1)); // soldiers where the Crown lands
+    Game g(std::move(s), warRules());
+    g.declareIndependence();
+    g.takeNotices();
+    setForce(g, 4, 2, 2, 1);
+    g.endTurn();
+    const auto news = g.takeNotices();
+    const auto* invasion = find(news, "INVASION");
+    VCR_CHECK(invasion != nullptr && invasion->strings == std::vector<std::string>{"Fort Orange"});
+    const auto* seized = find(news, "SEIZURELAND");
+    VCR_CHECK(seized != nullptr && seized->strings == std::vector<std::string>{"Soldiers"});
+    // A man-of-war on the first sea square by the colony, and three men on
+    // the one land square next to both: regulars, cavalry, artillery.
+    std::array<int, 19> types{};
+    int crownUnits = 0;
+    for (int i = 0; i < g.unitCount(); ++i) {
+        const auto& u = g.unit(i);
+        VCR_CHECK(u.nation == kCrown);
+        ++crownUnits;
+        ++types[static_cast<std::size_t>(u.type)];
+        if (u.type == 18) {
+            VCR_CHECK(u.x == 5 && u.y == 1);
+        } else {
+            // Landed at (4, 1); the Crown's own move may take them a step on.
+            VCR_CHECK(std::abs(u.x - 4) <= 1 && std::abs(u.y - 1) <= 1 && u.x < 5);
+        }
+    }
+    VCR_CHECK(crownUnits == 4 && types[18] == 1 && types[6] == 1 && types[8] == 1 && types[11] == 1);
+    VCR_CHECK(headerWord(g, 106) == 3 && headerWord(g, 108) == 1 && headerWord(g, 110) == 1 && headerWord(g, 112) == 0);
+}
+
+VCR_TEST("independence: with nothing left to send, the Tories rise once") {
+    SaveGame s = warSave();
+    Game g(std::move(s), warRules());
+    g.declareIndependence();
+    g.takeNotices();
+    setForce(g, 0, 0, 0, 0);
+    const GameNotice* rising = nullptr;
+    std::vector<GameNotice> news;
+    for (int turn = 0; turn < 30 && rising == nullptr; ++turn) {
+        g.endTurn();
+        news = g.takeNotices();
+        rising = find(news, "TORYUPRISING");
+    }
+    VCR_CHECK(rising != nullptr && rising->strings == std::vector<std::string>{"Fort Orange"});
+    VCR_CHECK((g.state().colonies[0].raw[28] & 0x01) != 0);
+    // 40% Tories of 10 people: 40 x 2 x 10 / 100 + difficulty + 1 = 10 on
+    // the five free squares around.
+    int tories = 0;
+    for (int i = 0; i < g.unitCount(); ++i) {
+        const auto& u = g.unit(i);
+        if (u.nation == kCrown) {
+            ++tories;
+            VCR_CHECK(u.type == 1 || u.type == 4);
+            VCR_CHECK(std::abs(u.x - 4) <= 1 && std::abs(u.y - 2) <= 1 && u.x < 5);
+        }
+    }
+    VCR_CHECK(tories == 10);
+    for (int turn = 0; turn < 30; ++turn) {
+        g.endTurn();
+        VCR_CHECK(!has(g.takeNotices(), "TORYUPRISING"));
+    }
+}

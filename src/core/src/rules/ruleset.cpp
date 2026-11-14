@@ -167,6 +167,21 @@ Ruleset readRuleset(const TextFile& names) {
         rules.tribes.push_back({row.text(0), row.text(1), row.text(2), row.number(3), row.number(4)});
     }
 
+    if (const auto* republics = names.find("INDEPENDENT")) {
+        for (std::string line : republics->lines) {
+            while (!line.empty() && (line.back() == ' ' || line.back() == '\t')) {
+                line.pop_back();
+            }
+            if (line.empty()) {
+                if (!rules.independent.empty()) {
+                    break;
+                }
+                continue;
+            }
+            rules.independent.push_back(line);
+        }
+    }
+
     if (rules.terrain.empty() || rules.buildings.empty() || rules.jobs.empty() || rules.cargo.empty() ||
         rules.units.empty() || rules.classes.empty() || rules.fathers.empty() || rules.tribes.empty()) {
         throw FormatError("NAMES.TXT has an empty rule table");

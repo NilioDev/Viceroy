@@ -112,6 +112,9 @@ struct Ruleset {
     std::vector<EuropeanClass> classes;
     std::vector<FoundingFather> fathers;
     std::vector<Tribe> tribes;
+    // The names of the republics a nation becomes when its King lets its
+    // colonies go (@INDEPENDENT, by nation); empty if the section is missing.
+    std::vector<std::string> independent;
 };
 
 // Reads the rule tables. Missing sections, rows with the wrong number of

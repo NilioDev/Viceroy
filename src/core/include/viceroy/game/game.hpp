@@ -647,6 +647,17 @@ public:
     void playAlone();
     // "Yes! Give me liberty or give me death!": the war begins.
     void declareIndependence();
+
+    // --- The end of the game (game_end.cpp) --------------------------------
+    // Looked at when the year turns: the war won or lost, the colonies all
+    // lost, the other nations' kings letting their colonies go, and the
+    // Viceroy's retirement in 1800 (1850 during the war).
+    void checkTheEnd();
+    // The game is over: nothing more is played (header byte 18 bit 10h
+    // with header word 82 still 0).
+    bool gameOver() const;
+    // "Keep playing anyway." to SCORED.
+    void keepPlaying();
     // The chance in 36 that a scout infiltrating the colony is caught.
     int infiltrationRisk(int unit, int colony) const;
 
@@ -958,6 +969,14 @@ private:
     void forceArrives(bool mercenaries);
     void interventionDeclared();
     void independenceBells(int nation, int bells);
+    int colonyStrength(int colony) const;
+    void seizeAt(int x, int y);
+    void placeCrownUnit(int x, int y, int type);
+    void crownLands();
+    void toryUprising();
+    void othersGranted();
+    void coloniesChangeHands(int colony);
+    static void sortLikeTheOriginal(std::vector<int>& keys, std::vector<int>& values);
     void kingArmyGrowth(int nation);
     int royalUnitType(int kind, int nation) const;
     // The Continental Congress.
