@@ -17,7 +17,8 @@ touch controls.
 > the original's routes), board ships and make landfall, plow fields,
 > clear forests (lumber for a colony nearby) and build roads with your pioneers, found colonies (your
 > advisors warn of a poor site and you type the name), look inside your colonies, end turns and save. The colony screen
-> shows its buildings, people, what they produce and the warehouse; give
+> shows its buildings (laid out differently in every colony, as in the
+> original), people, what they produce and the warehouse; give
 > colonists other jobs with the jobs menu (where an expert can also be made
 > an ordinary free colonist) or by clicking a colonist and then
 > a building or field, send them out of the colony as colonists, pioneers,

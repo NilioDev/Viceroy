@@ -83,7 +83,7 @@ VCR_TEST("original files: a colony's production and screen") {
     // VICEROY_JOBS=line opens the jobs menu on that line, for comparing.
     const int jobsLine = std::getenv("VICEROY_JOBS") ? std::atoi(std::getenv("VICEROY_JOBS")) : -1;
     drawColonyScreen(screen, art, colonyArt, game, {which, 0, jobsLine});
-    VCR_CHECK(jobsLine >= 0 || screen.at(200, 50) == 0);
+    VCR_CHECK(jobsLine >= 0 || screen.at(199, 50) == 0);
     if (const char* dump = std::getenv("VICEROY_DUMP_COLONY")) {
         dumpScreen(screen, art, dump);
     }
@@ -112,7 +112,7 @@ VCR_TEST("original files: the colony screen opens from the map and closes") {
     VCR_CHECK(play.colonyScreen()->colony == 1);
     Screen screen;
     play.draw(screen, art);
-    VCR_CHECK(screen.at(200, 50) == 0); // the colony screen, not the map
+    VCR_CHECK(screen.at(199, 50) == 0); // the colony screen, not the map
 
     VCR_CHECK(play.handle(Command::Cancel)); // closes the colony
     VCR_CHECK(!play.colonyScreen().has_value());
@@ -765,6 +765,32 @@ VCR_TEST("original files: (CLEAR SPECIALTY) makes an expert a free colonist") {
     VCR_CHECK(named);
     play.handle(Command::Confirm); // "Yes"
     VCR_CHECK(play.game().state().colonies[1].skills[0] == skill::kFreeColonist);
+}
+
+VCR_TEST("original files: every colony shuffles its town (measured)") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
+    const auto save = readSaveGame(Bytes(std::istreambuf_iterator<char>(in), {}));
+    auto spot = [&](const std::string& name, BuildingKind kind) {
+        for (const auto& c : save.colonies) {
+            if (c.name == name) {
+                return townSpot(save, c, kind);
+            }
+        }
+        return std::array<int, 2>{-1, -1};
+    };
+    // Isabella and Jamestown as measured before; Curacao from the original.
+    VCR_CHECK((spot("Isabella", BuildingKind::TownHall) == std::array<int, 2>{87, 11}));
+    VCR_CHECK((spot("Isabella", BuildingKind::Blacksmith) == std::array<int, 2>{56, 13}));
+    VCR_CHECK((spot("Isabella", BuildingKind::Warehouse) == std::array<int, 2>{6, 14}));
+    VCR_CHECK((spot("Jamestown", BuildingKind::TownHall) == std::array<int, 2>{66, 87}));
+    VCR_CHECK((spot("Curacao", BuildingKind::TownHall) == std::array<int, 2>{66, 87}));
+    VCR_CHECK((spot("Curacao", BuildingKind::Carpenter) == std::array<int, 2>{128, 53}));
+    VCR_CHECK((spot("Curacao", BuildingKind::Blacksmith) == std::array<int, 2>{56, 13}));
+    VCR_CHECK((spot("Curacao", BuildingKind::Docks) == std::array<int, 2>{123, 55}));
 }
 
 VCR_TEST("original files: dialogs measure the text file's spaces when wrapping") {
