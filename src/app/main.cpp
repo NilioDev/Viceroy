@@ -837,6 +837,9 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
         app->pointerShown = true;
         SDL_RenderCoordinatesFromWindow(app->renderer, event->motion.x, event->motion.y, &app->pointerX,
                                         &app->pointerY);
+        if (app->mode == Mode::Play && app->play) {
+            app->play->pointAt(static_cast<int>(app->pointerX), static_cast<int>(app->pointerY));
+        }
         break;
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
         app->pointerShown = true;

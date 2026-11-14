@@ -793,6 +793,25 @@ VCR_TEST("original files: every colony shuffles its town (measured)") {
     VCR_CHECK((spot("Curacao", BuildingKind::Docks) == std::array<int, 2>{123, 55}));
 }
 
+VCR_TEST("original files: pointing at the town names the place (measured)") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
+    const auto save = readSaveGame(Bytes(std::istreambuf_iterator<char>(in), {}));
+    for (const auto& c : save.colonies) {
+        if (c.name != "Curacao") {
+            continue;
+        }
+        // The carpenter's shop's spot lies inside the docks' spot; the
+        // original tries the spots in their order, so the shop wins.
+        VCR_CHECK(townPlaceAt(save, c, 150, 64) == 10);
+        VCR_CHECK(townPlaceAt(save, c, 161, 80) == 14);
+        VCR_CHECK(townPlaceAt(save, c, 199, 125) == -1);
+    }
+}
+
 VCR_TEST("original files: dialogs measure the text file's spaces when wrapping") {
     const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
     if (!isGameFolder(dir)) {

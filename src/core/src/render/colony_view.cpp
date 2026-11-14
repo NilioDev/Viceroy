@@ -35,6 +35,8 @@ constexpr std::uint8_t kBrightGreen = 0x0A;
 constexpr int kExpertIcons = 81;
 constexpr std::uint8_t kHarbourText = 0x39;
 constexpr std::uint8_t kStockText = 0x3D;
+constexpr std::uint8_t kStockHundreds = 0x94;
+constexpr std::uint8_t kStockOver = 0x04;
 constexpr std::uint8_t kRed = 0x0C;
 constexpr std::uint8_t kGold = 0x95;
 constexpr std::uint8_t kMenuBar = 0x8A;
@@ -308,9 +310,52 @@ void drawTopLine(Screen& screen, const Art& art, const Game& game, const SaveCol
     screen.fill({0, 7, Screen::kWidth, 1}, kBlack);
     const auto& save = game.state();
     const auto& nation = save.nations[static_cast<std::size_t>(game.human())];
-    const std::string text = colony.name + ".  " + seasonName(art, save.season) + ", " + std::to_string(save.year) +
+    // Measured on the original: one space more after the name.
+    const std::string text = colony.name + ".   " + seasonName(art, save.season) + ", " + std::to_string(save.year) +
                              ".  Gold: " + std::to_string(nation.gold) + "$";
     screen.text(art.tiny, 160 - Screen::textWidth(art.tiny, text) / 2, 1, text, {kGreen, kNoColour, kNoColour});
+}
+
+constexpr int kLabelTrees = 122;         // @MISC
+constexpr int kLabelOutsideColony = 123; // @MISC
+
+// Read from the original: the name of the building at a place of the town in
+// white on black, centred on the place and at its top (for the large
+// buildings, the docks and empty places halfway down); the stockade's adds
+// "(Outside Colony)" and an empty place says "Trees". It stays in the town.
+void drawTownLabel(Screen& screen, const Art& art, const Game& game, const SaveColony& colony, int place) {
+    for (const auto& slot : townSlots(game.state(), colony)) {
+        if (slot.place != place) {
+            continue;
+        }
+        const Rect r = slotRect(slot);
+        const int level = buildingLevel(colony, slot.kind);
+        const auto& rows = game.rules().buildings;
+        std::string text;
+        bool middle = slot.size == 2 || slot.size == 4;
+        if (level <= 0) {
+            text = textLine(art.labelText, "MISC", kLabelTrees, "Trees");
+            middle = true;
+        } else {
+            int row = kBuildingFields[static_cast<std::size_t>(slot.kind)].firstRow + level - 1;
+            if (slot.kind == BuildingKind::Warehouse && storageLimit(colony) >= 300) {
+                ++row; // the warehouse expansion
+            }
+            if (row >= 0 && static_cast<std::size_t>(row) < rows.size()) {
+                text = rows[static_cast<std::size_t>(row)].name;
+            }
+            if (slot.kind == BuildingKind::Fortification) {
+                text += " " + textLine(art.labelText, "MISC", kLabelOutsideColony, "(Outside Colony)");
+            }
+        }
+        const int w = Screen::textWidth(art.tiny, text) + 1;
+        int x = r.x + r.w / 2 - w / 2;
+        const int y = middle ? r.y + r.h / 2 - 3 : r.y;
+        x = std::clamp(x, 0, kTown.x + kTown.w - w);
+        screen.fill({x, y, w, 7}, kBlack);
+        screen.text(art.tiny, x + 1, y + 1, text, {kWhite, kNoColour, kNoColour});
+        return;
+    }
 }
 
 void drawTown(Screen& screen, const Art& art, const ColonyArt& colonyArt, const Game& game, const SaveColony& colony,
@@ -926,6 +971,23 @@ std::array<int, 2> townSpot(const SaveGame& save, const SaveColony& colony, Buil
     return {-1, -1};
 }
 
+int townPlaceAt(const SaveGame& save, const SaveColony& colony, int x, int y) {
+    // Read from the original: the spots are tried in their order.
+    const auto slots = townSlots(save, colony);
+    for (const auto& spot : kSpots) {
+        for (const auto& slot : slots) {
+            if (slot.x != spot[0] || slot.y != spot[1]) {
+                continue;
+            }
+            const Rect r = slotRect(slot);
+            if (x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) {
+                return slot.place;
+            }
+        }
+    }
+    return -1;
+}
+
 // 1 when the jobs menu starts with "(CLEAR SPECIALTY)": the colonist is an expert.
 int jobsMenuClearLine(const SaveColony& colony, int colonist) {
     if (colonist < 0 || colonist >= colony.population) {
@@ -1008,14 +1070,37 @@ void drawMakePanel(Screen& screen, const Art& art, const Game& game, const SaveC
     }
 }
 
-void drawWarehouse(Screen& screen, const Art& art, const SaveColony& colony) {
+void drawWarehouse(Screen& screen, const Art& art, const SaveColony& colony, int selectedGood) {
     for (int good = 0; good < kGoodsKinds; ++good) {
         const int centre = 10 + 19 * good;
         const int icon = kGoodsIcon + good;
         blitSprite(screen, art.icons, icon, centre - spriteWidth(art.icons, icon) / 2, 181);
-        const std::string amount = std::to_string(colony.stock[static_cast<std::size_t>(good)]);
-        screen.text(art.tiny, centre - Screen::textWidth(art.tiny, amount) / 2, 194, amount,
-                    {kStockText, kNoColour, kNoColour});
+        // Read from the original: the hundreds in another colour; goods the
+        // custom house sells in green; goods beyond what the warehouse
+        // keeps (not food) in red.
+        const int stock = colony.stock[static_cast<std::size_t>(good)];
+        std::uint8_t hundredsColour = kStockHundreds;
+        std::uint8_t restColour = kStockText;
+        if (buildingLevel(colony, BuildingKind::CustomHouse) > 0 && exportTicked(colony, good)) {
+            restColour = kBrightGreen;
+        }
+        if (good != cargo::kFood && stock > storageLimit(colony)) {
+            hundredsColour = kRed;
+            restColour = kStockOver;
+        }
+        const std::string amount = std::to_string(stock);
+        int x = centre + 1 - (Screen::textWidth(art.tiny, amount) + 1) / 2;
+        if (stock >= 100) {
+            x = screen.text(art.tiny, x, 194, std::to_string(stock / 100), {hundredsColour, kNoColour, kNoColour});
+            const int rest = stock % 100;
+            const std::string tens = (rest < 10 ? "0" : "") + std::to_string(rest);
+            screen.text(art.tiny, x, 194, tens, {restColour, kNoColour, kNoColour});
+        } else {
+            screen.text(art.tiny, x, 194, amount, {restColour, kNoColour, kNoColour});
+        }
+    }
+    if (selectedGood >= 0 && selectedGood < kGoodsKinds) {
+        screen.frame({19 * selectedGood, 179, 20, 21}, kBrightGreen);
     }
     screen.text(art.tiny, 306, 179, "Exit", {kWhite, kNoColour, kNoColour});
 }
@@ -1267,6 +1352,9 @@ void drawColonyScreen(Screen& screen, const Art& art, const ColonyArt& colonyArt
     screen.clear(kBlack);
     drawTopLine(screen, art, game, colony);
     drawTown(screen, art, colonyArt, game, colony, production, view.selectedColonist, view.selectedOutside);
+    if (view.townLabel >= 0) {
+        drawTownLabel(screen, art, game, colony, view.townLabel);
+    }
     drawArea(screen, art, game, colony, production, view.selectedColonist);
     screen.blit(colonyArt.background, 0, kLowerTop);
     screen.fill({0, kLowerTop, Screen::kWidth, 1}, kBlack);
@@ -1281,7 +1369,7 @@ void drawColonyScreen(Screen& screen, const Art& art, const ColonyArt& colonyArt
         drawProductionView(screen, art, colony, production);
     }
     drawPanelButtons(screen, art, view.panel);
-    drawWarehouse(screen, art, colony);
+    drawWarehouse(screen, art, colony, view.selectedGood);
     if (view.jobsMenu >= 0 && view.selectedColonist >= 0) {
         drawJobsMenu(screen, art, game, colony, view.selectedColonist, view.jobsMenu);
     }
