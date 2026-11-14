@@ -67,10 +67,17 @@ crosses, its own included.
 
 ## Rows of goods
 
-A row shows one icon per unit, `width + 1` apart, squeezed when the row would
-not fit. The number is written in white on a black box over the first icon
-(text at icon x + (width − text + 1) / 2 + 1, y + 2). A shortage is drawn as
-the good with a red cross (`ICONS.SS` 55) and a red number.
+A row of goods (production view and food row) is laid out like this, read
+from the original. Each item is a good with a count, and some of its icons
+may be crossed out (`ICONS.SS` 55) to show what is missing; the number is
+white on a black box at the item's x + 2 (text at y + 3), and the crossed-out
+part has its own red number over its first crossed icon. An item with every
+icon crossed shows one red number.
+
+Items start at the row's x with a gap between them. When the icons do not fit
+the row's width, first the gap shrinks, then the icons overlap more and more,
+until the row fits; very long items then show only every second (fourth, ...)
+icon.
 
 ## Area view
 
@@ -84,18 +91,33 @@ than a plain enlargement of the 16-pixel map squares; we enlarge them for now.
 ## People view
 
 The rebel flag (`ICONS.SS` 123) at (2, 132) with "N% (rebels)" in white at
-(15, 133); the crown (124) at (104, 132) with the Tories' share right-aligned
-before it. Colonists stand from (2, 142), 10 pixels apart. Below, at y 163:
-the food eaten, the food left over, the crosses and the bells, each a row of
-icons with 4 pixels between rows.
+(15, 133); the crown (124) at (104, 132) with the Tories' share ending at
+x 104.
+
+From (2, 142) stand the colonists and then, 4 pixels further, the units on
+the colony's square. They are 2 pixels apart, or less (overlapping if need
+be) until they fit in 96 pixels. The selected one gets a bright green frame.
+
+The food row (x 2, y 163, width 118, gap 4): the food eaten, then the food
+left over, or, when the colony makes too little, the food made and the food
+missing crossed out in red. The fishermen's catch is shown first, as fish
+(`ICONS.SS` 57), in the food eaten and then in what is left over; these
+numbers count fish and corn together. Then the crosses and the bells.
 
 ## Harbour, production, warehouse
 
 "No Ships In Port" in colour 0x39 centred on x 163 at y 132, above six empty
 holds (122) at (127 + 12k, 165).
 
-The production view (x 213) has three rows: sugar, tobacco, cotton, furs;
-rum, cigars, cloth, coats; lumber, hammers, ore, tools, muskets, silver. The
+The production view (x 213, width 89) has three rows, read from the
+original:
+
+- y 134: sugar, tobacco, cotton, furs, ore and silver that the colony makes,
+  each with what its workshops want beyond that crossed out.
+- y 148: horses, then rum, cigars, cloth, coats, trade goods, tools and
+  muskets, each with what cannot be made for want of the raw good crossed out.
+- y 162 (gap 4): lumber (used and surplus, or the lumber missing crossed out)
+  and hammers, with the hammers lost for want of lumber crossed out. The
 buttons are `ICONS.SS` 67-69.
 
 The warehouse shows the 16 goods (`ICONS.SS` 22-37) centred on

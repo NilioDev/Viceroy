@@ -58,6 +58,7 @@ constexpr int kHammerIcon = 54;
 constexpr int kCrossIcon = 56;
 constexpr int kBellIcon = 62;
 constexpr int kCrossedOut = 55;
+constexpr int kFish = 57;
 constexpr int kButtonProduction = 67;
 constexpr int kButtonUnits = 68;
 constexpr int kButtonBuild = 69;
@@ -459,8 +460,194 @@ void drawArea(Screen& screen, const Art& art, const Game& game, const SaveColony
     }
 }
 
-void drawPeople(Screen& screen, const Art& art, const SaveColony& colony, const ColonyProduction& production,
-                int selected, int libertyExtra) {
+void drawHarbour(Screen& screen, const Art& art) {
+    const std::string text = "No Ships In Port";
+    screen.text(art.tiny, 163 - Screen::textWidth(art.tiny, text) / 2, 132, text, {kHarbourText, kNoColour, kNoColour});
+    for (int i = 0; i < 6; ++i) {
+        blitSprite(screen, art.icons, kEmptyHold, 127 + 12 * i, 165);
+    }
+}
+
+// One good in the production view: `count` icons, the last `red` of them
+// crossed out; `allCrossed` crosses every one and writes the number in red.
+struct ProductionItem {
+    int good;
+    int count;
+    int red;
+    bool allCrossed = false;
+    // Read from the original, for food: the first `count - red` icons are
+    // fish (ICONS.SS 57) instead of the good, none are crossed out, and the
+    // number counts them all.
+    bool fish = false;
+};
+
+// Read from the original: the rows of the production view. Raw goods with
+// what the workshops want beyond them; then horses and what the workshops
+// make, with what they cannot make for want of the raw good; then lumber
+// and hammers.
+std::array<std::vector<ProductionItem>, 3> productionRows(const SaveColony& colony,
+                                                          const ColonyProduction& production) {
+    const auto made = [&](int good) { return production.produced[static_cast<std::size_t>(good)]; };
+    const auto wanted = [&](int good) { return production.needed[static_cast<std::size_t>(good)]; };
+    // What a workshop cannot make: what it wants beyond the stock and the
+    // raw good made this turn.
+    const auto lost = [&](int input) {
+        return std::max(0, wanted(input) - made(input) - colony.stock[static_cast<std::size_t>(input)]);
+    };
+    std::array<std::vector<ProductionItem>, 3> rows;
+    for (const int good : {cargo::kSugar, cargo::kTobacco, cargo::kCotton, cargo::kFurs, cargo::kOre, cargo::kSilver}) {
+        if (made(good) != 0) {
+            const int beyond = std::max(0, wanted(good) - made(good));
+            rows[0].push_back({good, made(good) + beyond, beyond});
+        }
+    }
+    // Horses: what the herd could breed, and what it does not for want of
+    // food.
+    const int surplus = made(cargo::kFood) - production.foodEaten;
+    const int herd = horsesBred(colony, 1 << 14);
+    const int horsesLost = herd - horsesBred(colony, surplus);
+    if (herd != 0 || horsesLost != 0) {
+        rows[1].push_back({cargo::kHorses, std::max(herd, horsesLost), horsesLost});
+    }
+    static constexpr std::array<std::array<int, 2>, 7> kMadeFrom{{{cargo::kRum, cargo::kSugar},
+                                                                  {cargo::kCigars, cargo::kTobacco},
+                                                                  {cargo::kCloth, cargo::kCotton},
+                                                                  {cargo::kCoats, cargo::kFurs},
+                                                                  {cargo::kTradeGoods, -1},
+                                                                  {cargo::kTools, cargo::kOre},
+                                                                  {cargo::kMuskets, cargo::kTools}}};
+    for (const auto& [good, input] : kMadeFrom) {
+        const int missing = input >= 0 ? std::min(made(good), lost(input)) : 0;
+        if (made(good) != 0 || missing != 0) {
+            rows[1].push_back({good, std::max(made(good), missing), missing});
+        }
+    }
+    const int lumber = made(cargo::kLumber);
+    const int used = wanted(cargo::kLumber);
+    if (lumber > used) {
+        if (used != 0) {
+            rows[2].push_back({cargo::kLumber, used, 0});
+        }
+        rows[2].push_back({cargo::kLumber, lumber - used, 0});
+    } else {
+        if (lumber != 0) {
+            rows[2].push_back({cargo::kLumber, lumber, 0});
+        }
+        if (used - lumber != 0) {
+            rows[2].push_back({cargo::kLumber, used - lumber, 0, true});
+        }
+    }
+    const int noHammers = std::min(made(cargo::kHammers), lost(cargo::kLumber));
+    if (made(cargo::kHammers) != noHammers) {
+        rows[2].push_back({cargo::kHammers, made(cargo::kHammers) - noHammers, 0});
+    }
+    if (noHammers != 0) {
+        rows[2].push_back({cargo::kHammers, noHammers, 0, true});
+    }
+    return rows;
+}
+
+// Read from the original: a row of groups of icons laid out in `width`.
+// The groups stand `gap` apart; when they do not fit the gap shrinks, then
+// the icons overlap, and the extra icons of each group share what room is
+// left, at most one pixel more apart than the icon is wide (or, with no
+// room at all, only every second, fourth... icon is drawn).
+void drawProductionRow(Screen& screen, const Art& art, const std::vector<ProductionItem>& items, int x, int y,
+                       int width, int gap) {
+    const int n = static_cast<int>(items.size());
+    if (n == 0) {
+        return;
+    }
+    int multi = 0;
+    int extra = 0;
+    int iconsWidth = 0;
+    for (const auto& item : items) {
+        if (item.count > 1) {
+            ++multi;
+            extra += item.count - 1;
+        }
+        iconsWidth += spriteWidth(art.icons, goodIcon(item.good));
+    }
+    int overlap = 0;
+    int space = 0;
+    for (;;) {
+        const int icons = std::max(0, iconsWidth - n * overlap);
+        space = width - (n - 1) * gap - icons;
+        if (space >= multi) {
+            break;
+        }
+        if (gap > 0) {
+            --gap;
+        } else if (icons > 0) {
+            ++overlap;
+        } else {
+            space = multi;
+            break;
+        }
+    }
+    int step = 0;
+    int shift = 0;
+    if (extra != 0) {
+        step = space / extra;
+        if (step == 0) {
+            do {
+                ++shift;
+            } while ((extra >> shift) > space);
+        }
+    }
+    const TextColours white{kWhite, kWhite, kWhite};
+    const TextColours red{kRed, kRed, kRed};
+    const auto number = [&](int count, int at, const TextColours& colours) {
+        if (count <= 0) {
+            return;
+        }
+        const std::string text = std::to_string(count);
+        const int w = Screen::textWidth(art.tiny, text);
+        screen.fill({at, y + 2, w + 1, 7}, kBlack);
+        screen.text(art.tiny, at + 1, y + 3, text, colours);
+    };
+    for (const auto& item : items) {
+        const int icon = goodIcon(item.good);
+        const int w = spriteWidth(art.icons, icon);
+        const int e = step != 0 ? std::min(w + 1, step) : 1;
+        const int start = x;
+        const int redFrom = (item.count - item.red) >> shift;
+        int redX = -1;
+        const int units = item.count >> shift;
+        for (int k = 0; k < units; ++k) {
+            if (k == redFrom) {
+                redX = x;
+            }
+            if (item.fish && k < redFrom) {
+                blitSprite(screen, art.icons, kFish, x, y);
+            } else {
+                blitSprite(screen, art.icons, icon, x, y);
+                if (item.allCrossed || (k >= redFrom && !item.fish)) {
+                    blitSprite(screen, art.icons, kCrossedOut, x, y);
+                }
+            }
+            if (k < units - 1) {
+                x += e;
+            }
+        }
+        number(item.fish ? item.count : item.count - item.red, start + 2, item.allCrossed ? red : white);
+        if (!item.fish) {
+            number(item.red, redX + 2, red);
+        }
+        x += w - overlap + gap;
+    }
+}
+
+void drawProductionView(Screen& screen, const Art& art, const SaveColony& colony, const ColonyProduction& production) {
+    const auto rows = productionRows(colony, production);
+    for (std::size_t row = 0; row < rows.size(); ++row) {
+        drawProductionRow(screen, art, rows[row], 213, 134 + 14 * static_cast<int>(row), 89, row == 2 ? 4 : 2);
+    }
+}
+
+void drawPeople(Screen& screen, const Art& art, const Game& game, const SaveColony& colony,
+                const ColonyProduction& production, int selected, int libertyExtra) {
+    const auto outside = unitsOutside(game, colony);
     const TextColours white{kWhite, kWhite, kWhite};
     const int sol = sonsOfLibertyPercent(colony, libertyExtra);
     const int rebels = rebelCount(colony, libertyExtra);
@@ -468,104 +655,80 @@ void drawPeople(Screen& screen, const Art& art, const SaveColony& colony, const 
     screen.text(art.tiny, 15, 133, std::to_string(sol) + "% (" + std::to_string(rebels) + ")", white);
     const std::string tory =
         std::to_string(100 - sol) + "% (" + std::to_string(colony.population - rebels) + ")";
-    screen.text(art.tiny, 102 - Screen::textWidth(art.tiny, tory), 133, tory, white);
+    screen.text(art.tiny, 104 - Screen::textWidth(art.tiny, tory), 133, tory, white);
     blitSprite(screen, art.icons, kCrown, 104, 132);
 
+    // Read from the original: the colonists, then after 4 more pixels the
+    // units outside, 2 pixels apart, or less (even overlapping) until the
+    // row fits in 96 pixels.
+    std::vector<int> icons;
     for (int i = 0; i < colony.population; ++i) {
-        const int icon = colonistIcon(colony.skills[static_cast<std::size_t>(i)]);
-        const int x = 2 + 10 * i;
+        icons.push_back(colonistIcon(colony.skills[static_cast<std::size_t>(i)]));
+    }
+    for (const int u : outside) {
+        icons.push_back(unitIcon(game, u));
+    }
+    const int n = static_cast<int>(icons.size());
+    int widths = 0;
+    for (const int icon : icons) {
+        widths += spriteWidth(art.icons, icon);
+    }
+    const int apart = outside.empty() ? 0 : 4;
+    int gap = 2;
+    while (gap * (n - 1) + apart + widths >= 96) {
+        --gap;
+    }
+    int x = 2;
+    int owed = 0; // pixels still to take back from figures at least 1 apart
+    for (int i = 0; i < n; ++i) {
+        const int icon = icons[static_cast<std::size_t>(i)];
+        const int w = spriteWidth(art.icons, icon);
         blitSprite(screen, art.icons, icon, x, 142);
         if (i == selected) {
-            screen.frame({x - 1, 141, spriteWidth(art.icons, icon) + 2, 18}, kSelectGreen);
+            screen.frame({x - 1, 143, w + 2, 16}, kBrightGreen);
+        }
+        int step = gap + w;
+        if (step < 1) {
+            owed += 1 - step;
+            step = 1;
+        }
+        while (step > 1 && owed > 0) {
+            --step;
+            --owed;
+        }
+        x += step;
+        if (i == colony.population - 1) {
+            x += 4;
         }
     }
 
-    // Food eaten, food left over, crosses and bells.
+    // Read from the original: the food eaten, then what is left over or
+    // (crossed out) what is missing, the fishermen's catch shown first as
+    // fish; then the crosses and the bells.
     const int food = production.produced[cargo::kFood];
-    int x = 2;
-    const int eaten = std::min(food, production.foodEaten);
-    if (eaten > 0) {
-        x = drawGoodsRow(screen, art, cargo::kFood, eaten, x, 163, 70, 3) + 4;
-    }
-    if (food > production.foodEaten) {
-        x = drawGoodsRow(screen, art, cargo::kFood, food - production.foodEaten, x, 163, 30, 3) + 4;
-    }
-    x = drawGoodsRow(screen, art, cargo::kCrosses, production.produced[cargo::kCrosses], x, 163, 30, 3) + 4;
-    drawGoodsRow(screen, art, cargo::kBells, production.produced[cargo::kBells], x, 163, 40, 3);
-}
-
-void drawHarbour(Screen& screen, const Art& art) {
-    const std::string text = "No Ships In Port";
-    screen.text(art.tiny, 163 - Screen::textWidth(art.tiny, text) / 2, 132, text,
-                {kHarbourText, kNoColour, kNoColour});
-    for (int i = 0; i < 6; ++i) {
-        blitSprite(screen, art.icons, kEmptyHold, 127 + 12 * i, 165);
-    }
-}
-
-void drawProductionView(Screen& screen, const Art& art, const ColonyProduction& production) {
-    // Three rows: raw crops, what is made of them, then lumber, ore and
-    // what is made of those. Each good is followed by the shortage of what
-    // its workshop wants, crossed out.
-    struct Group {
-        int good;
-        int count;
-        bool shortage;
-    };
-    static constexpr int kRows[3][7] = {
-        {cargo::kSugar, cargo::kTobacco, cargo::kCotton, cargo::kFurs, -1, -1, -1},
-        {cargo::kRum, cargo::kCigars, cargo::kCloth, cargo::kCoats, -1, -1, -1},
-        {cargo::kLumber, cargo::kHammers, cargo::kOre, cargo::kTools, cargo::kMuskets, cargo::kSilver, -1},
-    };
-    constexpr int kLeft = 213;
-    constexpr int kRoom = 87;
-    for (int row = 0; row < 3; ++row) {
-        std::vector<Group> groups;
-        for (const int good : kRows[row]) {
-            if (good < 0) {
-                break;
-            }
-            const int made = production.produced[static_cast<std::size_t>(good)];
-            const int short_ = production.needed[static_cast<std::size_t>(good)] - made;
-            if (made > 0) {
-                groups.push_back({good, made, false});
-            }
-            if (short_ > 0 && production.needed[static_cast<std::size_t>(good)] > 0) {
-                groups.push_back({good, short_, true});
-            }
-        }
-        int icons = 0;
-        for (const auto& g : groups) {
-            icons += g.count;
-        }
-        if (icons == 0) {
-            continue;
-        }
-        const int y = 134 + 14 * row;
-        int x = kLeft;
-        for (std::size_t k = 0; k < groups.size(); ++k) {
-            const auto& g = groups[k];
-            const int icon = goodIcon(g.good);
-            const int w = spriteWidth(art.icons, icon);
-            const int step = std::max(1, std::min(w + 1, kRoom / icons));
-            for (int i = 0; i < g.count; ++i) {
-                blitSprite(screen, art.icons, icon, x + i * step, y);
-                if (g.shortage) {
-                    blitSprite(screen, art.icons, kCrossedOut, x + i * step, y);
-                }
-            }
-            const std::string text = std::to_string(g.count);
-            const int tw = Screen::textWidth(art.tiny, text);
-            const int tx = x + (w - tw + 1) / 2 + 1;
-            screen.fill({tx - 1, y + 1, tw + 1, 7}, kBlack);
-            screen.text(art.tiny, tx, y + 2, text, g.shortage ? TextColours{kRed, kRed, kRed} : TextColours{kWhite, kWhite, kWhite});
-            x += g.count * step;
-            const bool sameGood = k + 1 < groups.size() && groups[k + 1].good == g.good;
-            if (!sameGood) {
-                x += 2;
-            }
+    const int eaten = production.foodEaten;
+    int fish = 0;
+    for (std::size_t i = 0; i < production.colonists.size(); ++i) {
+        if (colony.jobs[i] == job::kFisherman && production.colonists[i].good == cargo::kFood) {
+            fish += production.colonists[i].amount;
         }
     }
+    std::vector<ProductionItem> items;
+    if (food >= eaten) {
+        const int fishEaten = std::min(fish, eaten);
+        items.push_back({cargo::kFood, eaten, eaten - fishEaten, false, true});
+        items.push_back({cargo::kFood, food - eaten, food - eaten - (fish - fishEaten), false, true});
+    } else {
+        items.push_back({cargo::kFood, food, food - fish, false, true});
+        items.push_back({cargo::kFood, eaten - food, 0, true});
+    }
+    if (production.produced[cargo::kCrosses] != 0) {
+        items.push_back({cargo::kCrosses, production.produced[cargo::kCrosses], 0});
+    }
+    if (production.produced[cargo::kBells] != 0) {
+        items.push_back({cargo::kBells, production.produced[cargo::kBells], 0});
+    }
+    drawProductionRow(screen, art, items, 2, 163, 118, 4);
 }
 
 std::string goodName(const Game& game, int good) {
@@ -1107,7 +1270,7 @@ void drawColonyScreen(Screen& screen, const Art& art, const ColonyArt& colonyArt
     drawArea(screen, art, game, colony, production, view.selectedColonist);
     screen.blit(colonyArt.background, 0, kLowerTop);
     screen.fill({0, kLowerTop, Screen::kWidth, 1}, kBlack);
-    drawPeople(screen, art, colony, production, view.selectedColonist,
+    drawPeople(screen, art, game, colony, production, view.selectedColonist,
                nationEffects(save, colony.nation).libertyExtra(colony.nation == save.humanNation));
     drawHarbour(screen, art);
     if (view.panel == ColonyPanel::Make) {
@@ -1115,7 +1278,7 @@ void drawColonyScreen(Screen& screen, const Art& art, const ColonyArt& colonyArt
     } else if (view.panel == ColonyPanel::Units) {
         drawUnitsPanel(screen, art, game, colony, view.selectedUnit);
     } else {
-        drawProductionView(screen, art, production);
+        drawProductionView(screen, art, colony, production);
     }
     drawPanelButtons(screen, art, view.panel);
     drawWarehouse(screen, art, colony);
