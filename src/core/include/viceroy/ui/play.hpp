@@ -234,10 +234,12 @@ private:
     std::vector<int> villageOptions_;
     int village_ = -1;
     int welcomeTribe_ = -1; // the tribe whose welcome is up
+    int scoutColony_ = -1;  // the colony a scout has reached (SCOUTCOLONY)
     int congressHall_ = -1; // the father just come into the hall, shown until a key
     bool congressReport_ = false; // F3, shown until a key or a click
     int inciteTarget_ = -1; // the nation a missionary would have the tribe attack
     void startIncite(int unit);
+    void scoutColony(int unit, int colony, int choice);
     void endIncite(int unit);
     void enterVillage(int unit, int settlement);
     void showLesson(int unit, const std::string& section, const std::vector<std::string>& strings);

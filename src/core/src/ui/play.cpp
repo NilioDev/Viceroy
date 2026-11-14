@@ -231,6 +231,14 @@ void PlayScreen::moveActive(Step step) {
         const auto settlement = game_.settlementAt(tx, ty);
         if (settlement) {
             enterVillage(index, *settlement);
+        } else if (colony && game_.unit(index).type == unit_type::kScout &&
+                   game_.state().colonies[static_cast<std::size_t>(*colony)].nation < kEuropeanNations) {
+            // Read from the original: a scout asks what to do there.
+            scoutColony_ = *colony;
+            ask("SCOUTCOLONY", index, {game_.state().colonies[static_cast<std::size_t>(*colony)].name});
+            if (dialog_) {
+                placeFrontiersmanDialog(*dialog_);
+            }
         } else if (defender >= 0 && !settlement) {
             startAttack(index, defender);
         } else if (colony && !game_.isShip(index) && game_.canAttack(index) && game_.colonyUndefended(*colony)) {
@@ -504,6 +512,41 @@ void PlayScreen::startIncite(int unit) {
         choices_.push_back(nation);
     }
     placeNative(tribe);
+}
+
+void PlayScreen::scoutColony(int unit, int colony, int choice) {
+    // Meet With Mayor, Infiltrate Colony, Attack Colony, Nothing.
+    if (colony < 0) {
+        return;
+    }
+    if (choice == 2) {
+        const auto& c = game_.state().colonies[static_cast<std::size_t>(colony)];
+        const int defender = game_.canAttack(unit) ? game_.defenderAt(c.x, c.y, unit) : -1;
+        if (defender >= 0) {
+            startAttack(unit, defender);
+        } else if (game_.canAttack(unit) && game_.colonyUndefended(colony)) {
+            startAttack(unit, -1, colony);
+        }
+        return;
+    }
+    if (choice == 0) {
+        game_.scoutMeetMayor(unit, colony);
+    } else if (choice == 1) {
+        if (!game_.infiltrateColony(unit, colony)) {
+            // A look round the colony, without a say in it.
+            ColonyViewState state;
+            state.colony = colony;
+            state.selectedColonist = -1;
+            state.foreign = true;
+            colonyScreen_ = state;
+        }
+    } else {
+        game_.skipUnit(unit);
+    }
+    for (auto& notice : game_.takeNotices()) {
+        notices_.push_back(std::move(notice));
+    }
+    advanceAfterNotices_ = true;
 }
 
 void PlayScreen::endIncite(int unit) {
@@ -1162,7 +1205,7 @@ void PlayScreen::showNotices() {
                                                  "VALOR",       "CAPTURED",       "LOOT",             "LOOT2",
                                                  "INDIANSLAVES", "INDIANWARFARE", "INDIANBURN", "TEAPARTY",
                                                  "KINGBUY",     "REBELUP",        "REBELUP50",        "REBELDOWN",
-                                                 "MERCENARIES", "MERCS"};
+                                                 "MERCENARIES", "MERCS", "NOMAYORSDURINGREV"};
         if (std::find(std::begin(kBattles), std::end(kBattles), notice.section) != std::end(kBattles)) {
             placeMapDialog(*dialog_);
         } else if (notice.section == "LOOTCASH" || notice.section == "CASHTREASURE") {
@@ -1363,6 +1406,8 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
         } else if (option == kVillageAttack && village_ >= 0) {
             attackVillage(unit);
         }
+    } else if (question == "SCOUTCOLONY") {
+        scoutColony(unit, std::exchange(scoutColony_, -1), choice);
     } else if (question == "SAILPORT" || question == "TRAVELPLACE") {
         goTo(picked);
     } else if (question == "LOSTCITY0") {
@@ -1962,6 +2007,9 @@ bool PlayScreen::clickColonyScreen(int x, int y) {
     if (state.jobsMenu >= 0) {
         return false;
     }
+    if (state.foreign) {
+        return !(x >= 300 && y >= 178); // only the exit button
+    }
     if (inside(kPanelButtons[0])) {
         state.panel = ColonyPanel::Production;
         return true;
@@ -1996,6 +2044,12 @@ bool PlayScreen::clickColonyScreen(int x, int y) {
 
 bool PlayScreen::handleColonyScreen(Command command) {
     auto& state = *colonyScreen_;
+    if (state.foreign) {
+        if (command == Command::Cancel || command == Command::Confirm) {
+            colonyScreen_.reset();
+        }
+        return true;
+    }
     auto& save = game_.state();
     auto& colony = save.colonies[static_cast<std::size_t>(state.colony)];
     const int people = colony.population;

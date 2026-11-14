@@ -63,6 +63,8 @@ constexpr int kLastShip = 18;
 constexpr int kTalkTune = 0x8020; // plus the nation: its leader's tune
 constexpr int kWarMood = 4;
 constexpr int kStuffGood = 4; // see WANTSTUFF below
+constexpr int kSeasonedScout = 0x16; // the scout's profession
+constexpr int kStolenHorses = 100;
 
 constexpr std::array<int, 8> kDx{0, 1, 1, 1, 0, -1, -1, -1};
 constexpr std::array<int, 8> kDy{-1, -1, 0, 1, 1, 1, 0, -1};
@@ -1205,6 +1207,70 @@ bool Game::stepMeeting(Meeting& m) {
     }
     }
     return false;
+}
+
+// --- Scouts at a foreign colony ---------------------------------------------
+
+void Game::scoutMeetMayor(int index, int colony) {
+    if (index < 0 || index >= unitCount() || colony < 0 || colony >= static_cast<int>(save_.colonies.size())) {
+        return;
+    }
+    auto& u = save_.units[static_cast<std::size_t>(index)];
+    u.movesUsed = movementAllowance(index);
+    if ((save_.header[kHeaderIndependence] & 1) != 0) {
+        // "Scouts cannot meet with mayors during the War of Independence."
+        notices_.push_back(GameNotice{"NOMAYORSDURINGREV", {}});
+        return;
+    }
+    const auto& c = save_.colonies[static_cast<std::size_t>(colony)];
+    const int a = u.nation;
+    const int b = c.nation;
+    if (a < 0 || a >= kEuropeanNations || b < 0 || b >= kEuropeanNations || a == b) {
+        return;
+    }
+    int dir = -1;
+    for (std::size_t d = 0; d < kDx.size(); ++d) {
+        if (u.x + kDx[d] == c.x && u.y + kDy[d] == c.y) {
+            dir = static_cast<int>(d);
+        }
+    }
+    if (!startMeeting(a, b, index, dir, true)) {
+        endMeeting(a, b);
+    }
+}
+
+int Game::infiltrationRisk(int index, int colony) const {
+    // (walls + 6) x 2 in 36, half for a seasoned scout, and the difficulty
+    // above Conquistador adds to it for the player (less below).
+    const auto& c = save_.colonies[static_cast<std::size_t>(colony)];
+    int risk = (buildingLevel(c, BuildingKind::Fortification) + 6) * 2;
+    if (unit(index).profession == kSeasonedScout) {
+        risk >>= 1;
+    }
+    if (unit(index).nation == human()) {
+        risk += save_.difficulty - 2;
+    }
+    return risk;
+}
+
+bool Game::infiltrateColony(int index, int colony) {
+    if (index < 0 || index >= unitCount() || colony < 0 || colony >= static_cast<int>(save_.colonies.size())) {
+        return false;
+    }
+    save_.units[static_cast<std::size_t>(index)].movesUsed = movementAllowance(index);
+    if (aiRandom(1, 36) > infiltrationRisk(index, colony)) {
+        return false; // the player looks round the colony
+    }
+    auto& c = save_.colonies[static_cast<std::size_t>(colony)];
+    // "Our scouts near Quebec have been captured by the French!"
+    GameNotice caught{"LOSTOURSCOUTS", {"", c.name}};
+    caught.adjectives = {{0, c.nation}};
+    caught.numbers = {kStolenHorses};
+    notices_.push_back(std::move(caught));
+    c.stock[static_cast<std::size_t>(cargo::kHorses)] =
+        static_cast<std::int16_t>(c.stock[static_cast<std::size_t>(cargo::kHorses)] + kStolenHorses);
+    removeUnit(index);
+    return true;
 }
 
 bool Game::askWithdrawal(Meeting& m) {

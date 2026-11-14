@@ -598,6 +598,16 @@ public:
     std::vector<std::pair<int, std::string>> allianceChoices() const;
     // The turn the player last talked with the nation (-1 never).
     int lastTalk(int nation) const;
+    // A scout of the player's at another nation's colony (SCOUTCOLONY):
+    // meeting the mayor brings the leader to talk (not during the war of
+    // independence: NOMAYORSDURINGREV); infiltrating may get the scout
+    // caught (LOSTOURSCOUTS: it is gone and the colony gets its horses),
+    // true then, false when the player may look at the colony. Either way
+    // the scout's turn is over.
+    void scoutMeetMayor(int unit, int colony);
+    bool infiltrateColony(int unit, int colony);
+    // The chance in 36 that a scout infiltrating the colony is caught.
+    int infiltrationRisk(int unit, int colony) const;
 
     // --- Map -----------------------------------------------------------------
     void reveal(int x, int y, int radius, int nation);

@@ -66,7 +66,8 @@ touch controls.
 > withdrawal of your troops, declaring war, or, at peace, hearing your
 > requests for withdrawal, gifts or an alliance against a third party.
 > The computer nations make peace and war among themselves, and you hear
-> of it. The other nations elect their own
+> of it. A scout at another nation's colony can meet its mayor or try to
+> spy on the colony. The other nations elect their own
 > fathers as the original's do. A tribe you meet for the first time
 > offers you peace; refusing it angers the tribe. Missionaries can found missions,
 > which the tribe takes well or badly as in the original, pay a tribe to

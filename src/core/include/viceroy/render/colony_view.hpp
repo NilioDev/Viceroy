@@ -34,6 +34,7 @@ struct ColonyViewState {
     ColonyPanel panel = ColonyPanel::Production;
     int buildList = -1;       // the highlighted line of the list of things to build, -1 when closed
     int selectedUnit = -1;    // the unit clicked on the Units Present panel, -1 for none
+    bool foreign = false;     // another nation's colony that a scout looks round: no changes
 };
 
 // Where the panel's parts are, for clicks.
