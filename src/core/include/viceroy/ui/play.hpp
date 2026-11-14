@@ -216,6 +216,18 @@ private:
     sound::BackgroundMusic* music_ = nullptr;
     std::string question_; // the GAME.TXT section the dialog asks
     int questionUnit_ = -1;
+    // A tribe's claim on land being asked about (INDIANFOREST, INDIANROAD,
+    // INDIANLAND), and what waits on the answer.
+    std::optional<LandClaim> landClaim_;
+    int workOrders_ = 0;
+    int landColonist_ = -1;
+    int landJob_ = -1;
+    void askLandClaim(const std::string& section, const LandClaim& claim, int unit);
+    enum class LandAfter { Nothing, Work, Colony };
+    LandAfter landAfterBribe_ = LandAfter::Nothing;
+    bool landBought(const LandClaim& claim, int nation, int unit);
+    void putToLandWork();
+    void startWork(int unit, int orders);
     std::vector<int> choices_; // what each choice of a list stands for
     int goToPage_ = 0;
     // The rows of @UNITOPTIONS a unit's options box offers, top to bottom.

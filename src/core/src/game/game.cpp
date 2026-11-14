@@ -297,8 +297,8 @@ int Game::workEffort(int x, int y, int orders) const {
     return std::max(0, orders == SaveUnit::kRoad ? value - 2 : value);
 }
 
-WorkResult Game::startWork(int index, int orders) {
-    auto& u = save_.units[static_cast<std::size_t>(index)];
+WorkResult Game::canStartWork(int index, int orders) const {
+    const auto& u = unit(index);
     if (u.type != unit_type::kPioneer || u.tools <= 0) {
         return WorkResult::NotAPioneer;
     }
@@ -316,6 +316,14 @@ WorkResult Game::startWork(int index, int orders) {
     } else if ((sq.flags & (MapSquare::kRoad | MapSquare::kHasColony)) != 0) {
         return WorkResult::AlreadyRoad;
     }
+    return WorkResult::Started;
+}
+
+WorkResult Game::startWork(int index, int orders) {
+    if (const auto check = canStartWork(index, orders); check != WorkResult::Started) {
+        return check;
+    }
+    auto& u = save_.units[static_cast<std::size_t>(index)];
     u.orders = orders;
     u.workTurns = 1;
     u.movesUsed = movementAllowance(index);
@@ -340,8 +348,10 @@ void Game::finishWork(int index) {
     auto& sq = save_.map.at(u.x, u.y);
     if (u.orders == SaveUnit::kRoad) {
         sq.flags = static_cast<std::uint8_t>(sq.flags | MapSquare::kRoad);
+        landGrudge(index, true);
     } else if (sq.isForest()) {
         sq.terrain = static_cast<std::uint8_t>(sq.terrain - 8);
+        landGrudge(index, false);
     } else {
         sq.flags = static_cast<std::uint8_t>(sq.flags | MapSquare::kPlowed);
     }

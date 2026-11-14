@@ -100,6 +100,54 @@ first contact, an attack, inciting and trade all use:
   burn Dutch missions! Church authorities are outraged!". Read from the
   code; the roll has not been seen to come up in a test run yet.
 
+## The tribes' land
+
+Read from the original's code. A tribe claims the land around its
+settlements: a square belongs to the nearest settlement on land of the
+same region (of equals, the last in the list) when it lies within the
+tribe's reach, 1 square for the semi-nomadic and agrarian tribes, 2 for
+the advanced and 3 for the civilized (measured the longer side plus half
+the shorter). Land paid for (bit 0x10 of the map's mask layer) and the
+squares of a colony are free, and so is all land for a nation with Peter
+Minuit.
+
+**The price** the tribe of settlement s asks nation n for the square at
+distance d from s, with L the tribe's level, S the land it has sold (byte
+5 of its record, one more for every sale) and D the difficulty level:
+
+- for the player (L + S − d + 2 × (D + 3)) × 65, for a computer player
+  (L + S − D − d + 12) × 50, first less (10 − the nation's people) / 2
+  when that is above 0, doubled on a resource, and at least 1 before the
+  multiplication;
+- for the player times the tribe's tension step toward it plus one;
+- half as much again at the tribe's capital; nothing with Peter Minuit;
+- halved at the end.
+
+**Asking.** When the player puts a colonist to work on a claimed square
+around a colony (`@INDIANLAND`), or a pioneer of the player is told to
+clear a forest (`@INDIANFOREST`) or build a road (`@INDIANROAD`) on one,
+and the tribe has a treaty with the player (bit 0x40 of its relation
+byte), its figure asks, naming the tribe and the price; the price must be
+above 0, and "We offer you ..." is greyed when the treasury is short:
+
+1. the colonist stays where they were, or the pioneer does nothing and
+   ends its moves;
+2. the player pays: the square is marked paid for, the tribe's count of
+   land sold rises, and it answers `@INDIANBRIBE` before the work starts;
+3. the work goes on regardless.
+
+(For the colony, the original checks the claim when a colonist is put on
+a square; Viceroy does it when the job menu puts the colonist on a new
+square.)
+
+**Grudges.** When a pioneer of any nation has cleared a forest or built a
+road on claimed land not paid for (here the treaty does not matter), a
+computer player pays the price if it keeps at least half the price
+besides. Otherwise the tribe grows tense toward the nation by 5 for a
+forest and 3 for a road, plus the difficulty level for the player; twice
+that within 2 squares of the settlement and three times next to it.
+`@INDIANFOREST2` is never used by the original.
+
 ## Inciting a tribe
 
 A missionary at a tribe its nation has a treaty with is always offered

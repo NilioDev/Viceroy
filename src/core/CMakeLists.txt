@@ -27,6 +27,7 @@ add_library(vcr_core STATIC
     src/game/native_attack.cpp
     src/game/native_contact.cpp
     src/game/native_incite.cpp
+    src/game/native_land.cpp
     src/game/native_heresy.cpp
     src/game/native_move.cpp
     src/game/native_raid.cpp

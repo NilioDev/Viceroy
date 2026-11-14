@@ -91,7 +91,10 @@ touch controls.
 > go to war against another nation, or denounce another nation's mission
 > to take it over. A furious tribe with a treaty may burn your missions.
 > Native settlements grow, raise new braves, and calm down or grow angry
-> from missions and nearby colonies each turn, as in the original. Their
+> from missions and nearby colonies each turn, as in the original. A tribe
+> with a treaty claims the land around its villages: it asks a price when
+> your colonists work it, your pioneers clear its forest or build a road
+> on it, and grows angry when the work is done unpaid. Their
 > braves roam, fortify, take up muskets and horses at home and head for
 > nearby colonies the way the original's do. Angry braves attack: they
 > ambush units in the open and take their muskets and horses, kill the

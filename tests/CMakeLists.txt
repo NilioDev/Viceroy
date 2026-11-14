@@ -12,6 +12,7 @@ add_executable(vcr_tests
     test_resource.cpp
     test_new_game.cpp
     test_pioneers.cpp
+    test_native_land.cpp
     test_crosses.cpp
     test_liberty.cpp
     test_colony_reports.cpp

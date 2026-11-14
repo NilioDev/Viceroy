@@ -1327,11 +1327,60 @@ void PlayScreen::showNotices() {
     }
 }
 
+void PlayScreen::askLandClaim(const std::string& section, const LandClaim& claim, int unit) {
+    // Read from the original: the tribe's figure asks; "We offer you ..."
+    // is greyed when the treasury is short.
+    const int tribeNation = kEuropeanNations + claim.tribe;
+    ask(section, unit, {adjective(tribeNation)}, -1, {0, claim.price});
+    if (!dialog_) {
+        return;
+    }
+    landClaim_ = claim;
+    const int nation = unit >= 0 ? game_.unit(unit).nation : game_.human();
+    if (dialog_->disabled.size() < dialog_->options.size()) {
+        dialog_->disabled.resize(dialog_->options.size());
+    }
+    if (dialog_->disabled.size() > 1 && game_.state().nations[static_cast<std::size_t>(nation)].gold < claim.price) {
+        dialog_->disabled[1] = true;
+    }
+    placeNative(claim.tribe);
+}
+
+bool PlayScreen::landBought(const LandClaim& claim, int nation, int unit) {
+    if (!game_.buyLand(claim, nation)) {
+        return false;
+    }
+    // "Very well, we withdraw our objection." The work goes on after it.
+    ask("INDIANBRIBE", unit);
+    placeNative(claim.tribe);
+    return dialog_.has_value();
+}
+
+void PlayScreen::putToLandWork() {
+    if (!colonyScreen_) {
+        return;
+    }
+    auto& save = game_.state();
+    auto& colony = save.colonies[static_cast<std::size_t>(colonyScreen_->colony)];
+    assignJob(colony, save.map, game_.rules(), save.colonies, landColonist_, landJob_);
+}
+
 void PlayScreen::work(int orders) {
     const int active = game_.activeUnit();
     if (active < 0) {
         return;
     }
+    if (game_.canStartWork(active, orders) == WorkResult::Started && game_.unit(active).nation == game_.human()) {
+        if (const auto claim = game_.workClaim(active, orders)) {
+            workOrders_ = orders;
+            askLandClaim(orders == SaveUnit::kRoad ? "INDIANROAD" : "INDIANFOREST", *claim, active);
+            return;
+        }
+    }
+    startWork(active, orders);
+}
+
+void PlayScreen::startWork(int active, int orders) {
     switch (game_.startWork(active, orders)) {
     case WorkResult::Started:
     case WorkResult::Finished:
@@ -1447,6 +1496,49 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
                                                                                  : -1;
     }();
     choices_.clear();
+    if (question == "INDIANFOREST" || question == "INDIANROAD") {
+        // Leave it, pay the tribe, or go on regardless.
+        const auto claim = std::exchange(landClaim_, std::nullopt);
+        if (unit < 0 || !claim) {
+            return;
+        }
+        if (choice == 0) {
+            game_.setOrders(unit, SaveUnit::kNoOrders);
+            game_.skipUnit(unit);
+            advance();
+            return;
+        }
+        landAfterBribe_ = LandAfter::Work;
+        if (choice == 1 && landBought(*claim, game_.unit(unit).nation, unit)) {
+            return;
+        }
+        startWork(unit, workOrders_);
+        return;
+    }
+    if (question == "INDIANBRIBE") {
+        if (landAfterBribe_ == LandAfter::Work && unit >= 0) {
+            startWork(unit, workOrders_);
+        } else if (landAfterBribe_ == LandAfter::Colony) {
+            putToLandWork();
+        }
+        landAfterBribe_ = LandAfter::Nothing;
+        return;
+    }
+    if (question == "INDIANLAND") {
+        // "Very well, ...": the colonist stays where they were; paying or
+        // "this is OUR land now" puts them to work.
+        const auto claim = std::exchange(landClaim_, std::nullopt);
+        if (!claim || !colonyScreen_ || choice == 0) {
+            return;
+        }
+        landAfterBribe_ = LandAfter::Colony;
+        const int nation = game_.state().colonies[static_cast<std::size_t>(colonyScreen_->colony)].nation;
+        if (choice == 1 && landBought(*claim, nation, -1)) {
+            return;
+        }
+        putToLandWork();
+        return;
+    }
     if (question == "PICKMUSIC") {
         // The twelve tunes, then three more lists.
         static constexpr const char* kLists[3] = {"PICKINDEPENDENCE", "PICKMILITARY", "PICKINDIAN"};
@@ -2216,8 +2308,20 @@ bool PlayScreen::handleColonyScreen(Command command) {
         case Command::Confirm:
         case Command::Skip:
             if (state.jobsMenu < static_cast<int>(choices.size())) {
-                assignJob(colony, save.map, game_.rules(), save.colonies, state.selectedColonist,
-                          choices[static_cast<std::size_t>(state.jobsMenu)].job);
+                const auto& picked = choices[static_cast<std::size_t>(state.jobsMenu)];
+                const bool there = picked.square >= 0 &&
+                                   colony.squares[static_cast<std::size_t>(picked.square)] == state.selectedColonist;
+                const auto claim =
+                    picked.square >= 0 && !there ? game_.colonyClaim(state.colony, picked.square) : std::nullopt;
+                if (claim) {
+                    // Read from the original: the tribe whose land it is asks.
+                    landColonist_ = state.selectedColonist;
+                    landJob_ = picked.job;
+                    state.jobsMenu = -1;
+                    askLandClaim("INDIANLAND", *claim, -1);
+                    return true;
+                }
+                assignJob(colony, save.map, game_.rules(), save.colonies, state.selectedColonist, picked.job);
             }
             state.jobsMenu = -1;
             break;

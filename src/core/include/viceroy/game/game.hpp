@@ -46,6 +46,16 @@ inline constexpr int kManOWar = 18;
 inline constexpr int kFirstNative = 19;
 } // namespace unit_type
 
+// A tribe's claim on a square: the tribe, its settlement nearest the
+// square, and the price it asks.
+struct LandClaim {
+    int tribe = -1;
+    int settlement = -1;
+    int x = 0;
+    int y = 0;
+    int price = 0;
+};
+
 enum class MoveResult {
     Moved,       // the unit moved
     Boarded,     // the unit went aboard a ship
@@ -194,6 +204,20 @@ public:
     // (SaveUnit::kPlow), or builds a road (SaveUnit::kRoad). Each job uses
     // 20 tools; a pioneer without tools is a colonist again. The timings
     // are measured: docs/rules/pioneers.md.
+    // The natives' land (native_land.cpp).
+    // What the tribe of the settlement asks the nation for the square.
+    int landPrice(int settlement, int nation, int x, int y) const;
+    // The claim a tribe with a treaty makes when the player's pioneer
+    // starts to clear the forest (orders kPlow) or build a road there
+    // (@INDIANFOREST, @INDIANROAD).
+    std::optional<LandClaim> workClaim(int unit, int orders) const;
+    // The claim on square 0-7 around the player's colony when a colonist
+    // is put to work there (@INDIANLAND).
+    std::optional<LandClaim> colonyClaim(int colony, int square) const;
+    // Pays the price: the square is the nation's from then on.
+    bool buyLand(const LandClaim& claim, int nation);
+    // What startWork would answer, without starting (Started when it may).
+    WorkResult canStartWork(int unit, int orders) const;
     WorkResult startWork(int index, int orders);
     // The effort of a job on a square: the terrain's improvement value
     // from NAMES.TXT, less 2 for a road.
@@ -818,6 +842,11 @@ private:
     void aiSendOut(int colony, int colonist, int role);
     bool aiRoadToColony(int colony);
     bool aiImproveLand(int colony, int region);
+    // The natives' land (native_land.cpp). The settlement nearest (x, y)
+    // on land of the region (-1: any), the last of equals; -1 for none.
+    int nearestSettlementIn(int x, int y, int region, int* distance) const;
+    // After a pioneer has cleared a forest or built a road (finishWork).
+    void landGrudge(int unit, bool road);
     // The tribe that claims square k around a colony (-1 for none).
     int aiTribeClaim(const SaveColony& colony, int k, int region) const;
     // What a colony's later plans weigh from the earlier ones.
