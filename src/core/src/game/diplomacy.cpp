@@ -26,6 +26,7 @@ constexpr std::size_t kColonyPeople = kExtra + 24;
 constexpr std::size_t kPeople = kExtra + 28;
 constexpr std::size_t kAttack = kExtra + 44; // words
 constexpr std::size_t kAttackOut = kExtra + 60;
+constexpr std::size_t kShips = kExtra + 40;
 constexpr std::size_t kByType = kExtra + 64; // 19 per nation
 constexpr std::size_t kRegionUnits = kExtra + 172;
 constexpr std::size_t kRegionColonies = kExtra + 236;
@@ -53,7 +54,9 @@ constexpr std::uint8_t kPiracy = 0x80;
 constexpr std::uint8_t kUSA = 0x04; // byte 0 of the nation record
 
 constexpr std::size_t kHeaderLastTalk = 88; // a word per nation
-constexpr std::size_t kHeaderRoyalNation = 98; // the nation king.cpp calls kFirstHalf (first to half rebels), or -1
+constexpr std::size_t kHeaderGoneNation = 98; // the nation gone after the War of the Spanish Succession, or -1
+constexpr std::size_t kHeaderPlayers = 17;
+constexpr std::uint8_t kSeveralHumans = 0x80;
 constexpr std::size_t kHeaderIndependence = 18;
 
 constexpr int kFranklin = 19; // rows of @FATHERS
@@ -62,9 +65,12 @@ constexpr int kFirstShip = 13;
 constexpr int kLastShip = 18;
 constexpr int kTalkTune = 0x8020; // plus the nation: its leader's tune
 constexpr int kWarMood = 4;
+constexpr int kSuccessionMood = 3;
 constexpr int kStuffGood = 4; // see WANTSTUFF below
 constexpr int kSeasonedScout = 0x16; // the scout's profession
 constexpr int kStolenHorses = 100;
+constexpr int kSoldierType = 1;
+constexpr int kVeteranSoldier = 0x15;
 
 constexpr std::array<int, 8> kDx{0, 1, 1, 1, 0, -1, -1, -1};
 constexpr std::array<int, 8> kDy{-1, -1, 0, 1, 1, 1, 0, -1};
@@ -543,9 +549,9 @@ bool Game::startMeeting(int a, int b, int mover, int dir, bool forced) {
             m.target = kEuropeanNations + t;
         }
     }
-    const int royal = headerWord(save_.header, kHeaderRoyalNation);
+    const int gone = headerWord(save_.header, kHeaderGoneNation);
     for (int e = 0; e < kEuropeanNations; ++e) {
-        if (e == a || e == b || e == royal || (relation(b, e) & (kMet | kPeace)) != kMet) {
+        if (e == a || e == b || e == gone || (relation(b, e) & (kMet | kPeace)) != kMet) {
             continue;
         }
         const int theirAttack = wordAt(block, kAttack + 2 * ub);
@@ -1207,6 +1213,185 @@ bool Game::stepMeeting(Meeting& m) {
     }
     }
     return false;
+}
+
+// --- The King's wars -----------------------------------------------------------
+
+void Game::kingDeclaresWar(int nation, int turn) {
+    // Read from the original: on a turn the King does not touch the tax,
+    // he may declare war on a nation the player has a treaty with. Never
+    // with Franklin, and not before (difficulty + 2) x turn reaches 800.
+    if (nation < 0 || nation >= kEuropeanNations || save_.players[static_cast<std::size_t>(nation)].control != 0 ||
+        hasFather(nation, kFranklin) || (save_.difficulty + 2) * turn < 800) {
+        return;
+    }
+    const auto& block = save_.tribesAndMore;
+    const int gone = headerWord(save_.header, kHeaderGoneNation);
+    const auto usa = [&](int e) { return (save_.nations[static_cast<std::size_t>(e)].raw[0] & kUSA) != 0; };
+    int treaties = 0;
+    for (int e = 0; e < kEuropeanNations; ++e) {
+        if (e == nation || e == gone || usa(e)) {
+            continue;
+        }
+        if ((relation(nation, e) & kPeace) != 0) {
+            ++treaties;
+        }
+        if ((relation(nation, e) & (kMet | kPeace)) == kMet) {
+            return; // already at war with someone
+        }
+    }
+    if (treaties == 0 || aiRandom(0, (4 - treaties) * 20) > save_.difficulty) {
+        return;
+    }
+    int enemy = 0;
+    do {
+        enemy = aiRandom(0, kEuropeanNations - 1);
+    } while (enemy == nation || (relation(nation, enemy) & kPeace) == 0 || usa(enemy));
+    // Help for the war: more against a stronger enemy, less at the harder
+    // levels.
+    int soldiers = 1;
+    int money = (save_.difficulty + 1) * 100;
+    const int mine = byteAt(block, kAttackOut + static_cast<std::size_t>(nation));
+    const int theirs = byteAt(block, kAttackOut + static_cast<std::size_t>(enemy));
+    if (mine < theirs) {
+        soldiers = ((theirs - mine) >> 3) + 1;
+        money += (theirs - mine) * 25;
+    }
+    soldiers = std::min(soldiers, 6 - save_.difficulty);
+    money = std::min(money, (5 - save_.difficulty) * 500);
+    // "The arrogant attitude of the French has forced us to declare war
+    // on them ..."
+    GameNotice notice{"KINGNEWWAR", {"", save_.players[static_cast<std::size_t>(nation)].name, ""}};
+    notice.lines = {{0, true, "DIFFICULTY", save_.difficulty}};
+    notice.adjectives = {{2, enemy}};
+    notice.numbers = {money, soldiers};
+    notices_.push_back(std::move(notice));
+    save_.nations[static_cast<std::size_t>(nation)].gold += money;
+    for (int i = 0; i < soldiers; ++i) {
+        addUnitInEurope(kSoldierType, kVeteranSoldier, nation);
+    }
+    clearRelationBits(nation, enemy, kPeace);
+    addRelationBits(nation, enemy, kInsulted);
+    setHeaderWord(save_.header, kHeaderLastTalk + 2 * static_cast<std::size_t>(enemy), turn);
+}
+
+// --- The War of the Spanish Succession -------------------------------------------
+
+void Game::spanishSuccession() {
+    // Read from the original: once the player's rebels first reach half,
+    // the weakest computer nation gives up its colonies, men and maps to
+    // the next weakest and leaves the New World. Not in a game of several
+    // human players.
+    if ((save_.header[kHeaderPlayers] & kSeveralHumans) != 0 || headerWord(save_.header, kHeaderGoneNation) >= 0) {
+        return;
+    }
+    const auto& block = save_.tribesAndMore;
+    // 3 x ships + 2 x colonies + people, sorted from the weakest the way
+    // the original sorts (an out-of-order one goes before its equals).
+    std::array<int, kEuropeanNations> score{};
+    std::array<int, kEuropeanNations> order{};
+    for (int n = 0; n < kEuropeanNations; ++n) {
+        const auto un = static_cast<std::size_t>(n);
+        score[un] = 3 * byteAt(block, kShips + un) + 2 * byteAt(block, kColonyCount + un) + byteAt(block, kPeople + un);
+        order[un] = n;
+    }
+    for (;;) {
+        std::size_t i = 0;
+        while (i + 1 < score.size() && score[i + 1] >= score[i]) {
+            ++i;
+        }
+        if (i + 1 >= score.size()) {
+            break;
+        }
+        const int value = score[i + 1];
+        const int who = order[i + 1];
+        std::size_t j = 0;
+        while (j < i + 1 && value > score[j]) {
+            ++j;
+        }
+        for (std::size_t k = i + 1; k > j; --k) {
+            score[k] = score[k - 1];
+            order[k] = order[k - 1];
+        }
+        score[j] = value;
+        order[j] = who;
+    }
+    const auto computer = [&](int n) { return save_.players[static_cast<std::size_t>(n)].control != 0; };
+    int loser = -1;
+    int winner = -1;
+    for (const int n : order) {
+        if (!computer(n)) {
+            continue;
+        }
+        if (loser < 0) {
+            loser = n;
+        } else if (winner < 0) {
+            winner = n;
+        }
+    }
+    if (loser < 0 || winner < 0) {
+        return;
+    }
+    // "War of the Spanish Succession ends in Europe! Spain, ravaged by
+    // war, agrees to cede New Spain to the Dutch ..."
+    GameNotice notice{"SUCCESSION", {"", save_.players[static_cast<std::size_t>(loser)].country, "", ""}};
+    notice.sentenceCountries = {{0, loser}};
+    notice.adjectives = {{2, winner}, {3, loser}};
+    notice.value = kForeignNews;
+    notice.music = {{MusicCue::Kind::ChangeMood, kSuccessionMood}};
+    notices_.push_back(std::move(notice));
+
+    // What the loser had explored, and the squares it last walked, become
+    // the winner's.
+    for (auto& square : save_.map.squares) {
+        if ((square.seen & (0x10 << loser)) != 0) {
+            square.seen = static_cast<std::uint8_t>(square.seen | (0x10 << winner));
+        }
+        if ((square.region >> 4) == loser) {
+            square.region = static_cast<std::uint8_t>((square.region & 0x0F) | (winner << 4));
+        }
+    }
+    // Its men on the map change sides; those in Europe or at sea are lost.
+    for (int i = unitCount() - 1; i >= 0; --i) {
+        auto& u = save_.units[static_cast<std::size_t>(i)];
+        if (u.nation != loser) {
+            continue;
+        }
+        if (!save_.map.inside(u.x, u.y)) {
+            removeUnit(i);
+            continue;
+        }
+        u.nation = winner;
+        u.raw[3] = static_cast<std::uint8_t>(winner);
+        auto& square = save_.map.squares[static_cast<std::size_t>(u.y) * static_cast<std::size_t>(save_.map.width) +
+                                         static_cast<std::size_t>(u.x)];
+        square.region = static_cast<std::uint8_t>((square.region & 0x0F) | (winner << 4));
+    }
+    // Its colonies too, and their liberty bells are forgotten.
+    for (auto& c : save_.colonies) {
+        if (c.nation != loser) {
+            continue;
+        }
+        c.nation = winner;
+        c.raw[26] = static_cast<std::uint8_t>(winner);
+        c.rebelDividend = 0;
+        if (save_.map.inside(c.x, c.y)) {
+            auto& square = save_.map.squares[static_cast<std::size_t>(c.y) * static_cast<std::size_t>(save_.map.width) +
+                                             static_cast<std::size_t>(c.x)];
+            square.region = static_cast<std::uint8_t>((square.region & 0x0F) | (winner << 4));
+        }
+    }
+    // And its missions.
+    for (auto& settlement : save_.settlements) {
+        if ((settlement.raw[5] & 0x0F) == loser) {
+            settlement.raw[5] = static_cast<std::uint8_t>((settlement.raw[5] & 0xF0) | winner);
+        }
+    }
+    refreshUnitFlags();
+    nationCensus(loser);
+    nationCensus(winner);
+    save_.players[static_cast<std::size_t>(loser)].control = 2;
+    setHeaderWord(save_.header, kHeaderGoneNation, loser);
 }
 
 // --- Scouts at a foreign colony ---------------------------------------------

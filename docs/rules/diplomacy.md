@@ -152,3 +152,36 @@ United States. It keeps out when it already fights a stronger player, or
 when its colonies would not be safe, and it weighs its force against the
 other's in the regions where both have men, against the number of wars it
 already fights and its character.
+
+## The King declares war
+
+On a turn of the player's when the King leaves the tax alone, he may
+declare war on a nation the player has a treaty with (`KINGNEWWAR`):
+
+- never with Benjamin Franklin, never while the player is at war with
+  another nation, and not before (difficulty + 2) × turn reaches 800;
+- the chance is 1 + difficulty in (4 − treaties) × 20 + 1, so higher with
+  more treaties and at the harder levels;
+- the enemy is one of the nations at peace with the player, at random.
+
+The Crown sends (difficulty + 1) × 100 gold and one veteran soldier to the
+docks, more against an enemy with more force in the field: one more
+soldier for every 8 points of difference, and 25 gold a point. At most
+6 − difficulty soldiers and (5 − difficulty) × 500 gold. The treaty is
+broken and the enemy feels insulted (it waits 16 turns before talking
+again).
+
+## The War of the Spanish Succession
+
+The first time the player's rebels reach 50%, the war ends in Europe
+(`SUCCESSION`, told by the man of the home port, with the music's mood
+changing). The computer nations are ranked by 3 × ships + 2 × colonies +
+people: the weakest gives up its New World to the next weakest.
+
+- Its colonies change hands, and their liberty bells are lost.
+- Its men on the map change sides; those in Europe or on the high seas
+  are gone.
+- What it had explored and its missions go to the winner.
+- It leaves the game for good, and is left out of later talks and wars.
+
+This does not happen in a game with several human players.

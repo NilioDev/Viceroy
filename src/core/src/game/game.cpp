@@ -634,7 +634,9 @@ void Game::endTurn() {
     // King's message comes before theirs).
     {
         const int nextYear = save_.year < 1600 || save_.season != 0 ? save_.year + 1 : save_.year;
-        kingTax(human(), save_.turn + 1, nextYear);
+        if (!kingTax(human(), save_.turn + 1, nextYear)) {
+            kingDeclaresWar(human(), save_.turn + 1);
+        }
     }
     // Measured: the original goes through the colonies from the last
     // founded to the first, which sets the order of its messages.

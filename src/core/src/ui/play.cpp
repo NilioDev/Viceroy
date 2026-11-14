@@ -925,6 +925,15 @@ void PlayScreen::showNotices() {
             notice.strings[static_cast<std::size_t>(string)] = nation == 3 ? "the " + country : country;
         }
     }
+    for (const auto& [string, nation] : notice.sentenceCountries) {
+        if (string >= 0) {
+            if (notice.strings.size() <= static_cast<std::size_t>(string)) {
+                notice.strings.resize(static_cast<std::size_t>(string) + 1);
+            }
+            const std::string country = textLine(art_->names, "COUNTRY", nation, "");
+            notice.strings[static_cast<std::size_t>(string)] = nation == 3 ? "The " + country : country;
+        }
+    }
     for (const auto& [string, nation] : notice.ports) {
         if (string >= 0) {
             if (notice.strings.size() <= static_cast<std::size_t>(string)) {

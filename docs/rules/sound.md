@@ -95,6 +95,7 @@ are four kinds of call:
 | A rumour with gold | next mood 2 (and mood now without Background Music) |
 | Treasure in burial mounds (`BURIAL3`), with no tribe angered | tune 24h |
 | The mounds were a tribe's burial ground (`SCREWED`) | tune 32h |
+| The War of the Spanish Succession ends (`SUCCESSION`) | mood now 3 |
 | The leader declares war (`WARMEEK`, `WARMANLY`, `PROVOKE` after a threat), or takes the player's money for a war (`MERCENARY`) | mood now 4 |
 
 The tribe's mood is 7 for the Inca, 6 for the Aztecs and 5 for the others.
