@@ -60,21 +60,11 @@ void Game::setGoTo(int index, int x, int y) {
     u.raw[kDestY] = static_cast<std::uint8_t>(y);
 }
 
-bool Game::goToEurope(int index) {
-    // Seen once: the ship is sent to the nearest sea lane (the first of
-    // equals, row by row) and sails for Europe when it gets there, in the
-    // same turn if its moves last.
-    if (!isShip(index) || !onMap(index)) {
-        return false;
-    }
+bool Game::nearestSeaLane(int index, int& outX, int& outY) const {
+    // Seen once: the nearest sea lane (the first of equals, row by row).
     const auto& u = unit(index);
     const auto& map = save_.map;
-    if (map.at(u.x, u.y).terrain == kSeaLane) {
-        return sailToEurope(index);
-    }
     int best = -1;
-    int bx = 0;
-    int by = 0;
     for (int y = 0; y < map.height; ++y) {
         for (int x = 0; x < map.width; ++x) {
             if (map.at(x, y).terrain != kSeaLane) {
@@ -85,15 +75,30 @@ bool Game::goToEurope(int index) {
             const int d = std::max(dx, dy) + std::min(dx, dy) / 2;
             if (best < 0 || d < best) {
                 best = d;
-                bx = x;
-                by = y;
+                outX = x;
+                outY = y;
             }
         }
     }
-    if (best < 0) {
+    return best >= 0;
+}
+
+bool Game::goToEurope(int index) {
+    // The ship is sent to the nearest sea lane and sails for Europe when it
+    // gets there, in the same turn if its moves last.
+    if (!isShip(index) || !onMap(index)) {
         return false;
     }
-    setGoTo(index, bx, by);
+    const auto& u = unit(index);
+    if (save_.map.at(u.x, u.y).terrain == kSeaLane) {
+        return sailToEurope(index);
+    }
+    int x = 0;
+    int y = 0;
+    if (!nearestSeaLane(index, x, y)) {
+        return false;
+    }
+    setGoTo(index, x, y);
     return true;
 }
 

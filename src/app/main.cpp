@@ -606,6 +606,12 @@ void click(App& app, float wx, float wy) {
         send(app, Command::Confirm);
         return;
     }
+    if (app.play->routeScreen() >= 0) {
+        if (!app.play->dialog()) {
+            app.play->clickRouteScreen(static_cast<int>(x), static_cast<int>(y));
+        }
+        return;
+    }
     if (app.play->colonyScreen() || app.play->europeScreen()) {
         if (app.play->colonyScreen() && app.play->clickColonyScreen(static_cast<int>(x), static_cast<int>(y))) {
             return;

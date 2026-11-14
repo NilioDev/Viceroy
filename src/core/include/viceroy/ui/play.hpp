@@ -113,6 +113,15 @@ public:
     // A question in a message box, when one is up.
     const std::optional<Dialog>& dialog() const { return dialog_; }
     bool combatAnalysisUp() const { return analysisUp_; }
+    // The EDIT TRADE ROUTE screen: the route shown, or -1.
+    int routeScreen() const { return routeScreen_; }
+    // The TRADE menu's entries, and Begin Trade Route (ORDERS).
+    void editTradeRoute();
+    void createTradeRoute();
+    void deleteTradeRoute();
+    void beginTradeRoute();
+    // A click on the EDIT TRADE ROUTE screen. Returns true when it was used.
+    bool clickRouteScreen(int x, int y);
     // The hall of the Continental Congress with a new father in it.
     bool congressHallUp() const { return congressHall_ >= 0; }
     bool reportUp() const { return congressReport_; }
@@ -262,6 +271,20 @@ private:
     void putToLandWork();
     void startWork(int unit, int orders);
     std::vector<int> choices_; // what each choice of a list stands for
+    // Trade routes (play_routes.cpp).
+    int routeScreen_ = -1;
+    std::optional<Game::TradeRoute> routeDraft_; // a route being created
+    int routeRow_ = -1;                          // the stop being changed
+    int routePage_ = 0;
+    int routeKind_ = 0; // 0 any, 1 land, 2 sea: the routes listed
+    void openRouteList(std::string_view section, const std::string& question, int kind, int selected);
+    void openRouteColonies(int page);
+    void openRoutePorts(int page);
+    void openRouteStops(int route);
+    void openRouteCargo(bool load);
+    void addDraftRoute();
+    bool answerRoute(const std::string& question, int choice, int picked);
+    bool handleRouteScreen(Command command);
     int goToPage_ = 0;
     // The rows of @UNITOPTIONS a unit's options box offers, top to bottom.
     enum UnitOption { kUnitFront, kUnitClear, kUnitSentry, kUnitFortify, kUnitNoChange };

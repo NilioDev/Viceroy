@@ -1059,8 +1059,10 @@ void Game::endTurn() {
     }
     // The year has turned: is the game over?
     checkTheEnd();
-    // The player's units under Go To set off before anyone is asked.
+    // The player's units under Go To and on trade routes set off before
+    // anyone is asked.
     moveGoToUnits();
+    moveTradeRouteUnits();
     save_.activeUnit = nextUnitNeedingOrders(-1);
 }
 
@@ -1110,7 +1112,9 @@ bool Game::sailToEurope(int ship) {
         raw[kReturnY] = static_cast<std::uint8_t>(u.y);
     }
     setEuropeStage(u, kLastStage);
-    u.orders = SaveUnit::kNoOrders;
+    if (u.orders != kTradeRouteOrders) {
+        u.orders = SaveUnit::kNoOrders;
+    }
     for (const int p : aboard) {
         auto& passenger = save_.units[static_cast<std::size_t>(p)];
         passenger.x = u.x;
@@ -1153,8 +1157,6 @@ int Game::freeHolds(int ship) const {
 }
 
 namespace {
-
-constexpr int kTradeRouteOrders = 2; // a unit on a trade route keeps its orders when loaded
 
 // Read from the original: holds of the good are topped up first, the rest
 // takes a new hold.
@@ -1403,7 +1405,9 @@ void Game::sailOn() {
         auto& s = save_.units[static_cast<std::size_t>(ship)];
         s.x = x;
         s.y = y;
-        s.orders = SaveUnit::kNoOrders;
+        if (s.orders != kTradeRouteOrders) {
+            s.orders = SaveUnit::kNoOrders;
+        }
         reveal(x, y, sightRadius(ship), s.nation);
         if (ours) {
             lastTurnNews_.push_back(name + " has arrived in the New World.");

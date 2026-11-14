@@ -2,13 +2,14 @@
 #include "viceroy/ui/play.hpp"
 
 #include "viceroy/data/reader.hpp"
+#include "viceroy/data/text_table.hpp"
 #include "viceroy/game/colony.hpp"
 #include "viceroy/game/europe.hpp"
 #include "viceroy/game/natives.hpp"
 #include "viceroy/game/sounds.hpp"
-#include "viceroy/render/report_view.hpp"
-#include "viceroy/data/text_table.hpp"
 #include "viceroy/game_files.hpp"
+#include "viceroy/render/report_view.hpp"
+#include "viceroy/render/trade_route_view.hpp"
 #include "viceroy/sound/background_music.hpp"
 
 #include <algorithm>
@@ -1036,7 +1037,8 @@ bool PlayScreen::handleDialog(Command command) {
             d.selected = -1; // no answer: the leader takes it as none of his
             break;
         }
-        if (question_ == "SAILPORT" || question_ == "TRAVELPLACE" || question_.rfind("PICK", 0) == 0) {
+        if (question_ == "SAILPORT" || question_ == "TRAVELPLACE" || question_.rfind("PICK", 0) == 0 ||
+            (question_.rfind("ROUTE", 0) == 0 && question_ != "ROUTESURE")) {
             // Go To has no "None": Escape leaves the unit as it was.
             // Pick Music and its lists close without a pick.
             dialog_.reset();
@@ -1750,6 +1752,9 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
                                                                                  : -1;
     }();
     choices_.clear();
+    if (answerRoute(question, choice, picked)) {
+        return;
+    }
     if (question == "INDIANFOREST" || question == "INDIANROAD") {
         // Leave it, pay the tribe, or go on regardless.
         const auto claim = std::exchange(landClaim_, std::nullopt);
@@ -3562,6 +3567,9 @@ bool PlayScreen::handle(Command command) {
     if (menu_) {
         return handleMenu(command);
     }
+    if (routeScreen_ >= 0) {
+        return handleRouteScreen(command);
+    }
     if (europeScreen_) {
         return handleEuropeScreen(command);
     }
@@ -3726,6 +3734,11 @@ bool PlayScreen::handle(Command command) {
             openGoTo(0);
         }
         break;
+    case Command::Train: // T: Begin Trade Route
+        if (active >= 0 && (game_.isShip(active) || game_.unit(active).type == unit_type::kWagonTrain)) {
+            beginTradeRoute();
+        }
+        break;
     case Command::Purchase: // P
         work(SaveUnit::kPlow);
         break;
@@ -3854,7 +3867,7 @@ void PlayScreen::draw(Screen& screen, const Art& art) const {
         return;
     }
     drawScreen(screen, art);
-    if (menu_ && !colonyScreen_ && !europeScreen_) {
+    if (menu_ && !colonyScreen_ && !europeScreen_ && routeScreen_ < 0) {
         drawMenuBar(screen, art, art.menus, &*menu_);
     }
     if (analysisUp_ && attack_) {
@@ -3873,6 +3886,10 @@ void PlayScreen::draw(Screen& screen, const Art& art) const {
 }
 
 void PlayScreen::drawScreen(Screen& screen, const Art& art) const {
+    if (routeScreen_ >= 0) {
+        drawTradeRouteScreen(screen, art, game_, routeScreen_);
+        return;
+    }
     if (europeScreen_ && colonyArt_ != nullptr) {
         drawEuropeScreen(screen, art, *colonyArt_, game_, *europeScreen_);
         // Our own line for what just happened (the original has none here).
@@ -4036,6 +4053,11 @@ constexpr int kNoOrders = 17;
 constexpr int kDump = 18;
 constexpr int kDisband = 19;
 } // namespace orders_menu
+namespace trade_menu {
+constexpr int kEdit = 0;
+constexpr int kCreate = 1;
+constexpr int kDelete = 2;
+} // namespace trade_menu
 constexpr int kHiddenPedia = 6; // Miscellaneous and Complete are not shown
 constexpr std::uint8_t kSeaLaneTerrain = 26;
 
@@ -4121,7 +4143,7 @@ std::vector<EntryState> PlayScreen::menuStates(int index) const {
 
 void PlayScreen::openMenu(int index, bool keyboard) {
     if (art_ == nullptr || index < 0 || index >= static_cast<int>(art_->menus.size()) || slide_ || dialog_ ||
-        colonyScreen_ || europeScreen_) {
+        colonyScreen_ || europeScreen_ || routeScreen_ >= 0) {
         return;
     }
     OpenMenu open;
@@ -4179,7 +4201,7 @@ bool PlayScreen::handleMenu(Command command) {
 }
 
 bool PlayScreen::clickMenu(int x, int y) {
-    if (art_ == nullptr || slide_ || dialog_ || colonyScreen_ || europeScreen_) {
+    if (art_ == nullptr || slide_ || dialog_ || colonyScreen_ || europeScreen_ || routeScreen_ >= 0) {
         return false;
     }
     const int title = menuTitleAt(*art_, art_->menus, x, y);
@@ -4463,6 +4485,9 @@ bool PlayScreen::pickMenuEntry(int entry) {
         case kGoToPort:
         case kGoToPlace:
             return handle(Command::GoTo);
+        case kTradeRoute:
+            beginTradeRoute();
+            return true;
         case kDump:
             return handle(Command::Dump);
         case kDisband:
@@ -4482,6 +4507,21 @@ bool PlayScreen::pickMenuEntry(int entry) {
         default:
             notYet();
             return true;
+        }
+    }
+    if (section == "TRADE") {
+        switch (entry) {
+        case trade_menu::kEdit:
+            editTradeRoute();
+            return true;
+        case trade_menu::kCreate:
+            createTradeRoute();
+            return true;
+        case trade_menu::kDelete:
+            deleteTradeRoute();
+            return true;
+        default:
+            break;
         }
     }
     notYet();

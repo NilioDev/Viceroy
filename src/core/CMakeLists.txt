@@ -35,6 +35,7 @@ add_library(vcr_core STATIC
     src/game/rumour.cpp
     src/game/route.cpp
     src/game/goto.cpp
+    src/game/trade_routes.cpp
     src/game/native_turn.cpp
     src/game/colony.cpp
     src/game/colony_moves.cpp
@@ -48,7 +49,9 @@ add_library(vcr_core STATIC
     src/render/dialog.cpp
     src/render/menu_bar.cpp
     src/render/report_view.cpp
+    src/render/trade_route_view.cpp
     src/ui/play.cpp
+    src/ui/play_routes.cpp
     src/ui/title.cpp
     src/ui/new_game_flow.cpp
     src/ui/debug_menu.cpp
