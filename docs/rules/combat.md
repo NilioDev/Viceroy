@@ -79,7 +79,26 @@ veteran soldier attacking a dragoon in forest on Discoverer: 80 against 36).
    below.
 
 All divisions round down. See [natives](natives.md) for the natives' side.
-Not covered yet: ships, and the rules after independence.
+
+## During the war of independence
+
+Read from the original with a disassembler. After Spain's bonus (step 7)
+and before the steps for the easy levels:
+
+- On a colony, the Crown's attack gets half again, and then the colony's
+  Tories in % (100 − its Sons of Liberty). The rebels' attack on a colony
+  gets its Sons of Liberty in %, with half again first once the foreign
+  power has joined the war.
+- In the open, the Crown's attack on land gets 5% for each level of
+  difficulty (attack × difficulty / 20).
+- On Discoverer and Explorer the help to a human colony under attack
+  (step 8, its first two parts) is gone during the war, unless a ship
+  attacks.
+
+At sea, the last ship of a kind is no longer only damaged during the war;
+only the Crown's last man-of-war is. A rebel ship that is damaged with no
+drydock of its own to go to is lost, as Europe is closed. The Crown's
+damaged ships go home to the player's home port.
 
 ## Hardening after a win
 
@@ -88,8 +107,11 @@ is a soldier or dragoon, may move up:
 
 - A free colonist becomes a veteran, an indentured servant a free colonist,
   and a petty criminal an indentured servant. Indian converts stay converts.
-  Experts and veterans don't move (veterans can become Continental Army
-  after independence, which is not covered yet).
+  Experts don't move. Veterans move only during the war of independence,
+  once the player has raised the Continental Army (the player's flag,
+  whoever the unit is): a veteran soldier becomes Continental Army and a
+  veteran dragoon Continental Cavalry, only for a human player
+  (`@CONTINENTAL`, which names the new kind).
 - With George Washington in the nation's congress it always happens.
 - Otherwise the original rolls 1 to (own + opponent's number), using the two
   numbers the fight was rolled on. The human player's units add the

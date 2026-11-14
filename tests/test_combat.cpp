@@ -526,3 +526,59 @@ VCR_TEST("combat: without a drydock a damaged ship goes back to Europe") {
     const auto notices = g.takeNotices();
     VCR_CHECK(notices.size() == 1 && notices[0].section == "SHIPDAMAGE" && notices[0].value == kDutch);
 }
+
+VCR_TEST("combat: during the war a rebel ship with no drydock is lost") {
+    Game g = seaBattleUntil(CombatOutcome::DefenderWon, [](Game& game) {
+        game.state().header[18] = 0x01;
+        game.state().header[98] = kFrench;
+    });
+    VCR_CHECK(g.unitCount() == 1);
+    VCR_CHECK(g.unit(0).nation == kFrench);
+    const auto notices = g.takeNotices();
+    VCR_CHECK(notices.size() == 1 && notices[0].section == "SHIPSUNK");
+}
+
+VCR_TEST("combat: during the war veterans harden to the Continental Army") {
+    Game g = battle(unit_type::kDragoon, unit_type::kSoldier);
+    g.state().nations[kDutch].raw[8] = 0x08; // George Washington
+    g.state().units[0].profession = 0x15;
+    g.state().header[18] = 0x01;
+    g.promote(0, 80, 24);
+    VCR_CHECK(g.unit(0).type == unit_type::kDragoon); // not yet raised
+    g.state().nations[kDutch].raw[0] |= 0x08;          // the Continental Army raised
+    g.promote(0, 80, 24);
+    VCR_CHECK(g.unit(0).type == 7 && g.unit(0).profession == 0x15);
+    const auto notices = g.takeNotices();
+    VCR_CHECK(notices.size() == 1 && notices[0].section == "CONTINENTAL");
+    g.state().units[0].type = unit_type::kSoldier;
+    g.promote(0, 80, 24);
+    VCR_CHECK(g.unit(0).type == 9);
+}
+
+VCR_TEST("combat: the war's bonuses on the attack") {
+    Game g = battle(unit_type::kSoldier, unit_type::kDragoon);
+    auto& s = g.state();
+    s.difficulty = 4;
+    s.turn = 200;
+    VCR_CHECK(g.combatStrengths(0, 1).attack == 24);
+    // The Crown in the open: 5% a level.
+    s.header[18] = 0x01;
+    s.header[98] = kDutch;
+    VCR_CHECK(g.combatStrengths(0, 1).attack == 28);
+    // On a colony of 60% Sons of Liberty: half again, then the Tories' 40%.
+    SaveColony c;
+    c.x = 1;
+    c.y = 1;
+    c.nation = kFrench;
+    c.population = 10;
+    c.rebelDividend = 6000;
+    c.rebelDivisor = 10000;
+    s.colonies.push_back(c);
+    s.map.at(1, 1).flags |= MapSquare::kHasColony;
+    VCR_CHECK(g.combatStrengths(0, 1).attack == 50);
+    // The rebels: the Sons' 60%, and half again once the power has joined.
+    s.header[98] = kFrench;
+    VCR_CHECK(g.combatStrengths(0, 1).attack == 38);
+    s.header[18] |= 0x02;
+    VCR_CHECK(g.combatStrengths(0, 1).attack == 57);
+}

@@ -333,12 +333,33 @@ CombatStrengths Game::strengthsAgainst(int attacker, const SaveUnit& du, bool de
     if (settlement && au.nation == kSpain && !defenderEuropean) {
         a += a >> 1;
     }
+    // Read from the original: the war of independence. On a colony the
+    // Crown attacks with half again and the colony's Tories in %, the
+    // rebels with its Sons of Liberty in % (and half again once the foreign
+    // power has joined); in the open the Crown adds 5% a level of
+    // difficulty on land.
+    const bool war = (save_.header[18] & 0x01) != 0;
+    if (war && attackerEuropean) {
+        const bool crown = au.nation == crownNation();
+        if (colony) {
+            if (crown || (save_.header[18] & 0x02) != 0) {
+                a += a >> 1;
+            }
+            const auto& c = save_.colonies[static_cast<std::size_t>(*colony)];
+            const int sons = sonsOfLibertyPercent(c, nationEffects(save_, c.nation).libertyExtra(true));
+            a += a * (crown ? 100 - sons : sons) / 100;
+        } else if (crown && save_.map.inside(du.x, du.y) && !save_.map.at(du.x, du.y).isWater()) {
+            a += a * difficulty / 20;
+        }
+    }
     if (beforeLevels) {
         // Where the original stops when a computer player only weighs an
         // attack: the steps below are left out of its odds.
         return {std::max(0, a), std::max(0, d)};
     }
-    if (difficulty <= 1) {
+    // During the war the easy levels' help to a colony under attack is
+    // gone, unless a ship attacks.
+    if (difficulty <= 1 && !(war && colony && !isShip(attacker))) {
         constexpr int kEarlyTurns = 80;
         if (defenderHuman && save_.turn < kEarlyTurns && colony) {
             a = difficulty == 0 ? a - (a >> 2) : a >> 1;
@@ -346,9 +367,9 @@ CombatStrengths Game::strengthsAgainst(int attacker, const SaveUnit& du, bool de
         if (defenderHuman && (!attackerEuropean || save_.turn < kEarlyTurns)) {
             a >>= 1;
         }
-        if (difficulty == 0 && attackerHuman) {
-            a <<= 1;
-        }
+    }
+    if (difficulty == 0 && attackerHuman) {
+        a <<= 1;
     }
     if (colony && defenderEuropean) {
         // Read from the original: a tribe never takes a nation's last
@@ -546,13 +567,44 @@ void Game::loseShip(int loser, int winner) {
     bool damaged = true;
     if (wt.attack > 0 && wt.guns > 0) {
         damaged = 1 + nextRandom(wt.guns + lt.hull) <= lt.hull;
-        if (!damaged) {
+        const bool war = (save_.header[18] & 0x01) != 0;
+        if (!damaged && !war) {
             int same = 0;
             for (const auto& u : save_.units) {
                 same += u.nation == nation && u.type == unit(loser).type ? 1 : 0;
             }
             damaged = same < 2;
+        } else if (!damaged && nation == crownNation() && unit(loser).type == kManOWar) {
+            // Read from the original: during the war only the Crown's last
+            // man-of-war is spared.
+            int same = 0;
+            for (const auto& u : save_.units) {
+                same += u.nation == nation && u.type == kManOWar ? 1 : 0;
+            }
+            damaged = same < 2;
         }
+    }
+    // Where a damaged ship goes: the nearest of its nation's colonies with
+    // a drydock, or Europe.
+    const auto drydock = [&] {
+        int best = -1;
+        int bestDistance = 0;
+        const auto& l = unit(loser);
+        for (std::size_t c = 0; c < save_.colonies.size(); ++c) {
+            const auto& col = save_.colonies[c];
+            if (col.nation != nation || buildingLevel(col, BuildingKind::Docks) < 2) {
+                continue;
+            }
+            const int distance = std::max(std::abs(col.x - l.x), std::abs(col.y - l.y));
+            if (best < 0 || distance < bestDistance) {
+                best = static_cast<int>(c);
+                bestDistance = distance;
+            }
+        }
+        return best;
+    }();
+    if (damaged && drydock < 0 && nation == human() && (save_.header[18] & 0x01) != 0) {
+        damaged = false; // read from the original: during the war Europe is closed to the rebels' ships
     }
     const auto aboard = passengers(loser);
     if (!damaged) {
@@ -608,29 +660,19 @@ void Game::loseShip(int loser, int winner) {
         start = std::max(start, 8);
     }
     l.workTurns = start;
-    int best = -1;
-    int bestDistance = 0;
-    for (std::size_t c = 0; c < save_.colonies.size(); ++c) {
-        const auto& col = save_.colonies[c];
-        if (col.nation != nation || buildingLevel(col, BuildingKind::Docks) < 2) {
-            continue;
-        }
-        const int distance = std::max(std::abs(col.x - l.x), std::abs(col.y - l.y));
-        if (best < 0 || distance < bestDistance) {
-            best = static_cast<int>(c);
-            bestDistance = distance;
-        }
-    }
     GameNotice notice{"SHIPDAMAGE", {"", lt.name, ""}};
     notice.adjectives = {{0, nation}};
-    if (best >= 0) {
-        const auto& col = save_.colonies[static_cast<std::size_t>(best)];
+    if (drydock >= 0) {
+        const auto& col = save_.colonies[static_cast<std::size_t>(drydock)];
         l.x = col.x;
         l.y = col.y;
         notice.strings[2] = col.name;
     } else {
         setEuropeStage(l, kPortStage);
-        notice.value = nation; // the screen names the home port
+        // The screen names the home port; the Crown's is the player's
+        // (read from the original).
+        const bool crown = (save_.header[18] & 0x01) != 0 && nation == crownNation();
+        notice.value = crown ? human() : nation;
     }
     if (winner >= 0 || nation == human()) {
         notices_.push_back(std::move(notice));
@@ -793,9 +835,19 @@ void Game::promote(int index, int own, int opponent) {
     if (u.type != unit_type::kSoldier && u.type != unit_type::kDragoon) {
         return;
     }
-    // Veterans only go further after independence, and experts never.
+    // Veterans only go further during the war of independence, once the
+    // Continental Army has been raised (the player's flag, whoever the
+    // unit is); other experts never.
     const int from = u.profession;
-    if (from != kIndenturedServant && from != kPettyCriminal && from != kIndianConvert && from != kFreeColonist) {
+    if (from == kVeteranSoldier) {
+        constexpr std::uint8_t kDeclared = 0x01;
+        constexpr std::uint8_t kMobilized = 0x08;
+        if ((save_.header[18] & kDeclared) == 0 ||
+            (save_.nations[static_cast<std::size_t>(this->human())].raw[0] & kMobilized) == 0) {
+            return;
+        }
+    } else if (from != kIndenturedServant && from != kPettyCriminal && from != kIndianConvert &&
+               from != kFreeColonist) {
         return;
     }
     // The chance is the opponent's share of the fight: an unlikely win
@@ -816,17 +868,35 @@ void Game::promote(int index, int own, int opponent) {
     const int to = from == kPettyCriminal       ? kIndenturedServant
                    : from == kIndenturedServant ? kFreeColonist
                    : from == kIndianConvert     ? kIndianConvert
+                   : from == kVeteranSoldier    ? -1 // the Continental Army
                                                 : kVeteranSoldier;
     if (to == from) {
         return;
     }
-    u.profession = to;
+    const bool humanControl = u.nation >= 0 && u.nation < kEuropeanNations &&
+                              save_.players[static_cast<std::size_t>(u.nation)].control == 0;
+    if (to < 0) {
+        if (!humanControl) {
+            return;
+        }
+        u.type = u.type == unit_type::kSoldier ? kContinentalArmy : kContinentalCavalry;
+    } else {
+        u.profession = to;
+    }
     if (!human) {
         return;
     }
     const auto typeName = u.type < static_cast<int>(rules_.units.size())
                               ? rules_.units[static_cast<std::size_t>(u.type)].name
                               : std::string();
+    if (to < 0) {
+        // "Our Veteran ... have hardened to Continental Army status" (the
+        // original names the new kind).
+        GameNotice notice{"CONTINENTAL", {typeName}};
+        notice.unit = index;
+        notices_.push_back(std::move(notice));
+        return;
+    }
     if (to == kVeteranSoldier) {
         // "Our Dragoons have hardened to Veteran status, Your Excellency!"
         notices_.push_back({"VETERAN", {typeName}});
