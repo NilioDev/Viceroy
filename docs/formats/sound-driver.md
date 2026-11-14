@@ -27,6 +27,15 @@ music voices, each on its own stream in the data segment. It can also name
 one voice as the drum voice. Viceroy finds each command's streams by reading
 that small piece of start-up code.
 
+One tune (3Ch, the city of gold's) fades nothing out. Its first three
+voices each begin with a rest whose length the command sets before starting
+the voice: 14, 28 or 42 ticks plus a random 0 to 7 (the driver's own random
+numbers). The fourth starts at once on the stream the three run into, so
+the piece comes in as a round that differs every time.
+
+Tune 34h is not played by Viceroy yet: it sets the beat clock (48 ticks)
+itself and starts eight voices, and command 8026h joins it on the beat.
+
 ## Voices and the chip
 
 There are nine voices:
