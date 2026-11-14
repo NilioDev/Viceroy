@@ -63,6 +63,16 @@ enum class WorkResult {
     AlreadyRoad,   // GAME.TXT @NOROAD
 };
 
+// Music the original asks for with an event (see docs/rules/sound.md): a
+// mood for the next tune, a mood now, a mood that only changes the tune at
+// once with Event Music alone, or a tune of its own (a driver command).
+struct MusicCue {
+    enum class Kind { SetMood, ChangeMood, MoodEvent, Pick };
+    Kind kind = Kind::SetMood;
+    int value = 0;
+    bool operator==(const MusicCue&) const = default;
+};
+
 // Something the player is told in a message box: a GAME.TXT section and
 // the %STRINGs that go in it.
 struct GameNotice {
@@ -82,6 +92,8 @@ struct GameNotice {
     std::vector<std::pair<int, int>> countries{};
     // %STRINGs that are a nation's home port ("London").
     std::vector<std::pair<int, int>> ports{};
+    // The music that goes with it, when the box shows.
+    std::vector<MusicCue> music{};
 };
 
 enum class FoundResult {
@@ -184,6 +196,11 @@ public:
     // Message boxes for the player that came up since the last call: a
     // pioneer out of tools, ...
     std::vector<GameNotice> takeNotices() { return std::exchange(notices_, {}); }
+    // Music asked for without a message box.
+    std::vector<MusicCue> takeMusicCues() { return std::exchange(musicCues_, {}); }
+    // The mood of a tribe's own tune: the Inca and the Aztecs have one each,
+    // the other tribes share one.
+    static int tribeMood(int tribe);
     // A unit the colony on this square has built.
     void addBuiltUnit(int x, int y, int nation, int type);
     // A free colonist appears on the square (born in a colony).
@@ -681,6 +698,7 @@ private:
     Ruleset rules_;
     std::vector<std::string> lastTurnNews_;
     std::vector<GameNotice> notices_;
+    std::vector<MusicCue> musicCues_;
     // A brave's visit, while it waits on the player's answer.
     struct BraveVisitState {
         int nation = -1;

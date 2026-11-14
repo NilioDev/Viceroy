@@ -101,9 +101,12 @@ touch controls.
 >
 > The music plays during a game: the original's own tunes, read from its
 > sound driver for OPL3 cards (Sound Blaster Pro and 16) and played on an
-> emulated chip, with the recorded drums of a card that plays samples. As in the original a new tune starts whenever one ends,
-> and Sound Options in the Game menu turn background music, event music
-> and sound effects on or off. Pick Music chooses the next tune yourself.
+> emulated chip, with the recorded drums of a card that plays samples. As
+> in the original a new tune starts whenever one ends, and events change the
+> mood of the music as they do there (a famine, a sunk ship, meeting a tribe,
+> a lost city). Sound Options in the Game menu turn background music, event
+> music and sound effects on or off. Pick Music chooses the next tune
+> yourself.
 
 Viceroy is not affiliated with or endorsed by the makers of the original
 game. It contains none of the original game's files: you need your own copy.

@@ -287,6 +287,9 @@ void Game::winAgainstVillage(int attacker, int settlement) {
             // "Frightened Apache flock to Dutch mission as converts."
             GameNotice notice{"INDIANSLAVES", {adjective, ""}};
             notice.adjectives = {{1, nation}};
+            if (nation == human()) {
+                notice.music = {{MusicCue::Kind::ChangeMood, 4}}; // read from the original
+            }
             notices_.push_back(std::move(notice));
         }
     }
@@ -308,6 +311,9 @@ void Game::winAgainstVillage(int attacker, int settlement) {
         GameNotice notice{"LOOT", {"", adjective, ""}, place};
         notice.adjectives = {{0, nation}};
         notice.numbers = {treasure * 100};
+        if (nation == human()) {
+            notice.music = {{MusicCue::Kind::ChangeMood, 2}}; // read from the original
+        }
         notices_.push_back(std::move(notice));
     } else {
         GameNotice notice{"LOOT2", {"", adjective, ""}, place};

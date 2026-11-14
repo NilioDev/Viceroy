@@ -454,14 +454,18 @@ bool Game::starve(const ColonyTurn& turn, int c) {
     }
     if (colony.population <= 1) {
         if (ours) {
-            notices_.push_back(GameNotice{"VANISH", {colony.name}});
+            GameNotice notice{"VANISH", {colony.name}};
+            notice.music = {{MusicCue::Kind::ChangeMood, 1}};
+            notices_.push_back(std::move(notice));
         }
         removeColony(c);
         return true;
     }
     if (ours) {
         const bool autumnNext = save_.year >= 1600 && save_.season == 0;
-        notices_.push_back(GameNotice{autumnNext ? "STARVE2" : "STARVE1", {colony.name}, -1, {}, c});
+        GameNotice notice{autumnNext ? "STARVE2" : "STARVE1", {colony.name}, -1, {}, c};
+        notice.music = {{MusicCue::Kind::ChangeMood, 1}};
+        notices_.push_back(std::move(notice));
     }
     removeColonist(colony, nextRandom(colony.population));
     return false;
@@ -490,9 +494,13 @@ void Game::foodNotices(const ColonyTurn& turn, int c) {
     // winter coming when the next turn is autumn.
     if (turn.foodRanOut) {
         const bool autumnNext = save_.year >= 1600 && save_.season == 0;
-        notices_.push_back(GameNotice{autumnNext ? "FOOD2" : "FOOD1", {colony.name}, -1, {}, c});
+        GameNotice notice{autumnNext ? "FOOD2" : "FOOD1", {colony.name}, -1, {}, c};
+        notice.music = {{MusicCue::Kind::MoodEvent, 1}};
+        notices_.push_back(std::move(notice));
     } else if (turn.foodShort > 0 && food < 4 * turn.foodShort) {
-        notices_.push_back(GameNotice{"FOODLOW", {colony.name}, -1, {food}, c});
+        GameNotice notice{"FOODLOW", {colony.name}, -1, {food}, c};
+        notice.music = {{MusicCue::Kind::SetMood, 1}};
+        notices_.push_back(std::move(notice));
     }
 }
 
@@ -514,7 +522,9 @@ void Game::storageNotices(const ColonyTurn& turn, int c) {
         if (turn.cargoReady[g]) {
             const bool full = colony.stock[g] >= limit;
             const char* section = !full ? "CARGOREADY0" : canExpand ? "CARGOREADY1" : "CARGOREADY2";
-            notices_.push_back(GameNotice{section, {colony.name, goodName(good)}, -1, {limit}, c});
+            GameNotice notice{section, {colony.name, goodName(good)}, -1, {limit}, c};
+            notice.music = {{MusicCue::Kind::SetMood, 2}};
+            notices_.push_back(std::move(notice));
             // Measured: with Tutorial Hints on, the naval advisor follows the
             // first cargo report of the game with how to ship it home
             // ("there are 100 Cotton in ..."); never again after that.
@@ -658,7 +668,14 @@ void Game::endTurn() {
             // colonial advisor, with the map on the colony.
             const std::string what = turn.builtUnit >= 0 ? rules_.units[static_cast<std::size_t>(turn.builtUnit)].name
                                                          : constructionName(rules_, turn.built);
-            notices_.push_back(GameNotice{"BUILT", {colony.name, what}, -1, {}, static_cast<int>(c)});
+            GameNotice notice{"BUILT", {colony.name, what}, -1, {}, static_cast<int>(c)};
+            // Read from the original: the armory, magazine, printing press
+            // and newspaper call for the independence tunes.
+            constexpr int kArmory = 3, kMagazine = 4, kPress = 19, kNewspaper = 20;
+            const int b = turn.builtUnit >= 0 ? -1 : turn.built;
+            const bool rousing = b == kArmory || b == kMagazine || b == kPress || b == kNewspaper;
+            notice.music = {{MusicCue::Kind::MoodEvent, rousing ? 3 : 2}};
+            notices_.push_back(std::move(notice));
         }
         if (ours && turn.toolsNeeded > 0) {
             const int have = std::max(0, colony.stock[cargo::kTools]);
@@ -1003,6 +1020,11 @@ int Game::addUnitInEurope(int type, int profession, int nation) {
     setEuropeStage(u, kPortStage);
     save_.units.push_back(u);
     return unitCount() - 1;
+}
+
+int Game::tribeMood(int tribe) {
+    constexpr int kInca = 0, kAztec = 1;
+    return tribe == kInca ? 7 : tribe == kAztec ? 6 : 5;
 }
 
 int Game::randomRecruit(int nation) {

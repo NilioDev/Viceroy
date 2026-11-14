@@ -165,6 +165,7 @@ private:
     void showSoundOptions();
     void showPickMusic();
     void pickTune(int tune);
+    void playMusic(const std::vector<MusicCue>& cues);
     void moveActive(Step step);
     void activate(int index);
     void advance(); // to the next unit that needs orders

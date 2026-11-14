@@ -24,6 +24,7 @@ struct Dialog {
     bool checkbox = false;
     std::vector<bool> checked;
     int selected = 0;
+    int marked = -1; // a choice shown in gold: the tune playing in Pick Music
     bool small = false; // @smallfont: FONTTINY, for long lists
     bool help = false;  // "(F1 for Help)" in the corner
     int optionLeft = 9;

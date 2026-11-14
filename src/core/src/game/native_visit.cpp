@@ -136,8 +136,11 @@ bool Game::braveVisit(int brave, int direction, int nation) {
         block[warning + 1] = 0;
     }
     if (nation == human() && v.colony >= 0) {
-        // The original picks here whether the tribe's music plays.
-        nextRandom(9);
+        // Read from the original: one visit in nine makes the tribe's tune
+        // the next one.
+        if (nextRandom(9) == 0) {
+            musicCues_.push_back({MusicCue::Kind::SetMood, tribeMood(tribe)});
+        }
     }
     const auto economy = villageEconomy(save_, v.home);
     v.wants = economy.wants;
@@ -393,6 +396,7 @@ bool Game::visitDemand(BraveVisitState v) {
         notice.unit = v.brave;
         notice.colony = v.colony;
         notice.numbers = {amount};
+        notice.music = {{MusicCue::Kind::ChangeMood, tribeMood(v.tribe)}};
         notices_.push_back(std::move(notice));
         visits_.push_back(v);
         return true;
@@ -443,6 +447,7 @@ bool Game::visitWagons(BraveVisitState v) {
         notice.value = v.tribe;
         notice.unit = v.brave;
         notice.numbers = {v.amount};
+        notice.music = {{MusicCue::Kind::ChangeMood, tribeMood(v.tribe)}};
         notices_.push_back(std::move(notice));
         visits_.push_back(v);
         return true;

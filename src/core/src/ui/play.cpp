@@ -842,6 +842,7 @@ void PlayScreen::showNotices() {
     }
     GameNotice notice = notices_.front();
     notices_.erase(notices_.begin());
+    playMusic(notice.music);
     for (const auto& [string, nation] : notice.adjectives) {
         if (string >= 0) {
             if (notice.strings.size() <= static_cast<std::size_t>(string)) {
@@ -1221,6 +1222,7 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
                     choices_.push_back(kFirstTune[list] + i);
                     if (sound::tuneCommand(kFirstTune[list] + i) == playing) {
                         dialog_->selected = i;
+                        dialog_->marked = i;
                     }
                 }
             }
@@ -2225,6 +2227,7 @@ bool PlayScreen::save() {
 
 void PlayScreen::tick(std::uint64_t milliseconds) {
     clock_ += milliseconds;
+    playMusic(game_.takeMusicCues());
     view_.blinkOn = (clock_ / kBlinkMs) % 2 == 0;
     if (slide_) {
         slide_->elapsed += milliseconds;
@@ -2704,6 +2707,28 @@ void PlayScreen::setMusic(sound::BackgroundMusic* music) {
     music_ = music;
 }
 
+void PlayScreen::playMusic(const std::vector<MusicCue>& cues) {
+    if (music_ == nullptr) {
+        return;
+    }
+    for (const auto& cue : cues) {
+        switch (cue.kind) {
+        case MusicCue::Kind::SetMood:
+            music_->setMood(cue.value);
+            break;
+        case MusicCue::Kind::ChangeMood:
+            music_->changeMood(cue.value);
+            break;
+        case MusicCue::Kind::MoodEvent:
+            music_->moodEvent(cue.value);
+            break;
+        case MusicCue::Kind::Pick:
+            music_->pick(cue.value);
+            break;
+        }
+    }
+}
+
 void PlayScreen::showSoundOptions() {
     ask("SOUNDOPTIONS", -1);
     if (!dialog_) {
@@ -2728,6 +2753,9 @@ void PlayScreen::showPickMusic() {
     for (int tune = 1; tune <= sound::kTuneCount; ++tune) {
         if (sound::tuneCommand(tune) == playing) {
             dialog_->selected = tune <= 12 ? tune - 1 : tune <= 18 ? 12 : tune <= 22 ? 13 : 14;
+            if (tune <= 12) {
+                dialog_->marked = tune - 1; // seen: the tune playing in gold
+            }
             break;
         }
     }
