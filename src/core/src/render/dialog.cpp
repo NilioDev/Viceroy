@@ -496,7 +496,22 @@ int checkboxForLetter(const Dialog& d, char letter) {
     }
     const int want = std::toupper(static_cast<unsigned char>(letter));
     for (std::size_t i = 0; i < d.options.size(); ++i) {
-        for (const char c : d.options[i]) {
+        // A gold key letter ("Show ~Indian Moves" in the text) is the key;
+        // otherwise the first letter.
+        const auto& option = d.options[i];
+        bool keyed = false;
+        for (std::size_t at = option.find('{'); at != std::string::npos; at = option.find('{', at + 1)) {
+            if (at + 2 < option.size() && option[at + 2] == '}') {
+                keyed = true;
+                if (std::toupper(static_cast<unsigned char>(option[at + 1])) == want) {
+                    return static_cast<int>(i);
+                }
+            }
+        }
+        if (keyed) {
+            continue;
+        }
+        for (const char c : option) {
             if (c != '{' && c != '}' && c != '"' && c != ' ') {
                 if (std::toupper(static_cast<unsigned char>(c)) == want) {
                     return static_cast<int>(i);

@@ -291,6 +291,67 @@ VCR_TEST("original files: Colony Report Options set the report bits (read from t
     VCR_CHECK(play.game().colonyReportBits() == (before ^ colony_report::kTraining ^ colony_report::kRebels));
 }
 
+VCR_TEST("original files: Game Options, autosave and the turn ending by itself (read from the original)") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    const auto work = std::filesystem::temp_directory_path() / "viceroy_test_options";
+    std::filesystem::remove_all(work);
+    std::filesystem::create_directories(work);
+    std::filesystem::copy_file(*findFileNoCase(dir, "COLONY00.SAV"), work / "COLONY03.SAV");
+    std::ifstream in(work / "COLONY03.SAV", std::ios::binary);
+    const Bytes bytes(std::istreambuf_iterator<char>(in), {});
+    PlayScreen play(Game(readSaveGame(bytes), art.rules), work / "COLONY03.SAV");
+    play.setArt(&art);
+
+    // The save's 0xC6: both Show Moves, Autosave, Combat Analysis and Water
+    // Color Cycling ticked (seen in the original); this one has the
+    // tutorial's hints on too.
+    const int before = play.game().gameOptionBits();
+    VCR_CHECK((before >> 8) == 0xC6 && (before & game_option::kTutorialHints) != 0);
+    play.openMenu(0, true);
+    play.handle(Command::Confirm);
+    VCR_CHECK(play.dialog().has_value() && play.dialog()->checkbox);
+    VCR_CHECK(play.dialog()->x == 62 && play.dialog()->y == 41); // measured
+    const std::vector<bool> seen{true, true, false, false, true, true, true, true};
+    VCR_CHECK(play.dialog()->checked == seen);
+    // The gold letters: E turns End of Turn on, Y Water Color Cycling off,
+    // I Show Indian Moves off and on again.
+    play.dialogLetter('e');
+    play.dialogLetter('y');
+    play.dialogLetter('i');
+    VCR_CHECK(!play.dialog()->checked[0]);
+    play.dialogLetter('i');
+    play.handle(Command::Confirm);
+    VCR_CHECK(!play.dialog().has_value());
+    VCR_CHECK(play.game().gameOptionBits() == (before | game_option::kEndOfTurn | game_option::kNoWaterCycling));
+
+    // With End of Turn on, the game waits at the end of the turn.
+    for (int i = 0; i < 200 && !play.waitingForEndOfTurn(); ++i) {
+        play.handle(Command::Skip);
+    }
+    VCR_CHECK(play.waitingForEndOfTurn());
+    const int year = play.game().state().year;
+    const int season = play.game().state().season;
+    play.tick(2000);
+    VCR_CHECK(play.waitingForEndOfTurn() && play.game().state().year == year);
+    // Without it the turn ends by itself, and the new turn is autosaved in
+    // COLONY09.SAV while the game stays in its own slot.
+    play.handle(Command::Menu);
+    play.handle(Command::Cancel);
+    auto& game = play.game();
+    game.setGameOptionBits(game.gameOptionBits() & ~game_option::kEndOfTurn);
+    for (int i = 0; i < 20 && play.game().state().year == year && play.game().state().season == season; ++i) {
+        play.tick(100);
+    }
+    VCR_CHECK(play.game().state().year != year || play.game().state().season != season);
+    VCR_CHECK(std::filesystem::exists(work / "COLONY09.SAV"));
+    VCR_CHECK(play.savePath() == work / "COLONY03.SAV");
+    std::filesystem::remove_all(work);
+}
+
 VCR_TEST("original files: Pick Music plays the tune picked") {
     const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
     if (!isGameFolder(dir)) {

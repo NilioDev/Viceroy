@@ -297,6 +297,10 @@ SaveGame newAmericaGame(std::span<const std::uint8_t> mapFile, const Ruleset& ru
     }
     put16(h + 98, -1);
     put16(h + 100, -1); // no power to help in the war of independence yet (as in every save)
+    // The Game Options of every save of the original we have seen: Show
+    // Indian and Foreign Moves, Autosave, Combat Analysis and Water Color
+    // Cycling on, the rest off.
+    h[19] = 0xC6;
 
     // The market is drawn once and shared by all.
     std::array<int, kGoodsKinds> prices{};
