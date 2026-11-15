@@ -639,6 +639,10 @@ public:
     };
     // The unit goes in; its turn is over. LEARNSTAY asks whether to learn.
     NativeLesson liveAmongNatives(int unit, int settlement);
+    // Read from the original: when one of the player's units trades with a
+    // village or goes to live among its people, one time in four the
+    // tribe's tune becomes the next one (a music cue, see takeMusicCues).
+    void villageVisitMood(int nation, int tribe);
     // The answer "Then I shall become a master ...": the unit learns.
     void learnFromNatives(int unit, int settlement);
     // A missionary may found a mission at a settlement without one.
@@ -925,6 +929,10 @@ public:
     // has kMercenaryQuestion as its value.
     static constexpr int kMercenaryQuestion = 2;
     static constexpr int kTreasureQuestion = 3;
+    // The King offers a frigate against the warships near the colonies
+    // (KINGFRIGATE, value kFrigateQuestion): yes sends it, for a tax rise.
+    static constexpr int kFrigateQuestion = 4;
+    void answerKingFrigate(bool yes);
     bool mercenariesWaiting() const { return mercenaries_.price > 0; }
     // "Pay": the gold goes and the mercenaries land at one of the player's
     // coastal colonies (notice MERCS).
@@ -1362,6 +1370,8 @@ private:
     bool loseBattle(int loser, int winner);
     // The sounds of a fight, read from the original (docs/rules/sound.md):
     // sent at once, when the player's unit or colony is in it.
+    void kingFrigate(int n, int turn);
+    void sendKingFrigate(int n);
     void sound(int command) { musicCues_.push_back({MusicCue::Kind::Sound, command}); }
     int europeArrival_ = -1;
     void fightStartSound(int attackerNation, int attackerType, int defenderNation, int defenderType);

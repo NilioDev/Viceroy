@@ -697,3 +697,59 @@ VCR_TEST("european ai: computer colonies lose no work to tories") {
     VCR_CHECK(workModifier(c, 0).penalty == 1);
     VCR_CHECK(workModifier(c, 0, false).penalty == 0);
 }
+
+VCR_TEST("european ai: the King sends a frigate against warships near the colonies") {
+    constexpr int kFrench = 1;
+    constexpr int kDutch = 3;
+    constexpr int kFrigate = 17;
+    const auto frigates = [](const Game& g, int nation) {
+        int n = 0;
+        for (int i = 0; i < g.unitCount(); ++i) {
+            n += g.unit(i).nation == nation && g.unit(i).type == kFrigate ? 1 : 0;
+        }
+        return n;
+    };
+    SaveGame s = aiSave();
+    s.turn = 8;
+    for (const int n : {kFrench, kDutch}) {
+        SaveColony c;
+        c.x = 4;
+        c.y = n == kFrench ? 2 : 7;
+        c.nation = n;
+        c.population = 2;
+        s.colonies.push_back(c);
+        s.map.at(c.x, c.y).flags |= MapSquare::kHasColony;
+        s.map.at(c.x, c.y).region = static_cast<std::uint8_t>(n << 4 | 2);
+    }
+    s.units.push_back(unitAt(3, 2, kFrigate, 0)); // English frigates off both
+    s.units.push_back(unitAt(3, 7, kFrigate, 0));
+    {
+        Game g(s, aiRules());
+        g.europeanTurn(kFrench);
+        VCR_CHECK(frigates(g, kFrench) == 1);
+    }
+    {
+        // Not on a turn that is not a multiple of eight.
+        SaveGame odd = s;
+        odd.turn = 9;
+        Game g(odd, aiRules());
+        g.europeanTurn(kFrench);
+        VCR_CHECK(frigates(g, kFrench) == 0);
+    }
+    {
+        // The player is asked at the end of turn 7, and pays 10 in tax.
+        SaveGame human = s;
+        human.turn = 7;
+        Game g(human, aiRules());
+        g.endTurn();
+        bool asked = false;
+        for (const auto& n : g.takeNotices()) {
+            asked = asked || (n.section == "KINGFRIGATE" && n.value == Game::kFrigateQuestion);
+        }
+        VCR_CHECK(asked);
+        const int tax = g.state().nations[kDutch].taxRate;
+        g.answerKingFrigate(true);
+        VCR_CHECK(frigates(g, kDutch) == 1);
+        VCR_CHECK(g.state().nations[kDutch].taxRate == tax + 10);
+    }
+}

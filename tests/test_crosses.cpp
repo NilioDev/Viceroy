@@ -97,3 +97,36 @@ VCR_TEST("docks: who comes next follows the original's draw") {
         VCR_CHECK(dutch.recruits[1] != 0x19 && dutch.recruits[1] != 0x1A);
     }
 }
+
+VCR_TEST("crosses: a newcomer brings a cheerful tune; with Brewster the player chooses") {
+    Game g = crossGame(7, 9);
+    g.endTurn();
+    auto notices = g.takeNotices();
+    VCR_CHECK(notices.size() == 1 && !notices[0].music.empty());
+    VCR_CHECK(!notices.empty() && notices[0].music[0].kind == MusicCue::Kind::SetMood &&
+              notices[0].music[0].value == 2);
+
+    Game brewster = crossGame(7, 9);
+    brewster.state().nations[3].raw[7 + 20 / 8] |= 1U << (20 % 8);
+    brewster.endTurn();
+    notices = brewster.takeNotices();
+    VCR_CHECK(notices.size() == 1 && notices[0].section == "RECRUITCHOOSE");
+    VCR_CHECK(brewster.unitCount() == 0); // nobody until the player chooses
+    VCR_CHECK(brewster.state().nations[3].crosses == 0);
+    VCR_CHECK(brewster.recruitFree(1) >= 0 && brewster.unitCount() == 1);
+}
+
+VCR_TEST("natives: trading or living with a tribe now and then brings its tune") {
+    Game g = crossGame(0, 10);
+    int cues = 0;
+    for (int i = 0; i < 400; ++i) {
+        g.villageVisitMood(3, 1); // the Aztecs
+        for (const auto& cue : g.takeMusicCues()) {
+            VCR_CHECK(cue.kind == MusicCue::Kind::SetMood && cue.value == 6);
+            ++cues;
+        }
+        g.villageVisitMood(0, 1); // not the player: nothing
+        VCR_CHECK(g.takeMusicCues().empty());
+    }
+    VCR_CHECK(cues > 60 && cues < 140);
+}
