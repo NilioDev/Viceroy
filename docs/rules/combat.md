@@ -108,6 +108,19 @@ only the Crown's last man-of-war is. A rebel ship that is damaged with no
 drydock of its own to go to is lost, as Europe is closed. The Crown's
 damaged ships go home to the player's home port.
 
+## When another European attacks the player
+
+Read from the original: after a fight in which another European nation
+attacked one of the player's units (not a colonist defending a colony),
+the player is told who won, before what the loser loses:
+
+- `EUROPEWIN` when the attacker won: "English defeat Dutch Soldiers near
+  Jamestown!" (the attacker's and the player's adjectives, the beaten
+  unit's kind, the nearest colony of anyone, or "Wilderness");
+- `EUROPELOSE` when the player's unit held: "Dutch Soldiers defeat English
+  near Jamestown!", "defeats" for artillery and the kinds after it; the
+  mood turns to 4 at once.
+
 ## Hardening after a win
 
 Watched in the original with a debugger. After every fight the winner, if it

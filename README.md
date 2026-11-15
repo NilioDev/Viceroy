@@ -70,7 +70,8 @@ touch controls.
 > before breaking a peace treaty, the Combat Analysis option shows the
 > odds, the fight is rolled the way the original rolls it (with its help
 > on the easy levels), the loser is demoted, damaged or captured, and a
-> winning soldier can harden to a veteran. Warships fight other ships: the
+> winning soldier can harden to a veteran; when another nation attacks your
+> men you are told who won. Warships fight other ships: the
 > weaker one may evade, and a beaten ship sinks or limps to a drydock or
 > Europe for repairs. Colonists can walk into a native settlement and
 > live among the natives to learn the skill it teaches, and scouts can

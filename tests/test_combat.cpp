@@ -627,3 +627,36 @@ VCR_TEST("combat: a taken colony is told as the original tells it") {
         VCR_CHECK(notices.back().strings.at(2) == "Martinique");
     }
 }
+
+VCR_TEST("combat: the player hears who won when another European attacks") {
+    for (int round = 0; round < 6; ++round) {
+        Game g = battle(unit_type::kSoldier, unit_type::kSoldier);
+        g.state().humanNation = kFrench; // the defender
+        for (int k = 0; k < round; ++k) {
+            g.randomPick(7);
+        }
+        const auto outcome = g.attack(0, 1);
+        std::vector<GameNotice> reports;
+        for (auto& n : g.takeNotices()) {
+            if (n.section == "EUROPEWIN" || n.section == "EUROPELOSE") {
+                reports.push_back(std::move(n));
+            }
+        }
+        VCR_CHECK(reports.size() == 1);
+        if (reports.size() != 1) {
+            continue;
+        }
+        const auto& r = reports[0];
+        VCR_CHECK(r.section == (outcome == CombatOutcome::AttackerWon ? "EUROPEWIN" : "EUROPELOSE"));
+        VCR_CHECK(r.strings.size() == 5 && r.strings[2] == "Soldiers");
+        VCR_CHECK(std::find(r.labels.begin(), r.labels.end(), std::pair<int, int>{3, 17}) != r.labels.end());
+        VCR_CHECK(std::find(r.labels.begin(), r.labels.end(), std::pair<int, int>{4, 73}) != r.labels.end());
+        VCR_CHECK(r.music.empty() == (r.section == "EUROPEWIN"));
+    }
+    // The player's own attack is not reported so.
+    Game g = battle(unit_type::kSoldier, unit_type::kSoldier);
+    g.attack(0, 1);
+    for (const auto& n : g.takeNotices()) {
+        VCR_CHECK(n.section != "EUROPEWIN" && n.section != "EUROPELOSE");
+    }
+}

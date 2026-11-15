@@ -2,6 +2,7 @@
 #include "viceroy/game/natives.hpp"
 
 #include "viceroy/game/game.hpp"
+#include "viceroy/sound/background_music.hpp"
 
 #include <algorithm>
 #include <cstdlib>
@@ -596,6 +597,12 @@ Game::NativeLesson Game::liveAmongNatives(int index, int settlement) {
 void Game::villageVisitMood(int nation, int tribe) {
     if (nation == human() && nextRandom(4) == 0) {
         musicCues_.push_back({MusicCue::Kind::SetMood, tribeMood(tribe)});
+    }
+}
+
+void Game::villageEntryMood(int nation, int tribe) {
+    if (nation == human() && !viceroy::sound::SoundOptions::fromSave(soundOptionBits()).background) {
+        musicCues_.push_back({MusicCue::Kind::ChangeMood, tribeMood(tribe)});
     }
 }
 

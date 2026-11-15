@@ -487,6 +487,8 @@ void PlayScreen::enterVillage(int unit, int settlement) {
     const auto& save = game_.state();
     const int tribe = tribeOf(save.settlements[static_cast<std::size_t>(settlement)]);
     const int nation = game_.unit(unit).nation;
+    game_.villageEntryMood(nation, tribe);
+    playMusic(game_.takeMusicCues());
     // "a Camp of Sioux": the settlement's word for the tribe's level.
     std::string place;
     if (const auto* levels = art_->names.find("LEVELS")) {

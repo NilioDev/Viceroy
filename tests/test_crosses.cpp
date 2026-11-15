@@ -2,6 +2,7 @@
 #include "test.hpp"
 
 #include "viceroy/game/game.hpp"
+#include "viceroy/sound/background_music.hpp"
 
 using namespace viceroy;
 
@@ -129,4 +130,18 @@ VCR_TEST("natives: trading or living with a tribe now and then brings its tune")
         VCR_CHECK(g.takeMusicCues().empty());
     }
     VCR_CHECK(cues > 60 && cues < 140);
+}
+
+VCR_TEST("natives: without Background Music, entering a village turns the music to the tribe's") {
+    for (const bool background : {true, false}) {
+        Game g = crossGame(0, 10);
+        auto options = sound::SoundOptions::fromSave(g.state().header[22]);
+        options.background = background;
+        g.state().header[22] = options.toSave(g.state().header[22]);
+        g.villageEntryMood(3, 0); // the Inca
+        const auto cues = g.takeMusicCues();
+        VCR_CHECK(background ? cues.empty() : cues == std::vector<MusicCue>{{MusicCue::Kind::ChangeMood, 7}});
+        g.villageEntryMood(1, 0);
+        VCR_CHECK(g.takeMusicCues().empty());
+    }
 }

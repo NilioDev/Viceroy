@@ -84,6 +84,7 @@ are four kinds of call:
 | A tribe is met (`INDIANWELCOME`) | the tribe's mood now; in the first 20 turns with Background Music on, a tribe other than the Inca and the Aztecs as next mood |
 | A tribe visits a colony | one visit in nine: the tribe's mood next |
 | The player trades with a village or goes to live among its people | one time in four: the tribe's mood next |
+| A unit of the player's enters a village | without Background Music, the tribe's mood now |
 | A colonist comes from the docks for crosses (`UNREST`, `RECRUITCHOOSE`) | next mood 2 (and mood now without Background Music) |
 | A tribe demands goods (`INDIANCITY`, `INDIANWAGONS`) | the tribe's mood now |
 | A ship sinks (`SHIPSUNK`) | event mood 1 for its owner, event mood 4 for the winner |
@@ -101,6 +102,7 @@ are four kinds of call:
 | Independence is declared, the Continental Army forms (`MOBILIZE`, `MOBILIZE2`), a power joins the war (`INTERVENTION`), the Crown lands (`INVASION`) | mood now 3 |
 | The power's force lands (`INTERVENE`) | event mood 3, then tune 3Fh |
 | A treaty breaks in an attack (`CANCELPEACE`, `SNEAK`) | mood now 4 |
+| The player's unit beats off a European attack (`EUROPELOSE`) | mood now 4 |
 | The leader declares war (`WARMEEK`, `WARMANLY`, `PROVOKE` after a threat), or takes the player's money for a war (`MERCENARY`) | mood now 4 |
 
 The tribe's mood is 7 for the Inca, 6 for the Aztecs and 5 for the others.
