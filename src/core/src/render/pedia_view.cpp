@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdint>
 
 namespace viceroy {
 
@@ -543,6 +544,248 @@ int drawBuildingPage(Screen& screen, const Art& art, const ColonyArt* colonyArt,
     return textY;
 }
 
+// ---- Terrain pages -------------------------------------------------------
+
+// Sprites of PHYS0.SS and TERRAIN.SS the terrain picture is made of.
+constexpr int kPhysMinorRiver = 16; // + neighbour mask (1 E, 2 W, 4 S, 8 N)
+constexpr int kPhysMountains = 32;
+constexpr int kPhysHills = 48;
+constexpr int kPhysForest = 64;
+constexpr int kPhysRoad = 81; // + direction: 0 N, 1 NE, 2 E, 3 SE, 4 S, ...
+constexpr int kPhysPlowed = 149;
+constexpr int kScrubForest = 9;
+constexpr int kScrubTile = 8;
+constexpr std::uint8_t kPictureFrame = 134;
+constexpr std::uint8_t kPictureEdge = 138;
+
+enum class TerrainResource {
+    None,
+    Oasis,
+    Grain,
+    Cotton,
+    Tobacco,
+    Sugar,
+    Minerals,
+    Fish,
+    Beaver,
+    Deer,
+    Timber,
+    Silver,
+    Ore
+};
+
+struct TerrainFacts {
+    TerrainResource resource;
+    int sprite;  // PHYS0.SS
+    int nameRow; // of @RESOURCE
+};
+
+// The resource each page shows (seen), by terrain number.
+TerrainFacts terrainFacts(int terrain) {
+    switch (terrain) {
+    case 1:
+    case 9:
+        return {TerrainResource::Oasis, 90, 1};
+    case 2:
+        return {TerrainResource::Grain, 91, 2};
+    case 3:
+        return {TerrainResource::Cotton, 92, 3};
+    case 4:
+        return {TerrainResource::Tobacco, 93, 4};
+    case 5:
+        return {TerrainResource::Sugar, 94, 5};
+    case 0:
+    case 6:
+    case 7:
+    case 14:
+    case 15:
+        return {TerrainResource::Minerals, 95, 6};
+    case 25:
+        return {TerrainResource::Fish, 96, 7};
+    case 10:
+        return {TerrainResource::Beaver, 97, 8};
+    case 8:
+    case 11:
+        return {TerrainResource::Deer, 98, 9};
+    case 12:
+    case 13:
+        return {TerrainResource::Timber, 99, 10};
+    case 27:
+        return {TerrainResource::Silver, 101, 12};
+    case 28:
+        return {TerrainResource::Ore, 102, 13};
+    default:
+        return {TerrainResource::None, -1, -1};
+    }
+}
+
+// What a resource adds to a job's yield, or 0; doubles: it doubles it.
+int resourceBonus(TerrainResource r, int job, bool& doubles) {
+    doubles = false;
+    switch (r) {
+    case TerrainResource::Oasis:
+    case TerrainResource::Grain:
+        return job == 0 ? 2 : 0;
+    case TerrainResource::Deer:
+        return job == 0 || job == 4 ? 2 : 0;
+    case TerrainResource::Fish:
+        return job == 8 ? 3 : 0;
+    case TerrainResource::Beaver:
+        return job == 4 ? 3 : 0;
+    case TerrainResource::Timber:
+        return job == 5 ? 2 : 0;
+    case TerrainResource::Minerals:
+        return job == 6 ? 3 : 0;
+    case TerrainResource::Ore:
+        return job == 6 ? 2 : 0;
+    case TerrainResource::Silver:
+        return job == 7 ? 2 : 0;
+    case TerrainResource::Cotton:
+        doubles = job == 3;
+        return 0;
+    case TerrainResource::Tobacco:
+        doubles = job == 2;
+        return 0;
+    case TerrainResource::Sugar:
+        doubles = job == 1;
+        return 0;
+    case TerrainResource::None:
+        break;
+    }
+    return 0;
+}
+
+// The picture (seen): three squares by three of the terrain, joined up
+// among themselves, the resource in the middle, a river coming in from the
+// west down the left column and a road going down the right column. On
+// open ground the corners are its forest and the bottom middle is plowed.
+void drawTerrainPicture(Screen& screen, const Art& art, int terrain, int px, int py) {
+    const bool water = terrain == 25 || terrain == 26;
+    const bool forest = terrain >= 8 && terrain < 16;
+    const bool open = terrain < 8;
+    const bool hills = terrain == 28;
+    const bool mountains = terrain == 27;
+    const int land = terrain < 16 ? terrain & 7 : 0;
+    for (int j = 0; j < 3; ++j) {
+        for (int i = 0; i < 3; ++i) {
+            const int x = px + 16 * i;
+            const int y = py + 16 * j;
+            const bool corner = i != 1 && j != 1;
+            const int mask = (i < 2 ? 1 : 0) | (i > 0 ? 2 : 0) | (j < 2 ? 4 : 0) | (j > 0 ? 8 : 0);
+            int tile = land;
+            if (terrain == 24) {
+                tile = 9;
+            } else if (terrain == 25) {
+                tile = 10;
+            } else if (terrain == 26) {
+                tile = 11;
+            } else if (terrain == kScrubForest || (terrain == 1 && corner)) {
+                tile = kScrubTile;
+            } else if (hills || mountains) {
+                tile = 3;
+            }
+            blitSprite(screen, art.terrain, tile, x, y);
+            if (water) {
+                continue;
+            }
+            if (open && i == 1 && j == 2) {
+                blitSprite(screen, art.phys, kPhysPlowed, x, y);
+            }
+            if (forest && terrain != kScrubForest) {
+                blitSprite(screen, art.phys, kPhysForest + mask, x, y);
+            } else if (open && corner && terrain != 1) {
+                blitSprite(screen, art.phys, kPhysForest, x, y);
+            }
+            const bool river = i == 0 && j > 0 && terrain != 24 && !hills && !mountains;
+            if (river) {
+                blitSprite(screen, art.phys, kPhysMinorRiver + (j == 1 ? 2 | 4 : 2 | 8), x, y);
+            }
+            if (hills) {
+                blitSprite(screen, art.phys, kPhysHills + mask, x, y);
+            }
+            if (mountains) {
+                blitSprite(screen, art.phys, kPhysMountains + mask, x, y);
+            }
+            if (i == 2 && j == 0) {
+                blitSprite(screen, art.phys, kPhysRoad + 1, x, y); // north-east
+                blitSprite(screen, art.phys, kPhysRoad + 4, x, y); // south
+            } else if (i == 2 && j == 1) {
+                blitSprite(screen, art.phys, kPhysRoad + 0, x, y); // north
+                blitSprite(screen, art.phys, kPhysRoad + 3, x, y); // south-east
+            }
+        }
+    }
+    const auto facts = terrainFacts(terrain);
+    if (facts.sprite >= 0) {
+        blitSprite(screen, art.phys, facts.sprite, px + 16, py + 16);
+    }
+}
+
+// The rows of what each job makes there, then the moves and the defence.
+// Returns where the text starts.
+int drawTerrainPage(Screen& screen, const Art& art, int terrain) {
+    constexpr int kPicX = 9;
+    constexpr int kPicY = 23;
+    screen.frame({kPicX - 2, kPicY - 2, 52, 52}, kPictureEdge);
+    screen.frame({kPicX - 1, kPicY - 1, 50, 50}, kPictureFrame);
+    drawTerrainPicture(screen, art, terrain, kPicX, kPicY);
+    const int row = terrain < 16 ? terrain : 16 + terrain - 24;
+    if (row < 0 || static_cast<std::size_t>(row) >= art.rules.terrain.size()) {
+        return 85;
+    }
+    const auto& t = art.rules.terrain[static_cast<std::size_t>(row)];
+    const auto facts = terrainFacts(terrain);
+    const int gap = 8;
+    int y = 21;
+    const auto item = [&](int& x, const std::string& text, std::uint8_t colour) {
+        say(screen, art, x, y + 6, text, colour);
+        x += Screen::textWidth(art.tiny, text) + gap;
+    };
+    for (int job = 0; job < static_cast<int>(kSquareWorkCount); ++job) {
+        int amount = t.yield[static_cast<std::size_t>(job)];
+        if (amount <= 0) {
+            continue;
+        }
+        if (job == 0 || job == 8) {
+            amount += 1; // a farmer makes one more; a fisherman by the coast too
+        } else if (job == 5) {
+            amount *= 2;
+        }
+        blitSprite(screen, art.icons, kExpertIcons + job, 63, y);
+        int x = 75;
+        const auto j = static_cast<std::size_t>(job);
+        const std::string jobName = j < art.rules.jobs.size() ? art.rules.jobs[j].name : std::string();
+        item(x, jobName + ": " + std::to_string(amount), kGold);
+        const int improvementLabel = job <= 3 ? 183 : job == 8 ? 185 : 31; // Plow, Coast, Road
+        const int improvement = job == 4 || job == 5 ? 2 : 1;
+        item(x,
+             label(art, improvementLabel, "Plow") + "/" + label(art, 184, "River") + ": +" +
+                 std::to_string(improvement),
+             kGreen);
+        bool doubles = false;
+        const int bonus = resourceBonus(facts.resource, job, doubles);
+        if (bonus > 0 || doubles) {
+            blitSprite(screen, art.phys, facts.sprite, x - 6, y);
+            x += 12;
+            // Seen: the grassland's tobacco is just "Prime" (@MISC row 200).
+            std::string name = facts.resource == TerrainResource::Tobacco
+                                   ? label(art, 200, "Prime")
+                                   : firstField(textLine(art.names, "RESOURCE", facts.nameRow, ""));
+            std::string value = doubles ? "x2" : "+" + std::to_string(bonus);
+            if (!doubles && (job == 0 || job == 8)) {
+                value += "/" + std::to_string(2 * bonus);
+            }
+            item(x, name + ": " + value, kGold);
+        }
+        item(x, label(art, 4, "Expert") + ": " + (job == 0 || job == 8 ? "+3" : "x2"), kGreen);
+        y += 16;
+    }
+    int x = 63;
+    item(x, label(art, 186, "Move Cost") + ": " + std::to_string(t.movementCost), kGreen);
+    item(x, label(art, 187, "Defense or Ambush Bonus") + ": +" + std::to_string(t.defenseBonus * 25) + "%", kGreen);
+    return std::max(85, y + 23);
+}
+
 std::string partName(const Art& art, int part) { return textLine(art.pedia, "PEDIA", part, ""); }
 
 } // namespace
@@ -705,6 +948,9 @@ void drawPedia(Screen& screen, const Art& art, const PediaState& state, int nati
     int y = textTop(state.part);
     if (state.part == pedia::kBuilding) {
         y = drawBuildingPage(screen, art, colonyArt, state.page);
+    }
+    if (state.part == pedia::kTerrain) {
+        y = drawTerrainPage(screen, art, state.page);
     }
     if (state.part == pedia::kSkill) {
         y = drawSkillPage(screen, art, colonyArt, state.page) + 4;
