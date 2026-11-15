@@ -439,6 +439,10 @@ std::optional<Command> keyCommand(const SDL_KeyboardEvent& key) {
         return (key.mod & SDL_KMOD_SHIFT) ? std::optional<Command>(Command::Disband) : std::nullopt;
     case SDLK_O:
         return Command::Dump;
+    case SDLK_L:
+        return Command::Load;
+    case SDLK_U:
+        return Command::Unload;
     case SDLK_B:
         return Command::BuildColony;
     case SDLK_C:

@@ -131,7 +131,7 @@ VCR_TEST("liberty: a new colony starts at 0 of 200, a colonist joining adds 100"
 
 VCR_TEST("liberty: reaching 50% is reported after the turn") {
     SaveGame s;
-    s.year = 1600;
+    s.year = 1601; // not 1600: that spring brings the time-scale box
     s.humanNation = 3;
     s.map.width = 3;
     s.map.height = 3;

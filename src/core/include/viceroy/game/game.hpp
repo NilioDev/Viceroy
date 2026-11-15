@@ -558,6 +558,11 @@ public:
     int loadInColony(int carrier, int colony, int good, int amount);
     // The first hold with that good: its amount, or -1 when there is none.
     int colonyCargoHold(int carrier, int good) const;
+    // The Load Cargo order (L), as the manual describes it: the good of the
+    // colony's warehouse worth the most in Europe (up to 100 of it, at the
+    // nation's selling price), leaving out horses, tools and muskets, for an
+    // empty hold. -1 when there is no empty hold or nothing to load.
+    int cargoToLoad(int carrier, int colony) const;
     // Unloads the first hold of that good into the warehouse; `amount`
     // (when less) keeps the rest aboard. Returns how much was unloaded.
     int unloadInColony(int carrier, int colony, int good, int amount);

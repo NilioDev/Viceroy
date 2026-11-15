@@ -249,6 +249,7 @@ saved in the first free slot, or over the savegame saved longest ago.
 | Build colony | B | X |
 | Disband the unit | Shift+D, or the Orders menu | Start, then Orders |
 | Dump cargo overboard | O, or the Orders menu | Start, then Orders |
+| Load the most valuable cargo / unload the first hold (a ship or wagon train in a colony) | L / U, or the Orders menu | Start, then Orders |
 | Go To: send the unit to one of your colonies (a ship also to Europe) | G, or the Orders menu | Start, then Orders |
 | Begin Trade Route (a ship or wagon train) | T, or the Orders menu | Start, then Orders |
 | Edit, create or delete a trade route | The TRADE menu; on the route screen click a stop, a cargo column or a good's icon | |

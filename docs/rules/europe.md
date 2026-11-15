@@ -181,8 +181,9 @@ Read from the original:
   for Frigate:" (EUROPESHIPCLICK with @EUROPESHIPOPTIONS): "Move to front.",
   "Set sail for the New World." (left out for a damaged ship; it asks
   SAILAWAY), "Unload all cargo." (left out when nothing is aboard; it sells
-  the holds, the last first, leaving boycotted goods aboard) and "No
-  changes.". Measured: "Move to front." is offered even for the only ship.
+  the holds, the last first, leaving boycotted goods aboard; read from the
+  original: when the first hold is boycotted the trade adviser says that
+  some cargo could not be unloaded, SOMEBOYCOTT) and "No changes.". Measured: "Move to front." is offered even for the only ship.
 - Clicking a unit on the docks opens "European dock options:" (EUROPEARM
   with @ARMOPTIONS). "Don't get on next ship." for a unit waiting to board,
   "Board next ship." otherwise, "Move to front of dock." for all but the

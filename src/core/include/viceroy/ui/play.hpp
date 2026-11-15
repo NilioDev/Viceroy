@@ -71,6 +71,8 @@ enum class Command {
     ScoreReport,    // F10: the Colonization Score
     Disband,        // Shift+D: Disband Unit
     Dump,           // O: Dump Cargo Overboard
+    Load,           // L: Load Cargo, the most valuable good of the colony
+    Unload,         // U: Unload Cargo, the first hold
     TerrainHelp,    // F1: the Colonizopedia's page of the terrain
     ZoomIn,         // Z
     ZoomOut,        // X
@@ -232,6 +234,7 @@ private:
     bool pickMenuEntry(int entry); // false: back to the load menu
     void stepMenu(int delta);
     void notYet();
+    void loadOrUnload(int carrier, bool load);
     bool handleCheckboxes(Command command);
     void showSoundOptions();
     void showColonyReportOptions();

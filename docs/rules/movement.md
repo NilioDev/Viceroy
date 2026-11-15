@@ -54,7 +54,9 @@ rule as a guess until it is checked against the original.
 ## Turns
 
 Ending the turn gives every unit its moves back and moves the calendar on:
-one turn a year until 1599, then spring and autumn. The natives move (see
+one turn a year until 1599, then spring and autumn. Read from the
+original: at the end of the spring turn of 1600 a plain box explains the
+change (TIMECHANGE, "Colonization Help: Time Scale"). The natives move (see
 [natives](natives.md)); the other European nations do not move yet.
 
 ## Colonies

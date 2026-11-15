@@ -1735,8 +1735,11 @@ void PlayScreen::showNotices() {
             placeReligiousDialog(*dialog_); // read from the original
         } else if (notice.section == "CAPTURED2") {
             placeForeignNewsDialog(*dialog_); // read from the original: the man in the home port
-        } else if (notice.section == "LOOTCASH" || notice.section == "CASHTREASURE") {
+        } else if (notice.section == "LOOTCASH" || notice.section == "CASHTREASURE" ||
+                   notice.section == "SOMEBOYCOTT") {
             placeTradeDialog(*dialog_); // read from the original: the trade adviser
+        } else if (notice.section == "TIMECHANGE" || notice.section == "TOOMANYUNITS") {
+            // Read from the original: a plain box with no adviser.
         } else {
             placeFrontiersmanDialog(*dialog_);
         }
@@ -3545,13 +3548,17 @@ void PlayScreen::openEuropeShipOptions(int ship) {
 }
 
 // Read from the original: "Unload all cargo." in Europe sells the holds,
-// the last first, leaving the boycotted goods aboard.
+// the last first, leaving the boycotted goods aboard. When the first hold
+// is one of those, the trade adviser says so (SOMEBOYCOTT; as the original
+// has it, a boycotted hold further back alone says nothing).
 void PlayScreen::unloadAllInEurope(int ship) {
     auto& save = game_.state();
     const auto& nation = save.nations[static_cast<std::size_t>(game_.human())];
+    bool boycotted = false;
     for (int k = game_.unit(ship).holds - 1; k >= 0; --k) {
         const int good = holdGood(game_.unit(ship), k);
-        if (game_.isBoycotted(game_.human(), good)) {
+        boycotted = game_.isBoycotted(game_.human(), good);
+        if (boycotted) {
             continue;
         }
         const Trade t = sellGoods(save, game_.rules(), ship, good);
@@ -3561,6 +3568,9 @@ void PlayScreen::unloadAllInEurope(int ship) {
             tellPriceMove(good, t.priceMove);
         }
         k = std::min(k, game_.unit(ship).holds);
+    }
+    if (boycotted) {
+        tell({"SOMEBOYCOTT", {}});
     }
 }
 
@@ -3720,6 +3730,26 @@ bool PlayScreen::handleColonyScreen(Command command) {
     case Command::BuildColony: // B, or X on a gamepad: choose what to build
         openBuildList();
         break;
+    case Command::Load:
+    case Command::Unload: {
+        // The manual: L loads the most valuable good into the chosen ship
+        // or wagon, U empties its first hold into the warehouse.
+        const auto ships = shipsInPort(game_, colony);
+        if (ships.empty()) {
+            break;
+        }
+        state.selectedShip = std::clamp(state.selectedShip, 0, static_cast<int>(ships.size()) - 1);
+        const int carrier = ships[static_cast<std::size_t>(state.selectedShip)];
+        state.harbourChosen = true;
+        if (command == Command::Load) {
+            if (const int good = game_.cargoToLoad(carrier, state.colony); good >= 0) {
+                startLoad(carrier, good, false);
+            }
+        } else if (game_.unit(carrier).holds > 0) {
+            startUnload(carrier, holdGood(game_.unit(carrier), 0), false);
+        }
+        break;
+    }
     case Command::Purchase: // P, or Y on a gamepad: buy it
     case Command::EndTurn:
         openBuy();
@@ -4041,6 +4071,10 @@ bool PlayScreen::handle(Command command) {
         break;
     case Command::Dump:
         dumpCargo();
+        break;
+    case Command::Load:
+    case Command::Unload:
+        loadOrUnload(active, command == Command::Load);
         break;
     case Command::Fortify:
         if (active >= 0 && !game_.isShip(active)) {
@@ -5149,6 +5183,40 @@ void PlayScreen::clickPedia(int x, int y) {
     }
 }
 
+// The Load and Unload Cargo orders on the map, for a ship or wagon train in
+// one of the player's colonies (as the manual describes them).
+void PlayScreen::loadOrUnload(int carrier, bool load) {
+    if (carrier < 0 || !game_.onMap(carrier)) {
+        return;
+    }
+    const auto& u = game_.unit(carrier);
+    const auto colony = game_.colonyAt(u.x, u.y);
+    if (!colony || game_.state().colonies[static_cast<std::size_t>(*colony)].nation != u.nation) {
+        return;
+    }
+    const auto& c = game_.state().colonies[static_cast<std::size_t>(*colony)];
+    if (load) {
+        const int good = game_.cargoToLoad(carrier, *colony);
+        if (good < 0) {
+            return;
+        }
+        const int amount = std::min(
+            {100, static_cast<int>(c.stock[static_cast<std::size_t>(good)]), game_.colonyCargoRoom(carrier, good)});
+        if (const int moved = game_.loadInColony(carrier, *colony, good, amount); moved > 0) {
+            say(std::to_string(moved) + " " + goodName(good) + " " + cargoLabel(kLabelMovedTo) + " " +
+                unitTypeName(carrier));
+        }
+        return;
+    }
+    if (u.holds <= 0) {
+        return;
+    }
+    const int good = holdGood(u, 0);
+    if (const int moved = game_.unloadInColony(carrier, *colony, good, 100); moved > 0) {
+        say(std::to_string(moved) + " " + goodName(good) + " " + cargoLabel(kLabelMovedTo) + " " + c.name);
+    }
+}
+
 void PlayScreen::notYet() {
     say("Not in Viceroy yet.");
 }
@@ -5294,6 +5362,10 @@ bool PlayScreen::pickMenuEntry(int entry) {
             return true;
         case kDump:
             return handle(Command::Dump);
+        case kLoad:
+            return handle(Command::Load);
+        case kUnload:
+            return handle(Command::Unload);
         case kDisband:
             return handle(Command::Disband);
         case kReturnToEurope: {

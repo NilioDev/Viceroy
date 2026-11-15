@@ -60,7 +60,15 @@ units build or join colonies; soldiers pillage; ships and wagon trains trade
 and carry cargo); these are still to be checked against the original. The
 encyclopedia shows six of its eight entries.
 
-Entries Viceroy cannot do yet say so in the panel.
+Load Cargo (L) and Unload Cargo (U) work as the manual describes, for a
+ship or wagon train in one of the player's colonies, on the map and on the
+colony screen (for the chosen ship). Load puts the good of the warehouse
+that sells for the most in Europe (up to 100, at the nation's price) in an
+empty hold, leaving out horses, tools and muskets. Unload empties the first
+hold into the warehouse; on the colony screen the warehouse warning comes
+first, as when it is dragged. Pressed again, they go on hold by hold.
+
+Entries Viceroy cannot do yet say so in the panel (Pillage).
 
 ## Game Options
 
