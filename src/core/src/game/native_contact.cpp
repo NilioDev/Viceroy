@@ -160,7 +160,9 @@ bool Game::meetNeighbours(int index) {
         const bool background = sound::SoundOptions::fromSave(soundOptionBits()).background;
         const bool wait = save_.turn < 20 && background && tribe >= 2;
         notice.music = {{wait ? MusicCue::Kind::SetMood : MusicCue::Kind::ChangeMood, mood}};
-        notices_.push_back(std::move(notice));
+        // The woodcut of the meeting first: the Inca's, the Aztecs', or
+        // that of the other tribes.
+        pushWithWoodcut(std::move(notice), tribe == 0 ? 5 : tribe == 1 ? 4 : 3);
         asked = true;
     }
     return asked;

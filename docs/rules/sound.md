@@ -154,6 +154,7 @@ beaten by a ship plays 4Dh, whoever attacked.
 | A mission is lost to another nation (`HERESY1`) | 53h |
 | The chief kills the scout (`CHIEFKILL`) | 55h |
 | A unit in a colony is told to fortify (`UNITOPTIONS`) | 58h |
+| The player founds a colony | 54h |
 | The King raises the tax and no party is possible | 3Eh |
 | A tea party (`TEAPARTY`) | 56h |
 | A European leader comes to talk (`HELLO...`) | 8020h + the leader's nation |
@@ -165,5 +166,5 @@ home port), 3Fh when a foreign power lands troops to help in the war of independ
 declaration of war, 21h or 25h with the final score, 39h before the
 opening, 52h for a wagon train of the player's, 8024h when a colony
 finishes some buildings, and a few calls that pass on a sound chosen
-elsewhere. Still to be placed: 54h in three places (one of them as a
+elsewhere. Still to be placed: 54h in two more places (one of them as a
 player's turn begins) and 58h in one more.

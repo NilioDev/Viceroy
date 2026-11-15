@@ -74,7 +74,10 @@ VCR_TEST("diplomacy: a first meeting offers a treaty, and peace keeps them away"
     VCR_CHECK(g.meetNeighbours(1));
     VCR_CHECK(g.meetingWaiting());
     auto notices = g.takeNotices();
-    VCR_CHECK(sections(notices) == (std::vector<std::string>{"HELLOFIRST", "WORTHY"}));
+    // The first meeting with a European nation shows its woodcut first.
+    VCR_CHECK(sections(notices) == (std::vector<std::string>{"WOODCUT", "HELLOFIRST", "WORTHY"}));
+    VCR_CHECK(notices.size() == 3 && notices[0].value == 10 && g.woodcutShown(10));
+    notices.erase(notices.begin());
     VCR_CHECK(notices[0].leader == kFrench);
     VCR_CHECK(notices[0].strings.size() == 4 && notices[0].strings[1] == "New France");
     VCR_CHECK(notices[0].music == (std::vector<MusicCue>{{MusicCue::Kind::Sound, 0x8020 + kFrench}}));

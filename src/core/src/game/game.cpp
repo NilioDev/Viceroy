@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "viceroy/game/game.hpp"
 #include "viceroy/game/resource.hpp"
+#include "viceroy/game/sounds.hpp"
 
 #include "viceroy/game/colony.hpp"
 #include "viceroy/game/europe.hpp"
@@ -245,7 +246,25 @@ MoveResult Game::move(int index, Step step) {
         if (land) {
             auto& flags = save_.players[static_cast<std::size_t>(human())].raw[48];
             flags = static_cast<std::uint8_t>(flags | 0x80);
-            notices_.push_back(GameNotice{"LANDHO", {}});
+            // The woodcut of the discovery comes first.
+            pushWithWoodcut(GameNotice{"LANDHO", {}}, 1);
+        }
+    }
+    // Read from the original: the first time one of the player's units
+    // comes next to the Pacific (water the new game marked with mask bit
+    // 0x20), its woodcut.
+    if (u.nation == human() && !woodcutShown(6)) {
+        bool pacific = false;
+        for (int y = toY - 1; y <= toY + 1; ++y) {
+            for (int x = toX - 1; x <= toX + 1; ++x) {
+                pacific = pacific || (map.inside(x, y) && map.at(x, y).isWater() &&
+                                      (map.at(x, y).flags & MapSquare::kPacific) != 0);
+            }
+        }
+        if (pacific) {
+            if (auto picture = woodcut(6)) {
+                notices_.push_back(std::move(*picture));
+            }
         }
     }
     refreshUnitFlags();
@@ -563,6 +582,14 @@ FoundResult Game::foundColony(int index, const std::string& name) {
     removeUnit(index);
     reveal(colony.x, colony.y, 2, colony.nation);
     refreshUnitFlags();
+    // Read from the original: the player's new colony is greeted with a
+    // sound, and the first one with its woodcut.
+    if (colony.nation == human()) {
+        sound(sounds::kColonyFounded);
+        if (auto picture = woodcut(2)) {
+            notices_.push_back(std::move(*picture));
+        }
+    }
     return FoundResult::Founded;
 }
 
@@ -1384,6 +1411,17 @@ void Game::sailOn() {
             }
             if (next == kPortStage && ours) {
                 lastTurnNews_.push_back(name + " has arrived in Europe.");
+                // Read from the original: the first ship to arrive that is
+                // not on a trade route opens the Europe screen, and the
+                // first time it brings cargo, the woodcut of the cargo.
+                if (europeArrival_ < 0 && u.orders != kTradeRouteOrders) {
+                    europeArrival_ = ship;
+                    if (u.holds > 0) {
+                        if (auto picture = woodcut(9)) {
+                            notices_.push_back(std::move(*picture));
+                        }
+                    }
+                }
             }
             continue;
         }

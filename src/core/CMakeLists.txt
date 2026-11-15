@@ -44,6 +44,7 @@ add_library(vcr_core STATIC
     src/game/resource.cpp
     src/game/new_game.cpp
     src/game/tutorial.cpp
+    src/game/woodcut.cpp
     src/render/screen.cpp
     src/render/game_view.cpp
     src/render/colony_view.cpp

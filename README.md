@@ -50,8 +50,11 @@ touch controls.
 > ashore, a good place for the first colony, jobs, food, the stockade,
 > roads and plowing, loading ships, Europe, natives who teach and
 > converts. The first time one of your units comes next to land you name
-> the new land. Ships sail to Europe from
-> the high seas, sell and buy goods there (prices move as you trade), take colonists from the docks and
+> the new land. Great moments (the discovery, your first colony, meeting
+> a tribe or another nation, the Pacific, a first native village, the
+> Fountain of Youth, a first cargo for Europe, a raid, a burning colony)
+> are shown once each as a woodcut. Ships sail to Europe from
+> the high seas (the Europe screen opens when one arrives), sell and buy goods there (prices move as you trade), take colonists from the docks and
 > sail back. In Europe you can recruit colonists, buy artillery and ships,
 > have specialists trained, arm or equip the colonists on the docks with
 > muskets, tools or horses (or sell their gear), and bless them as

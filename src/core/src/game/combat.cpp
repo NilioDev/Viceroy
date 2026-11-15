@@ -859,6 +859,15 @@ void Game::fightStartSound(int attackerNation, int attackerType, int defenderNat
     // Braves that fall on the player's men cry out first.
     if (attackerNation >= kEuropeanNations && defenderNation == human()) {
         sound(sounds::kWarCry + attackerType);
+        // Read from the original: the first time, the woodcut of the raid.
+        // After that the war cry is all, unless Combat Analysis is on.
+        const bool shown = woodcutShown(13);
+        if (auto picture = woodcut(13)) {
+            notices_.push_back(std::move(*picture));
+        }
+        if (shown && !gameOption(game_option::kCombatAnalysis)) {
+            return;
+        }
     }
     const auto attackOf = [&](int type) {
         return type >= 0 && type < static_cast<int>(rules_.units.size())

@@ -415,6 +415,10 @@ void PlayScreen::foundNamedColony(int unit, const std::string& name) {
     if (game_.foundColony(unit, name) != FoundResult::Founded) {
         return;
     }
+    // The first colony's woodcut comes before its screen.
+    for (auto& notice : game_.takeNotices()) {
+        notices_.push_back(std::move(notice));
+    }
     openColony(static_cast<int>(game_.state().colonies.size()) - 1);
     game_.setActiveUnit(-1);
     activate(game_.nextUnitNeedingOrders(-1));
@@ -500,6 +504,15 @@ void PlayScreen::enterVillage(int unit, int settlement) {
         }
         question_ = "LESSONDONE";
         return;
+    }
+    // Read from the original: the first time a unit of the player's
+    // enters a village, its woodcut comes before the greeting.
+    if (nation == game_.human()) {
+        if (auto picture = game_.woodcut(7)) {
+            villageAfterWoodcut_ = std::make_pair(unit, settlement);
+            tell(std::move(*picture));
+            return;
+        }
     }
     const auto& tribes = game_.rules().tribes;
     const std::string people =
@@ -1000,6 +1013,15 @@ void PlayScreen::ask(std::string_view section, int unit, std::vector<std::string
 
 bool PlayScreen::handleDialog(Command command) {
     auto& d = *dialog_;
+    if (d.woodcut > 0) {
+        dialog_.reset();
+        question_.clear();
+        if (const auto visit = std::exchange(villageAfterWoodcut_, std::nullopt)) {
+            enterVillage(visit->first, visit->second);
+        }
+        showNotices();
+        return true;
+    }
     if (d.checkbox) {
         return handleCheckboxes(command);
     }
@@ -1236,6 +1258,12 @@ void PlayScreen::showNotices() {
         if (colonyAfterNotices_ >= 0) {
             openColony(std::exchange(colonyAfterNotices_, -1));
         }
+        if (const int ship = std::exchange(europeAfterNotices_, -1); ship >= 0 && ship < game_.unitCount()) {
+            openEurope();
+            if (europeScreen_ && europePlace(game_.unit(ship)) == EuropePlace::InPort) {
+                europeScreen_->ship = ship;
+            }
+        }
     }
     if (dialog_ || notices_.empty() || art_ == nullptr) {
         return;
@@ -1413,6 +1441,14 @@ void PlayScreen::showNotices() {
         if (!signing_) {
             showNotices();
         }
+        return;
+    }
+    if (notice.section == "WOODCUT") {
+        // Read from the original: the picture fills the screen until a key
+        // or a click.
+        dialog_ = Dialog{};
+        dialog_->woodcut = notice.value;
+        question_ = "WOODCUT";
         return;
     }
     if (notice.section == "CONGRESSHALL") {
@@ -3888,9 +3924,13 @@ bool PlayScreen::handle(Command command) {
             view_.shownYear = year;
             view_.shownSeason = season;
         }
+        // Read from the original: a ship of the player's that arrived in
+        // Europe opens its screen once the news is read.
+        europeAfterNotices_ = game_.takeEuropeArrival();
         for (auto& notice : notices) {
-            tell(std::move(notice));
+            notices_.push_back(std::move(notice));
         }
+        showNotices();
         break;
     }
     case Command::Skip:
@@ -4220,6 +4260,10 @@ void PlayScreen::draw(Screen& screen, const Art& art) const {
                            : attack_->colony >= 0
                                ? game_.analyseColonyAttack(attack_->attacker, attack_->colony, attack_->colonist)
                                : game_.analyseAttack(attack_->attacker, attack_->defender));
+    }
+    if (dialog_ && dialog_->woodcut > 0) {
+        drawWoodcut(screen, art, dialog_->woodcut);
+        return;
     }
     if (dialog_) {
         drawDialog(screen, art, *dialog_);

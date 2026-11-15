@@ -105,6 +105,14 @@ void prepareStartingMap(SaveMap& map) {
     // second column but before the outermost columns turn to sea lane: those
     // keep the mark where they were ocean.
     markSeaWithoutFish(map);
+    // Read from the original: the Pacific is the water of each row from the
+    // second column east up to the first land, short of the last 16
+    // columns (as in the saves of the America map).
+    for (int y = 1; y < map.height - 1; ++y) {
+        for (int x = 1; x < map.width - 16 && map.at(x, y).isWater(); ++x) {
+            map.at(x, y).flags |= MapSquare::kPacific;
+        }
+    }
     for (int y = 1; y < map.height - 1; ++y) {
         for (int x = 0; x < map.width; ++x) {
             auto& sq = map.at(x, y);

@@ -427,6 +427,9 @@ public:
     std::vector<GameNotice> takeNotices() { return std::exchange(notices_, {}); }
     // Music asked for without a message box.
     std::vector<MusicCue> takeMusicCues() { return std::exchange(musicCues_, {}); }
+    // The player's ship that arrived in Europe at the end of the turn, for
+    // the Europe screen to open with it (-1 for none).
+    int takeEuropeArrival() { return std::exchange(europeArrival_, -1); }
     // The mood of a tribe's own tune: the Inca and the Aztecs have one each,
     // the other tribes share one.
     static int tribeMood(int tribe);
@@ -484,6 +487,18 @@ public:
     // player names the new land (LANDHO). Player flag 0x80.
     bool landSighted() const;
     void setCountryName(const std::string& name);
+
+    // --- Woodcuts ----------------------------------------------------------
+    // The thirteen pictures of WOODCUT.TXT, each shown the first time its
+    // event happens to the human player (header bytes 154 and 155, bit
+    // n-1 for woodcut n). See docs/rules/woodcuts.md.
+    bool woodcutShown(int n) const;
+    // Marks woodcut n shown and gives the notice that shows it (section
+    // WOODCUT, value n, with its music), or nothing when it was shown.
+    std::optional<GameNotice> woodcut(int n);
+    // Queues woodcut n, if not yet shown, before the notice; the notice's
+    // music then plays with the woodcut, as the original starts it first.
+    void pushWithWoodcut(GameNotice notice, int n);
 
     // --- Europe --------------------------------------------------------------
     // A ship on the high seas sets sail for Europe with everyone aboard. It
@@ -1348,6 +1363,7 @@ private:
     // The sounds of a fight, read from the original (docs/rules/sound.md):
     // sent at once, when the player's unit or colony is in it.
     void sound(int command) { musicCues_.push_back({MusicCue::Kind::Sound, command}); }
+    int europeArrival_ = -1;
     void fightStartSound(int attackerNation, int attackerType, int defenderNation, int defenderType);
     // A beaten unit: the sound of the attacker's win over it.
     void fightWonSound(int attacker, int x, int y);

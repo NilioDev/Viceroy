@@ -501,6 +501,9 @@ private:
     };
     int defenderNation(const PendingAttack& a) const;
     int colonyAfterNotices_ = -1; // a colony just taken opens once its news is read
+    int europeAfterNotices_ = -1;
+    std::optional<std::pair<int, int>> villageAfterWoodcut_; // unit and village: the greeting after the woodcut // a
+                                                             // ship arrived in Europe: its screen opens after the news
     std::optional<PendingAttack> attack_;
     bool advanceAfterNotices_ = false; // the next unit once the news is read
     bool analysisUp_ = false; // the Combat Analysis box waits for a key

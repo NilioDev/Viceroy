@@ -23,6 +23,12 @@ ship is found by following the chain of units (bytes 24-27 of the unit
 record): the passengers come before the ship. The original shows them
 after the ship, walking the chain backwards from it.
 
+When the turn ends with ships of the player's arriving in port, the first
+of them not on a trade route opens the Europe screen with it selected,
+once the news of the turn has been read (read from the original). The
+first time such a ship brings cargo, the woodcut of the cargo comes first
+(see [woodcuts](woodcuts.md)).
+
 In our tests, a ship in port at stage 2 with land units of the same chain
 showed the land units on the docks, not in the ship.
 
