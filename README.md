@@ -41,12 +41,16 @@ touch controls.
 > sentry or fortify it. At the end of the turn colonies
 > store what they make, breed horses from spare food, grow and finish
 > the buildings, wagon trains, artillery and ships under way, and your
-> advisors report full warehouses (with Tutorial Hints on, the first time
-> comes with a hint on shipping the cargo home), waste, food running low and workshops
+> advisors report full warehouses, waste, food running low and workshops
 > out of raw goods, inefficient government and mines that wear out (no
 > more wagon trains than colonies); a custom house sells the goods you tick
 > above 50; a colony that stays without food loses colonists to
-> hunger. Ships sail to Europe from
+> hunger. With Tutorial Hints on (as a Discoverer game starts) your
+> advisors teach the game as you play, each lesson once: sailing, going
+> ashore, a good place for the first colony, jobs, food, the stockade,
+> roads and plowing, loading ships, Europe, natives who teach and
+> converts. The first time one of your units comes next to land you name
+> the new land. Ships sail to Europe from
 > the high seas, sell and buy goods there (prices move as you trade), take colonists from the docks and
 > sail back. In Europe you can recruit colonists, buy artillery and ships,
 > have specialists trained, arm or equip the colonists on the docks with

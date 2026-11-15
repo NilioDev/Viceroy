@@ -155,7 +155,14 @@ public:
     // The leader signing the declaration of independence.
     bool signingUp() const { return signing_.has_value(); }
     // Set by the app after loading Art: needed for message boxes.
-    void setArt(const Art* art) { art_ = art; }
+    // News waiting from before the art was there (a hint for the first
+    // unit up) shows now.
+    void setArt(const Art* art) {
+        art_ = art;
+        if (!notices_.empty()) {
+            showNotices();
+        }
+    }
     // The music the Sound Options and Pick Music change (none: they only
     // change the savegame).
     void setMusic(sound::BackgroundMusic* music);

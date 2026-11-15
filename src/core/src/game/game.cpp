@@ -232,6 +232,22 @@ MoveResult Game::move(int index, Step step) {
         }
     }
     reveal(toX, toY, sightRadius(index), u.nation);
+    // Read from the original: the first time one of the player's units
+    // comes next to land, the player names the new land (once a game,
+    // player flag 0x80).
+    if (u.nation == human() && !landSighted()) {
+        bool land = false;
+        for (int y = toY - 1; y <= toY + 1; ++y) {
+            for (int x = toX - 1; x <= toX + 1; ++x) {
+                land = land || (map.inside(x, y) && !map.at(x, y).isWater());
+            }
+        }
+        if (land) {
+            auto& flags = save_.players[static_cast<std::size_t>(human())].raw[48];
+            flags = static_cast<std::uint8_t>(flags | 0x80);
+            notices_.push_back(GameNotice{"LANDHO", {}});
+        }
+    }
     refreshUnitFlags();
     if (ship && target.isWater()) {
         slowByWarships(index);
@@ -672,8 +688,8 @@ void Game::storageNotices(const ColonyTurn& turn, int c) {
             // ("there are 100 Cotton in ..."); never again after that.
             if (tutorialHints() && !tutorialShown(kTutorialCargo)) {
                 markTutorialShown(kTutorialCargo);
-                notices_.push_back(GameNotice{"TUTORIAL6", {goodName(good), colony.name}, -1,
-                                              {colony.stock[g] / kHoldSize * kHoldSize}});
+                notices_.push_back(GameNotice{
+                    "TUTORIAL6", {goodName(good), colony.name}, 0, {colony.stock[g] / kHoldSize * kHoldSize}});
             }
         } else if (turn.wasted[g] > 0) {
             spoiled = good;
@@ -825,25 +841,6 @@ void Game::wearMines(int c) {
             }
         }
     }
-}
-
-// Game options: header byte 18, bit 7 (seen in the Game Options box with
-// the savegame edited).
-bool Game::tutorialHints() const {
-    return (save_.header[18] & 0x80) != 0;
-}
-
-// The hints already given: bits of the 16-bit word at header bytes 22-23
-// (measured for the cargo hint only, bit 9).
-bool Game::tutorialShown(int bit) const {
-    const int word = save_.header[22] | (save_.header[23] << 8);
-    return (word >> bit & 1) != 0;
-}
-
-void Game::markTutorialShown(int bit) {
-    const int byte = 22 + bit / 8;
-    save_.header[static_cast<std::size_t>(byte)] =
-        static_cast<std::uint8_t>(save_.header[static_cast<std::size_t>(byte)] | (1 << (bit % 8)));
 }
 
 void Game::setColonyNames(const TextFile& colonyNames) {

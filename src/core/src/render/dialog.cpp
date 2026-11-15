@@ -201,6 +201,8 @@ Dialog makeDialog(const Art& art, std::string_view section, const std::vector<st
                 d.checkbox = true;
             } else if (line == "@options") {
                 inOptions = true;
+            } else if (line.rfind("@x=", 0) == 0) {
+                d.sectionX = std::atoi(line.c_str() + 3);
             } else if (line.rfind("@y=", 0) == 0) {
                 fixedY = std::atoi(line.c_str() + 3);
             } else if (line.rfind("@width=", 0) == 0) {
@@ -246,6 +248,7 @@ Dialog makeDialog(const Art& art, std::string_view section, const std::vector<st
             d.lines.push_back(std::move(l));
         }
     }
+    d.paragraphs = std::move(paragraphs);
     d.selected = d.options.empty() ? 0 : std::min(d.selected, static_cast<int>(d.options.size()) - 1);
     d.x = (Screen::kWidth - boxWidth(d)) / 2;
     d.y = fixedY >= 0 ? fixedY : (Screen::kHeight - dialogHeight(d)) / 2;
@@ -272,7 +275,18 @@ void makeInput(const Art& art, Dialog& d, std::string text, int maxLength) {
     d.selected = 0;
     const Font& font = fontOf(art, d);
     const int needed = kTextLeft + Screen::textWidth(font, d.inputLabel) + kFieldGap + fieldWidth(d) + 5;
-    d.width = std::max(d.width, needed - 6);
+    if (needed - 6 > d.width) {
+        // Measured with "Land Ho!": the text is wrapped to the wider box.
+        d.width = needed - 6;
+        if (!d.paragraphs.empty()) {
+            d.lines.clear();
+            for (const auto& paragraph : d.paragraphs) {
+                for (auto& l : wrap(font, paragraph, d.width - kTextLeft)) {
+                    d.lines.push_back(std::move(l));
+                }
+            }
+        }
+    }
     // Centred, half a column to the right (measured: 207 wide at 57).
     d.x = (Screen::kWidth - boxWidth(d) + 1) / 2;
     d.y = (Screen::kHeight - dialogHeight(d) + 1) / 2;
@@ -461,16 +475,27 @@ void placeNavalDialog(Dialog& d) {
     d.portraitY = 37;
 }
 
-void placeTutorialDialog(Dialog& d) {
-    d.portrait = kNavalAdvisor;
+void placeTutorialDialog(Dialog& d, int adviser) {
+    d.portrait = adviser;
     d.portraitBehind = false; // his hands lie over the box
     // The advisor stands 4 columns left of the box and 71 rows above it; the
     // two together are centred on the screen (measured with one box; the
     // woman advisor's tutorial box follows the same rule).
-    d.x = (Screen::kWidth + 4 - boxWidth(d)) / 2;
+    // An odd width leaves the extra column on the left (measured with the
+    // naming of the new land).
+    d.x = (Screen::kWidth + 4 - boxWidth(d) + 1) / 2;
     d.y = (Screen::kHeight + 72 - dialogHeight(d)) / 2;
     d.portraitX = d.x - 4;
     d.portraitY = d.y - 71;
+    dropTallAdviser(d);
+}
+
+void dropTallAdviser(Dialog& d) {
+    if (d.portrait >= 0 && d.y + dialogHeight(d) > Screen::kHeight) {
+        d.portrait = -1;
+        d.x = (Screen::kWidth - boxWidth(d) + 1) / 2;
+        d.y = (Screen::kHeight - dialogHeight(d)) / 2;
+    }
 }
 
 void placeTradeDialog(Dialog& d) {

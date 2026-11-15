@@ -51,6 +51,12 @@ struct Dialog {
     std::string inputText;
     bool inputFresh = true;
     int inputMax = 23;
+    // The text before wrapping, one entry per paragraph: a box made wider
+    // for its line to type in wraps it again.
+    std::vector<std::string> paragraphs;
+    // The section's @x, or -1: only some boxes go there (most are
+    // centred whatever it says).
+    int sectionX = -1;
 };
 
 // Portraits in Art::portraits.
@@ -146,8 +152,12 @@ void placeLeaderDialog(const Art& art, Dialog& dialog, int nation);
 // News of treaties and wars between other nations: the man of the home
 // port tells it.
 void placeForeignNewsDialog(Dialog& dialog);
-// The tutorial's hints: the naval advisor, his hands over the box.
-void placeTutorialDialog(Dialog& dialog);
+// The tutorial hints (and the naming of the new land): an adviser, the
+// naval one unless another is named, hands over the box.
+void placeTutorialDialog(Dialog& dialog, int adviser = kNavalAdvisor);
+// Measured with the pioneers' hint: a box too tall for its adviser to
+// stand over it within the screen comes alone, in the middle.
+void dropTallAdviser(Dialog& dialog);
 // The name of a European nation as the messages use it ("the Netherlands").
 std::string countryName(const Art& art, int nation);
 
