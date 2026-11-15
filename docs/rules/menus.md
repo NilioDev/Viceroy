@@ -68,7 +68,12 @@ empty hold, leaving out horses, tools and muskets. Unload empties the first
 hold into the warehouse; on the colony screen the warehouse warning comes
 first, as when it is dragged. Pressed again, they go on hold by hold.
 
-Entries Viceroy cannot do yet say so in the panel (Pillage).
+Seen in the original for a veteran soldier at war with France, standing on
+road and plowed land next to Martinique, and on a plowed square that
+Quebec works: Pillage is not shown either. No text in GAME.TXT belongs to
+it, so Viceroy does not show it at all.
+
+Entries Viceroy cannot do yet say so in the panel.
 
 ## Game Options
 

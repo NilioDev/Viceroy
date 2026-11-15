@@ -4796,7 +4796,6 @@ std::vector<EntryState> PlayScreen::menuStates(int index) const {
     const bool ship = game_.isShip(active);
     const bool wagon = u.type == unit_type::kWagonTrain;
     const bool pioneer = u.type == unit_type::kPioneer;
-    const bool military = game_.rules().units[static_cast<std::size_t>(u.type)].attack > 0;
     const auto& square = game_.state().map.at(u.x, u.y);
     const bool inColony = game_.colonyAt(u.x, u.y).has_value();
 
@@ -4823,7 +4822,10 @@ std::vector<EntryState> PlayScreen::menuStates(int index) const {
     // Seen for a pioneer: no Load or Unload for those who carry nothing.
     set(kLoad, !(ship || wagon) ? EntryState::Hidden : inColony ? EntryState::Enabled : EntryState::Disabled);
     set(kUnload, !(ship || wagon) ? EntryState::Hidden : cargo && inColony ? EntryState::Enabled : EntryState::Disabled);
-    set(kPillage, military && !ship ? EntryState::Enabled : EntryState::Hidden);
+    // Seen in the original for veteran soldiers at war on a road and plowed
+    // land next to a French colony, and on a square Quebec works: Pillage
+    // is not shown. It has no text in GAME.TXT either; Viceroy never shows it.
+    set(kPillage, EntryState::Hidden);
     set(kGoToPort, ship ? EntryState::Enabled : EntryState::Hidden);
     set(kGoToPlace, ship ? EntryState::Hidden : EntryState::Enabled);
     set(kTradeRoute, ship || wagon ? EntryState::Enabled : EntryState::Hidden);
