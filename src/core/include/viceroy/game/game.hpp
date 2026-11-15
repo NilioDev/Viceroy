@@ -254,6 +254,11 @@ public:
     // towns (-1: anyone's). Its working state lives on between calls, as in
     // the original.
     int routeStep(int index, int nation);
+    // What a new game works out once for the route finder and the
+    // computer players: which 4 × 4 blocks of the map join their
+    // neighbours by land and by sea, and for each land region its squares
+    // and its open farmland (bytes 0 to 603 of the block after the map).
+    void buildRouteTables();
     // Go To (orders 3): the colonies the unit can be sent to, sending it
     // there or a ship to Europe, and moving the player's units that have
     // it. See docs/rules/routes.md.

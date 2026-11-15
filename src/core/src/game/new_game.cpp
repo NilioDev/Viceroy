@@ -2,6 +2,9 @@
 #include "viceroy/game/new_game.hpp"
 
 #include "viceroy/data/reader.hpp"
+#include "viceroy/game/game.hpp"
+#include "viceroy/game/natives.hpp"
+#include "viceroy/game/new_world.hpp"
 #include "viceroy/game/resource.hpp"
 
 #include <algorithm>
@@ -283,12 +286,16 @@ SaveUnit europeanUnit(int x, int y, int type, int nation, int profession) {
 
 } // namespace
 
-SaveGame newAmericaGame(std::span<const std::uint8_t> mapFile, const Ruleset& rules, const NewGameSetup& setup) {
-    NewGameRandom random(setup.seed);
+namespace {
+
+// Everything of a new game but the natives, on a map made ready: the
+// header, the market, the four nations and their ships. starts holds the
+// square of each nation.
+SaveGame startingGame(SaveMap map, const std::array<std::array<int, 2>, 4>& starts, const Ruleset& rules,
+                      const NewGameSetup& setup, NewGameRandom& random, bool america) {
     SaveGame save;
-    save.map = readMapFile(mapFile);
-    save.map.resourceSeed = static_cast<std::uint8_t>(random.below(256));
-    prepareStartingMap(save.map);
+    save.map = std::move(map);
+    computeSiteValues(save.map, rules);
 
     save.year = kStartYear;
     save.season = 0;
@@ -320,6 +327,8 @@ SaveGame newAmericaGame(std::span<const std::uint8_t> mapFile, const Ruleset& ru
         h[18] = static_cast<std::uint8_t>(h[18] | 0x80);
     }
     h[22] = 0x0E;
+    // Word 24: the map of America (the original's natives read it).
+    put16(h + 24, america ? 1 : 0);
 
     // The market is drawn once and shared by all.
     std::array<int, kGoodsKinds> prices{};
@@ -327,11 +336,6 @@ SaveGame newAmericaGame(std::span<const std::uint8_t> mapFile, const Ruleset& ru
         const auto& c = rules.cargo[g];
         prices[g] = c.startPriceLow + random.below(std::max(1, c.startPriceHigh - c.startPriceLow + 1));
     }
-    std::array<int, 4> squareOf{0, 1, 2, 3};
-    for (int i = 3; i > 0; --i) {
-        std::swap(squareOf[static_cast<std::size_t>(i)], squareOf[static_cast<std::size_t>(random.below(i + 1))]);
-    }
-
     for (int n = 0; n < kEuropeanNations; ++n) {
         const auto i = static_cast<std::size_t>(n);
         const bool human = n == save.humanNation;
@@ -356,7 +360,7 @@ SaveGame newAmericaGame(std::span<const std::uint8_t> mapFile, const Ruleset& ru
         if (human && n == 3) {
             nation.recruits = kDutchPlayerRecruits;
         }
-        const auto& start = kStartSquares[static_cast<std::size_t>(squareOf[i])];
+        const auto& start = starts[i];
         nation.raw[50] = static_cast<std::uint8_t>(start[0]);
         nation.raw[51] = static_cast<std::uint8_t>(start[1]);
 
@@ -390,17 +394,69 @@ SaveGame newAmericaGame(std::span<const std::uint8_t> mapFile, const Ruleset& ru
         }
     }
 
-    save.settlements = placeAmericaSettlements(save.map, rules.tribes, random);
-    for (auto& brave : settlementBraves(save.settlements)) {
-        save.units.push_back(brave);
-    }
-    for (const auto& u : save.units) {
-        save.map.at(u.x, u.y).flags |= MapSquare::kHasUnit;
-    }
     save.tribesAndMore.assign(kTribesAndMoreSize, 0);
     save.tail.assign(kTailSize, 0);
     save.tail[kSeedAt] = save.map.resourceSeed;
     return save;
+}
+
+// What follows the natives in every new game: units marked on the map and
+// the route finder's tables.
+SaveGame finishedGame(SaveGame save, const Ruleset& rules) {
+    for (const auto& u : save.units) {
+        save.map.at(u.x, u.y).flags |= MapSquare::kHasUnit;
+    }
+    Game game(std::move(save), rules);
+    game.buildRouteTables();
+    return game.state();
+}
+
+} // namespace
+
+SaveGame newAmericaGame(std::span<const std::uint8_t> mapFile, const Ruleset& rules, const NewGameSetup& setup) {
+    NewGameRandom random(setup.seed);
+    SaveMap map = readMapFile(mapFile);
+    map.resourceSeed = static_cast<std::uint8_t>(random.below(256));
+    prepareStartingMap(map);
+    std::array<int, 4> squareOf{0, 1, 2, 3};
+    for (int i = 3; i > 0; --i) {
+        std::swap(squareOf[static_cast<std::size_t>(i)], squareOf[static_cast<std::size_t>(random.below(i + 1))]);
+    }
+    std::array<std::array<int, 2>, 4> starts{};
+    for (std::size_t i = 0; i < 4; ++i) {
+        starts[i] = kStartSquares[static_cast<std::size_t>(squareOf[i])];
+    }
+    auto save = startingGame(std::move(map), starts, rules, setup, random, true);
+    OriginalRandom dice(setup.seed);
+    initTribes(save, rules, dice);
+    save.settlements = placeAmericaSettlements(save.map, rules.tribes, random);
+    for (const auto& s : save.settlements) {
+        auto& sq = save.map.at(s.x, s.y);
+        sq.flags |= MapSquare::kHasColony;
+        sq.region = static_cast<std::uint8_t>((sq.region & 0x0F) | (s.nation << 4));
+        auto* tribe = save.tribesAndMore.data() + 78 * static_cast<std::size_t>(s.nation - kEuropeanNations);
+        if ((s.raw[3] & 4) != 0) {
+            tribe[0] = static_cast<std::uint8_t>(s.x);
+            tribe[1] = static_cast<std::uint8_t>(s.y);
+        }
+    }
+    for (auto& brave : settlementBraves(save.settlements)) {
+        save.units.push_back(brave);
+    }
+    return finishedGame(std::move(save), rules);
+}
+
+SaveGame newWorldGame(const NewWorldSettings& settings, const Ruleset& rules, const NewGameSetup& setup) {
+    OriginalRandom dice(setup.seed);
+    auto world = generateNewWorld(settings, setup.humanNation & 3, dice);
+    for (auto& sq : world.map.squares) {
+        sq.region = static_cast<std::uint8_t>(0xF0 | (sq.region & 0x0F)); // nobody has been anywhere yet
+    }
+    NewGameRandom random(setup.seed ^ 0x5A5A5A5AU);
+    auto save = startingGame(std::move(world.map), world.start, rules, setup, random, false);
+    initTribes(save, rules, dice);
+    placeNewWorldNatives(save, rules, dice);
+    return finishedGame(std::move(save), rules);
 }
 
 } // namespace viceroy

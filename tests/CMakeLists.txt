@@ -11,6 +11,7 @@ add_executable(vcr_tests
     test_europe.cpp
     test_resource.cpp
     test_new_game.cpp
+    test_new_world.cpp
     test_pioneers.cpp
     test_native_land.cpp
     test_founding.cpp

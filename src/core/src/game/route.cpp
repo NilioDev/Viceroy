@@ -339,6 +339,106 @@ int Game::routeReach(int fromX, int fromY, int toX, int toY, bool ship, int limi
     return step >= 0 ? route_.best : -1;
 }
 
+void Game::buildRouteTables() {
+    auto& map = save_.map;
+    constexpr std::size_t kTables = 604;
+    if (save_.tail.size() < kTables) {
+        save_.tail.resize(kTables, 0);
+    }
+    const auto flatSquare = [&](int x, int y) -> const MapSquare* {
+        const long at = static_cast<long>(y) * map.width + x;
+        return at >= 0 && at < static_cast<long>(map.squares.size()) ? &map.squares[static_cast<std::size_t>(at)]
+                                                                     : nullptr;
+    };
+    // The first square of the 2 × 2 at (x0, y0) of the kind (water of the
+    // open sea for ships); returns the region number of the last square of
+    // the kind looked at, -1 for none. The square found is kept in (x, y),
+    // which keep their old values when none is.
+    const auto blockSquare = [&](int x0, int y0, bool ship, int& x, int& y) {
+        int region = -1;
+        for (int sx = x0; sx <= x0 + 1; ++sx) {
+            for (int sy = y0; sy <= y0 + 1; ++sy) {
+                const auto* sq = flatSquare(sx, sy);
+                if (sq == nullptr || sq->isWater() != ship) {
+                    continue;
+                }
+                region = sq->region & 0x0F;
+                if (!ship || region == 1) {
+                    x = sx;
+                    y = sy;
+                    return region;
+                }
+            }
+        }
+        return region;
+    };
+    const bool roads = route_.roads;
+    route_.roads = true; // every step costs one
+    int fromX = 0;
+    int fromY = 0;
+    int toX = 0;
+    int toY = 0;
+    for (const bool ship : {false, true}) {
+        const std::size_t base = ship ? kSeaBlocks : kLandBlocks;
+        std::fill_n(save_.tail.begin() + static_cast<long>(base), kBlocksAcross * kBlocksDown, std::uint8_t{0});
+        for (int bx = 0; bx < kBlocksAcross; ++bx) {
+            for (int by = 0; by < kBlocksDown; ++by) {
+                const int x0 = 1 + 4 * bx;
+                const int y0 = 1 + 4 * by;
+                const int region = blockSquare(x0, y0, ship, fromX, fromY);
+                if (region < 0) {
+                    continue;
+                }
+                for (int d = 0; d < 4; ++d) {
+                    const int nx = x0 + 4 * kDx[static_cast<std::size_t>(d)];
+                    const int ny = y0 + 4 * kDy[static_cast<std::size_t>(d)];
+                    if (nx < 1 || ny < 1 || nx >= map.width - 1 || ny >= map.height - 1 ||
+                        blockSquare(nx, ny, ship, toX, toY) != region) {
+                        continue;
+                    }
+                    const int cost = routeReach(fromX, fromY, toX, toY, ship, 9);
+                    if (cost <= 0 || cost >= 8) {
+                        continue;
+                    }
+                    save_.tail[base + static_cast<std::size_t>(bx * kBlocksDown + by)] |=
+                        static_cast<std::uint8_t>(1 << d);
+                    const int nbx = bx + kDx[static_cast<std::size_t>(d)];
+                    const int nby = by + kDy[static_cast<std::size_t>(d)];
+                    if (nbx >= 0 && nbx < kBlocksAcross && nby >= 0 && nby < kBlocksDown) {
+                        save_.tail[base + static_cast<std::size_t>(nbx * kBlocksDown + nby)] |=
+                            static_cast<std::uint8_t>(1 << ((d + 4) & 7));
+                    }
+                }
+            }
+        }
+    }
+    route_.roads = roads;
+    // Per land region: its open farmland (plains to savannah, with or
+    // without forest) and all its squares, 16 bits each.
+    std::array<int, 16> farmland{};
+    std::array<int, 16> squares{};
+    for (int y = 0; y < map.height; ++y) {
+        for (int x = map.width - 1; x >= 0; --x) {
+            if (x < 1 || y < 1 || x >= map.width - 1 || y >= map.height - 1 || map.at(x, y).isWater()) {
+                continue;
+            }
+            const auto& sq = map.at(x, y);
+            const auto region = static_cast<std::size_t>(sq.region & 0x0F);
+            const int ground = sq.terrain & 7;
+            if ((sq.relief & 1) == 0 && sq.terrain < 24 && ground >= 2 && ground <= 5) {
+                ++farmland[region];
+            }
+            ++squares[region];
+        }
+    }
+    for (std::size_t i = 0; i < 16; ++i) {
+        save_.tail[540 + 2 * i] = static_cast<std::uint8_t>(farmland[i]);
+        save_.tail[541 + 2 * i] = static_cast<std::uint8_t>(farmland[i] >> 8);
+        save_.tail[572 + 2 * i] = static_cast<std::uint8_t>(squares[i]);
+        save_.tail[573 + 2 * i] = static_cast<std::uint8_t>(squares[i] >> 8);
+    }
+}
+
 bool Game::routeBlock(int x, int y, bool ship) {
     // The block of (x, y), or the nearest joined neighbour, whose corner
     // square can be reached from it cheaply; into the target.

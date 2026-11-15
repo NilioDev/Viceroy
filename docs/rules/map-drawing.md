@@ -202,8 +202,8 @@ all fit.
 | Hills | 102 |
 | Mountains | 101 (silver deposit), or 89 with mask bit 2 |
 
-*Guess:* tundra never came up on a pattern square in the tours; we draw
-grain (91). Marsh has minerals (95): an ore miner there makes 3 more, as on
+Tundra has minerals (95), read from the original's table of resources
+(tundra never came up on a pattern square in the tours). Marsh has minerals (95): an ore miner there makes 3 more, as on
 swamp (see production.md).
 
 ## Lost city rumours

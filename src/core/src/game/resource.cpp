@@ -78,10 +78,10 @@ Resource resourceAt(const SaveMap& map, int x, int y) {
     if (!onResourcePattern(x, y, map.resourceSeed)) {
         return Resource::None;
     }
-    // Tundra (0) and marsh (6) never showed one; grain and minerals are
-    // guesses.
-    static constexpr Resource kOpen[8] = {Resource::Grain,   Resource::Oasis, Resource::Grain,    Resource::Cotton,
-                                          Resource::Tobacco, Resource::Sugar, Resource::Minerals, Resource::Minerals};
+    // Read from the original's table: tundra, marsh and swamp have
+    // minerals.
+    static constexpr Resource kOpen[8] = {Resource::Minerals, Resource::Oasis, Resource::Grain,    Resource::Cotton,
+                                          Resource::Tobacco,  Resource::Sugar, Resource::Minerals, Resource::Minerals};
     return kOpen[ground];
 }
 

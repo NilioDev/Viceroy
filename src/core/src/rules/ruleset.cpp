@@ -167,6 +167,14 @@ Ruleset readRuleset(const TextFile& names) {
         rules.tribes.push_back({row.text(0), row.text(1), row.text(2), row.number(3), row.number(4)});
     }
 
+    if (const auto* resources = names.find("RESOURCE")) {
+        for (const auto& fields : rows(*resources)) {
+            Row row("RESOURCE", fields);
+            row.expect(2);
+            rules.resourceValues.push_back(row.number(1));
+        }
+    }
+
     if (const auto* republics = names.find("INDEPENDENT")) {
         for (std::string line : republics->lines) {
             while (!line.empty() && (line.back() == ' ' || line.back() == '\t')) {
