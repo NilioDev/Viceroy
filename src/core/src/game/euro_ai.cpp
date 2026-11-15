@@ -1005,6 +1005,57 @@ void Game::aiEurope(int n) {
     }
 }
 
+void Game::kingFrigate(int n, int turn) {
+    // Read from the original: every eighth turn before independence, when
+    // armed ships of others lurk near the nation's colonies (a frigate near
+    // one, or other warships near more than three) and it has no frigate,
+    // the King sends one. The player is asked first, and pays for it with
+    // a tax rise of 10.
+    constexpr std::size_t kIndependenceByte = 18;
+    const auto& block = save_.tribesAndMore;
+    if (n < 0 || n >= kEuropeanNations || (save_.header[kIndependenceByte] & 1) != 0 || (turn & 7) != 0 ||
+        block.size() < kBlockEnd) {
+        return;
+    }
+    if (ai_.frigateThreat == 0 && ai_.privateerThreat <= 3) {
+        return;
+    }
+    if (block[kByType + 19 * static_cast<std::size_t>(n) + kFrigate] != 0) {
+        return;
+    }
+    if (n != human()) {
+        sendKingFrigate(n);
+        return;
+    }
+    GameNotice notice{"KINGFRIGATE", {"", save_.players[static_cast<std::size_t>(n)].name, ""}, kFrigateQuestion};
+    notice.lines = {{0, true, "DIFFICULTY", save_.difficulty}};
+    notice.adjectives = {{2, n}};
+    notice.music = {MusicCue{MusicCue::Kind::Sound, 0x3E}};
+    notices_.push_back(std::move(notice));
+}
+
+void Game::answerKingFrigate(bool yes) {
+    if (yes) {
+        sendKingFrigate(human());
+    }
+}
+
+void Game::sendKingFrigate(int n) {
+    // The frigate sails from Europe for the nation's landing square.
+    const int index = addUnitInEurope(kFrigate, 0, n);
+    auto& u = save_.units[static_cast<std::size_t>(index)];
+    setEuropeStage(u, 1);
+    u.orders = SaveUnit::kNoOrders;
+    const auto& raw = save_.nations[static_cast<std::size_t>(n)].raw;
+    u.raw[9] = raw[kReturnX];
+    u.raw[10] = raw[kReturnY];
+    u.raw[4] = static_cast<std::uint8_t>(u.raw[4] | 0x40);
+    if (n == human()) {
+        GameNotice tax{"KINGTAX", {}};
+        changeTax(n, 10, std::move(tax));
+    }
+}
+
 void Game::europeanTurn(int n) {
     if (n < 0 || n >= kEuropeanNations || save_.players[static_cast<std::size_t>(n)].control != 1) {
         return;
@@ -1012,6 +1063,7 @@ void Game::europeanTurn(int n) {
     // The King first, as for the player (docs/rules/king.md).
     kingTax(n, save_.turn, save_.year);
     nationCensus(n);
+    kingFrigate(n, save_.turn);
     aiTallies(n);
     aiRelations(n);
     aiEurope(n);

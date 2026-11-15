@@ -117,6 +117,19 @@ once for its full value (`CASHTREASURE`).
 The treasure's value is kept in hundreds in byte 23 of the unit, where a
 colonist keeps its profession.
 
+## A frigate against raiders
+
+Read from the original. At the start of a nation's turn (for the player
+with the new turn number), after the count of its units and colonies,
+before independence and on turns that are a multiple of 8, the King sends
+a frigate when the nation has none and armed ships of other nations
+threaten its colonies: a frigate within reach of one colony (five moves by
+sea at most), or other warships near more than three. A computer nation
+simply gets it. The player is asked first (`KINGFRIGATE`, with sound 3Eh):
+yes brings the frigate, sailing from Europe for the nation's landing
+square, and a tax rise of 10 (`KINGTAX`, refused as any rise can be); no
+leaves things as they are.
+
 ## Rebel sentiment
 
 After the colonies' turn the nation's rebel share is worked out: each

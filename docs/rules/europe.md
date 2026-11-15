@@ -111,6 +111,9 @@ Measured by ending turns in the original with changed saves.
   on the docks (bytes 2 to 4) comes over for free, the crosses go back to 0
   and someone new takes the empty place. Which of the three comes is a guess
   (chance); the original took the second in the one case measured.
+- With William Brewster the player chooses which of the three comes
+  (`@RECRUITCHOOSE`, the religious adviser's box with the home port), and
+  there is no `@UNREST` news. Read from the original.
 - The number needed does not change when someone comes. It is a running
   value the original moves in other ways (it was 2 lower after an artillery
   was lost, and the English need 2/3 of what the others do); the rule for

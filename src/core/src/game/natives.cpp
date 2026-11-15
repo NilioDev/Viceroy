@@ -560,6 +560,7 @@ Game::NativeLesson Game::liveAmongNatives(int index, int settlement) {
     auto& u = save_.units[static_cast<std::size_t>(index)];
     const auto& s = save_.settlements[static_cast<std::size_t>(settlement)];
     const int tribe = tribeOf(s);
+    villageVisitMood(u.nation, tribe);
     NativeLesson lesson;
     lesson.skill = villageSkill(save_, settlement);
     const auto jobName = [&](int job) {
@@ -590,6 +591,12 @@ Game::NativeLesson Game::liveAmongNatives(int index, int settlement) {
         lesson.section = "LEARNSTAY";
     }
     return lesson;
+}
+
+void Game::villageVisitMood(int nation, int tribe) {
+    if (nation == human() && nextRandom(4) == 0) {
+        musicCues_.push_back({MusicCue::Kind::SetMood, tribeMood(tribe)});
+    }
 }
 
 bool Game::canSpeakWithChief(int index, int settlement) const {

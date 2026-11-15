@@ -852,6 +852,9 @@ void PlayScreen::tradeWithVillage(int unit) {
 }
 
 void PlayScreen::startTrade(int unit) {
+    game_.villageVisitMood(game_.unit(unit).nation,
+                           tribeOf(game_.state().settlements[static_cast<std::size_t>(village_)]));
+    playMusic(game_.takeMusicCues());
     trade_ = VillageTrade{};
     trade_->unit = unit;
     const auto& u = game_.unit(unit);
@@ -1486,11 +1489,16 @@ void PlayScreen::showNotices() {
         questionUnit_ = -1;
         return;
     }
-    if (notice.section == "LOSTCITY0") {
+    if (notice.section == "LOSTCITY0" || notice.section == "RECRUITCHOOSE") {
         // A Fountain of Youth: "Which of the following individuals shall
-        // we recruit?", one of the three on the docks, for free.
+        // we recruit?", one of the three on the docks, for free. With
+        // William Brewster the religious adviser asks the same when the
+        // crosses bring a newcomer (read from the original).
         const auto& nation = game_.state().nations[static_cast<std::size_t>(game_.human())];
-        Dialog d = makeDialog(*art_, "LOSTCITY0");
+        const bool brewster = notice.section == "RECRUITCHOOSE";
+        Dialog d = brewster ? makeDialog(*art_, notice.section, {textLine(art_->names, "HOMEPORT", game_.human(), "")},
+                                         {}, game_.human())
+                            : makeDialog(*art_, "LOSTCITY0");
         choices_.clear();
         for (std::size_t slot = 0; slot < nation.recruits.size(); ++slot) {
             const auto job = static_cast<std::size_t>(professionJob(nation.recruits[slot]));
@@ -1498,7 +1506,11 @@ void PlayScreen::showNotices() {
             choices_.push_back(static_cast<int>(slot));
         }
         d.selected = 0;
-        placeFrontiersmanDialog(d);
+        if (brewster) {
+            placeReligiousDialog(d);
+        } else {
+            placeFrontiersmanDialog(d);
+        }
         dialog_ = d;
         question_ = "LOSTCITY0";
         questionUnit_ = -1;
@@ -1964,6 +1976,7 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
         villageOptions_.clear();
         if (option == kVillageLive && village_ >= 0) {
             const auto lesson = game_.liveAmongNatives(unit, village_);
+            playMusic(game_.takeMusicCues());
             showLesson(unit, lesson.section, lesson.strings);
             if (lesson.section != "LEARNSTAY") {
                 question_ = "LESSONDONE";
@@ -2377,6 +2390,11 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
             const auto news = game_.takeNotices();
             ask("KISSSORRY", -1, {}, -1, news.empty() ? std::vector<int>{} : news.front().numbers);
         }
+    } else if (question == "KINGFRIGATE") {
+        // "Yes, I fear it is necessary.": the frigate, and the tax rise.
+        game_.answerKingFrigate(choice == 0);
+        auto news = game_.takeNotices();
+        notices_.insert(notices_.begin(), std::make_move_iterator(news.begin()), std::make_move_iterator(news.end()));
     } else if (question.rfind("KINGGALLEON", 0) == 0) {
         // "Very well, and let the Crown claim its rightful share."
         game_.answerTreasure(choice == 0);

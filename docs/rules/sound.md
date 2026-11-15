@@ -83,6 +83,8 @@ are four kinds of call:
 | A colony finishes something (`BUILT`) | event mood 3 for an armory, magazine, printing press or newspaper, event mood 2 otherwise |
 | A tribe is met (`INDIANWELCOME`) | the tribe's mood now; in the first 20 turns with Background Music on, a tribe other than the Inca and the Aztecs as next mood |
 | A tribe visits a colony | one visit in nine: the tribe's mood next |
+| The player trades with a village or goes to live among its people | one time in four: the tribe's mood next |
+| A colonist comes from the docks for crosses (`UNREST`, `RECRUITCHOOSE`) | next mood 2 (and mood now without Background Music) |
 | A tribe demands goods (`INDIANCITY`, `INDIANWAGONS`) | the tribe's mood now |
 | A ship sinks (`SHIPSUNK`) | event mood 1 for its owner, event mood 4 for the winner |
 | Braves are beaten off (`INDIANLOSE`) | mood now 4 |
@@ -156,6 +158,7 @@ beaten by a ship plays 4Dh, whoever attacked.
 | A unit in a colony is told to fortify (`UNITOPTIONS`) | 58h |
 | The player founds a colony | 54h |
 | The King raises the tax and no party is possible | 3Eh |
+| The King offers a frigate (`KINGFRIGATE`) | 3Eh |
 | A tea party (`TEAPARTY`) | 56h |
 | A European leader comes to talk (`HELLO...`) | 8020h + the leader's nation |
 

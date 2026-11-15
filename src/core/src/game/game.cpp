@@ -2,6 +2,7 @@
 #include "viceroy/game/game.hpp"
 #include "viceroy/game/resource.hpp"
 #include "viceroy/game/sounds.hpp"
+#include "viceroy/sound/background_music.hpp"
 
 #include "viceroy/game/colony.hpp"
 #include "viceroy/game/europe.hpp"
@@ -931,6 +932,7 @@ void Game::endTurn() {
     // start of their turns (its figures in the Foreign Affairs report come
     // from this count).
     nationCensus(human());
+    kingFrigate(human(), save_.turn + 1);
     // Measured: the original goes through the colonies from the last
     // founded to the first, which sets the order of its messages.
     for (std::size_t c = save_.colonies.size(); c-- > 0;) {
@@ -1650,6 +1652,21 @@ void Game::gatherCrosses() {
         return;
     }
     nation.crosses = 0;
+    // Read from the original: a newcomer makes the next tune a cheerful
+    // one (at once without Background Music).
+    std::vector<MusicCue> music{{MusicCue::Kind::SetMood, 2}};
+    if (!viceroy::sound::SoundOptions::fromSave(soundOptionBits()).background) {
+        music.push_back({MusicCue::Kind::ChangeMood, 2});
+    }
+    // Read from the original: with William Brewster the player chooses
+    // which of the three comes (RECRUITCHOOSE), without the news of unrest.
+    constexpr int kBrewster = 20;
+    if (hasFather(human(), kBrewster)) {
+        GameNotice choose{"RECRUITCHOOSE", {}};
+        choose.music = std::move(music);
+        notices_.push_back(std::move(choose));
+        return;
+    }
     // Guess: which of the three comes is chance (the original took the
     // second in the one case measured).
     random_ = random_ == 0 ? static_cast<std::uint32_t>(save_.turn * 7919 + 17) | 1U : random_;
@@ -1658,7 +1675,9 @@ void Game::gatherCrosses() {
     const int profession = nation.recruits[slot];
     addUnitInEurope(professionUnitType(profession), profession);
     nation.recruits[slot] = randomRecruit(human());
-    notices_.push_back({"UNREST", {}, profession});
+    GameNotice unrest{"UNREST", {}, profession};
+    unrest.music = std::move(music);
+    notices_.push_back(std::move(unrest));
 }
 
 int Game::recruit(int slot) {

@@ -59,7 +59,8 @@ touch controls.
 > have specialists trained, arm or equip the colonists on the docks with
 > muskets, tools or horses (or sell their gear), and bless them as
 > missionaries. Crosses made in your colonies and churches
-> bring colonists over from the docks for free. Liberty bells win colonists
+> bring colonists over from the docks for free (with William Brewster you
+> choose who comes). Liberty bells win colonists
 > for the Sons of Liberty: at 50% and 100% membership a colony works
 > better, and too many tories slow it down. Soldiers, dragoons and
 > artillery can attack the other nations' units and colonies on the map,
@@ -98,7 +99,8 @@ touch controls.
 > original; you may refuse a rise with a party that boycotts the good in
 > Europe until you pay the back taxes. He builds up his army, tells you
 > when your colonists' rebel sentiment rises or falls, offers to carry your
-> treasure home for the Crown's share, and now and then a European king
+> treasure home for the Crown's share, offers a frigate (for a tax rise)
+> when warships lurk near your colonies, and now and then a European king
 > offers you mercenaries. When your men meet another European nation, its
 > leader comes to talk: offering a treaty, demanding tribute, goods or the
 > withdrawal of your troops, declaring war, or, at peace, hearing your
