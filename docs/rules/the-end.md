@@ -107,6 +107,9 @@ Read from the original:
    declared, won, year, season, difficulty, score, rating and step.
    Viceroy keeps it beside the saved games, in the original's format.
 
+**View Hall of Fame** on the main menu shows the same screen with no
+newcomer, all places in green; a key or a click goes back to the menu.
+
 Known difference: in the Hall of Fame the original leaves out a few of the
 shadow's pixels inside the letters.
 

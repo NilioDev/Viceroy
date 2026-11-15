@@ -225,8 +225,9 @@ and download one at the bottom of the page.
 ## Controls
 
 When the game files are in place, Viceroy plays the original's opening and
-then shows its main menu. **Start a Game in AMERICA** and **LOAD Game** work
-there; the New World maps and the customizing come later. A new game is
+then shows its main menu. **Start a Game in AMERICA**, **LOAD Game** and
+**View Hall of Fame** work there; the New World maps and the customizing
+come later. A new game is
 saved in the first free slot, or over the savegame saved longest ago.
 
 | Action | Keyboard | Gamepad |
