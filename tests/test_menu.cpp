@@ -519,6 +519,9 @@ VCR_TEST("original files: the Colonizopedia's index and pages (seen in the origi
     // A line of the file without a trailing space counts 3 pixels more.
     const auto sugar = pediaPageLines(art, pedia::kCargo, 1);
     VCR_CHECK(sugar.size() > 2 && sugar[1].ends_with("profit or converted"));
+    // "^" and a tab starts a paragraph: an empty line, no stray blank.
+    const auto fisherman = pediaPageLines(art, pedia::kSkill, 8);
+    VCR_CHECK(fisherman.size() > 5 && fisherman[4].empty() && fisherman[5].starts_with("{In general"));
 
     std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
     const Bytes bytes(std::istreambuf_iterator<char>(in), {});

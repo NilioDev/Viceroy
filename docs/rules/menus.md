@@ -138,8 +138,10 @@ Seen in the original (PEDIA.TXT holds the pages, `@PEDIA` the parts):
   word goes on the line while the line stays within 286 pixels, measuring
   each space as 1 pixel, a word that ends a sentence 1 pixel narrower and
   the space after it as 2, 3 more where a line of PEDIA.TXT ends without a
-  trailing space, and the paragraph's last word 4 pixels wider. Three of
-  the 170 breaks do not follow this (Continental Cavalry, Furs, Tools).
+  trailing space, and the paragraph's last word 4 pixels wider. Seven of
+  the 310 breaks seen do not follow this (Continental Cavalry, Furs,
+  Tools, Free Colonist, Fisherman, Missionary, Pioneer). A line holding
+  only `^` and a tab also starts a paragraph.
 - **A unit's page:** the unit in the player's colour at (8, 33), with its
   orders box showing "-", and its name in green 6 rows lower, 18 pixels
   right of the last picture. Units with an expert (soldier, dragoon,
@@ -158,5 +160,18 @@ Seen in the original (PEDIA.TXT holds the pages, `@PEDIA` the parts):
   40 four apart, and "Cloth (With Master Weavers)" in green at (76, y + 4).
   Horses and trade goods have no expert: their row starts 14 further left
   and has only the name. The text starts at y 43 + 20 per row.
+- **A skill's page:** the expert (the convert's picture is the one icon
+  66) at x 10 and the experts' name ("Master Blacksmiths") in gold 14 to
+  its right. The buildings they work in (BUILDING.SS, sprite = row of
+  `@BUILDING`) stand 24 right of that name, from y 22, each 4 rows below
+  the one before, with their names in gold 3 right of the picture; the
+  statesman's shows only the first Town Hall, farmers, planters, trappers,
+  miners and fishermen none. What they make (fish for fishermen, crosses
+  for preachers, liberty bells for statesmen) stands 24 right of the
+  first building's name, or of the experts' name without buildings, with
+  its name in gold 16 right of its left edge. The expert's top is 33, or
+  centred on the first building (22 + (height − 16) / 2 + 1); the good is
+  2 lower and the names 6 below each top (7 + half the difference for the
+  buildings). The text starts 4 rows below the last building, or at 53.
 - F1 on the map opens the page of the active unit's square (its mountains
   or hills, else its forest or ground); a key goes back to the map.
