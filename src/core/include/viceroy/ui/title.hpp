@@ -51,6 +51,15 @@ public:
     // How long one frame lasts, in milliseconds.
     static constexpr int kFrameMs = 132;
 
+    // The opening's music: driver command 34h starts with the publisher's
+    // logo, which Viceroy leaves out, so the tune is this many driver ticks
+    // in when the map comes up (measured in DOSBox).
+    static constexpr int kMusic = 0x34;
+    static constexpr int kMusicLeadTicks = 1430;
+    // The driver commands the opening sent since the last call, in order:
+    // 8026h at frame 25, and 25h as the man starts wading ashore.
+    std::vector<int> takeSounds();
+
 private:
     struct Credit {
         int first = 0;
@@ -67,7 +76,9 @@ private:
     std::vector<Credit> credits_;
     std::vector<Animation> animations_;
     int end_ = 891;
+    int ashore_ = 720; // the first frame of the man wading ashore (series 7)
     std::uint64_t elapsed_ = 0;
+    std::vector<int> sounds_;
 };
 
 enum class TitleChoice { NewWorld, America, Customize, Load, HallOfFame };

@@ -20,7 +20,7 @@ game's commands:
 | 0–8 | Control: reset, stop (fade out) all or some voices, "is music playing?" |
 | 0x20–0x3F | Tunes |
 | 0x40–0x5D | Sound effects |
-| 0x8020–0x8026 | Short pieces built like the tunes: Viceroy plays 8020h to 8025h |
+| 0x8020–0x8026 | Short pieces built like the tunes |
 
 Each tune command fades out what is playing. Then it starts some of the six
 music voices, each on its own stream in the data segment. It can also name
@@ -33,8 +33,15 @@ the voice: 14, 28 or 42 ticks plus a random 0 to 7 (the driver's own random
 numbers). The fourth starts at once on the stream the three run into, so
 the piece comes in as a round that differs every time.
 
-Tune 34h is not played by Viceroy yet: it sets the beat clock (48 ticks)
-itself and starts eight voices, and command 8026h joins it on the beat.
+Tune 34h, the opening's, sets the beat clock itself (48 ticks: `mov word
+[A0h]` and `[A2h]`, and clears the piece waiting for the beat at `[A4h]`),
+fades out what plays and starts eight voices. Command 8026h jumps to its
+second part: unless 34h's first voice plays and its last voice (7) has
+read past 21FBh in its stream (the word at 16h of the voice's state), it
+sets the same clock, silences everything at once (control command 0,
+"reset") and starts eight voices on the second part. So it cuts in only
+while 34h is still in its first part; 34h's own voices reach the second
+part about 1650 ticks in.
 
 ## Voices and the chip
 

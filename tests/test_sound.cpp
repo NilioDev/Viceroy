@@ -136,6 +136,63 @@ VCR_TEST("original files: Northfire starts and joins the tune after it") {
     VCR_CHECK(player.busy());
 }
 
+VCR_TEST("original files: the music stream keeps going past a tick that falls just after a frame") {
+    const auto driver = loadDriver("PSOUND.COL");
+    if (!driver) {
+        VCR_SKIP("no PSOUND.COL in gamedata/");
+    }
+    // At 44100 a second, tick 3577 falls a thousandth of a frame after a
+    // whole frame (about 59 seconds in); rounding that wait down to no
+    // frames at all once made render() loop for ever.
+    MusicStream stream(*driver, 44100);
+    std::vector<std::int16_t> pcm(1024 * 2);
+    for (int i = 0; i < 44100 * 62 / 1024; ++i) {
+        stream.render(pcm);
+    }
+    VCR_CHECK(true);
+}
+
+VCR_TEST("original files: the opening's tune and the piece that joins it") {
+    const auto driver = loadDriver("PSOUND.COL");
+    if (!driver) {
+        VCR_SKIP("no PSOUND.COL in gamedata/");
+    }
+    // 34h sets the beat clock itself (48 ticks) and starts eight voices.
+    const Piece* opening = driver->piece(0x34);
+    VCR_CHECK(opening != nullptr && opening->beat.has_value());
+    VCR_CHECK(opening->beat->clock == 0x30 && opening->beat->period == 0x30);
+    VCR_CHECK(opening->starts.size() == 8);
+    // 8026h starts its own eight voices unless 34h's last voice has read
+    // past the start of its stream.
+    const Piece* join = driver->piece(0x8026);
+    VCR_CHECK(join != nullptr && join->join.has_value() && join->resetFirst);
+    VCR_CHECK(join->join->stream == opening->starts.front().stream && join->join->voice == 7);
+    VCR_CHECK(join->starts.size() == 8);
+
+    // 34h's own voices reach the part 8026h starts after about 1650 ticks;
+    // from then on 8026h changes nothing.
+    MusicStream alone(*driver, 44100);
+    MusicStream joined(*driver, 44100);
+    alone.player().command(0x34);
+    joined.player().command(0x34);
+    alone.skip(1700);
+    joined.skip(1700);
+    joined.player().command(0x8026);
+    std::vector<std::int16_t> a(4096 * 2);
+    std::vector<std::int16_t> b(4096 * 2);
+    alone.render(a);
+    joined.render(b);
+    VCR_CHECK(a == b);
+    // Before that, it jumps there at once.
+    MusicStream early(*driver, 44100);
+    early.player().command(0x34);
+    early.skip(10);
+    early.player().command(0x8026);
+    early.skip(1690);
+    early.render(b);
+    VCR_CHECK(a != b);
+}
+
 VCR_TEST("sound options follow the save game's bits") {
     const SoundOptions all = SoundOptions::fromSave(0x9E);
     VCR_CHECK(all.background && all.events && all.effects);

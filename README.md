@@ -184,7 +184,9 @@ touch controls.
 > tribe's gift, survivors of a lost colony, angry shrines, nothing, or an
 > expedition that vanishes. Scouts and Hernando de Soto do better.
 >
-> The music plays during a game: the original's own tunes, read from its
+> The music plays from the opening on, through the main menu, the
+> audience with the King, the departure and the game: the original's own
+> tunes, read from its
 > sound driver for OPL3 cards (Sound Blaster Pro and 16) and played on an
 > emulated chip, with the recorded drums of a card that plays samples. As
 > in the original a new tune starts whenever one ends, and events change the

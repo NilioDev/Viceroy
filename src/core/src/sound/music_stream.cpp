@@ -2,6 +2,7 @@
 #include "viceroy/sound/music_stream.hpp"
 
 #include <algorithm>
+#include <cmath>
 
 extern "C" {
 #include "opl3.h"
@@ -59,12 +60,25 @@ void MusicStream::render(std::span<std::int16_t> stereo) {
             player_.tick();
             untilTick_ += samplesPerTick_;
         }
-        const std::size_t n = std::min(frames - frame, static_cast<std::size_t>(untilTick_ + 0.999));
+        // At least one frame: a tick can be due a sliver of a frame from
+        // now, and rounding that down to none would loop here for ever.
+        const auto due = std::max<std::size_t>(1, static_cast<std::size_t>(std::ceil(untilTick_)));
+        const std::size_t n = std::min(frames - frame, due);
         chip_.render(stereo.subspan(frame * 2, n * 2));
         mixRecordings(stereo.subspan(frame * 2, n * 2));
         frame += n;
         untilTick_ -= static_cast<double>(n);
     }
+}
+
+void MusicStream::skip(int ticks) {
+    for (int i = 0; i < ticks; ++i) {
+        player_.tick();
+    }
+    // The chip takes the register writes as it plays on; recordings that
+    // would have ended by now are dropped.
+    waiting_.clear();
+    playing_ = -1;
 }
 
 void MusicStream::setRecordings(std::vector<std::uint8_t> coldig) {

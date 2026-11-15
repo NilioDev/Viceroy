@@ -93,6 +93,31 @@ void Audio::send(int command) {
     music_stream_->player().command(command);
 }
 
+void Audio::command(int command) {
+    if (!ready()) {
+        return;
+    }
+    std::lock_guard lock(mutex_);
+    music_stream_->player().command(command);
+}
+
+void Audio::startIntro(int command, int ticks) {
+    if (!ready()) {
+        return;
+    }
+    std::lock_guard lock(mutex_);
+    music_stream_->player().command(command);
+    music_stream_->skip(ticks);
+}
+
+bool Audio::busy() {
+    if (!ready()) {
+        return false;
+    }
+    std::lock_guard lock(mutex_);
+    return music_stream_->player().busy();
+}
+
 void SDLCALL Audio::feed(void* self, SDL_AudioStream* stream, int additional, int) {
     auto* audio = static_cast<Audio*>(self);
     std::vector<std::int16_t> pcm(static_cast<std::size_t>(additional) / sizeof(std::int16_t) / 2 * 2);

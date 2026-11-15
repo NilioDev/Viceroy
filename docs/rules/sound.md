@@ -18,6 +18,25 @@ Control commands (below 0x10) are always sent. A command with bit 0x20
 Effects. With Event Music on and Background Music off, a tune still plays
 when an event or Pick Music asks for one, but nothing follows it.
 
+## Before a game
+
+Read from the original's code and checked against its sound recorded in
+DOSBox:
+
+- **The opening** (OPENING.EXE) starts tune 34h as its publisher's logo
+  comes up. Viceroy leaves the logo out, so it starts the tune 1430 ticks
+  in, where it was when the map came up. At frame 25 the opening sends
+  8026h, which jumps the tune to its second part (see
+  `docs/formats/sound-driver.md`), and as the man starts wading ashore
+  (frame 720) 25h, which takes over on the next beat.
+- **The main menu** sends 33h straight to the driver, whatever the options.
+  The tune goes on while the menu stays up.
+- **The audience with the King** asks for 3Eh as the next tune, as Pick
+  Music does (the tune playing fades out first); after it the background
+  music goes on as in a game, with a new game's options (all on).
+- **The departure** starts 39h, which lasts about as long as the ten
+  pictures.
+
 ## The next tune
 
 Every frame the game asks the driver whether anything is still playing.
@@ -168,8 +187,7 @@ Read from the original but not yet in Viceroy: 5Ch when a colonist or
 soldier takes horses and 8024h when one is blessed as a missionary (in the
 home port), 3Fh when a foreign power lands troops to help in the war of independence
 (`INTERVENE`), 8020h near a
-declaration of war, 21h or 25h with the final score, 39h before the
-opening, 52h for a wagon train of the player's, 8024h when a colony
+declaration of war, 21h or 25h with the final score, 52h for a wagon train of the player's, 8024h when a colony
 finishes some buildings, and a few calls that pass on a sound chosen
 elsewhere. Still to be placed: 54h in two more places (one of them as a
 player's turn begins) and 58h in one more.

@@ -59,6 +59,12 @@ every four frames. From frame 640, when the view stops, it sails one pixel
 west a frame until it runs aground at frame 701, where `OPENBONK.SS` takes
 over.
 
+## Music
+
+Tune 34h, already 1430 ticks in (where the original's tune is after its
+logo), then 8026h at frame 25 and 25h at frame 720. See
+`docs/rules/sound.md`.
+
 ## The main menu
 
 The `@BEGINMENU` box of `GAME.TXT`: `@y=91` puts its top at row 91 and

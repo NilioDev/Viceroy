@@ -71,6 +71,7 @@ struct App {
     std::unique_ptr<viceroy::LoadMenu> load;
     std::unique_ptr<viceroy::NewGameArt> newGameArt;
     std::unique_ptr<viceroy::NewGameFlow> newGame;
+    std::optional<viceroy::NewGameFlow::Step> lastStep; // for the music of each step
     std::unique_ptr<viceroy::ColonyArt> colonyArt;
     std::unique_ptr<viceroy::PlayScreen> play;
     viceroy::DebugMenu debug;
@@ -172,6 +173,12 @@ std::string buildDate() {
     return std::to_string(day) + "-" + date.substr(0, 3) + "-" + date.substr(9, 2);
 }
 
+// The music of the main menu, and of the new game's audience with the
+// King and its departure (read from the original).
+constexpr int kMenuTune = 0x33;
+constexpr int kAudienceTune = 0x3E;
+constexpr int kDepartureTune = 0x39;
+
 // The original's main menu, or the load menu when its pictures are missing.
 void showTitle(App& app) {
     if (!app.title) {
@@ -185,6 +192,8 @@ void showTitle(App& app) {
     }
     app.mainMenu = std::make_unique<viceroy::MainMenu>(*app.art, std::string(viceroy::kVersion), buildDate());
     app.mode = Mode::Title;
+    // Read from the original: the main menu calls the driver with 33h.
+    app.audio.command(kMenuTune);
 }
 
 void beginPlay(App& app, viceroy::Game game, const std::filesystem::path& path) {
@@ -301,6 +310,7 @@ void pickTitle(App& app, viceroy::TitleChoice choice) {
             } else {
                 app.newGame = std::make_unique<viceroy::NewGameFlow>(*app.art, mapFiles(app));
             }
+            app.lastStep.reset();
             app.mode = Mode::NewGame;
         } catch (const std::exception& e) {
             app.mainMenu->say(std::string("Cannot start a game: ") + e.what());
@@ -325,6 +335,20 @@ void afterNewGameStep(App& app) {
         SDL_StartTextInput(app.window);
     } else {
         SDL_StopTextInput(app.window);
+    }
+    const auto step = app.newGame->step();
+    if (step != app.lastStep) {
+        app.lastStep = step;
+        if (step == Step::Audience) {
+            // The King's fanfare as the next tune; from then on the
+            // background music goes on as in a game, with the options a new
+            // game starts with.
+            app.audio.music().options = viceroy::sound::SoundOptions{};
+            app.audio.music().pick(kAudienceTune);
+            app.audio.setPlaying(true);
+        } else if (step == Step::Departure) {
+            app.audio.send(kDepartureTune);
+        }
     }
     if (app.newGame->step() == Step::Cancelled) {
         app.newGame.reset();
@@ -355,6 +379,9 @@ void openLibrary(App& app) {
         }
         app.status.clear();
         app.audio.open(viceroy::pack::baseFolder(app.library));
+        if (app.mode == Mode::Intro) {
+            app.audio.startIntro(viceroy::Intro::kMusic, viceroy::Intro::kMusicLeadTicks);
+        }
     } catch (const std::exception& e) {
         app.art.reset();
         app.status = std::string("Cannot read the imported game: ") + e.what() + " Drop it here again.";
@@ -1091,9 +1118,18 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
     if (app->mode == Mode::NewGame) {
         app->newGame->tick(elapsed);
         afterNewGameStep(*app);
+        app->audio.update(false);
+    }
+    if (app->mode == Mode::Title && !app->audio.busy()) {
+        // Heard in the original: the menu's tune goes on as long as the
+        // menu stays up.
+        app->audio.command(kMenuTune);
     }
     if (app->mode == Mode::Intro) {
         app->intro->tick(elapsed);
+        for (const int command : app->intro->takeSounds()) {
+            app->audio.command(command);
+        }
         if (app->intro->finished()) {
             showTitle(*app);
         }
