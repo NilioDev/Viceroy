@@ -129,6 +129,8 @@ VCR_TEST("original files: a new game on America starts as the original's") {
     VCR_CHECK(save.players[3].name == "Michiel De Ruyter" && save.players[0].country == "New England");
     VCR_CHECK(save.nations[3].gold == 1000 && save.nations[0].gold == 0);
     VCR_CHECK(save.units[9].type == 14 && save.activeUnit == 9);
+    // Measured: a Discoverer game starts with Tutorial Hints on.
+    VCR_CHECK(setup.difficulty == 0 && (save.header[18] & 0x80) != 0 && save.header[22] == 0x0E);
     for (const auto& s : save.settlements) {
         VCR_CHECK(save.map.at(s.x, s.y).isLand() && !save.map.at(s.x, s.y).mountains());
     }

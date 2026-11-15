@@ -36,6 +36,8 @@ total matters for finding the map.
 | 0 | 9 | `COLONIZE` and a 0 byte |
 | 12 | 2 | Map width (58 in a normal game) |
 | 14 | 2 | Map height (72) |
+| 16, 22, 23 | 1 each | Tutorial hints given, a bit each (see [tutorial](../rules/tutorial.md)) |
+| 18 | 1 | Game options and the course of the war of independence |
 | 26 | 2 | Year |
 | 28 | 2 | Season: 0 spring, 1 autumn |
 | 30 | 2 | Turn number |
@@ -92,7 +94,7 @@ back over it. Writing an unchanged save gives the same file (tested with all
 ten saves).
 
 **Player** (52 bytes): leader name (24, text), name of the new land (24),
-flags (1), control (1: 0 human, 1 computer, 2 withdrawn), colonies founded
+flags (1; 0x80 once the player has named the new land), control (1: 0 human, 1 computer, 2 withdrawn), colonies founded
 (1), diplomacy (1). The 24 bytes after the four players are kept as they are.
 
 **Colony** (202 bytes):

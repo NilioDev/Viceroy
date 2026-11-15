@@ -43,6 +43,10 @@ SaveGame shipSave() {
     };
     unit(2, 2, unit_type::kCaravel, 3, SaveUnit::kNoOrders); // 0
     unit(2, 2, unit_type::kColonist, 3, SaveUnit::kSentry);  // 1: aboard
+    // The new land has its name already (no "Land Ho!").
+    for (auto& player : s.players) {
+        player.raw[48] = 0x80;
+    }
     return s;
 }
 

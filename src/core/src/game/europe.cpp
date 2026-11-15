@@ -124,6 +124,19 @@ void removeHold(SaveUnit& ship, int hold) {
     --ship.holds;
 }
 
+int buyRoom(const SaveGame& save, int ship, int good, int freeHolds) {
+    const auto& s = save.units[static_cast<std::size_t>(ship)];
+    if (good < 0 || good >= kGoodsKinds) {
+        return 0;
+    }
+    for (int k = 0; k < s.holds; ++k) {
+        if (holdGood(s, k) == good && holdAmount(s, k) < kHoldSize) {
+            return kHoldSize - holdAmount(s, k);
+        }
+    }
+    return freeHolds > 0 && s.holds < kMaxHolds ? kHoldSize : 0;
+}
+
 Trade buyGoods(SaveGame& save, const Ruleset& rules, int ship, int good, int freeHolds) {
     Trade trade;
     auto& s = save.units[static_cast<std::size_t>(ship)];

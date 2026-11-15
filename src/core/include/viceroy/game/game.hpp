@@ -88,6 +88,9 @@ struct MusicCue {
 
 // Something the player is told in a message box: a GAME.TXT section and
 // the %STRINGs that go in it.
+// A tutorial hint given in a plain box, without an adviser.
+inline constexpr int kTutorialNoAdviser = 9;
+
 struct GameNotice {
     std::string section;
     std::vector<std::string> strings;
@@ -435,10 +438,52 @@ public:
     // --- Tutorial hints ------------------------------------------------------
     // The "Tutorial Hints" game option.
     bool tutorialHints() const;
-    // Each hint is given once a game; the savegame remembers which.
-    static constexpr int kTutorialCargo = 9; // @TUTORIAL6: ship a cargo home
-    bool tutorialShown(int bit) const;
-    void markTutorialShown(int bit);
+    // Each hint is given once a game; the savegame remembers which, a bit
+    // of header byte 16, 22 or 23 each (read from the original).
+    struct TutorialFlag {
+        int byte = 0;
+        int mask = 0;
+    };
+    static constexpr TutorialFlag kTutorialSail{22, 0x10};      // @TUTORIAL1
+    static constexpr TutorialFlag kTutorialSite{22, 0x40};      // @TUTORIAL3
+    static constexpr TutorialFlag kTutorialJobs{22, 0x80};      // @TUTORIAL4
+    static constexpr TutorialFlag kTutorialDocks{23, 0x01};     // @TUTORIAL5
+    static constexpr TutorialFlag kTutorialCargo{23, 0x02};     // @TUTORIAL6: ship a cargo home
+    static constexpr TutorialFlag kTutorialStockade{23, 0x04};  // @TUTORIAL7
+    static constexpr TutorialFlag kTutorialLearn{23, 0x08};     // @TUTORIAL8
+    static constexpr TutorialFlag kTutorialRoad{23, 0x10};      // @TUTORIAL9
+    static constexpr TutorialFlag kTutorialPlow{23, 0x20};      // @TUTORIAL10
+    static constexpr TutorialFlag kTutorialShip{23, 0x40};      // @TUTORIAL11
+    static constexpr TutorialFlag kTutorialLoad{23, 0x80};      // @TUTORIAL12
+    static constexpr TutorialFlag kTutorialPioneer{16, 0x01};   // @TUTORIAL13
+    static constexpr TutorialFlag kTutorialSoldier{16, 0x02};   // @TUTORIAL14
+    static constexpr TutorialFlag kTutorialNewcomers{16, 0x08}; // @TUTORIAL15
+    static constexpr TutorialFlag kTutorialFood{16, 0x10};      // @TUTORIAL16
+    static constexpr TutorialFlag kTutorialEurope{16, 0x20};    // @TUTORIAL17
+    static constexpr TutorialFlag kTutorialConvert{16, 0x80};   // @TUTORIAL19
+    bool tutorialShown(TutorialFlag flag) const;
+    void markTutorialShown(TutorialFlag flag);
+    // The hint for the unit that is up for orders, if one is due (the
+    // original looks each time a unit waits for orders, with the option
+    // on). It is marked as given. The notice's value is the adviser who
+    // gives it (the number of its picture, MSS0 to MSS5), or
+    // kTutorialNoAdviser for a plain box.
+    std::optional<GameNotice> unitHint(int unit);
+    // Hints of the colony screen as it opens: how to give jobs (the first
+    // colony) and how to load a ship in port.
+    std::vector<GameNotice> colonyScreenHints(int colony);
+    // The colony screen shows the colony short of food.
+    std::optional<GameNotice> foodHint(int colony);
+    // A colonist was put to work: a colony of three without a stockade.
+    std::optional<GameNotice> stockadeHint(int colony);
+    // The Europe screen opens.
+    std::optional<GameNotice> europeHint();
+    // After a new colonist appears on the docks.
+    std::optional<GameNotice> docksHint(int profession);
+    // The first time a unit of the human player comes next to land: the
+    // player names the new land (LANDHO). Player flag 0x80.
+    bool landSighted() const;
+    void setCountryName(const std::string& name);
 
     // --- Europe --------------------------------------------------------------
     // A ship on the high seas sets sail for Europe with everyone aboard. It

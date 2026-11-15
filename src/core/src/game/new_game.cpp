@@ -301,6 +301,13 @@ SaveGame newAmericaGame(std::span<const std::uint8_t> mapFile, const Ruleset& ru
     // Indian and Foreign Moves, Autosave, Combat Analysis and Water Color
     // Cycling on, the rest off.
     h[19] = 0xC6;
+    // Measured on new games of the original: Tutorial Hints are on in a
+    // Discoverer game only, and byte 22 starts as 0x0E on every level
+    // (the bits of the hints given so far are 0x10 and up).
+    if (setup.difficulty == 0) {
+        h[18] = static_cast<std::uint8_t>(h[18] | 0x80);
+    }
+    h[22] = 0x0E;
 
     // The market is drawn once and shared by all.
     std::array<int, kGoodsKinds> prices{};

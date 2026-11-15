@@ -67,6 +67,10 @@ SaveGame kingSave() {
     c.raw[28] = 0x40; // by the water
     c.stock[cargo::kFood] = 100;
     s.colonies.push_back(c);
+    // The new land has its name already (no "Land Ho!").
+    for (auto& player : s.players) {
+        player.raw[48] = 0x80;
+    }
     return s;
 }
 

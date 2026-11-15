@@ -76,6 +76,8 @@ int moveMarket(const Ruleset& rules, SaveNation& nation, int good, int volume);
 
 // Buys up to 100 of a good into a ship in port: tops up a hold of the same
 // good, or fills a free one. Limited by gold and room.
+// How much one purchase would load: up to a full hold of 100.
+int buyRoom(const SaveGame& save, int ship, int good, int freeHolds);
 Trade buyGoods(SaveGame& save, const Ruleset& rules, int ship, int good, int freeHolds);
 // Sells everything of a good aboard a ship in port.
 Trade sellGoods(SaveGame& save, const Ruleset& rules, int ship, int good);

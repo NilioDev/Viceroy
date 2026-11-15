@@ -120,6 +120,11 @@ void PlayScreen::activate(int index) {
             centreOn(view_, game_, u.x, u.y);
         }
         view_.endOfTurn = false;
+        // Read from the original: with Tutorial Hints on, each time a unit
+        // is up for orders the advisers may have a lesson about it.
+        if (auto hint = game_.unitHint(index)) {
+            tell(std::move(*hint));
+        }
     } else {
         // Seen: the cursor stays on the square of the last unit moved, and
         // the panel tells about it, "End of Turn" below.
@@ -424,6 +429,15 @@ void PlayScreen::openColony(int index) {
     state.selectedColonist = -1;
     colonyScreen_ = state;
     lastColony_ = index;
+    // Read from the original: with Tutorial Hints on, the screen tells of
+    // a shortage of food, how to give jobs and how to load a ship.
+    if (auto food = game_.foodHint(index)) {
+        notices_.push_back(std::move(*food));
+    }
+    for (auto& hint : game_.colonyScreenHints(index)) {
+        notices_.push_back(std::move(hint));
+    }
+    showNotices();
 }
 
 void PlayScreen::pointAt(int x, int y) {
@@ -454,6 +468,11 @@ void PlayScreen::openEurope() {
     const auto ships = unitsInEurope(game_.state(), game_.rules(), game_.human(), EuropePlace::InPort, true);
     state.ship = ships.empty() ? -1 : ships.front();
     europeScreen_ = state;
+    // Read from the original: with Tutorial Hints on, the first visit
+    // explains the screen.
+    if (auto hint = game_.europeHint()) {
+        tell(std::move(*hint));
+    }
 }
 
 void PlayScreen::enterVillage(int unit, int settlement) {
@@ -1503,6 +1522,11 @@ void PlayScreen::showNotices() {
         if (dialog_) {
             placeReligiousDialog(*dialog_);
         }
+        // Read from the original: with Tutorial Hints on, the naval adviser
+        // follows the first of these with how to fetch them.
+        if (auto hint = game_.docksHint(notice.value)) {
+            notices_.insert(notices_.begin(), std::move(*hint));
+        }
         return;
     }
     if (notice.section == "EVASIVE" || notice.section == "SHIPDAMAGE" || notice.section == "SHIPSUNK" ||
@@ -1554,15 +1578,57 @@ void PlayScreen::showNotices() {
         }
         return;
     }
-    if (notice.section.rfind("TUTORIAL", 0) == 0) {
-        // %STRING2 of the cargo hint is the home port.
-        if (notice.strings.size() < 3) {
-            notice.strings.resize(3);
+    if (notice.section == "LANDHO") {
+        // "Land Ho! What shall we call this new land?", with the name the
+        // land has so far (read from the original).
+        ask(notice.section, -1);
+        if (dialog_) {
+            makeInput(*art_, *dialog_, game_.state().players[static_cast<std::size_t>(game_.human())].country);
+            placeTutorialDialog(*dialog_, kNavalAdvisor);
         }
-        notice.strings[2] = textLine(art_->names, "HOMEPORT", game_.human(), "");
+        return;
+    }
+    if (notice.section.rfind("TUTORIAL", 0) == 0) {
+        if (notice.section == "TUTORIAL6") {
+            // %STRING2 of the cargo hint is the home port.
+            if (notice.strings.size() < 3) {
+                notice.strings.resize(3);
+            }
+            notice.strings[2] = textLine(art_->names, "HOMEPORT", game_.human(), "");
+        }
         ask(notice.section, -1, notice.strings, game_.human(), notice.numbers);
         if (dialog_) {
-            placeTutorialDialog(*dialog_);
+            // The adviser by the number of its picture (MSSn), each where
+            // the other news of that adviser stands (measured with the
+            // naval and colonial advisers). A hint without an adviser is a
+            // plain box where the text's @y puts it (measured on the
+            // Europe screen's).
+            switch (notice.value) {
+            case 0:
+                placeTutorialDialog(*dialog_, kNavalAdvisor);
+                break;
+            case 1:
+                placeColonialDialog(*dialog_);
+                break;
+            case 2:
+                placeForeignNewsDialog(*dialog_);
+                break;
+            case 3:
+                placeFrontiersmanDialog(*dialog_);
+                break;
+            case 4:
+                placeReligiousDialog(*dialog_);
+                break;
+            case 5:
+                placeTutorialDialog(*dialog_, kBuyAdvisor);
+                break;
+            default:
+                if (dialog_->sectionX >= 0) {
+                    dialog_->x = dialog_->sectionX; // guess: as its @y, the food hint's @x
+                }
+                break;
+            }
+            dropTallAdviser(*dialog_);
         }
         return;
     }
@@ -2059,6 +2125,14 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
             } else {
                 ask("NOCITY", -1, {typed_});
             }
+        }
+    } else if (question == "LANDHO") {
+        if (choice == 0 && !typed_.empty()) {
+            game_.setCountryName(typed_);
+        }
+        // Read from the original: with Tutorial Hints on, how to go ashore.
+        if (game_.tutorialHints()) {
+            notices_.insert(notices_.begin(), GameNotice{"TUTORIAL2", {}, 0});
         }
     } else if (question == "RENAMECOLONY") {
         // An empty name keeps the old one (read from the original).
@@ -2576,6 +2650,15 @@ bool PlayScreen::handleEuropeScreen(Command command) {
                 askBackTaxes(state.good);
                 return true;
             }
+            // Read from the original: a purchase the treasury cannot pay
+            // in full is not made; the hint on buying less follows (shown
+            // whatever the Tutorial Hints option).
+            const int room = buyRoom(save, state.ship, state.good, game_.freeHolds(state.ship));
+            const int price = askPrice(game_.rules(), nation, state.good);
+            if (room > 0 && price * room > nation.gold) {
+                tell(GameNotice{"TUTORIAL18", {goodName(state.good)}, kTutorialNoAdviser, {price, nation.gold}});
+                return true;
+            }
             const Trade t = buyGoods(save, game_.rules(), state.ship, state.good, game_.freeHolds(state.ship));
             if (t.amount > 0) {
                 state.receipt = TradeReceipt{false, t.amount, goodName(state.good), t.price, t.gold, nation.taxRate, 0};
@@ -2777,6 +2860,18 @@ void PlayScreen::doColonyMove(ColonyMover who, int job, int square) {
         state.selectedOutside = -1;
         state.selectedColonist = colony.population - 1;
     }
+    // Read from the original: a colonist put to work in a colony of three
+    // without a stockade brings the lesson on building one; the screen
+    // drawn again may show the colony short of food.
+    if (out < 0) {
+        if (auto hint = game_.stockadeHint(state.colony)) {
+            notices_.push_back(std::move(*hint));
+        }
+    }
+    if (auto food = game_.foodHint(state.colony)) {
+        notices_.push_back(std::move(*food));
+    }
+    showNotices();
 }
 
 void PlayScreen::tellColonyMove(ColonyMove result, ColonyMover who) {
