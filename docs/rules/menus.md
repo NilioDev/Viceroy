@@ -132,7 +132,7 @@ Seen in the original (PEDIA.TXT holds the pages, `@PEDIA` the parts):
   `@FATHERn` from x 10, 7 rows a line: its first line (the name) alone,
   the rest wrapped, a line with only `^` leaving an empty line, braces in
   gold. The text starts at y 43 plus 20 for each row of goods, 69 for units (89 for the free
-  colonist), 85 for terrain, 119 for skills, 67 for buildings and 33 for
+  colonist), 85 for terrain (or lower, below), 119 for skills, 67 for buildings and 33 for
   founding fathers, below the pictures of the page.
 - **Wrapping**, worked out from the breaks of 170 lines on 44 pages: a
   word goes on the line while the line stays within 286 pixels, measuring
@@ -183,5 +183,23 @@ Seen in the original (PEDIA.TXT holds the pages, `@PEDIA` the parts):
   row 188) in green there, and the text starts 20 rows lower. The
   stable shows the town's stables (sprite 46); the warehouse expansion
   has no picture, its name at x 10, laid out as if 24 rows tall.
+- **A terrain's page:** a picture of three squares by three of the terrain
+  at (9, 23) in a two-pixel frame, joined up among themselves (forest,
+  hills, mountains), the terrain's resource in the middle, a minor river
+  coming in from the west down the left column (not on arctic, hills,
+  mountains or water) and a road going down the right column (not on
+  water); on open ground the corners are its forest (scrub for desert)
+  and the bottom middle is plowed. Right of it, from y 21 and 16 apart, a
+  row for each job the terrain yields anything for: the expert at x 63,
+  then from x 75, 8 pixels apart, "Farmer: 2" in gold (the yield, one
+  more for farmers and fishermen, twice for lumber), "Plow/River: +1",
+  "Road/River: +2" or "Coast/River: +1" in green, the resource's picture
+  6 to the left of where the next text would go and its name 12 further
+  on ("Game: +2/4" for farmers and fishermen, "Prime Cotton: x2" for
+  crops it doubles; the tobacco's is only "Prime") in gold, and "Expert:
+  +3" (farmers, fishermen) or "Expert: x2" in green. Below the rows,
+  "Move Cost: 2" and "Defense or Ambush Bonus: +50%" (25% for each point
+  of the table) in green. The text starts at y 85, or 23 below that last
+  row when it is lower.
 - F1 on the map opens the page of the active unit's square (its mountains
   or hills, else its forest or ground); a key goes back to the map.
