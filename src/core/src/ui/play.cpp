@@ -4360,8 +4360,18 @@ void PlayScreen::showLoaded() {
     }
 }
 
-void PlayScreen::loadFailed() {
-    ask("LOADNOT", -1, {slotFileName(std::exchange(loadPath_, {}))});
+std::string PlayScreen::loadProblem() const {
+    std::ifstream in(loadPath_, std::ios::binary);
+    if (!in) {
+        return "LOADERROR";
+    }
+    const Bytes file{std::istreambuf_iterator<char>(in), {}};
+    const auto& map = game_.state().map;
+    return std::string(saveLoadProblem(file, map.width * map.height));
+}
+
+void PlayScreen::loadFailed(std::string_view section) {
+    ask(section, -1, {slotFileName(std::exchange(loadPath_, {}))});
     if (dialog_) {
         placeCentredDialog(*dialog_);
     }

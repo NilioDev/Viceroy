@@ -103,7 +103,13 @@ Seen and measured in the original:
   game is saved in that slot from then on.
 - Picking an empty slot to load does nothing. A game that loads says
   "Loaded COLONY09.SAV successfully." (`LOADGOOD`), one that can't be read
-  "COLONY09.SAV is not a valid save file." (`LOADNOT`).
+  "COLONY09.SAV is not a valid save file." (`LOADNOT`). Read from the
+  original's loader: the file starts with "COLONIZE", a 0 and 0x1A, then
+  the version, 73. A later version is `LOADNOT`, an earlier one "is an
+  obsolete save file" (`LOADOLD`; Viceroy also takes 0, which its own
+  early saves have), a map of another size than the one being played
+  `LOADSIZE`, and a file that cannot be opened "Error loading game"
+  (`LOADERROR`). Games Viceroy starts are written with version 73.
 - From the main menu the list stands on `WOODPANL.PIK` without a box: the
   title at (62, 67) when the box is 207 wide, the slots 6 rows apart from
   row 75 at x + 9, the chosen one on a bar 8 high from a row above the text

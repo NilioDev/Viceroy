@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace viceroy {
@@ -184,6 +185,13 @@ struct SaveGame {
 };
 
 SaveGame readSaveGame(std::span<const std::uint8_t> file);
+
+// Read from the original's loader: why a file cannot be loaded over a game
+// whose map has `squares` squares (0 when there is none yet). LOADNOT
+// without the signature or with a later version than 73, LOADOLD with an
+// earlier one (but 0, which Viceroy's own early saves have), LOADSIZE when
+// the map size differs; empty when it may be loaded.
+std::string_view saveLoadProblem(std::span<const std::uint8_t> file, int squares = 0);
 
 // Writes a save the original game can read. Decoded fields are written over
 // the raw bytes they came from.

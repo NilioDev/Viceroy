@@ -86,6 +86,25 @@ void append(Bytes& out, std::span<const std::uint8_t> bytes) {
 
 } // namespace
 
+std::string_view saveLoadProblem(std::span<const std::uint8_t> file, int squares) {
+    constexpr int kVersion = 73;
+    if (file.size() < kHeaderSize || std::memcmp(file.data(), kSignature, kSignatureSize) != 0) {
+        return "LOADNOT";
+    }
+    const int version = u16(file.data() + 10);
+    if (version > kVersion) {
+        return "LOADNOT";
+    }
+    if (version < kVersion && version != 0) {
+        // (0: a game Viceroy started before it wrote the version.)
+        return "LOADOLD";
+    }
+    if (squares > 0 && u16(file.data() + 12) * u16(file.data() + 14) != squares) {
+        return "LOADSIZE";
+    }
+    return {};
+}
+
 SaveGame readSaveGame(std::span<const std::uint8_t> file) {
     if (file.size() < kHeaderSize || std::memcmp(file.data(), kSignature, kSignatureSize) != 0) {
         throw FormatError("not a savegame");

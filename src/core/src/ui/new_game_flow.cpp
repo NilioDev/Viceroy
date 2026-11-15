@@ -514,7 +514,9 @@ void NewGameFlow::drawDeparture(Screen& screen, const Art& art, const NewGameArt
         strings = {textLine(art.names, "HOMEPORT", nation_, "")};
         break;
     case 3:
-        strings = {country, dutch ? "Stadtholder" : "King"};
+        // Read from the original: the ruler's title is the nation's row of
+        // @MYLEADER (King, or Stadtholder for the Dutch).
+        strings = {country, textLine(art.gameText, "MYLEADER", nation_, dutch ? "Stadtholder" : "King")};
         break;
     case 6:
         strings = {country};
