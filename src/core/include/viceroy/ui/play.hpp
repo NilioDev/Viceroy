@@ -73,6 +73,7 @@ enum class Command {
     Dump,           // O: Dump Cargo Overboard
     Load,           // L: Load Cargo, the most valuable good of the colony
     Unload,         // U: Unload Cargo, the first hold
+    ExitToDos,      // Ctrl or Alt with Q or X: "Exit to DOS?"
     BuySome,        // Shift+Enter in Europe's market: buy how much (HOWMUCH4)
     SellSome,       // Shift+S in Europe's market: sell how much (HOWMUCH5)
     TerrainHelp,    // F1: the Colonizopedia's page of the terrain
