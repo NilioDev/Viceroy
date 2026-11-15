@@ -56,7 +56,7 @@ Build Colony even on mountains and arctic, where picking it says why not.
 Load, Unload, Pillage, Go to Port, Trade Route, Return to Europe and Dump
 are not shown. For other units
 Viceroy follows the manual (pioneers clear, plow and build roads; land
-units build or join colonies; soldiers pillage; ships and wagon trains trade
+units build or join colonies; ships and wagon trains trade
 and carry cargo); these are still to be checked against the original. The
 encyclopedia shows six of its eight entries.
 
