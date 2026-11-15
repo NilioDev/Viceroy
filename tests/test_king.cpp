@@ -259,6 +259,10 @@ VCR_TEST("king: mercenaries are offered now and then and land in a colony") {
     s.turn = 201; // not a turn of the King's
     s.nations[kHuman].gold = 100000;
     s.colonies[0].population = 3;
+    // Plains, so that the colony feeds its people over the long wait.
+    for (auto& sq : s.map.squares) {
+        sq.terrain = 2;
+    }
     // The ship that brings them needs the open sea next to the colony.
     s.map.squares[2 * 6 + 3].terrain = 25;
     s.map.squares[2 * 6 + 3].region = 1;
