@@ -332,6 +332,13 @@ bool Game::startMeeting(int a, int b, int mover, int dir, bool forced) {
     bool talk = forced;
     if ((relation(a, b) & kMet) == 0) {
         talk = true;
+        // Read from the original: the player's first meeting with another
+        // nation of Europe shows its woodcut first, once a game.
+        if (a == human()) {
+            if (auto picture = woodcut(10)) {
+                notices_.push_back(std::move(*picture));
+            }
+        }
     }
     if (lastTalk(b) + 16 <= save_.turn) {
         talk = true;

@@ -904,6 +904,44 @@ void drawCongressHall(Screen& screen, const Art& art, const std::vector<bool>& f
     }
 }
 
+void drawWoodcut(Screen& screen, const Art& art, int n) {
+    // Read from the original and checked pixel for pixel against it: the
+    // frame and the picture stand on the points their sheets give (feet in
+    // the middle), and both take the picture's colours.
+    if (n < 1 || static_cast<std::size_t>(n) > art.woodcuts.size()) {
+        return;
+    }
+    const auto& sheet = art.woodcuts[static_cast<std::size_t>(n - 1)];
+    if (sheet.palette) {
+        screen.setColours(*sheet.palette, 0, 255);
+    }
+    screen.clear(0);
+    for (const auto* s : {&art.woodcutFrame, &sheet}) {
+        if (!s->sprites.empty()) {
+            const auto& sprite = s->sprites.front();
+            screen.blit(sprite.image, sprite.x - sprite.image.width / 2, sprite.y - sprite.image.height + 1);
+        }
+    }
+    // The title is line n of @WOODCUT, on a plate of 16-pixel pieces just
+    // long enough for it between the two 18-pixel ends, centred.
+    const auto* titles = art.woodcutTitles.find("WOODCUT");
+    if (titles == nullptr || static_cast<std::size_t>(n) >= titles->lines.size() || art.namePlate.sprites.size() < 3) {
+        return;
+    }
+    const std::string& title = titles->lines[static_cast<std::size_t>(n)];
+    const int width = Screen::textWidth(art.plateFont, title);
+    const int pieces = (width + 15) / 16;
+    int x = 160 - (pieces * 16 + 36) / 2;
+    constexpr int kPlateY = 162;
+    screen.blit(art.namePlate.sprites[0].image, x, kPlateY);
+    x += 18;
+    for (int i = 0; i < pieces; ++i, x += 16) {
+        screen.blit(art.namePlate.sprites[1].image, x, kPlateY);
+    }
+    screen.blit(art.namePlate.sprites[2].image, x, kPlateY);
+    screen.text(art.plateFont, 160 - width / 2, kPlateY + 3, title, {0x5C, 0x5E, 0x5D});
+}
+
 Art loadArt(const std::filesystem::path& folder) {
     Art art;
     art.palette = readVgaPalette(readFile(folder, "VICEROY.PAL"));
@@ -942,6 +980,14 @@ Art loadArt(const std::filesystem::path& folder) {
         art.penLetters.push_back(readSpriteSheet(readFile(folder, std::string("DEC-LOW") + c + ".SS")));
     }
     art.penFlourish = readSpriteSheet(readFile(folder, "DEC-SQIG.SS"));
+    art.woodcutFrame = readSpriteSheet(readFile(folder, "WOODFRAM.SS"));
+    art.namePlate = readSpriteSheet(readFile(folder, "NAMEPLAT.SS"));
+    for (int n = 1; n <= 13; ++n) {
+        art.woodcuts.push_back(
+            readSpriteSheet(readFile(folder, (n < 10 ? "WDCUT0" : "WDCUT") + std::to_string(n) + ".SS")));
+    }
+    art.plateFont = readFont(readFile(folder, "FONT-NP.FF"));
+    art.woodcutTitles = parseTextFile(readFile(folder, "WOODCUT.TXT"));
     for (int f = 0; f < 25; ++f) {
         art.fathers.push_back(readSpriteSheet(readFile(folder, (f < 10 ? "CC-0" : "CC-") + std::to_string(f) + ".SS")));
     }

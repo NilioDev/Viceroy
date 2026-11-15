@@ -250,7 +250,12 @@ bool Game::exploreRumour(int index) {
         } else if (gold > 0) {
             mood(2);
         }
-        notices_.push_back(std::move(notice));
+        if (outcome == kFountain && human) {
+            // The tune, then the woodcut of the fountain, then the news.
+            pushWithWoodcut(std::move(notice), 8);
+        } else {
+            notices_.push_back(std::move(notice));
+        }
     }
     if (anger != 0 && shrineTribe >= 0) {
         changeTension(shrineTribe, nation, anger);

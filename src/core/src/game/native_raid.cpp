@@ -266,7 +266,11 @@ CombatOutcome Game::nativeAttack(int index, int x, int y) {
     if (human) {
         // Read from the original: the natives' own tune.
         notice.music.push_back({MusicCue::Kind::Pick, kNativesTune});
-        notices_.push_back(std::move(notice));
+        if (notice.section == "INDIANBURNCOLONY") {
+            pushWithWoodcut(std::move(notice), 11); // the woodcut of the burning first
+        } else {
+            notices_.push_back(std::move(notice));
+        }
     } else if (notice.section == "INDIANWINCOLONY" || notice.section == "INDIANBURNCOLONY") {
         // Read from the original: "Spies report: ..." when the colony is a
         // computer player's, without music.

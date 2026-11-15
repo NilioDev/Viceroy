@@ -624,8 +624,8 @@ void click(App& app, float wx, float wy) {
         }
         return;
     }
-    if (app.play->view().hiddenTerrain) {
-        send(app, Command::Confirm);
+    if (app.play->view().hiddenTerrain || (app.play->dialog() && app.play->dialog()->woodcut > 0)) {
+        send(app, Command::Confirm); // a click puts the woodcut away too
         return;
     }
     if (app.play->pedia()) {

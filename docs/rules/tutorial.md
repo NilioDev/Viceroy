@@ -103,5 +103,5 @@ among the nine squares around it, player flag 0x80 is set and the naval
 adviser asks for the name of the new land (`@LANDHO`, the box filled in
 with the name it has, "New England"). The box is widened for the line to
 type in and its text wrapped to the new width. With Tutorial Hints on,
-`@TUTORIAL2` (how to go ashore) follows. In the original the woodcut of
-the discovery comes first.
+`@TUTORIAL2` (how to go ashore) follows. The woodcut of the discovery
+comes first (see [woodcuts](woodcuts.md)).

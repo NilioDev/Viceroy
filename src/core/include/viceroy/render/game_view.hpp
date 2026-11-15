@@ -50,6 +50,11 @@ struct Art {
     std::vector<SpriteSheet> penCapitals; // DEC-UPPA.SS to DEC-UPPZ.SS: a capital written
     std::vector<SpriteSheet> penLetters;  // DEC-LOWA.SS to DEC-LOWZ.SS: a small letter written
     SpriteSheet penFlourish;              // DEC-SQIG.SS: the flourish at the end
+    SpriteSheet woodcutFrame;             // WOODFRAM.SS: the wooden frame of a woodcut
+    SpriteSheet namePlate;                // NAMEPLAT.SS: left end, middle piece, right end
+    std::vector<SpriteSheet> woodcuts;    // WDCUT01.SS to WDCUT13.SS, from 0
+    Font plateFont;                       // FONT-NP.FF: the woodcut's title
+    TextFile woodcutTitles;               // WOODCUT.TXT
     Ruleset rules;
 };
 
@@ -60,6 +65,10 @@ Art loadArt(const std::filesystem::path& folder);
 // (row of @FATHERS, true when in congress), each where the original
 // stands it.
 void drawCongressHall(Screen& screen, const Art& art, const std::vector<bool>& fathers);
+
+// Woodcut n (1 to 13) in its wooden frame, its title on a brass plate
+// below it, all in the woodcut's own colours (read from the original).
+void drawWoodcut(Screen& screen, const Art& art, int n);
 
 // The signing of the declaration of independence: the leader's name is
 // written on DECOIND.PIK letter by letter, each letter a few pictures of

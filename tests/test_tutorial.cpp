@@ -100,8 +100,10 @@ VCR_TEST("original files: next to land the player names it, then learns to go as
     VCR_CHECK(g.move(0, {1, 0}) == MoveResult::Moved); // (4, 3)
     VCR_CHECK(g.takeNotices().empty());
     VCR_CHECK(g.move(0, {1, 0}) == MoveResult::Moved); // (5, 3): land at (6, 3)
+    // The woodcut of the discovery, then the naming.
     auto notices = g.takeNotices();
-    VCR_CHECK(notices.size() == 1 && notices[0].section == "LANDHO");
+    VCR_CHECK(notices.size() == 2 && notices[0].section == "WOODCUT" && notices[0].value == 1);
+    VCR_CHECK(notices.size() == 2 && notices[1].section == "LANDHO");
     VCR_CHECK(g.landSighted() && (g.state().players[0].raw[48] & 0x80) != 0);
     g.setCountryName("Nieuw Holland");
     VCR_CHECK(g.state().players[0].country == "Nieuw Holland");
@@ -120,6 +122,8 @@ VCR_TEST("original files: next to land the player names it, then learns to go as
     play.setArt(&art);
     play.setAnimations(false);
     play.handle(Command::MoveE);
+    VCR_CHECK(play.dialog() && play.dialog()->woodcut == 1);
+    play.handle(Command::Confirm);
     VCR_CHECK(play.dialog() && play.dialog()->lines.front().find("Land Ho!") == 0);
     VCR_CHECK(play.dialog() && play.dialog()->inputText == "New England");
     play.handle(Command::Confirm);

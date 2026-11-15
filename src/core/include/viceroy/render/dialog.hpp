@@ -57,6 +57,8 @@ struct Dialog {
     // The section's @x, or -1: only some boxes go there (most are
     // centred whatever it says).
     int sectionX = -1;
+    // Not a box but a woodcut (1 to 13) over the whole screen, until a key.
+    int woodcut = 0;
 };
 
 // Portraits in Art::portraits.

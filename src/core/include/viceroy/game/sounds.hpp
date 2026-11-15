@@ -20,6 +20,7 @@ inline constexpr int kShipBeaten = 0x4D;  // a ship loses to a ship, or to a rai
 inline constexpr int kRaidGold = 0x4E;
 inline constexpr int kRaidStores = 0x4F;
 inline constexpr int kFire = 0x53;     // a raid burns a building, a colony burns, a mission burns
+inline constexpr int kColonyFounded = 0x54; // the player founds a colony
 inline constexpr int kChiefKill = 0x55;
 inline constexpr int kShipSunk = 0x57;
 inline constexpr int kFortify = 0x58;

@@ -32,6 +32,7 @@ struct MapSquare {
     static constexpr std::uint8_t kHasUnit = 0x01;
     static constexpr std::uint8_t kHasColony = 0x02;
     static constexpr std::uint8_t kRoad = 0x08;
+    static constexpr std::uint8_t kPacific = 0x20; // water of the Pacific, marked by the new game
     static constexpr std::uint8_t kPlowed = 0x40;
 
     bool isLand() const { return terrain <= 24; }

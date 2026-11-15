@@ -47,6 +47,7 @@ total matters for finding the map.
 | 44 | 2 | Number of units |
 | 46 | 2 | Number of colonies |
 | 54 | 1 | Difficulty, 0 (Discoverer) to 4 (Viceroy) |
+| 154, 155 | 1 each | Woodcuts shown, bit n-1 for woodcut n (see [woodcuts](../rules/woodcuts.md)) |
 
 ## Map layers
 
@@ -70,6 +71,7 @@ Andes and the Rockies in the saves.)
 **Mask.** Flags per square: bit 0 a unit is here, bit 1 a colony is here,
 bit 2 no fish on this pattern square of the sea, or silver instead of ore
 on a mountain (see [map drawing](../rules/map-drawing.md)), bit 3 road,
+bit 5 the Pacific (water a new game marks, see [woodcuts](../rules/woodcuts.md)),
 bit 6 plowed. The other bits are kept as they are.
 
 **Path.** The low four bits are region numbers used for route finding
