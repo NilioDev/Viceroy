@@ -426,13 +426,13 @@ std::optional<Command> keyCommand(const SDL_KeyboardEvent& key) {
         return Command::MoveNW;
     case SDLK_RETURN:
     case SDLK_KP_ENTER:
-        return Command::Confirm;
+        return (key.mod & SDL_KMOD_SHIFT) ? Command::BuySome : Command::Confirm;
     case SDLK_SPACE:
         return Command::Skip;
     case SDLK_W:
         return Command::Wait;
     case SDLK_S:
-        return ctrl ? Command::Save : Command::Sentry;
+        return ctrl ? Command::Save : (key.mod & SDL_KMOD_SHIFT) ? Command::SellSome : Command::Sentry;
     case SDLK_F:
         return Command::Fortify;
     case SDLK_D:

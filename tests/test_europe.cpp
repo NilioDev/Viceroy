@@ -30,6 +30,28 @@ VCR_TEST("europe: a unit's stage follows from its position") {
     VCR_CHECK(europePlace(u) == EuropePlace::None);
 }
 
+VCR_TEST("europe: buying and selling part of a cargo (HOWMUCH4, HOWMUCH5)") {
+    SaveGame s;
+    s.nations[3].gold = 1000;
+    s.nations[3].prices[1] = 5; // sugar: 4 to sell
+    SaveUnit ship;
+    ship.nation = 3;
+    ship.type = 14;
+    setEuropeStage(ship, kPortStage);
+    s.units.push_back(ship);
+    Ruleset r;
+    r.cargo.resize(16);
+    Trade t = buyGoods(s, r, 0, 1, 2, 30);
+    VCR_CHECK(t.amount == 30 && s.units[0].holds == 1 && holdAmount(s.units[0], 0) == 30);
+    t = buyGoods(s, r, 0, 1, 1); // tops the hold up to 100
+    VCR_CHECK(t.amount == 70 && holdAmount(s.units[0], 0) == 100);
+    // Selling part of it keeps the rest aboard.
+    t = sellGoods(s, r, 0, 1, 40);
+    VCR_CHECK(t.amount == 40 && t.price == 4 && s.units[0].holds == 1 && holdAmount(s.units[0], 0) == 60);
+    t = sellGoods(s, r, 0, 1, 60);
+    VCR_CHECK(t.amount == 60 && s.units[0].holds == 0);
+}
+
 namespace {
 
 Game loadSave(const Art& art, const char* name) {

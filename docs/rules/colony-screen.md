@@ -159,6 +159,11 @@ Goods are dragged, measured and read from the original:
 - With Shift held when letting go, HOWMUCH1 (loading) or HOWMUCH2
   (unloading) asks how much, up to what would have moved; when unloading,
   the rest stays aboard.
+- A hold let go on another carrier in the harbour moves its good across,
+  as the manual describes: up to the hold, 100 and the room on the other
+  side; with Shift HOWMUCH3 asks how much ("How much Muskets should be
+  moved from Frigate to Wagon Train"). Load (L) and Unload (U) work on the
+  chosen carrier too (see [menus](menus.md)).
 - A unit picked outside the colony, then a click on a carrier or its
   holds: the unit goes aboard that ship when it fits (each unit takes the
   holds of its size in `@UNIT`, a treasure six). Aboard, it is sentried and

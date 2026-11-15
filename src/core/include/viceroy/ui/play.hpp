@@ -73,6 +73,8 @@ enum class Command {
     Dump,           // O: Dump Cargo Overboard
     Load,           // L: Load Cargo, the most valuable good of the colony
     Unload,         // U: Unload Cargo, the first hold
+    BuySome,        // Shift+Enter in Europe's market: buy how much (HOWMUCH4)
+    SellSome,       // Shift+S in Europe's market: sell how much (HOWMUCH5)
     TerrainHelp,    // F1: the Colonizopedia's page of the terrain
     ZoomIn,         // Z
     ZoomOut,        // X
@@ -235,6 +237,7 @@ private:
     void stepMenu(int delta);
     void notYet();
     void loadOrUnload(int carrier, bool load);
+    void transferCargo(int from, int to, int good, int amount);
     bool handleCheckboxes(Command command);
     void showSoundOptions();
     void showColonyReportOptions();
@@ -368,6 +371,7 @@ private:
         int carrier = -1;
         int good = -1;
         int amount = 0;
+        int target = -1; // another ship or wagon train it goes to (HOWMUCH3)
     };
     CargoMove cargoMove_;
     std::vector<int> unloadAll_;    // goods still to unload for "Unload all cargo."
