@@ -88,7 +88,18 @@ VCR_TEST("original files: the opening plays and can be skipped") {
     }
     intro.tick(100 * Intro::kFrameMs);
     VCR_CHECK(intro.frame() == 100);
+    // Read from the original: 8026h at frame 25, then 25h as the man
+    // starts wading ashore (frame 720).
+    const auto early = intro.takeSounds();
+    VCR_CHECK(early.size() == 1 && early.front() == 0x8026);
+    VCR_CHECK(intro.takeSounds().empty());
+    intro.tick(619 * Intro::kFrameMs);
+    VCR_CHECK(intro.takeSounds().empty());
+    intro.tick(Intro::kFrameMs);
+    const auto ashore = intro.takeSounds();
+    VCR_CHECK(ashore.size() == 1 && ashore.front() == 0x25);
     intro.skip();
+    VCR_CHECK(intro.takeSounds().empty());
     VCR_CHECK(intro.finished());
     MainMenu menu(art, "0.0.1", "7-Feb-95");
     menu.draw(screen, art, title, &intro);

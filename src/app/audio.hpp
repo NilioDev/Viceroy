@@ -34,6 +34,14 @@ public:
     void update(bool independence);
     // Sends one driver command now, when the options allow it.
     void send(int command);
+    // Sends one driver command now, whatever the options: the opening and
+    // the main menu call the driver directly.
+    void command(int command);
+    // The opening's music, already as far in as the logo the original
+    // plays first would have taken it.
+    void startIntro(int command, int ticks);
+    // True while any voice plays.
+    bool busy();
 
 private:
     static void SDLCALL feed(void* self, SDL_AudioStream* stream, int additional, int total);

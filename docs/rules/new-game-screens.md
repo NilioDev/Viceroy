@@ -83,9 +83,13 @@ wide and 8 rows a line: pixel value 3 in colour 0, value 1 in 242.
 
 ## The departure
 
-`LEVN0001.PIK` to `LEVN0010.PIK`, each with its palette, a new one every 9.6
-seconds; each comes in over the last scattered pixel by pixel in about 1.3
-seconds. Over each, `BUILD1` to `BUILD10` centred in 310 pixels at row 30,
+`LEVN0001.PIK` to `LEVN0010.PIK`, each with its palette (all ten have the
+same), a new one every 9.6 seconds; each comes in over the last pixel by
+pixel in about 1.3 seconds. The order is the original's (its routine for
+transition 8): a 16-bit shift register starting at 1 is shifted right, and
+when a 1 falls out B400h is added to it with exclusive or; values above
+64000 are skipped and each other value less one is the next pixel, counted
+along the rows. Every pixel comes once, scattered with no pattern to see. Over each, `BUILD1` to `BUILD10` centred in 310 pixels at row 30,
 in `FONTINTR.FF` with colours 14, 54 and 47. The blanks are filled with the
 difficulty's name and the player's name, the home port, the country and
 "Stadtholder" (the Dutch) or "King" (seen for the English), and the
@@ -97,7 +101,6 @@ country again. A key or click goes straight to the game.
   and the second Dutch page one word later than Viceroy. Its line breaks
   do not follow from the widths of `FONTINTR.FF`'s letters alone; the rule
   is still to be found.
-- The dissolve's pixel order is Viceroy's own.
 - The original asks which of its ten slots to use when you save. Viceroy
   saves a new game in the first free slot, or over the one saved longest
   ago.

@@ -69,6 +69,32 @@ Rect customizeCell(int column, int row) {
     return {10 + 76 * column, 16 + 60 * row - (row > 1 ? 1 : 0), kCustomizeCellW, kCustomizeCellH};
 }
 
+// The order in which the original's dissolve copies the new picture's
+// pixels: a 16-bit shift register that starts at 1, shifts right and, when
+// a 1 falls out, takes B400h into it; values above 64000 are skipped and
+// each other value less one is the next pixel. So every pixel comes once,
+// scattered with no pattern to see.
+const std::vector<std::uint16_t>& dissolveOrder() {
+    static const std::vector<std::uint16_t> order = [] {
+        constexpr unsigned kPixels = Screen::kWidth * Screen::kHeight;
+        std::vector<std::uint16_t> o;
+        o.reserve(kPixels);
+        unsigned r = 1;
+        while (o.size() < kPixels) {
+            do {
+                const bool out = (r & 1U) != 0;
+                r >>= 1U;
+                if (out) {
+                    r ^= 0xB400U;
+                }
+            } while (r > kPixels);
+            o.push_back(static_cast<std::uint16_t>(r - 1));
+        }
+        return o;
+    }();
+    return order;
+}
+
 constexpr int kDepartureFrames = 10;
 // Measured on the original: a new picture every 9.6 seconds, coming in
 // over about 1.3 seconds.
@@ -597,17 +623,14 @@ void NewGameFlow::draw(Screen& screen, const Art& art, const NewGameArt& picture
             drawDeparture(previous, art, pictures, frame - 1);
         }
         drawDeparture(screen, art, pictures, frame);
-        // The new picture comes in pixel by pixel, in a scattered order.
+        // The new picture comes in pixel by pixel, in the original's order.
         if (into < kDissolveMs) {
-            const auto shown = static_cast<std::uint32_t>(Screen::kWidth * Screen::kHeight * into / kDissolveMs);
-            std::uint32_t at = 0;
-            for (std::uint32_t i = 0; i < Screen::kWidth * Screen::kHeight; ++i) {
-                at = (at * 4097U + 12345U) % (Screen::kWidth * Screen::kHeight);
-                if (i >= shown) {
-                    const int x = static_cast<int>(at % Screen::kWidth);
-                    const int y = static_cast<int>(at / Screen::kWidth);
-                    screen.pixel(x, y, previous.at(x, y));
-                }
+            const auto& order = dissolveOrder();
+            const auto shown = static_cast<std::size_t>(order.size() * into / kDissolveMs);
+            for (std::size_t i = shown; i < order.size(); ++i) {
+                const int x = order[i] % Screen::kWidth;
+                const int y = order[i] / Screen::kWidth;
+                screen.pixel(x, y, previous.at(x, y));
             }
         }
         break;

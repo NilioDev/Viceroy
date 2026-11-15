@@ -26,6 +26,9 @@ public:
     void write(int set, int reg, int value);
     // Interleaved stereo frames.
     void render(std::span<std::int16_t> stereo);
+    // Plays this many driver ticks at once without sound, as if they had
+    // gone by: the music goes on from there.
+    void skip(int ticks);
 
 private:
     struct Impl;
@@ -39,6 +42,9 @@ public:
     MusicPlayer& player() { return player_; }
     // Fills interleaved stereo frames, ticking the player as time passes.
     void render(std::span<std::int16_t> stereo);
+    // Plays this many driver ticks at once without sound, as if they had
+    // gone by: the music goes on from there.
+    void skip(int ticks);
 
     // COLDIG.BIN, for a card that plays samples: drums and effects then
     // play the recordings, one after another as the driver queues them.

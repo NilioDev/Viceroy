@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <fstream>
 #include <iterator>
+#include <utility>
 
 namespace viceroy {
 
@@ -169,13 +170,31 @@ Intro::Intro(const TitleArt& art) {
                 end_ = a.first; // END OF DEMO
                 break;
             }
+            if (a.series == 7) {
+                ashore_ = a.first;
+            }
             animations_.push_back(a);
         }
     }
 }
 
 void Intro::tick(std::uint64_t milliseconds) {
+    const int before = frame();
     elapsed_ += milliseconds;
+    const int now = frame();
+    // Read from the original's OPENING.EXE: at frame 25 it sends 8026h
+    // (which cuts in only while 34h is still near its start, so after the
+    // logo it changes nothing), and as series 7 starts, 25h, which takes
+    // over from 34h on its next beat.
+    for (const auto& [at, command] : {std::pair{25, 0x8026}, std::pair{ashore_, 0x25}}) {
+        if (before < at && at <= now && at < end_) {
+            sounds_.push_back(command);
+        }
+    }
+}
+
+std::vector<int> Intro::takeSounds() {
+    return std::exchange(sounds_, {});
 }
 
 void Intro::skip() {

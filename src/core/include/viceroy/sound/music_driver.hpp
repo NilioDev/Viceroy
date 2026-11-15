@@ -30,6 +30,7 @@ struct Piece {
     std::vector<Start> starts;
     int drumVoice = -1;
     bool stopFirst = false;     // the other voices fade out first
+    bool resetFirst = false;    // every voice is silenced at once first
     bool onlyIfIdle = false;    // started only when the first stream is not already playing
 
     // A piece that cuts in on a beat: the driver keeps a clock of `period`
@@ -43,6 +44,25 @@ struct Piece {
         std::array<std::uint16_t, 2> ifPlaying{};
     };
     std::optional<Segue> segue;
+
+    // A piece that sets the beat clock itself (the opening's, 34h, and
+    // 8026h): the clock starts at `clock` ticks and comes round every
+    // `period`, and no piece waits for it any more.
+    struct Beat {
+        int clock = 0;
+        int period = 0;
+    };
+    std::optional<Beat> beat;
+
+    // A piece that only cuts in while another is near its start: unless
+    // `stream` is playing and `voice` has read past `until` in its stream,
+    // the piece starts; otherwise the command does nothing.
+    struct Join {
+        std::uint16_t stream = 0;
+        int voice = 0;
+        std::uint16_t until = 0;
+    };
+    std::optional<Join> join;
 
     // A sound effect: a recording to play with a card that plays samples
     // (-1: none), else the streams to start on free effect voices.

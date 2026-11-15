@@ -91,6 +91,7 @@ std::optional<MusicDriver> MusicDriver::load(std::span<const std::uint8_t> file)
     std::size_t tunes = 0;
     std::size_t effects = 0;
     std::size_t specials = 0;
+    std::size_t controls = 0;
     for (std::size_t at = entry; at + 8 < code.size() && at < entry + 0x80; ++at) {
         if (code[at] == 0x81 && code[at + 1] == 0xEB && le16(code, at + 2) == 0x8020) { // sub bx, 8020h
             for (std::size_t k = at + 4; k + 5 < code.size() && k < at + 20; ++k) {
@@ -104,7 +105,11 @@ std::optional<MusicDriver> MusicDriver::load(std::span<const std::uint8_t> file)
             const int base = code[at + 2];
             for (std::size_t k = at + 3; k + 5 < code.size() && k < at + 20; ++k) {
                 if (code[k] == 0x2E && code[k + 1] == 0xFF && code[k + 2] == 0x97) {
-                    (base == 0x20 ? tunes : effects) = base == 0x20 || base == 0x40 ? le16(code, k + 3) : 0;
+                    if (base == 0) {
+                        controls = le16(code, k + 3);
+                    } else {
+                        (base == 0x20 ? tunes : effects) = base == 0x20 || base == 0x40 ? le16(code, k + 3) : 0;
+                    }
                     break;
                 }
             }
@@ -113,6 +118,17 @@ std::optional<MusicDriver> MusicDriver::load(std::span<const std::uint8_t> file)
     if (tunes == 0) {
         return std::nullopt;
     }
+    // Control command 0, "reset", silences every voice at once.
+    const std::size_t resetRoutine = controls != 0 ? le16(code, controls) : 0;
+    // The beat clock's words in the data segment: the ticks to the next
+    // beat, the ticks from beat to beat, and the piece waiting for the beat.
+    constexpr std::uint16_t kBeatClock = 0xA0;
+    constexpr std::uint16_t kBeatPeriod = 0xA2;
+    constexpr std::uint16_t kBeatWaiting = 0xA4;
+    // Each voice's state is 32h bytes from the first voice's; the stream
+    // position is the word at 16h.
+    constexpr std::uint16_t kVoiceSize = 0x32;
+    constexpr std::uint16_t kVoicePosition = 0x16;
 
     // Each command's code: stops the voices, may name a drum voice, and
     // starts voices on streams with "lea cx, stream; call start_voice_n".
@@ -123,12 +139,35 @@ std::optional<MusicDriver> MusicDriver::load(std::span<const std::uint8_t> file)
         int randomRest = -1;
     };
     std::array<std::vector<Raw>, 0x45> raw{};
+    std::array<std::uint16_t, 0x45> joinState{};
     const auto parse = [&](int index, std::size_t at) {
         Piece& p = d.pieces_[static_cast<std::size_t>(index)];
         bool ok = true;
+        // "lea cx, stream; call is_playing; jz go; lea cx, until; cmp cx,
+        // [position]; jc done": 8026h only cuts in near 34h's start.
+        if (at + 20 < code.size() && code[at] == 0x8D && code[at + 1] == 0x0E && code[at + 4] == 0xE8 &&
+            code[at + 7] == 0x74 && code[at + 9] == 0x8D && code[at + 10] == 0x0E && code[at + 13] == 0x3B &&
+            code[at + 14] == 0x0E && code[at + 17] == 0x72) {
+            p.join = Piece::Join{le16(code, at + 2), -1, le16(code, at + 11)};
+            joinState[static_cast<std::size_t>(index)] = static_cast<std::uint16_t>(le16(code, at + 15) - kVoicePosition);
+            at += 19;
+        }
         for (int steps = 0; steps < 40 && at + 6 < code.size(); ++steps) {
             const std::uint8_t op = code[at];
-            if (op == 0xC6 && code[at + 1] == 0x06) { // mov byte [x], n
+            if (op == 0xC7 && code[at + 1] == 0x06) { // mov word [x], n: the beat clock
+                const std::uint16_t place = le16(code, at + 2);
+                const int value = le16(code, at + 4);
+                if (place == kBeatClock || place == kBeatPeriod) {
+                    if (!p.beat) {
+                        p.beat = Piece::Beat{};
+                    }
+                    (place == kBeatClock ? p.beat->clock : p.beat->period) = value;
+                } else if (place != kBeatWaiting || value != 0) {
+                    ok = false;
+                    break;
+                }
+                at += 6;
+            } else if (op == 0xC6 && code[at + 1] == 0x06) { // mov byte [x], n
                 if (le16(code, at + 2) == 0x1CA) {
                     p.drumVoice = code[at + 4];
                 }
@@ -185,8 +224,11 @@ std::optional<MusicDriver> MusicDriver::load(std::span<const std::uint8_t> file)
             } else if (op == 0xE8) { // a call: the "fade every voice" routine
                 const std::size_t target =
                     (at + 3 + static_cast<std::size_t>(static_cast<std::int16_t>(le16(code, at + 1)))) & 0xFFFF;
-                (void)target;
-                p.stopFirst = true;
+                if (target == resetRoutine) {
+                    p.resetFirst = true;
+                } else {
+                    p.stopFirst = true;
+                }
                 at += 3;
             } else if (op == 0xC3 || op == 0xEB) {
                 break;
@@ -288,6 +330,15 @@ std::optional<MusicDriver> MusicDriver::load(std::span<const std::uint8_t> file)
             }
         }
         d.known_[i] = !d.pieces_[i].starts.empty() || d.pieces_[i].sample >= 0 || !d.pieces_[i].effectStreams.empty();
+        if (d.pieces_[i].join) {
+            const int voice = toVoice(joinState[i]);
+            const bool whole = joinState[i] >= firstVoice && (joinState[i] - firstVoice) % kVoiceSize == 0;
+            if (voice >= 0 && voice < 9 && whole) {
+                d.pieces_[i].join->voice = voice;
+            } else {
+                d.known_[i] = false;
+            }
+        }
     }
 
     // Segues: "if the clock is not running, start at once; otherwise if
@@ -516,6 +567,20 @@ bool MusicPlayer::command(int command) {
     }
     if (p->onlyIfIdle && !p->starts.empty() && playing(p->starts.front().stream)) {
         return true;
+    }
+    if (p->join) {
+        const Voice& v = voices_[static_cast<std::size_t>(p->join->voice)];
+        if (playing(p->join->stream) && v.pc > p->join->until) {
+            return true;
+        }
+    }
+    if (p->beat) {
+        clock_ = p->beat->clock;
+        clockPeriod_ = p->beat->period;
+        waiting_ = nullptr;
+    }
+    if (p->resetFirst) {
+        reset();
     }
     drumVoice_ = p->drumVoice;
     if (p->stopFirst) {
