@@ -124,6 +124,7 @@ VCR_TEST("original files: a new game on America starts as the original's") {
     }
     const auto save = newAmericaGame(file, art.rules, setup);
     VCR_CHECK(save.map.width == 58 && save.map.height == 72);
+    VCR_CHECK(save.header[9] == 0x1A && save.header[10] == 73 && save.header[11] == 0); // the version
     VCR_CHECK(save.units.size() == 12 + save.settlements.size());
     VCR_CHECK(save.settlements.size() >= 54);
     VCR_CHECK(save.players[3].name == "Michiel De Ruyter" && save.players[0].country == "New England");

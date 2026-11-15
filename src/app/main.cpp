@@ -1008,7 +1008,9 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
     if (app->mode == Mode::Play && !app->play->loadRequested().empty()) {
         // A game picked in the Load Game box replaces this one.
         const viceroy::SaveSlot slot{app->play->loadRequested(), {}, false};
-        if (startGame(*app, slot)) {
+        if (const std::string problem = app->play->loadProblem(); !problem.empty()) {
+            app->play->loadFailed(problem); // read from the original: it says why
+        } else if (startGame(*app, slot)) {
             app->play->showLoaded();
         } else {
             app->status.clear();

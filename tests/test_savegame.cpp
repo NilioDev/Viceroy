@@ -148,3 +148,18 @@ VCR_TEST("original files: every savegame has a sane map") {
     }
     VCR_CHECK(found > 0);
 }
+
+VCR_TEST("savegame: why the original's loader refuses a file") {
+    V d = sampleSave();
+    VCR_CHECK(saveLoadProblem(d).empty()); // version 0: Viceroy's own older saves
+    put16(d, 10, 72);
+    VCR_CHECK(saveLoadProblem(d) == "LOADOLD");
+    put16(d, 10, 73);
+    VCR_CHECK(saveLoadProblem(d).empty());
+    VCR_CHECK(saveLoadProblem(d, 6).empty());
+    VCR_CHECK(saveLoadProblem(d, 58 * 72) == "LOADSIZE");
+    put16(d, 10, 74);
+    VCR_CHECK(saveLoadProblem(d) == "LOADNOT");
+    d[0] = 'X';
+    VCR_CHECK(saveLoadProblem(d) == "LOADNOT");
+}

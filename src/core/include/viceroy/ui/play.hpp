@@ -190,7 +190,11 @@ public:
     // Just loaded: "Loaded COLONY03.SAV successfully."
     void showLoaded();
     // The game picked could not be read: "... is not a valid save file."
-    void loadFailed();
+    // Why the game picked in the Load Game box cannot replace this one
+    // (LOADNOT, LOADOLD, LOADSIZE, LOADERROR when it cannot be read), or
+    // empty.
+    std::string loadProblem() const;
+    void loadFailed(std::string_view section = "LOADNOT");
     // Units glide from square to square, and the game pauses a moment
     // before the next unit when one has used up its moves. Off by default
     // (tests); the app turns it on.

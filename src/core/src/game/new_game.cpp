@@ -297,6 +297,10 @@ SaveGame newAmericaGame(std::span<const std::uint8_t> mapFile, const Ruleset& ru
     save.humanNation = setup.humanNation & 3;
     auto* h = save.header.data();
     std::memcpy(h, "COLONIZE", 9);
+    // As every save of the original: byte 9 is 0x1A and the version 73,
+    // which the loader asks for (an older one is LOADOLD).
+    h[9] = 0x1A;
+    put16(h + 10, 73);
     put16(h + 40, save.humanNation);
     // As in the original's new games: no talks with the other nations yet
     // (the turn of the last, 88 + 2 × nation) and no royal side (98).
