@@ -15,11 +15,13 @@
 
 #include "viceroy/data/reader.hpp"
 #include "viceroy/data/savegame.hpp"
+#include "viceroy/game/hall_of_fame.hpp"
+#include "viceroy/game/new_game.hpp"
 #include "viceroy/game_files.hpp"
 #include "viceroy/pack/library.hpp"
 #include "viceroy/render/game_view.hpp"
+#include "viceroy/render/report_view.hpp"
 #include "viceroy/render/screen.hpp"
-#include "viceroy/game/new_game.hpp"
 #include "viceroy/ui/debug_menu.hpp"
 #include "viceroy/ui/new_game_flow.hpp"
 #include "viceroy/ui/play.hpp"
@@ -47,7 +49,7 @@ constexpr int kScreenH = viceroy::Screen::kHeight;
 constexpr Uint64 kStickRepeatMs = 220;
 constexpr float kStickThreshold = 0.6f;
 
-enum class Mode { Welcome, Intro, Title, Load, NewGame, Play };
+enum class Mode { Welcome, Intro, Title, Load, NewGame, Play, HallOfFame };
 
 struct App {
     SDL_Window* window = nullptr;
@@ -60,6 +62,7 @@ struct App {
     Uint32 pickedEvent = 0; // our event type for a picked file or folder
 
     std::unique_ptr<viceroy::Art> art;
+    std::vector<viceroy::HallEntry> hall; // the places shown from the main menu
     std::unique_ptr<viceroy::TitleArt> title;
     std::unique_ptr<viceroy::MainMenu> mainMenu;
     // The opening while it plays, and its last picture behind the menu
@@ -254,6 +257,11 @@ void pickTitle(App& app, viceroy::TitleChoice choice) {
         } catch (const std::exception& e) {
             app.mainMenu->say(std::string("Cannot start a game: ") + e.what());
         }
+    } else if (choice == viceroy::TitleChoice::HallOfFame) {
+        // Seen in the original: the Hall of Fame on its own, as at the end
+        // of a game but with no newcomer; a key goes back to the menu.
+        app.hall = viceroy::readHallOfFame(readAll(viceroy::pack::savesFolder(app.library) / "HALLFAME.DAT"));
+        app.mode = Mode::HallOfFame;
     } else {
         app.mainMenu->say("Not in Viceroy yet.");
     }
@@ -559,6 +567,7 @@ void send(App& app, Command command) {
         }
         break;
     case Mode::Intro:
+    case Mode::HallOfFame:
         showTitle(app);
         break;
     case Mode::Title:
@@ -709,6 +718,8 @@ void present(App& app) {
         app.intro->draw(app.screen, *app.title);
     } else if (app.mode == Mode::Title) {
         app.mainMenu->draw(app.screen, *app.art, *app.title, app.intro.get());
+    } else if (app.mode == Mode::HallOfFame) {
+        viceroy::drawHallOfFame(app.screen, *app.art, app.hall, -1);
     } else if (app.mode == Mode::NewGame) {
         app.newGame->draw(app.screen, *app.art, *app.newGameArt);
     } else if (app.mode == Mode::Load) {
