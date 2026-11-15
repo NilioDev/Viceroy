@@ -227,8 +227,10 @@ and download one at the bottom of the page.
 When the game files are in place, Viceroy plays the original's opening and
 then shows its main menu. **Start a Game in AMERICA**, **LOAD Game** and
 **View Hall of Fame** work there; the New World maps and the customizing
-come later. A new game is
-saved in the first free slot, or over the savegame saved longest ago.
+come later. After **Start a Game in AMERICA**, *Map Editor* lists the maps
+made with the original's map editor (`.MP` files) that were in the game's
+folder when you imported it, or that you put beside the saved games. A new
+game is saved in the first free slot, or over the savegame saved longest ago.
 
 | Action | Keyboard | Gamepad |
 | --- | --- | --- |
@@ -319,8 +321,9 @@ asks for it:
   **Z** or **Y** to choose the zip file.
 
 Viceroy checks the files, copies them into its own library and uses them from
-then on, so you can delete or move the original afterwards. The savegames that
-came with the game are copied too; your own saves are never overwritten. The
+then on, so you can delete or move the original afterwards. The savegames and
+the Hall of Fame that came with the game are copied too; your own are never
+overwritten. The
 game may sit in a subfolder of the folder or zip, and Mac leftovers such as
 `__MACOSX` are ignored. To import again, for example from another copy, just
 drop it onto the window.

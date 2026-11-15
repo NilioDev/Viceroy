@@ -8,8 +8,13 @@ aside), with the exceptions listed at the end.
 ## Which map
 
 The `AMERICA` message of `GAME.TXT` in a box centred on a black screen:
-"Original America" or "Map Editor". Viceroy offers only the original map
-for now; Map Editor goes back to the main menu.
+"Original America" or "Map Editor". Map Editor brings the `MAPTOLOAD` box,
+centred the same way: "Select Map File to Load" centred on the box (one
+pixel right of the middle), then every `.MP` file in the game's folder by
+its name in capitals, the original `AMER2.MP` among them. The picked map is
+used in place of the original one; the screens after it are the same.
+Viceroy lists the `.MP` files of the imported game and any the player keeps
+beside the saved games.
 
 ## Difficulty
 

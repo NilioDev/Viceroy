@@ -244,8 +244,10 @@ Dialog makeDialog(const Art& art, std::string_view section, const std::vector<st
         d.checked.assign(d.options.size(), false);
     }
     for (const auto& paragraph : paragraphs) {
-        for (auto& l : wrap(fontOf(art, d), paragraph, d.width - kTextLeft)) {
-            d.lines.push_back(std::move(l));
+        // "^^": a line centred in the box (the first ^ starts the paragraph).
+        const bool centred = !paragraph.empty() && paragraph[0] == '^';
+        for (auto& l : wrap(fontOf(art, d), centred ? paragraph.substr(1) : paragraph, d.width - kTextLeft)) {
+            d.lines.push_back(centred ? "^" + l : std::move(l));
         }
     }
     d.paragraphs = std::move(paragraphs);
@@ -714,6 +716,20 @@ void drawDialog(Screen& screen, const Art& art, const Dialog& d) {
     bool gold = false;
     int y = box.y + kTextTop;
     for (const auto& line : d.lines) {
+        if (!line.empty() && line[0] == '^') {
+            // Measured on "Select Map File to Load": centred on the box,
+            // one pixel to the right.
+            std::string plain;
+            for (const char c : line.substr(1)) {
+                if (c != '{' && c != '}') {
+                    plain += c;
+                }
+            }
+            const int x = box.x + (box.w - Screen::textWidth(font, plain)) / 2 + 1;
+            drawMarkedLine(screen, font, x, y, line.substr(1), gold);
+            y += d.small ? kSmallLineStep : kLineStep;
+            continue;
+        }
         drawMarkedLine(screen, font, box.x + kTextLeft + d.indent, y, line, gold);
         y += d.small ? kSmallLineStep : kLineStep;
     }

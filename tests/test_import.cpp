@@ -219,6 +219,9 @@ VCR_TEST("the original game imports from its folder") {
     VCR_CHECK(result.savesCopied == 10);
     VCR_CHECK(readAll(pack::baseFolder(library) / "VICEROY.PAL") == readAll(*findFileNoCase(game, "VICEROY.PAL")));
     VCR_CHECK(fs::is_regular_file(pack::savesFolder(library) / "COLONY00.SAV"));
+    if (findFileNoCase(game, "HALLFAME.DAT")) {
+        VCR_CHECK(fs::is_regular_file(pack::savesFolder(library) / "HALLFAME.DAT"));
+    }
 
     // A second import replaces the pack but keeps the player's saves.
     writeAll(pack::savesFolder(library) / "COLONY00.SAV", text("my own game"));

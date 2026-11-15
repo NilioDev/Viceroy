@@ -316,15 +316,16 @@ ImportResult importGame(const fs::path& source, const fs::path& library) {
     }
     fs::remove_all(old, ec);
 
-    // The savegames that came with the game, copied once. A player's own
-    // save of the same name is never overwritten.
+    // The savegames that came with the game, and its Hall of Fame, copied
+    // once. A player's own file of the same name is never overwritten.
     const fs::path saves = savesFolder(library);
     fs::create_directories(saves, ec);
     for (const auto& [name, content] : files) {
-        if (name.size() > 4 && name.compare(name.size() - 4, 4, ".SAV") == 0 && !fs::exists(saves / name, ec)) {
+        const bool save = name.size() > 4 && name.compare(name.size() - 4, 4, ".SAV") == 0;
+        if ((save || name == "HALLFAME.DAT") && !fs::exists(saves / name, ec)) {
             try {
                 writeFile(saves / name, content);
-                ++result.savesCopied;
+                result.savesCopied += save ? 1 : 0;
             } catch (const ImportError&) {
                 // The game itself is imported; a missing sample save is fine.
             }

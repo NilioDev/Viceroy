@@ -199,9 +199,23 @@ NewGameArt loadNewGameArt(const std::filesystem::path& folder) {
     return art;
 }
 
-NewGameFlow::NewGameFlow(const Art& art) : art_(art), mapChoice_(makeDialog(art, "AMERICA")) {
+NewGameFlow::NewGameFlow(const Art& art, std::vector<std::string> maps)
+    : art_(art), mapChoice_(makeDialog(art, "AMERICA")), mapFiles_(makeDialog(art, "MAPTOLOAD")) {
     mapChoice_.x = (Screen::kWidth - (mapChoice_.width + 6)) / 2;
     mapChoice_.y = (Screen::kHeight - dialogHeight(mapChoice_)) / 2;
+    // Seen in the original: "Select Map File to Load", then every map file
+    // in the game's folder by its name, the original map among them.
+    mapFiles_.options = std::move(maps);
+    mapFiles_.x = (Screen::kWidth - (mapFiles_.width + 6)) / 2;
+    mapFiles_.y = (Screen::kHeight - dialogHeight(mapFiles_)) / 2;
+}
+
+std::string NewGameFlow::mapFile() const {
+    if (mapChoice_.selected != 1 || mapFiles_.selected < 0 ||
+        mapFiles_.selected >= static_cast<int>(mapFiles_.options.size())) {
+        return {};
+    }
+    return mapFiles_.options[static_cast<std::size_t>(mapFiles_.selected)];
 }
 
 NewGameSetup NewGameFlow::setup() const {
@@ -219,8 +233,12 @@ NewGameSetup NewGameFlow::setup() const {
 void NewGameFlow::next() {
     switch (step_) {
     case Step::MapChoice:
-        // Only the original map for now; the map editor's maps come later.
-        step_ = mapChoice_.selected == 0 ? Step::Difficulty : Step::Cancelled;
+        step_ = mapChoice_.selected == 0    ? Step::Difficulty
+                : mapFiles_.options.empty() ? Step::Cancelled
+                                            : Step::MapFile;
+        break;
+    case Step::MapFile:
+        step_ = Step::Difficulty;
         break;
     case Step::Difficulty:
         step_ = Step::Nation;
@@ -266,8 +284,9 @@ void NewGameFlow::handle(Command command) {
     }
     switch (step_) {
     case Step::MapChoice:
+    case Step::MapFile:
         if (back || forward) {
-            stepSelection(mapChoice_, back ? -1 : 1);
+            stepSelection(step_ == Step::MapFile ? mapFiles_ : mapChoice_, back ? -1 : 1);
         }
         break;
     case Step::Difficulty:
@@ -296,6 +315,12 @@ void NewGameFlow::click(int x, int y) {
     case Step::MapChoice:
         if (const int option = dialogOptionAt(mapChoice_, x, y); option >= 0) {
             mapChoice_.selected = option;
+            next();
+        }
+        break;
+    case Step::MapFile:
+        if (const int option = dialogOptionAt(mapFiles_, x, y); option >= 0) {
+            mapFiles_.selected = option;
             next();
         }
         break;
@@ -355,6 +380,10 @@ void NewGameFlow::draw(Screen& screen, const Art& art, const NewGameArt& picture
     case Step::MapChoice:
         screen.clear(0);
         drawDialog(screen, art, mapChoice_);
+        break;
+    case Step::MapFile:
+        screen.clear(0);
+        drawDialog(screen, art, mapFiles_);
         break;
     case Step::Difficulty: {
         copyPicture(screen, pictures.difficulty.image);
