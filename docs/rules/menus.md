@@ -75,6 +75,12 @@ it, so Viceroy does not show it at all.
 
 Entries Viceroy cannot do yet say so in the panel.
 
+## Leaving the game
+
+Read from the original's keys on the map: Esc, Ctrl+Q, Ctrl+X, Alt+Q and
+Alt+X ask "Exit to DOS?" (`DOSYES`, Yes first); Yes ends the game. Game,
+Exit asks the same with No first (`DOS`).
+
 ## Game Options
 
 Read from the original and compared pixel by pixel. The box (`GAMEOPTIONS`)

@@ -291,7 +291,7 @@ saved in the first free slot, or over the savegame saved longest ago.
 | Find a colony by its name; see the land under the forests; the home port | View, Find Colony; View, Show Hidden Terrain (a key brings the map back); View, European Status | Start, then View |
 | The Colonizopedia (goods, units, terrain, skills, buildings, founding fathers) | Colonizopedia menu; arrows and Enter pick a page, any key goes back, Esc closes; F1 shows the terrain under the active unit | Start, then Colonizopedia |
 | Zoom the map in or out (four levels, up to the whole map) | Z and X, or View, Zoom In / Zoom Out / Zoom Level | Start, then View |
-| Back to the load menu | Esc | Guide |
+| Leave the game (it asks "Exit to DOS?" first) | Esc, Ctrl+Q, Ctrl+X, Alt+Q or Alt+X; or Game, Exit | Guide |
 
 The mouse pointer is the game's own arrow, drawn in the picture as the
 original does; it hides while you play with a gamepad.

@@ -452,7 +452,9 @@ std::optional<Command> keyCommand(const SDL_KeyboardEvent& key) {
     case SDLK_Z:
         return Command::ZoomIn;
     case SDLK_X:
-        return Command::ZoomOut;
+        return ctrl ? Command::ExitToDos : Command::ZoomOut;
+    case SDLK_Q:
+        return ctrl ? std::optional<Command>(Command::ExitToDos) : std::nullopt;
     case SDLK_V:
         return Command::ViewMode;
     case SDLK_M:
@@ -833,6 +835,10 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
             // open, a letter picks its entry.
             const SDL_Keycode k = event->key.key;
             const bool letter = k >= SDLK_A && k <= SDLK_Z;
+            if ((k == SDLK_Q || k == SDLK_X) && (event->key.mod & SDL_KMOD_ALT)) {
+                send(*app, Command::ExitToDos);
+                break;
+            }
             if (letter && (event->key.mod & SDL_KMOD_ALT) && app->art) {
                 for (std::size_t i = 0; i < app->art->menus.size(); ++i) {
                     const auto& title = app->art->menus[i].title;

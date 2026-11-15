@@ -121,7 +121,13 @@ VCR_TEST("original files: the colony screen opens from the map and closes") {
     VCR_CHECK(!play.colonyScreen().has_value());
     VCR_CHECK(play.handle(Command::Cancel)); // leaves the view mode
     VCR_CHECK(!play.viewMode());
-    VCR_CHECK(!play.handle(Command::Cancel)); // nothing left: back to the menu
+    // Nothing left: as in the original, "Exit to DOS?" with Yes first.
+    play.setArt(&art);
+    VCR_CHECK(play.handle(Command::Cancel));
+    VCR_CHECK(play.dialog() && play.dialog()->lines.front() == "Exit to DOS?");
+    play.handle(Command::Down);
+    play.handle(Command::Confirm); // No
+    VCR_CHECK(!play.dialog() && !play.quitRequested());
 
     // A click on one's own colony opens it too.
     play.clickSquare(43, 29);

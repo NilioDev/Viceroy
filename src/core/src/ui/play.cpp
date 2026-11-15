@@ -2518,7 +2518,7 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
                 loadPath_ = slots[static_cast<std::size_t>(choice)].path;
             }
         }
-    } else if (question == "DOS") {
+    } else if (question == "DOS" || question == "DOSYES") {
         quit_ = choice == 0;
     } else if (question == "RETIRE") {
         // "Yes" or "No".
@@ -4114,7 +4114,14 @@ bool PlayScreen::handle(Command command) {
     const int active = game_.activeUnit();
     switch (command) {
     case Command::Cancel:
-        return false;
+    case Command::ExitToDos:
+        // Read from the original: Esc (and Ctrl or Alt with Q or X) on the
+        // map asks "Exit to DOS?", Yes first.
+        ask("DOSYES", -1);
+        if (dialog_) {
+            placeCentredDialog(*dialog_);
+        }
+        return true;
     case Command::ViewMode: {
         viewMode_ = true;
         if (active >= 0) {
@@ -4714,6 +4721,7 @@ constexpr int kHiddenTerrain = 10;
 constexpr int kCentre = 11;
 } // namespace view_menu
 namespace reports_menu {
+constexpr int kTerrain = 0; // F1 Terrain Information
 constexpr int kReligion = 1;
 constexpr int kCongress = 2;
 constexpr int kLabor = 3;
@@ -5434,6 +5442,8 @@ bool PlayScreen::pickMenuEntry(int entry) {
     }
     if (section == "REPORTS") {
         switch (entry) {
+        case reports_menu::kTerrain:
+            return handle(Command::TerrainHelp);
         case reports_menu::kReligion:
             return handle(Command::ReligionReport);
         case reports_menu::kCongress:
