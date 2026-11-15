@@ -121,6 +121,32 @@ the player is told who won, before what the loser loses:
   near Jamestown!", "defeats" for artillery and the kinds after it; the
   mood turns to 4 at once.
 
+## A beaten ship's cargo
+
+Read from the original: when a ship beats another ship, before the loser
+is damaged or sunk, the winner takes its cargo hold by hold while it has
+room. With room for every hold it takes them all, and each is reported
+(`CARGOCAPTURE`: "Dutch cargo of 100 furs captured by English Privateer!")
+when the player is on either side. Otherwise the player picks
+(`PICKACARGO`, a plain box: "Nothing", then each hold), and is asked
+again while there is room; a computer nation takes the hold worth most at
+its own prices (the price it pays, times the amount), each reported as
+above. What is not taken is lost.
+
+## Forts fire on ships
+
+Read from the original: when a colony's turn comes, a fort or a fortress
+(not a stockade) fires on the ships around it. It looks at the eight
+squares from the north clockwise and takes the first ship on each that
+belongs to another nation: any ship of a nation it is not at peace with,
+and a privateer always. The fort shoots with 4 (a fort) or 8 (a
+fortress), times one more than the artillery in the colony, against the
+ship's combat value; the roll is that of any fight. "Fortress at Jamestown
+opens fire on Spanish Privateer!" (`FORTFIRE`) is shown when the player
+can see it. A hit damages the ship as artillery would (it never sinks
+one); a miss does nothing. Bonuses on either side, if the original gives
+any here, are not yet measured.
+
 ## Hardening after a win
 
 Watched in the original with a debugger. After every fight the winner, if it

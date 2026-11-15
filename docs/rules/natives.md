@@ -597,8 +597,9 @@ Then, if the roll was above the tension and no scout has spoken with this
 chief before, the settlement remembers the visit and a roll of 1 to 3
 decides:
 
-1. **Guides** (`@CHIEFGUIDES`): the scout becomes a seasoned scout. A
-   seasoned scout gets the tales instead.
+1. **Guides** (`@CHIEFGUIDES`): the scout becomes a seasoned scout, and
+   the frontiersman then says so (`@WELLSEASONED`). A seasoned scout gets
+   the tales instead.
 2. **Tales of nearby lands** (`@CHIEFAREA`): the squares next to the
    scout and the land of the same region within 6 squares are explored.
 3. **A gift** (`@CHIEFGIFT`): three rolls of 1 to 10 − difficulty, added

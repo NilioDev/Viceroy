@@ -324,6 +324,8 @@ public:
     // @UNIT (a treasure six, so only an empty galleon carries one).
     bool boardInColony(int unit, int ship);
     void leaveShipInColony(int unit);
+    // A colony's fort fires on the ships around it (at the colony's turn).
+    void fortFire(int colony);
     // The holds a unit takes aboard a ship.
     int unitSize(int unit) const;
     // Units on a square, ships first.
@@ -945,6 +947,10 @@ public:
     // The King offers a frigate against the warships near the colonies
     // (KINGFRIGATE, value kFrigateQuestion): yes sends it, for a tax rise.
     static constexpr int kFrigateQuestion = 4;
+    // A ship of the player's beat one with more cargo than it has room
+    // for (PICKACARGO): which hold to take, -1 for none.
+    std::vector<std::pair<int, int>> cargoToCapture() const; // (good, amount)
+    void answerCargoCapture(int hold);
     void answerKingFrigate(bool yes);
     bool mercenariesWaiting() const { return mercenaries_.price > 0; }
     // "Pay": the gold goes and the mercenaries land at one of the player's
@@ -1389,6 +1395,11 @@ private:
     void sendKingFrigate(int n);
     void sound(int command) { musicCues_.push_back({MusicCue::Kind::Sound, command}); }
     int europeArrival_ = -1;
+    // The player's winning ship and the beaten ship's holds (good, amount)
+    // still to pick from.
+    int captureShip_ = -1;
+    std::vector<std::pair<int, int>> captureHolds_;
+    void captureCargo(int loser, int winner);
     void fightStartSound(int attackerNation, int attackerType, int defenderNation, int defenderType);
     // A beaten unit: the sound of the attacker's win over it.
     void fightWonSound(int attacker, int x, int y);
@@ -1400,7 +1411,8 @@ private:
                         int defenderExtra) const;
     SaveUnit colonistAsUnit(int colony, int colonist) const;
     void captureColony(int colony, int attacker);
-    void loseShip(int loser, int winner);
+    // fortNation: no winning unit, a fort of that nation fired.
+    void loseShip(int loser, int winner, int fortNation = -1);
     void repairShips();
     int addColonyBonus(CombatSide& side, int colony) const; // its quarters
     int settlementQuarters(int settlement) const;

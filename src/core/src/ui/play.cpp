@@ -1003,6 +1003,10 @@ void PlayScreen::showChiefAnswer() {
         placeNative(tribe);
     }
     question_ = "LESSONDONE";
+    if (c.section == "CHIEFGUIDES") {
+        // Read from the original: then the frontiersman tells of it.
+        notices_.insert(notices_.begin(), GameNotice{"WELLSEASONED", {}});
+    }
 }
 
 void PlayScreen::ask(std::string_view section, int unit, std::vector<std::string> strings, int nation,
@@ -1491,6 +1495,24 @@ void PlayScreen::showNotices() {
         questionUnit_ = -1;
         return;
     }
+    if (notice.section == "PICKACARGO") {
+        // Read from the original: "Which cargo shall we capture?", a plain
+        // box: "Nothing", then the beaten ship's holds.
+        Dialog d = makeDialog(*art_, "PICKACARGO");
+        choices_.clear();
+        addOption(d, textLine(art_->labelText, "MISC", 32, "Nothing"));
+        choices_.push_back(-1);
+        const auto holds = game_.cargoToCapture();
+        for (std::size_t k = 0; k < holds.size(); ++k) {
+            addOption(d, std::to_string(holds[k].second) + " " + goodName(holds[k].first));
+            choices_.push_back(static_cast<int>(k));
+        }
+        d.selected = 0;
+        dialog_ = d;
+        question_ = "PICKACARGO";
+        questionUnit_ = -1;
+        return;
+    }
     if (notice.section == "LOSTCITY0" || notice.section == "RECRUITCHOOSE") {
         // A Fountain of Youth: "Which of the following individuals shall
         // we recruit?", one of the three on the docks, for free. With
@@ -1580,7 +1602,7 @@ void PlayScreen::showNotices() {
         return;
     }
     if (notice.section == "EVASIVE" || notice.section == "SHIPDAMAGE" || notice.section == "SHIPSUNK" ||
-        notice.section == "REFIT") {
+        notice.section == "REFIT" || notice.section == "CARGOCAPTURE" || notice.section == "FORTFIRE") {
         // Sea battles and repairs: a ship sent to Europe names the home
         // port. Observed: the naval advisor tells them.
         if (notice.value >= 0) {
@@ -1688,9 +1710,9 @@ void PlayScreen::showNotices() {
         // pioneers by the frontiersman.
         constexpr std::string_view kBattles[] = {
             "DEMOTE", "COLONISTCAPTURE", "COLONISTCAPTURE2", "WAGONCAPTURE", "LOOTCAPTURE", "ARTILLERY", "ARTILLERY2",
-            "VETERAN", "VALOR", "CAPTURED", "CAPTURED3", "LOOT", "LOOT2", "INDIANWINCOLONY", "INDIANBURNCOLONY",
-            "INDIANSLAVES", "INDIANWARFARE", "INDIANBURN", "TEAPARTY", "KINGBUY", "REBELUP", "REBELUP50", "REBELDOWN",
-            "MERCENARIES", "MERCS", "NOMAYORSDURINGREV",
+            "VETERAN", "VALOR", "EUROPEWIN", "EUROPELOSE", "CAPTURED", "CAPTURED3", "LOOT", "LOOT2", "INDIANWINCOLONY",
+            "INDIANBURNCOLONY", "INDIANSLAVES", "INDIANWARFARE", "INDIANBURN", "TEAPARTY", "KINGBUY", "REBELUP",
+            "REBELUP50", "REBELDOWN", "MERCENARIES", "MERCS", "NOMAYORSDURINGREV",
             // The war of independence (placement not measured yet).
             "ALREADYREVOLUTION", "TOOTORY", "MULTIREV", "DECLARE", "INDEPENDENCE", "SEIZURE", "MOBILIZE", "MOBILIZE2",
             "INTERVENE", "INTERVENTION", "AMBUSHHINT", "CONSIDER", "NOWARSDURINGREV", "EUROPENOTAVAIL",
@@ -2022,6 +2044,10 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
         goTo(picked);
     } else if (question == "LOSTCITY0") {
         game_.recruitFree(picked);
+    } else if (question == "PICKACARGO") {
+        game_.answerCargoCapture(picked);
+        auto news = game_.takeNotices();
+        notices_.insert(notices_.begin(), std::make_move_iterator(news.begin()), std::make_move_iterator(news.end()));
     } else if (question == "WHICHFREEDOM") {
         // A father who joins at once is announced before the rest of the
         // news, as in the original.

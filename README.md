@@ -73,7 +73,8 @@ touch controls.
 > winning soldier can harden to a veteran; when another nation attacks your
 > men you are told who won. Warships fight other ships: the
 > weaker one may evade, and a beaten ship sinks or limps to a drydock or
-> Europe for repairs. Colonists can walk into a native settlement and
+> Europe for repairs (the winner takes what cargo it has room for), and forts and fortresses fire on enemy ships beside
+> the colony. Colonists can walk into a native settlement and
 > live among the natives to learn the skill it teaches, and scouts can
 > speak with the chief for guides, tales of the land, a gift or an
 > early death, as in the original. The liberty bells of your colonies

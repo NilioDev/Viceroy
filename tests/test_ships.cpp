@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "test.hpp"
 
+#include "viceroy/game/colony.hpp"
 #include "viceroy/game/europe.hpp"
 #include "viceroy/game_files.hpp"
 #include "viceroy/ui/play.hpp"
@@ -314,4 +315,46 @@ VCR_TEST("ships: a galleon's treasure is sold in Europe, the Crown taking the ta
         }
     }
     VCR_CHECK(told);
+}
+
+VCR_TEST("ships: a fort fires on enemy ships beside the colony") {
+    auto rules = boardingRules();
+    rules.units[16] = {"Privateer", 11, 8, 8, 8, 2, 99, 20, 0, 0, 8, 0};
+    rules.units[11] = {"Artillery", 10, 1, 7, 5, 0, 1, 6, 4, 0, 0, 0};
+    rules.buildings.resize(3);
+    rules.buildings[1].name = "Fort";
+    rules.buildings[2].name = "Fortress";
+    int fired = 0;
+    int damaged = 0;
+    for (int round = 0; round < 40; ++round) {
+        SaveGame s = boardingSave();
+        s.units.resize(1); // the galleon stays in port
+        s.year = 1600 + round;
+        setBuildingLevel(s.colonies[0], BuildingKind::Fortification, 3); // a fortress
+        SaveUnit privateer;
+        privateer.x = 2; // west of the colony, at sea
+        privateer.y = 2;
+        privateer.type = 16;
+        privateer.nation = 1;
+        s.units.push_back(privateer);
+        SaveUnit caravel = privateer;
+        caravel.y = 1; // north-west, a French caravel: the nations are at peace
+        caravel.type = unit_type::kCaravel;
+        s.units.push_back(caravel);
+        s.nations[3].raw[52 + 1] |= 0x40;
+        s.nations[1].raw[52 + 3] |= 0x40;
+        Game g(s, rules);
+        g.fortFire(0);
+        for (const auto& n : g.takeNotices()) {
+            if (n.section == "FORTFIRE") {
+                ++fired;
+                VCR_CHECK(n.strings[0] == "Fortress" && n.strings[1] == "Fort Oranje" && n.strings[3] == "Privateer");
+            }
+        }
+        damaged += (g.unit(1).raw[4] & SaveUnit::kDamaged) != 0 ? 1 : 0;
+        VCR_CHECK((g.unit(2).raw[4] & SaveUnit::kDamaged) == 0); // never the caravel
+    }
+    VCR_CHECK(fired == 40);
+    // 8 against 8: about half the time.
+    VCR_CHECK(damaged > 8 && damaged < 32);
 }
