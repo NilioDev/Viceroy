@@ -270,12 +270,12 @@ bool Game::visitOn(BraveVisitState v) {
                 notice.colony = v.colony;
                 notices_.push_back(std::move(notice));
             }
-            if (unitCount() >= kMaxUnits) {
+            const int convert = addColonist(c.x, c.y, c.nation);
+            if (convert < 0) {
                 return false;
             }
-            addColonist(c.x, c.y, c.nation);
-            save_.units.back().profession = kConvert;
-            save_.units.back().raw[23] = kConvert;
+            save_.units[static_cast<std::size_t>(convert)].profession = kConvert;
+            save_.units[static_cast<std::size_t>(convert)].raw[23] = kConvert;
             return true;
         }
     }

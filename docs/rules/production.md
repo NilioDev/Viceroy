@@ -266,6 +266,11 @@ colonies), and a second warehouse expansion always (`NOMOREWAREHOUSE`).
 The hammers stay, so it is tried again each turn, and the tools are lost
 each time.
 
+Before the tools are looked at, a building the colony has already (at that
+level or higher) is not built again: the player hears "Jamestown is set to
+produce a Docks, but it has already built one!" (`ALREADYHAVE`) each turn,
+the hammers and tools stay, and bit 7 of colony byte 28 is set.
+
 ## Custom house
 
 Read from the original and measured on Curacao. As each good comes into

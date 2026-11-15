@@ -300,8 +300,9 @@ void Game::winAgainstVillage(int attacker, int settlement) {
         burnSettlement(settlement);
         burned = true;
         if (mission == nation) {
-            addBuiltUnit(sx, sy, nation, kMissionary);
-            save_.units.back().profession = expertMission ? kJesuit : kFreeColonist;
+            if (const int made = addBuiltUnit(sx, sy, nation, kMissionary); made >= 0) {
+                save_.units[static_cast<std::size_t>(made)].profession = expertMission ? kJesuit : kFreeColonist;
+            }
         }
     }
     // Read from the original: the people of the attacker's own mission may
@@ -318,9 +319,10 @@ void Game::winAgainstVillage(int attacker, int settlement) {
             chance -= 4;
         }
         if (nextRandom(13) < chance) {
-            addColonist(ax, ay, nation);
-            save_.units.back().profession = kConvert;
-            save_.units.back().raw[23] = kConvert;
+            if (const int made = addColonist(ax, ay, nation); made >= 0) {
+                save_.units[static_cast<std::size_t>(made)].profession = kConvert;
+                save_.units[static_cast<std::size_t>(made)].raw[23] = kConvert;
+            }
             // "Frightened Apache flock to Dutch mission as converts."
             GameNotice notice{"INDIANSLAVES", {adjective, ""}};
             notice.adjectives = {{1, nation}};
@@ -343,8 +345,9 @@ void Game::winAgainstVillage(int attacker, int settlement) {
     // in the notice's value: the tribe's level, or the capital's row.
     const int place = capital ? kCapitalRow : tribeLevel(save_, tribe);
     if (treasure > 0) {
-        addBuiltUnit(sx, sy, nation, kTreasure);
-        save_.units.back().profession = treasure;
+        if (const int made = addBuiltUnit(sx, sy, nation, kTreasure); made >= 0) {
+            save_.units[static_cast<std::size_t>(made)].profession = treasure;
+        }
         GameNotice notice{"LOOT", {"", adjective, ""}, place};
         notice.adjectives = {{0, nation}};
         notice.numbers = {treasure * 100};

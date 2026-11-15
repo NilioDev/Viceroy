@@ -145,6 +145,7 @@ struct SaveUnit {
     static constexpr int kSentry = 1;
     static constexpr int kFortify = 5;
     static constexpr int kFortified = 6;
+    static constexpr int kBuildColony = 7;
     static constexpr int kPlow = 8; // "Clear/Plow": plow, or clear a forest
     static constexpr int kRoad = 9;
 

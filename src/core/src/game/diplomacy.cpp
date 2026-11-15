@@ -1636,11 +1636,23 @@ bool Game::infiltrateColony(int index, int colony) {
         return false; // the player looks round the colony
     }
     auto& c = save_.colonies[static_cast<std::size_t>(colony)];
-    // "Our scouts near Quebec have been captured by the French!"
-    GameNotice caught{"LOSTOURSCOUTS", {"", c.name}};
-    caught.adjectives = {{0, c.nation}};
-    caught.numbers = {kStolenHorses};
-    notices_.push_back(std::move(caught));
+    const int scouts = unit(index).nation;
+    if (scouts == human()) {
+        // "Our scouts near Quebec have been captured by the French!"
+        GameNotice caught{"LOSTOURSCOUTS", {"", c.name}};
+        caught.adjectives = {{0, c.nation}};
+        caught.numbers = {kStolenHorses};
+        notices_.push_back(std::move(caught));
+    } else if (c.nation == human()) {
+        // Read from the original: the player hears when the scouts of
+        // another nation are caught in one of their colonies. "We have
+        // captured a party of French scouts attempting to infiltrate
+        // Jamestown."
+        GameNotice caught{"LOSTTHEIRSCOUTS", {"", c.name}};
+        caught.adjectives = {{0, scouts}};
+        caught.numbers = {kStolenHorses};
+        notices_.push_back(std::move(caught));
+    }
     c.stock[static_cast<std::size_t>(cargo::kHorses)] =
         static_cast<std::int16_t>(c.stock[static_cast<std::size_t>(cargo::kHorses)] + kStolenHorses);
     removeUnit(index);

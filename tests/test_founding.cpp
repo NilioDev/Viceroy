@@ -87,6 +87,21 @@ VCR_TEST("founding: what keeps a colony from being founded (read from the origin
         g.state().map.at(4, 4).terrain = 25;
         VCR_CHECK(g.canFoundColony(0) == FoundResult::AtSea);
     }
+    {
+        // A unit next door with orders to build a colony (TOONEARBUILD).
+        Game g(foundSave(), foundRules());
+        SaveUnit other = g.state().units[0];
+        other.x = 5;
+        other.nation = 2;
+        other.orders = SaveUnit::kBuildColony;
+        g.state().units.push_back(other);
+        VCR_CHECK(g.canFoundColony(0) == FoundResult::BuildNear);
+        g.state().units.back().orders = 0;
+        VCR_CHECK(g.canFoundColony(0) == FoundResult::Founded);
+        // Its own orders do not stop it.
+        g.state().units[0].orders = SaveUnit::kBuildColony;
+        VCR_CHECK(g.canFoundColony(0) == FoundResult::Founded);
+    }
 }
 
 VCR_TEST("founding: the advisors' warnings (read from the original)") {
@@ -174,4 +189,34 @@ VCR_TEST("original files: Escape at the name founds nothing") {
     // The name was used up all the same: the next offer is the second.
     play.handle(Command::BuildColony);
     VCR_CHECK(play.typing() && play.dialog()->inputText == "Fort Orange");
+}
+
+VCR_TEST("units: the original's limits on how many there may be") {
+    // Read from the original: 300 in all for the player, 292 for anyone
+    // else, and 201 for one European nation; the player is told.
+    Game g(foundSave(), foundRules());
+    auto& units = g.state().units;
+    SaveUnit filler = units[0];
+    filler.nation = 2;
+    while (static_cast<int>(units.size()) < 292) {
+        units.push_back(filler);
+    }
+    const int human = units[0].nation;
+    VCR_CHECK(g.addColonist(4, 4, 2) == -1); // another nation: 292 is full
+    VCR_CHECK(g.takeNotices().empty());
+    VCR_CHECK(g.addColonist(4, 4, human) == 292);
+    while (static_cast<int>(units.size()) < 300) {
+        units.push_back(units[0]);
+    }
+    VCR_CHECK(g.addColonist(4, 4, human) == -1);
+    const auto notices = g.takeNotices();
+    VCR_CHECK(notices.size() == 1 && notices[0].section == "TOOMANYUNITS");
+    // 201 of one nation is the most.
+    units.resize(1);
+    while (static_cast<int>(units.size()) < 201) {
+        units.push_back(units[0]);
+    }
+    VCR_CHECK(g.addColonist(4, 4, human) == -1);
+    units.pop_back();
+    VCR_CHECK(g.addColonist(4, 4, human) == 200);
 }

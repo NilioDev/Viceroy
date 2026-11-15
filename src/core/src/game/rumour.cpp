@@ -144,12 +144,12 @@ bool Game::exploreRumour(int index) {
             }
             if (rich && citiesFound_ < 7) {
                 treasure = 1 + nextRandom(20) + (scout + 2) * 10;
-                if (unitCount() >= kMaxUnits) {
+                const int made = addBuiltUnit(x, y, nation, kTreasure);
+                if (made < 0) {
                     return true;
                 }
-                addBuiltUnit(x, y, nation, kTreasure);
-                save_.units.back().profession = treasure;
-                save_.units.back().raw[23] = static_cast<std::uint8_t>(treasure);
+                save_.units[static_cast<std::size_t>(made)].profession = treasure;
+                save_.units[static_cast<std::size_t>(made)].raw[23] = static_cast<std::uint8_t>(treasure);
                 ++citiesFound_;
             } else {
                 outcome = quality <= 10 ? kVanish : quality < 25 ? kShrines : kNothing;
@@ -269,9 +269,7 @@ bool Game::exploreRumour(int index) {
     bool kept = true;
     switch (outcome) {
     case kSurvivors:
-        if (unitCount() < kMaxUnits) {
-            addColonist(x, y, nation);
-        }
+        addColonist(x, y, nation);
         break;
     case kFountain:
         // Eight free recruits from the docks: the player picks each one, a
@@ -328,12 +326,12 @@ void Game::searchBurial(const Burial& b) {
     } else {
         found = 3;
         treasure = (1 + nextRandom(8) + (b.scout + 5) * 2) * 2;
-        if (unitCount() >= kMaxUnits) {
+        const int made = addBuiltUnit(b.x, b.y, b.nation, kTreasure);
+        if (made < 0) {
             return;
         }
-        addBuiltUnit(b.x, b.y, b.nation, kTreasure);
-        save_.units.back().profession = treasure;
-        save_.units.back().raw[23] = static_cast<std::uint8_t>(treasure);
+        save_.units[static_cast<std::size_t>(made)].profession = treasure;
+        save_.units[static_cast<std::size_t>(made)].raw[23] = static_cast<std::uint8_t>(treasure);
     }
     if (human) {
         GameNotice notice{"BURIAL" + std::to_string(found), {}};
@@ -359,11 +357,14 @@ void Game::searchBurial(const Burial& b) {
 
 int Game::addFreeRecruit(int nation, int slot) {
     auto& n = save_.nations[static_cast<std::size_t>(nation)];
-    if (slot < 0 || slot >= static_cast<int>(n.recruits.size()) || unitCount() >= kMaxUnits) {
+    if (slot < 0 || slot >= static_cast<int>(n.recruits.size())) {
         return -1;
     }
     const int profession = n.recruits[static_cast<std::size_t>(slot)];
     const int made = addUnitInEurope(professionUnitType(profession), profession, nation);
+    if (made < 0) {
+        return -1;
+    }
     n.recruits[static_cast<std::size_t>(slot)] = randomRecruit(nation);
     return made;
 }

@@ -78,6 +78,7 @@ VCR_TEST("docks: who comes next follows the original's draw") {
     for (int i = 0; i < 300; ++i) {
         dutch.gold = 100000;
         dutch.recruitCount = 0;
+        g.state().units.clear(); // a nation may have 201 units at most
         const int before = dutch.raw[68];
         VCR_CHECK(g.recruit(0) >= 0);
         const int p = dutch.recruits[0];
@@ -94,6 +95,7 @@ VCR_TEST("docks: who comes next follows the original's draw") {
     for (int i = 0; i < 200; ++i) {
         dutch.gold = 100000;
         dutch.recruitCount = 0;
+        g.state().units.clear();
         g.recruit(1);
         VCR_CHECK(dutch.recruits[1] != 0x19 && dutch.recruits[1] != 0x1A);
     }

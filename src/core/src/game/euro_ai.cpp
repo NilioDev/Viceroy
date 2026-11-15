@@ -429,9 +429,6 @@ int Game::aiColonyNeed(int n) const {
 }
 
 int Game::aiCreateInEurope(int n, int type, int profession) {
-    if (unitCount() >= kMaxUnits) {
-        return -1;
-    }
     return addUnitInEurope(type, profession, n);
 }
 
@@ -1043,6 +1040,9 @@ void Game::answerKingFrigate(bool yes) {
 void Game::sendKingFrigate(int n) {
     // The frigate sails from Europe for the nation's landing square.
     const int index = addUnitInEurope(kFrigate, 0, n);
+    if (index < 0) {
+        return;
+    }
     auto& u = save_.units[static_cast<std::size_t>(index)];
     setEuropeStage(u, 1);
     u.orders = SaveUnit::kNoOrders;

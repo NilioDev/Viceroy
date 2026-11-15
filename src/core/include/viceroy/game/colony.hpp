@@ -279,6 +279,7 @@ struct ColonyTurn {
     std::array<int, kGoodsKinds> exported{}; // sold by the custom house
     bool noMoreWagons = false;    // the wagon train is done but not allowed
     bool noMoreWarehouse = false; // a second expansion is not allowed
+    bool alreadyHave = false;     // the building under construction stands already
 };
 
 // A colonist leaves the colony (starved): the ones after it move up, and

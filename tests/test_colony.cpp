@@ -523,6 +523,20 @@ VCR_TEST("construction: colonies build wagons, artillery and ships (measured)") 
     }
     turn = runColonyTurn(c, map, r);
     VCR_CHECK(turn.noMoreWarehouse && turn.built == -1 && c.stock[cargo::kTools] == 0 && c.hammers > 0);
+    // Read from the original: a building it has already is not built
+    // again, and keeps its tools and hammers (ALREADYHAVE).
+    setBuildingLevel(c, BuildingKind::Docks, 2);
+    c.construction = 6; // docks
+    c.stock[cargo::kTools] = 20;
+    c.raw[28] = 0;
+    turn = runColonyTurn(c, map, r);
+    VCR_CHECK(turn.alreadyHave && turn.built == -1 && c.stock[cargo::kTools] == 20 && c.hammers > 0);
+    VCR_CHECK((c.raw[28] & 0x80) != 0 && c.construction == 6);
+    c.construction = 8; // the shipyard is not built yet
+    turn = runColonyTurn(c, map, r);
+    VCR_CHECK(!turn.alreadyHave && turn.built == 8);
+    setBuildingLevel(c, BuildingKind::Docks, 0);
+    c.stock[cargo::kTools] = 0;
     c.raw[149] = 0;
     c.construction = 43;
     c.hammers = 0;

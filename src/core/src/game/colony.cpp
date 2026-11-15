@@ -985,7 +985,20 @@ ColonyTurn runColonyTurn(SaveColony& colony, const SaveMap& map, const Ruleset& 
         // loses those tools) and is tried again the next turn.
         constexpr int kWagonTrainUnit = 12;
         constexpr int kExpansionRow = 16;
-        if (colony.stock[cargo::kTools] < tools) {
+        bool have = false;
+        for (int k = 0; k < kBuildingKinds; ++k) {
+            const auto& f = kBuildingFields[static_cast<std::size_t>(k)];
+            if (f.firstRow >= 0 && colony.construction >= f.firstRow && colony.construction < f.firstRow + f.bits) {
+                have = buildingLevel(colony, static_cast<BuildingKind>(k)) >= colony.construction - f.firstRow + 1;
+            }
+        }
+        if (have) {
+            // Read from the original: a building the colony has already is
+            // not built again, before the tools are looked at; it keeps its
+            // hammers and marks colony byte 28 bit 7 (ALREADYHAVE).
+            colony.raw[28] = static_cast<std::uint8_t>(colony.raw[28] | 0x80);
+            turn.alreadyHave = true;
+        } else if (colony.stock[cargo::kTools] < tools) {
             turn.toolsNeeded = tools;
         } else if (constructionUnit(colony.construction) == kWagonTrainUnit && nation.wagonsFull) {
             colony.stock[cargo::kTools] -= tools;

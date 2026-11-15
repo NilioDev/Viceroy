@@ -305,8 +305,10 @@ int Game::moveColonist(int c, ColonyMover who, int job, int square) {
         int index = who.unit;
         if (who.colonist >= 0) {
             const int skill = colony.skills[static_cast<std::size_t>(who.colonist)];
-            addColonist(colony.x, colony.y, colony.nation);
-            index = unitCount() - 1;
+            index = addColonist(colony.x, colony.y, colony.nation);
+            if (index < 0) {
+                return -1; // no room for another unit: the colonist stays
+            }
             save_.units[static_cast<std::size_t>(index)].profession =
                 static_cast<std::uint8_t>(skill == skill::kFreeColonist ? skill::kFreeColonistUnit : skill);
             removeColonist(colony, who.colonist);
