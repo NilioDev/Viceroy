@@ -220,3 +220,32 @@ VCR_TEST("units: the original's limits on how many there may be") {
     units.pop_back();
     VCR_CHECK(g.addColonist(4, 4, human) == 200);
 }
+
+VCR_TEST("cargo: Load Cargo takes the good worth most in Europe") {
+    // The manual: the most valuable cargo of the warehouse, up to 100,
+    // leaving out horses, tools and muskets, into an empty hold.
+    Ruleset r = foundRules();
+    r.units[unit_type::kWagonTrain].cargoSlots = 2;
+    SaveGame s = foundSave();
+    SaveColony c;
+    c.x = 4;
+    c.y = 4;
+    c.nation = kDutch;
+    c.population = 1;
+    c.stock[3] = 300;  // sugar: 100 x 2
+    c.stock[5] = 60;   // cotton: 60 x 4
+    c.stock[8] = 100;  // horses are left out
+    c.stock[14] = 100; // so are tools
+    s.colonies.push_back(c);
+    s.nations[kDutch].prices[3] = 3;
+    s.nations[kDutch].prices[5] = 5;
+    s.nations[kDutch].prices[8] = 9;
+    s.nations[kDutch].prices[14] = 9;
+    s.units[0].type = unit_type::kWagonTrain;
+    Game g(std::move(s), r);
+    VCR_CHECK(g.cargoToLoad(0, 0) == 5);
+    g.state().colonies[0].stock[5] = 40; // 160 against 200
+    VCR_CHECK(g.cargoToLoad(0, 0) == 3);
+    g.state().units[0].holds = 2; // no empty hold
+    VCR_CHECK(g.cargoToLoad(0, 0) == -1);
+}

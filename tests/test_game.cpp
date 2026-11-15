@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "test.hpp"
 
+#include <algorithm>
+
 #include "viceroy/data/text_table.hpp"
 #include "viceroy/game/game.hpp"
 
@@ -120,10 +122,17 @@ VCR_TEST("game: turns follow the calendar") {
     VCR_CHECK(g.movesLeft(0) == 3);
     g.endTurn();
     VCR_CHECK(g.state().year == 1600 && g.state().season == 0);
+    const auto has = [](const std::vector<GameNotice>& notices, const char* section) {
+        return std::any_of(notices.begin(), notices.end(), [&](const GameNotice& n) { return n.section == section; });
+    };
+    VCR_CHECK(!has(g.takeNotices(), "TIMECHANGE"));
     g.endTurn();
     VCR_CHECK(g.state().year == 1600 && g.state().season == 1);
+    // Read from the original: the help box on the time scale, once.
+    VCR_CHECK(has(g.takeNotices(), "TIMECHANGE"));
     g.endTurn();
     VCR_CHECK(g.state().year == 1601 && g.state().season == 0);
+    VCR_CHECK(!has(g.takeNotices(), "TIMECHANGE"));
 }
 
 VCR_TEST("game: colonists found colonies, not too close and not on mountains") {

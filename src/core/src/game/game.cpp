@@ -1174,6 +1174,11 @@ void Game::endTurn() {
         ++save_.year;
         save_.season = 0;
     } else if (save_.season == 0) {
+        if (save_.year == 1600) {
+            // Read from the original: the first time the year has two
+            // turns, a help box says so ("Colonization Help: Time Scale").
+            notices_.push_back(GameNotice{"TIMECHANGE", {}});
+        }
         save_.season = 1;
     } else {
         save_.season = 0;
@@ -1489,6 +1494,35 @@ int Game::colonyCargoHold(int carrier, int good) const {
         }
     }
     return -1;
+}
+
+int Game::cargoToLoad(int carrier, int colony) const {
+    if (carrier < 0 || carrier >= unitCount() || colony < 0 ||
+        static_cast<std::size_t>(colony) >= save_.colonies.size()) {
+        return -1;
+    }
+    const auto& u = unit(carrier);
+    const int empty =
+        isShip(carrier) ? freeHolds(carrier) : rules_.units[static_cast<std::size_t>(u.type)].cargoSlots - u.holds;
+    if (empty <= 0 || u.nation < 0 || u.nation >= kEuropeanNations) {
+        return -1;
+    }
+    const auto& c = save_.colonies[static_cast<std::size_t>(colony)];
+    const auto& nation = save_.nations[static_cast<std::size_t>(u.nation)];
+    int best = -1;
+    int bestValue = 0;
+    for (int good = 0; good < kGoodsKinds; ++good) {
+        if (good == cargo::kHorses || good == cargo::kTools || good == cargo::kMuskets) {
+            continue;
+        }
+        const int amount = std::min(100, static_cast<int>(c.stock[static_cast<std::size_t>(good)]));
+        const int value = amount * std::max(1, bidPrice(nation, good));
+        if (amount > 0 && value > bestValue) {
+            best = good;
+            bestValue = value;
+        }
+    }
+    return best;
 }
 
 int Game::unloadInColony(int carrier, int colony, int good, int amount) {
