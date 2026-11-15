@@ -35,9 +35,22 @@ NewGameArt loadNewGameArt(const std::filesystem::path& folder);
 
 class NewGameFlow {
 public:
-    enum class Step { MapChoice, Difficulty, Nation, Name, NationPage1, NationPage2, Audience, Departure, Done, Cancelled };
+    enum class Step {
+        MapChoice,
+        MapFile,
+        Difficulty,
+        Nation,
+        Name,
+        NationPage1,
+        NationPage2,
+        Audience,
+        Departure,
+        Done,
+        Cancelled
+    };
 
-    explicit NewGameFlow(const Art& art);
+    // maps: the map files (*.MP) offered after "Map Editor", as named.
+    explicit NewGameFlow(const Art& art, std::vector<std::string> maps = {});
 
     void handle(Command command);
     void click(int x, int y);
@@ -51,6 +64,9 @@ public:
     int difficulty() const { return difficulty_; }
     int nation() const { return nation_; }
     const std::string& name() const { return name_; }
+    // The map file picked from the map editor's, or empty for the original
+    // Americas.
+    std::string mapFile() const;
     // What newAmericaGame needs, with the seed left to the caller.
     NewGameSetup setup() const;
 
@@ -63,6 +79,7 @@ private:
     const Art& art_;
     Step step_ = Step::MapChoice;
     Dialog mapChoice_;
+    Dialog mapFiles_;
     int difficulty_ = 0;
     int nation_ = 0;
     std::string name_;

@@ -223,9 +223,13 @@ std::filesystem::path newGameSlot(const std::filesystem::path& folder) {
 void startNewGame(App& app) {
     try {
         const auto base = viceroy::pack::baseFolder(app.library);
-        const auto mapPath = viceroy::findFileNoCase(base, "AMER2.MP");
+        const std::string mapName = app.newGame->mapFile().empty() ? "AMER2.MP" : app.newGame->mapFile();
+        auto mapPath = viceroy::findFileNoCase(viceroy::pack::savesFolder(app.library), mapName);
+        if (!mapPath || mapName == "AMER2.MP") {
+            mapPath = viceroy::findFileNoCase(base, mapName);
+        }
         if (!mapPath) {
-            throw viceroy::FormatError("missing AMER2.MP");
+            throw viceroy::FormatError("missing " + mapName);
         }
         auto setup = app.newGame->setup();
         setup.seed = static_cast<std::uint32_t>(SDL_GetTicksNS() ^ static_cast<Uint64>(std::time(nullptr)));
@@ -243,6 +247,28 @@ void startNewGame(App& app) {
     app.newGame.reset();
 }
 
+// The map files offered after "Map Editor": those in the game's folder
+// (the original map among them) and any the player keeps beside the saved
+// games, by name in capitals.
+std::vector<std::string> mapFiles(const App& app) {
+    std::vector<std::string> names;
+    for (const auto& folder : {viceroy::pack::baseFolder(app.library), viceroy::pack::savesFolder(app.library)}) {
+        std::error_code ec;
+        for (const auto& entry : std::filesystem::directory_iterator(folder, ec)) {
+            std::string name = entry.path().filename().string();
+            for (char& c : name) {
+                c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+            }
+            if (entry.is_regular_file(ec) && name.size() > 3 && name.compare(name.size() - 3, 3, ".MP") == 0 &&
+                std::find(names.begin(), names.end(), name) == names.end()) {
+                names.push_back(name);
+            }
+        }
+    }
+    std::sort(names.begin(), names.end());
+    return names;
+}
+
 void pickTitle(App& app, viceroy::TitleChoice choice) {
     if (choice == viceroy::TitleChoice::Load) {
         showLoadMenu(app);
@@ -252,7 +278,7 @@ void pickTitle(App& app, viceroy::TitleChoice choice) {
                 app.newGameArt = std::make_unique<viceroy::NewGameArt>(
                     viceroy::loadNewGameArt(viceroy::pack::baseFolder(app.library)));
             }
-            app.newGame = std::make_unique<viceroy::NewGameFlow>(*app.art);
+            app.newGame = std::make_unique<viceroy::NewGameFlow>(*app.art, mapFiles(app));
             app.mode = Mode::NewGame;
         } catch (const std::exception& e) {
             app.mainMenu->say(std::string("Cannot start a game: ") + e.what());

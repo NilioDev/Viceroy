@@ -209,3 +209,37 @@ VCR_TEST("original files: Escape leaves the new game screens") {
     flow.handle(Command::Cancel);
     VCR_CHECK(flow.step() == NewGameFlow::Step::Cancelled);
 }
+
+VCR_TEST("original files: Map Editor picks a map file") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    const NewGameArt pictures = loadNewGameArt(dir);
+    NewGameFlow flow(art, {"AMER2.MP", "TEST.MP"});
+    using Step = NewGameFlow::Step;
+    VCR_CHECK(flow.mapFile().empty());
+    flow.handle(Command::Down); // "Map Editor"
+    flow.handle(Command::Confirm);
+    VCR_CHECK(flow.step() == Step::MapFile);
+    flow.handle(Command::Down);
+    Screen screen;
+    flow.draw(screen, art, pictures);
+    if (const char* out = std::getenv("VICEROY_MAPFILE_SHOT")) {
+        std::ofstream ppm(out, std::ios::binary);
+        ppm << "P6\n" << Screen::kWidth << " " << Screen::kHeight << "\n255\n";
+        for (const auto index : screen.pixels()) {
+            const auto c = screen.colour(art.palette, index);
+            ppm << static_cast<char>(c.r) << static_cast<char>(c.g) << static_cast<char>(c.b);
+        }
+    }
+    flow.handle(Command::Confirm);
+    VCR_CHECK(flow.step() == Step::Difficulty);
+    VCR_CHECK(flow.mapFile() == "TEST.MP");
+
+    NewGameFlow none(art);
+    none.handle(Command::Down);
+    none.handle(Command::Confirm);
+    VCR_CHECK(none.step() == Step::Cancelled);
+}
