@@ -56,7 +56,7 @@ Build Colony even on mountains and arctic, where picking it says why not.
 Load, Unload, Pillage, Go to Port, Trade Route, Return to Europe and Dump
 are not shown. For other units
 Viceroy follows the manual (pioneers clear, plow and build roads; land
-units build or join colonies; soldiers pillage; ships and wagon trains trade
+units build or join colonies; ships and wagon trains trade
 and carry cargo); these are still to be checked against the original. The
 encyclopedia shows six of its eight entries.
 
@@ -68,7 +68,12 @@ empty hold, leaving out horses, tools and muskets. Unload empties the first
 hold into the warehouse; on the colony screen the warehouse warning comes
 first, as when it is dragged. Pressed again, they go on hold by hold.
 
-Entries Viceroy cannot do yet say so in the panel (Pillage).
+Seen in the original for a veteran soldier at war with France, standing on
+road and plowed land next to Martinique, and on a plowed square that
+Quebec works: Pillage is not shown either. No text in GAME.TXT belongs to
+it, so Viceroy does not show it at all.
+
+Entries Viceroy cannot do yet say so in the panel.
 
 ## Game Options
 
