@@ -114,6 +114,14 @@ told by the trade adviser). The original also adds the player's part to a
 During the war of independence the treasure is sold to foreign agents at
 once for its full value (`CASHTREASURE`).
 
+Read from the original: a treasure fills all six holds of a galleon. When
+the player's own galleon brings one to Europe, it is sold as the ship
+reaches port: the Crown takes the tax rate, but never more than 50%, into
+its army fund, the rest goes into the treasury (`LOOTCASH`, with tune 24h),
+before the woodcut of the first cargo. A computer nation's treasure is
+sold as it reaches one of its colonies; before independence the player's
+spies report it (`LOOTFOREIGN`).
+
 The treasure's value is kept in hundreds in byte 23 of the unit, where a
 colonist keeps its profession.
 

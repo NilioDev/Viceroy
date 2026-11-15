@@ -219,3 +219,99 @@ VCR_TEST("original files: dumping cargo overboard") {
     VCR_CHECK(play.game().unit(0).holds == 1);
     VCR_CHECK(holdGood(play.game().unit(0), 0) == 14 && holdAmount(play.game().unit(0), 0) == 30);
 }
+
+namespace {
+
+// A colony at (3, 2) on the coast of shipSave's world, with a galleon in
+// it; a caravel too, and a treasure of 3000 and a colonist outside.
+Ruleset boardingRules() {
+    Ruleset r;
+    r.terrain.resize(26);
+    for (auto& t : r.terrain) {
+        t.movementCost = 1;
+    }
+    r.units.resize(19);
+    r.units[unit_type::kColonist] = {"Colonists", 101, 1, 0, 1, 0, 1, 1, 0, 0, 0, 0};
+    r.units[unit_type::kTreasure] = {"Treasure", 17, 1, 0, 0, 0, 6, 4, 0, 0, 0, 0};
+    r.units[unit_type::kCaravel] = {"Caravel", 6, 4, 0, 2, 2, 99, 4, 4, 0, 4, 0};
+    r.units[15] = {"Galleon", 8, 6, 0, 10, 6, 99, 10, 10, 4, 20, 0};
+    r.cargo.resize(16);
+    return r;
+}
+
+SaveGame boardingSave() {
+    SaveGame s = shipSave();
+    s.units.clear();
+    SaveColony c;
+    c.x = 3;
+    c.y = 2;
+    c.nation = 3;
+    c.population = 1;
+    c.name = "Fort Oranje";
+    s.colonies.push_back(c);
+    s.map.at(3, 2).flags |= MapSquare::kHasColony;
+    s.map.at(3, 2).region = static_cast<std::uint8_t>(3 << 4 | 2);
+    auto unit = [&](int type) {
+        SaveUnit u;
+        u.x = 3;
+        u.y = 2;
+        u.type = type;
+        u.nation = 3;
+        u.orders = SaveUnit::kNoOrders;
+        s.units.push_back(u);
+    };
+    unit(15);                   // 0: galleon
+    unit(unit_type::kCaravel);  // 1
+    unit(unit_type::kTreasure); // 2
+    s.units[2].profession = 30; // 3000
+    unit(unit_type::kColonist); // 3
+    s.nations[3].taxRate = 60;
+    return s;
+}
+
+} // namespace
+
+VCR_TEST("ships: units in a colony go aboard by their size and sail with the ship") {
+    Game g(boardingSave(), boardingRules());
+    // A treasure fills six holds: never a caravel, and only an empty galleon.
+    VCR_CHECK(!g.boardInColony(2, 1));
+    VCR_CHECK(g.boardInColony(3, 0));
+    VCR_CHECK(g.freeHolds(0) == 5);
+    VCR_CHECK(!g.boardInColony(2, 0));
+    g.leaveShipInColony(3);
+    VCR_CHECK(g.passengersInColony(0).empty() && g.unit(3).orders == SaveUnit::kNoOrders);
+    VCR_CHECK(g.boardInColony(2, 0));
+    VCR_CHECK(g.freeHolds(0) == 0 && !g.boardInColony(3, 0));
+    VCR_CHECK(g.boardInColony(3, 1));
+    // Out of the colony, those aboard come along; the colonist stays.
+    VCR_CHECK(g.move(0, {-1, 0}) == MoveResult::Moved);
+    VCR_CHECK(g.unit(2).x == 2 && g.unit(3).x == 3);
+    VCR_CHECK(g.passengers(0) == std::vector<int>{2});
+    VCR_CHECK(g.move(1, {-1, 1}) == MoveResult::Moved);
+    VCR_CHECK(g.unit(3).x == 2 && g.unit(3).y == 3);
+}
+
+VCR_TEST("ships: a galleon's treasure is sold in Europe, the Crown taking the tax up to half") {
+    Game g(boardingSave(), boardingRules());
+    VCR_CHECK(g.boardInColony(2, 0));
+    VCR_CHECK(g.move(0, {-1, 0}) == MoveResult::Moved);
+    VCR_CHECK(g.sailToEurope(0));
+    const int gold = g.state().nations[3].gold;
+    std::vector<GameNotice> notices;
+    for (int i = 0; i < 4 && g.unitCount() == 4; ++i) {
+        g.endTurn();
+        for (auto& n : g.takeNotices()) {
+            notices.push_back(std::move(n));
+        }
+    }
+    VCR_CHECK(g.unitCount() == 3); // the treasure is gone
+    VCR_CHECK(g.state().nations[3].gold == gold + 1500);
+    bool told = false;
+    for (const auto& n : notices) {
+        if (n.section == "LOOTCASH") {
+            told = n.numbers == std::vector<int>{3000, 50, 1500} && !n.music.empty() &&
+                   n.music[0] == MusicCue{MusicCue::Kind::Pick, 0x24};
+        }
+    }
+    VCR_CHECK(told);
+}

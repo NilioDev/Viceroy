@@ -159,6 +159,13 @@ Goods are dragged, measured and read from the original:
 - With Shift held when letting go, HOWMUCH1 (loading) or HOWMUCH2
   (unloading) asks how much, up to what would have moved; when unloading,
   the rest stays aboard.
+- A unit picked outside the colony, then a click on a carrier or its
+  holds: the unit goes aboard that ship when it fits (each unit takes the
+  holds of its size in `@UNIT`, a treasure six). Aboard, it is sentried and
+  in the ship's chain of passengers, and sails with the ship when it
+  leaves. Who is aboard stands in the holds after the cargo (a guess at
+  the picture); a click there puts the unit back ashore, picked outside.
+  How the original shows and loads them exactly is not yet measured.
 - Pressing the chosen ship again and letting go on it opens its options
   (COLONYUNIT's title with @SHIPOPTIONS): "Move to front." (not for the
   first), "Clear orders." (not without orders), "Sentry." (not when

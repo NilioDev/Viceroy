@@ -18,8 +18,10 @@ rule as a guess until it is checked against the original.
   (read from the original). A unit that has not moved yet this turn always
   makes its move.
 - Land units stay on land, ships on water or in their own colonies. A land
-  unit boards a ship by moving onto it if a hold is free, and is then on
-  sentry.
+  unit boards a ship by moving onto it if there is room, and is then on
+  sentry. Read from the original: a unit takes as many holds as its size
+  in `@UNIT` (1 for people and artillery, 6 for a treasure, 99 for a wagon
+  train, which never boards), cargo one each.
 - Read from the original: a ship steering onto land with a unit aboard that
   still has moves asks `@LANDFALL` ("Shall we make landfall ... and leave the
   ships behind?"), or `@LANDFALL2` when the square has a river ("Our ships

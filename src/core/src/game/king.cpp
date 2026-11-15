@@ -524,6 +524,26 @@ void Game::answerTreasure(bool ship) {
     cashTreasure(index, share);
 }
 
+void Game::treasureInEurope(int index) {
+    const int nation = unit(index).nation;
+    if (nation < 0 || nation >= kEuropeanNations) {
+        return;
+    }
+    const int share = std::min(save_.nations[static_cast<std::size_t>(nation)].taxRate, 50);
+    const int amount = unit(index).profession * 100;
+    const int crown = static_cast<int>(static_cast<long>(amount) * share / 100);
+    if (nation == human()) {
+        GameNotice notice{"LOOTCASH", {"", ""}, -1, {amount, share, amount - crown}};
+        notice.adjectives.emplace_back(0, nation);
+        notice.ports.emplace_back(1, nation);
+        notice.music = {MusicCue{MusicCue::Kind::Pick, 0x24}};
+        notices_.push_back(std::move(notice));
+    }
+    auto& raw = save_.nations[static_cast<std::size_t>(nation)].raw;
+    setLong32(raw, kCrownFund, long32(raw, kCrownFund) + crown);
+    cashTreasure(index, share);
+}
+
 void Game::cashTreasure(int index, int crownPercent) {
     const int nation = unit(index).nation;
     const int amount = unit(index).profession * 100;
