@@ -653,6 +653,9 @@ public:
     // village or goes to live among its people, one time in four the
     // tribe's tune becomes the next one (a music cue, see takeMusicCues).
     void villageVisitMood(int nation, int tribe);
+    // Read from the original: a unit of the player's entering a village
+    // turns the music to the tribe's at once, without Background Music.
+    void villageEntryMood(int nation, int tribe);
     // The answer "Then I shall become a master ...": the unit learns.
     void learnFromNatives(int unit, int settlement);
     // A missionary may found a mission at a settlement without one.

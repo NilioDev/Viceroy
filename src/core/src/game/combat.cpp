@@ -957,6 +957,28 @@ CombatOutcome Game::attack(int attacker, int defender) {
         refreshUnitFlags();
         return won ? CombatOutcome::AttackerWon : CombatOutcome::DefenderWon;
     }
+    if (const int them = unit(defender).nation;
+        them == human() && a.nation != them && a.nation >= 0 && a.nation < kEuropeanNations) {
+        // Read from the original: when another European attacks one of
+        // the player's units, the player is told who won, near the
+        // nearest colony ("English defeat Dutch Soldiers near Jamestown!").
+        constexpr int kWilderness = 17; // @LABELS: "the wilderness"
+        constexpr int kDefeat = 73;     // "defeat", and "defeats" after it
+        const int type = unit(defender).type;
+        const int nearest = nearestColony(save_, unit(defender).x, unit(defender).y, -1);
+        GameNotice report{won ? "EUROPEWIN" : "EUROPELOSE",
+                          {"", "", rules_.units[static_cast<std::size_t>(type)].name,
+                           nearest >= 0 ? save_.colonies[static_cast<std::size_t>(nearest)].name : "", ""}};
+        report.adjectives = {{0, a.nation}, {1, them}};
+        if (nearest < 0) {
+            report.labels = {{3, kWilderness}};
+        }
+        report.labels.push_back({4, kDefeat + (!won && type >= 7 ? 1 : 0)});
+        if (!won) {
+            report.music = {{MusicCue::Kind::ChangeMood, 4}};
+        }
+        notices_.push_back(std::move(report));
+    }
     if (won) {
         if (shown) {
             fightWonSound(attacker, unit(defender).x, unit(defender).y);
