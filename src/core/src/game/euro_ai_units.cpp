@@ -2369,10 +2369,14 @@ int Game::aiDecide(int n, int i) {
             if (inOwnColony) {
                 const int gold = 100 * U().profession;
                 save_.nations[un].gold += gold;
-                GameNotice notice{"LOOTFOREIGN", {"", ""}, -1, {gold}};
-                notice.adjectives = {{0, n}};
-                notice.ports = {{1, n}};
-                notices_.push_back(notice);
+                // Read from the original: the spies' report only before
+                // independence.
+                if (!independenceDeclared()) {
+                    GameNotice notice{"LOOTFOREIGN", {"", ""}, -1, {gold}};
+                    notice.adjectives = {{0, n}};
+                    notice.ports = {{1, n}};
+                    notices_.push_back(notice);
+                }
                 removeUnit(i);
                 refreshUnitFlags();
                 return 1;

@@ -3153,7 +3153,19 @@ bool PlayScreen::clickColonyScreen(int x, int y) {
         const auto ships = shipsInPort(game_, colony);
         if (!ships.empty() && inHarbour(x, y)) {
             state.selectedShip = std::clamp(state.selectedShip, 0, static_cast<int>(ships.size()) - 1);
-            if (const int k = harbourShipAt(x, y, static_cast<int>(ships.size())); k >= 0) {
+            const int shipHit = harbourShipAt(x, y, static_cast<int>(ships.size()));
+            if (state.selectedOutside >= 0 && (shipHit >= 0 || harbourHoldAt(x, y) >= 0)) {
+                // A unit picked outside, then a ship or its holds: it goes
+                // aboard (when it fits).
+                const int k = shipHit >= 0 ? shipHit : state.selectedShip;
+                if (game_.boardInColony(state.selectedOutside, ships[static_cast<std::size_t>(k)])) {
+                    state.selectedShip = k;
+                    state.harbourChosen = true;
+                    state.selectedOutside = -1;
+                }
+                return true;
+            }
+            if (const int k = shipHit; k >= 0) {
                 shipPressedAgain_ = k == state.selectedShip;
                 state.selectedShip = k;
                 state.harbourChosen = true;
@@ -3164,6 +3176,19 @@ bool PlayScreen::clickColonyScreen(int x, int y) {
                 const int good = holdGood(carrier, hold);
                 cargoDrag_ = CargoDrag{true, good};
                 setColonyMessage(cargoLabel(kLabelUnloadingGoods) + " " + goodName(good));
+            } else if (hold >= carrier.holds) {
+                // Someone aboard: back ashore, picked outside.
+                int at = carrier.holds;
+                for (const int p : game_.passengersInColony(ships[static_cast<std::size_t>(state.selectedShip)])) {
+                    const int size = game_.unitSize(p);
+                    if (hold >= at && hold < at + size) {
+                        game_.leaveShipInColony(p);
+                        state.selectedOutside = p;
+                        state.selectedColonist = -1;
+                        break;
+                    }
+                    at += size;
+                }
             }
             return true;
         }

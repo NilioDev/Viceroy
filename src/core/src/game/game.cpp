@@ -181,14 +181,8 @@ MoveResult Game::move(int index, Step step) {
         if (carrier < 0) {
             return MoveResult::Blocked;
         }
-        const int slots = rules_.units[static_cast<std::size_t>(unit(carrier).type)].cargoSlots;
-        int used = unit(carrier).holds;
-        for (const int other : unitsAt(toX, toY)) {
-            if (!isShip(other)) {
-                ++used;
-            }
-        }
-        if (used >= slots) {
+        // Read from the original: a unit takes as many holds as its size.
+        if (unitSize(index) > freeHolds(carrier)) {
             return MoveResult::Blocked;
         }
         boarding = true;
@@ -207,13 +201,17 @@ MoveResult Game::move(int index, Step step) {
         return MoveResult::NoMovesLeft;
     }
 
-    // A ship takes the units aboard with it.
+    // A ship takes the units aboard with it; out of a colony, those who
+    // went aboard there.
     if (ship) {
-        for (const int other : unitsAt(u.x, u.y)) {
-            if (other != index && !isShip(other) && map.at(u.x, u.y).isWater()) {
-                save_.units[static_cast<std::size_t>(other)].x = toX;
-                save_.units[static_cast<std::size_t>(other)].y = toY;
-            }
+        const bool fromWater = map.at(u.x, u.y).isWater();
+        const auto aboard = fromWater ? passengers(index) : passengersInColony(index);
+        for (const int other : aboard) {
+            save_.units[static_cast<std::size_t>(other)].x = toX;
+            save_.units[static_cast<std::size_t>(other)].y = toY;
+        }
+        if (!fromWater) {
+            u.prevInTransport = -1;
         }
     }
     u.x = toX;
@@ -232,6 +230,7 @@ MoveResult Game::move(int index, Step step) {
                 save_.units[static_cast<std::size_t>(other)].orders = SaveUnit::kSentry;
             }
         }
+        u.prevInTransport = -1;
     }
     reveal(toX, toY, sightRadius(index), u.nation);
     // Read from the original: the first time one of the player's units
@@ -306,6 +305,77 @@ std::vector<int> Game::passengers(int ship) const {
         }
     }
     return out;
+}
+
+std::vector<int> Game::passengersInColony(int ship) const {
+    std::vector<int> out;
+    if (!isShip(ship) || !onMap(ship) || !colonyAt(unit(ship).x, unit(ship).y)) {
+        return out;
+    }
+    const auto& s = unit(ship);
+    // Walking back from the ship gives them last first. One who has left
+    // (moved, woken, gone to work) is passed over.
+    for (int at = s.prevInTransport, steps = 0; at >= 0 && at < unitCount() && steps < unitCount();
+         at = unit(at).prevInTransport, ++steps) {
+        const auto& p = unit(at);
+        if (isShip(at) || at == ship) {
+            break;
+        }
+        if (p.x == s.x && p.y == s.y && p.nation == s.nation && p.orders == SaveUnit::kSentry &&
+            std::find(out.begin(), out.end(), at) == out.end()) {
+            out.insert(out.begin(), at);
+        }
+    }
+    return out;
+}
+
+int Game::unitSize(int index) const {
+    const int type = unit(index).type;
+    if (type < 0 || static_cast<std::size_t>(type) >= rules_.units.size()) {
+        return 1;
+    }
+    return std::max(1, rules_.units[static_cast<std::size_t>(type)].size);
+}
+
+bool Game::boardInColony(int index, int ship) {
+    if (index == ship || isShip(index) || !isShip(ship) || !onMap(index) || !onMap(ship)) {
+        return false;
+    }
+    const auto& u = unit(index);
+    const auto& s = unit(ship);
+    if (u.x != s.x || u.y != s.y || u.nation != s.nation || !colonyAt(s.x, s.y)) {
+        return false;
+    }
+    auto aboard = passengersInColony(ship);
+    if (std::find(aboard.begin(), aboard.end(), index) != aboard.end() || unitSize(index) > freeHolds(ship)) {
+        return false;
+    }
+    aboard.push_back(index);
+    save_.units[static_cast<std::size_t>(index)].orders = SaveUnit::kSentry;
+    chainPassengers(ship, aboard);
+    return true;
+}
+
+void Game::leaveShipInColony(int index) {
+    if (index < 0 || index >= unitCount() || isShip(index)) {
+        return;
+    }
+    const auto& u = unit(index);
+    for (const int ship : unitsAt(u.x, u.y)) {
+        if (!isShip(ship)) {
+            continue;
+        }
+        auto aboard = passengersInColony(ship);
+        const auto it = std::find(aboard.begin(), aboard.end(), index);
+        if (it != aboard.end()) {
+            aboard.erase(it);
+            chainPassengers(ship, aboard);
+            save_.units[static_cast<std::size_t>(index)].orders = SaveUnit::kNoOrders;
+            save_.units[static_cast<std::size_t>(index)].prevInTransport = -1;
+            save_.units[static_cast<std::size_t>(index)].nextInTransport = -1;
+            return;
+        }
+    }
 }
 
 int Game::nextUnitNeedingOrders(int after) const {
@@ -1178,10 +1248,11 @@ int Game::freeHolds(int ship) const {
         return 0;
     }
     int used = unit(ship).holds;
-    if (onMap(ship)) {
-        used += static_cast<int>(passengers(ship).size());
-    } else {
-        used += static_cast<int>(passengersInPort(ship).size());
+    const auto aboard = !onMap(ship)                                         ? passengersInPort(ship)
+                        : save_.map.at(unit(ship).x, unit(ship).y).isWater() ? passengers(ship)
+                                                                             : passengersInColony(ship);
+    for (const int p : aboard) {
+        used += unitSize(p);
     }
     return std::max(0, rules_.units[static_cast<std::size_t>(type)].cargoSlots - used);
 }
@@ -1385,6 +1456,8 @@ bool Game::sailToNewWorld(int ship) {
 }
 
 void Game::sailOn() {
+    std::vector<int> treasures;
+    bool cargoWoodcut = false;
     for (int ship = 0; ship < unitCount(); ++ship) {
         if (!isShip(ship)) {
             continue;
@@ -1411,6 +1484,15 @@ void Game::sailOn() {
             for (const int p : aboard) {
                 setEuropeStage(save_.units[static_cast<std::size_t>(p)], next);
             }
+            if (next == kPortStage) {
+                // Read from the original: treasure aboard is sold on
+                // arrival; the Crown takes the tax rate, at most 50%.
+                for (const int p : aboard) {
+                    if (unit(p).type == unit_type::kTreasure) {
+                        treasures.push_back(p);
+                    }
+                }
+            }
             if (next == kPortStage && ours) {
                 lastTurnNews_.push_back(name + " has arrived in Europe.");
                 // Read from the original: the first ship to arrive that is
@@ -1418,11 +1500,7 @@ void Game::sailOn() {
                 // first time it brings cargo, the woodcut of the cargo.
                 if (europeArrival_ < 0 && u.orders != kTradeRouteOrders) {
                     europeArrival_ = ship;
-                    if (u.holds > 0) {
-                        if (auto picture = woodcut(9)) {
-                            notices_.push_back(std::move(*picture));
-                        }
-                    }
+                    cargoWoodcut = u.holds > 0;
                 }
             }
             continue;
@@ -1452,6 +1530,20 @@ void Game::sailOn() {
         reveal(x, y, sightRadius(ship), s.nation);
         if (ours) {
             lastTurnNews_.push_back(name + " has arrived in the New World.");
+        }
+    }
+    // The treasure is sold once every ship has moved on (it leaves the
+    // list of units), the last first.
+    std::sort(treasures.rbegin(), treasures.rend());
+    for (const int t : treasures) {
+        if (europeArrival_ > t) {
+            --europeArrival_;
+        }
+        treasureInEurope(t);
+    }
+    if (cargoWoodcut) {
+        if (auto picture = woodcut(9)) {
+            notices_.push_back(std::move(*picture));
         }
     }
     refreshUnitFlags();

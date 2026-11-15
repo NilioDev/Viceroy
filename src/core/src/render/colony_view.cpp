@@ -637,6 +637,17 @@ void drawHarbour(Screen& screen, const Art& art, const Game& game, const SaveCol
         const int icon = (holdAmount(ship, k) >= 100 ? kGoodsIcon : kGreyGoodsIcon) + good;
         blitSprite(screen, art.icons, icon, x + 5 - spriteWidth(art.icons, icon) / 2, 165);
     }
+    // Guess: who is aboard takes the holds after the cargo, one unit
+    // over the first of the holds it fills.
+    int k = ship.holds;
+    for (const int p : game.passengersInColony(chosen)) {
+        if (k >= holds) {
+            break;
+        }
+        const int icon = unitIcon(game, p);
+        drawUnitInColonyList(screen, art, game, p, 127 + 12 * k + 5 - spriteWidth(art.icons, icon) / 2, 165);
+        k += game.unitSize(p);
+    }
 }
 
 // One good in the production view: `count` icons, the last `red` of them
@@ -980,8 +991,16 @@ bool carries(const Game& game, int u) {
 std::vector<int> unitsPresent(const Game& game, const SaveColony& colony) {
     std::vector<int> out;
     const auto here = game.unitsAt(colony.x, colony.y);
+    // Those aboard a ship are in the harbour with it.
+    std::vector<int> aboard;
+    for (const int u : here) {
+        if (game.isShip(u)) {
+            const auto on = game.passengersInColony(u);
+            aboard.insert(aboard.end(), on.begin(), on.end());
+        }
+    }
     for (auto it = here.rbegin(); it != here.rend(); ++it) {
-        if (!carries(game, *it)) {
+        if (!carries(game, *it) && std::find(aboard.begin(), aboard.end(), *it) == aboard.end()) {
             out.push_back(*it);
         }
     }

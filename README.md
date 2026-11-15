@@ -25,7 +25,9 @@ touch controls.
 > its harbour with their cargo, and the warehouse; point at a
 > building or a good to see its name; drag goods from the warehouse onto a
 > ship or wagon train to load them and from a hold to the warehouse to
-> unload (hold Shift to choose how much); click the chosen ship again for
+> unload (hold Shift to choose how much); pick a unit outside the colony
+> and click a ship to take it aboard (a treasure needs an empty galleon);
+> click the chosen ship again for
 > its orders or to unload everything; give
 > colonists other jobs with the jobs menu (where an expert can also be made
 > an ordinary free colonist) or by clicking a colonist and then
@@ -99,7 +101,8 @@ touch controls.
 > original; you may refuse a rise with a party that boycotts the good in
 > Europe until you pay the back taxes. He builds up his army, tells you
 > when your colonists' rebel sentiment rises or falls, offers to carry your
-> treasure home for the Crown's share, offers a frigate (for a tax rise)
+> treasure home for the Crown's share (or you ship it in your own galleon
+> for the tax), offers a frigate (for a tax rise)
 > when warships lurk near your colonies, and now and then a European king
 > offers you mercenaries. When your men meet another European nation, its
 > leader comes to talk: offering a treaty, demanding tribute, goods or the

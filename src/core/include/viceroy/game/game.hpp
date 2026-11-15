@@ -316,6 +316,16 @@ public:
     std::string unitName(int index) const;
     // Land units aboard a ship.
     std::vector<int> passengers(int ship) const;
+    // Land units aboard a ship in a colony (sentried, in the ship's chain);
+    // they sail with it when it leaves.
+    std::vector<int> passengersInColony(int ship) const;
+    // A unit in a colony goes aboard a ship there, or back ashore. Read
+    // from the original: each unit takes as many holds as its size in
+    // @UNIT (a treasure six, so only an empty galleon carries one).
+    bool boardInColony(int unit, int ship);
+    void leaveShipInColony(int unit);
+    // The holds a unit takes aboard a ship.
+    int unitSize(int unit) const;
     // Units on a square, ships first.
     std::vector<int> unitsAt(int x, int y) const;
     // The square's colony or settlement, if any.
@@ -1306,6 +1316,8 @@ private:
     bool askWithdrawal(Meeting& m);
     void treasureArrives(int index);
     void cashTreasure(int index, int crownPercent);
+    // A treasure brought to Europe by the nation's own galleon.
+    void treasureInEurope(int index);
     // At the start of the player's turn, before independence.
     void offerMercenaries();
     // A nation's turn starts: the King may change its tax. `turn` and
