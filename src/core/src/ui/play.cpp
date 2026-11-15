@@ -1003,6 +1003,10 @@ void PlayScreen::showChiefAnswer() {
         placeNative(tribe);
     }
     question_ = "LESSONDONE";
+    if (c.section == "CHIEFGUIDES") {
+        // Read from the original: then the frontiersman tells of it.
+        notices_.insert(notices_.begin(), GameNotice{"WELLSEASONED", {}});
+    }
 }
 
 void PlayScreen::ask(std::string_view section, int unit, std::vector<std::string> strings, int nation,
@@ -1598,7 +1602,7 @@ void PlayScreen::showNotices() {
         return;
     }
     if (notice.section == "EVASIVE" || notice.section == "SHIPDAMAGE" || notice.section == "SHIPSUNK" ||
-        notice.section == "REFIT") {
+        notice.section == "REFIT" || notice.section == "CARGOCAPTURE" || notice.section == "FORTFIRE") {
         // Sea battles and repairs: a ship sent to Europe names the home
         // port. Observed: the naval advisor tells them.
         if (notice.value >= 0) {
@@ -1706,9 +1710,9 @@ void PlayScreen::showNotices() {
         // pioneers by the frontiersman.
         constexpr std::string_view kBattles[] = {
             "DEMOTE", "COLONISTCAPTURE", "COLONISTCAPTURE2", "WAGONCAPTURE", "LOOTCAPTURE", "ARTILLERY", "ARTILLERY2",
-            "VETERAN", "VALOR", "CAPTURED", "CAPTURED3", "LOOT", "LOOT2", "INDIANWINCOLONY", "INDIANBURNCOLONY",
-            "INDIANSLAVES", "INDIANWARFARE", "INDIANBURN", "TEAPARTY", "KINGBUY", "REBELUP", "REBELUP50", "REBELDOWN",
-            "MERCENARIES", "MERCS", "NOMAYORSDURINGREV",
+            "VETERAN", "VALOR", "EUROPEWIN", "EUROPELOSE", "CAPTURED", "CAPTURED3", "LOOT", "LOOT2", "INDIANWINCOLONY",
+            "INDIANBURNCOLONY", "INDIANSLAVES", "INDIANWARFARE", "INDIANBURN", "TEAPARTY", "KINGBUY", "REBELUP",
+            "REBELUP50", "REBELDOWN", "MERCENARIES", "MERCS", "NOMAYORSDURINGREV",
             // The war of independence (placement not measured yet).
             "ALREADYREVOLUTION", "TOOTORY", "MULTIREV", "DECLARE", "INDEPENDENCE", "SEIZURE", "MOBILIZE", "MOBILIZE2",
             "INTERVENE", "INTERVENTION", "AMBUSHHINT", "CONSIDER", "NOWARSDURINGREV", "EUROPENOTAVAIL",
