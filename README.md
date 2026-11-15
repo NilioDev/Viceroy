@@ -268,6 +268,7 @@ saved in the first free slot, or over the savegame saved longest ago.
 | Rename the colony | Click its name on the top line, type and Enter | |
 | Choose what the custom house sells | Click the custom house, tick goods with Space, Enter | |
 | Load or unload goods in a colony | Drag them from the warehouse to the harbour, or from a hold to the warehouse (Shift: how much) | |
+| Move goods from one ship or wagon train to another in a colony | Drag a hold onto the other one in the harbour (Shift: how much) | |
 | Orders for a ship in the colony's harbour, or unload all of it | Click the chosen ship again | |
 | Close the colony screen | Esc, or Enter with nobody picked, or click Exit | B |
 | Open the home port in Europe | E | Share / Capture button |
@@ -275,6 +276,7 @@ saved in the first free slot, or over the savegame saved longest ago.
 | In Europe: pick a good, ship or colonist | Left / Right | D-pad left / right |
 | In Europe: buy 100 of the good; the ship's options (set sail, unload all); the colonist's options (board, arm, equip, bless) | Enter | A |
 | In Europe: sell the good from the ship | S | X |
+| In Europe: buy or sell only part of a cargo (asks how much) | Shift+Enter / Shift+S | |
 | In Europe: everyone aboard goes back to the docks | Space | |
 | In Europe: Recruit, Purchase, Train | R, P, T, or click the button | D-pad up to the buttons, then A |
 | Close the Europe screen | Esc, or click Exit | B |

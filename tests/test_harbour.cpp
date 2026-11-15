@@ -167,3 +167,25 @@ VCR_TEST("original files: goods are dragged between the warehouse and the harbou
     VCR_CHECK(play.game().unit(kShip).holds == 0);
     VCR_CHECK(play.game().state().colonies[0].stock[kTools] == 190);
 }
+
+VCR_TEST("original files: cargo dragged from one carrier to another moves across") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    PlayScreen play(Game(harbourSave(), art.rules), dir / "unused.sav");
+    play.setArt(&art);
+    play.openColony(0);
+    // The frigate's muskets onto the wagon train (the second in the harbour).
+    VCR_CHECK(play.clickColonyScreen(130, 175));
+    VCR_CHECK(play.releaseColonyScreen(150, 150, false));
+    VCR_CHECK(play.game().unit(0).holds == 1 && holdGood(play.game().unit(0), 0) == kMuskets &&
+              holdAmount(play.game().unit(0), 0) == 100);
+    VCR_CHECK(play.game().unit(kShip).holds == 1 && holdGood(play.game().unit(kShip), 0) == kTools);
+    VCR_CHECK(play.game().state().colonies[0].stock[kMuskets] == 20);
+    // With Shift it asks how much (HOWMUCH3).
+    VCR_CHECK(play.clickColonyScreen(130, 175));
+    VCR_CHECK(play.releaseColonyScreen(150, 150, true));
+    VCR_CHECK(firstLine(play).find("How much") == 0);
+}

@@ -125,6 +125,11 @@ Measured by ending turns in the original with changed saves.
   it at (114, top − 52). The date in the panel stays on the old turn until
   the box is closed.
 
+Buying or selling part of a cargo, as the manual describes it: Shift+Enter
+asks how much to buy (`HOWMUCH4`, up to what one hold takes and the gold
+pays for), Shift+S how much of the first hold of the good to sell
+(`HOWMUCH5`); the rest stays aboard.
+
 ## Recruit, Purchase and Train
 
 Measured by changing the nation record of a save and reading what the

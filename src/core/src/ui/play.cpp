@@ -2248,6 +2248,37 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
                 checkWarehouse(move.carrier, move.good, amount);
             }
         }
+    } else if (question == "HOWMUCH3") {
+        const auto move = cargoMove_;
+        cargoMove_ = CargoMove{};
+        const int amount = std::min(std::atoi(typed_.c_str()), move.amount);
+        if (choice == 0 && amount > 0) {
+            transferCargo(move.carrier, move.target, move.good, amount);
+        }
+    } else if (question == "HOWMUCH4" || question == "HOWMUCH5") {
+        const auto move = cargoMove_;
+        cargoMove_ = CargoMove{};
+        const int amount = std::min(std::atoi(typed_.c_str()), move.amount);
+        auto& save = game_.state();
+        const auto& nation = save.nations[static_cast<std::size_t>(game_.human())];
+        if (choice == 0 && amount > 0 && europeScreen_ && move.carrier >= 0) {
+            if (question == "HOWMUCH4") {
+                const Trade t =
+                    buyGoods(save, game_.rules(), move.carrier, move.good, game_.freeHolds(move.carrier), amount);
+                if (t.amount > 0) {
+                    europeScreen_->receipt =
+                        TradeReceipt{false, t.amount, goodName(move.good), t.price, t.gold, nation.taxRate, 0};
+                    tellPriceMove(move.good, t.priceMove);
+                }
+            } else {
+                const Trade t = sellGoods(save, game_.rules(), move.carrier, move.good, amount);
+                if (t.amount > 0) {
+                    europeScreen_->receipt = TradeReceipt{
+                        true, t.amount, goodName(move.good), t.price, t.gold + t.tax, nation.taxRate, t.tax};
+                    tellPriceMove(move.good, t.priceMove);
+                }
+            }
+        }
     } else if (question == "WAREHOUSEFULL") {
         const auto move = cargoMove_;
         cargoMove_ = CargoMove{};
@@ -2792,6 +2823,47 @@ bool PlayScreen::handleEuropeScreen(Command command) {
             }
         }
         return true;
+    case Command::BuySome:
+    case Command::SellSome: {
+        // The manual: buying or selling part of a cargo asks how much.
+        if (state.focus != EuropeFocus::Market || state.ship < 0 || art_ == nullptr) {
+            return true;
+        }
+        if (game_.isBoycotted(game_.human(), state.good)) {
+            askBackTaxes(state.good);
+            return true;
+        }
+        if (command == Command::BuySome) {
+            const int price = askPrice(game_.rules(), nation, state.good);
+            const int most = std::min(buyRoom(save, state.ship, state.good, game_.freeHolds(state.ship)),
+                                      price > 0 ? nation.gold / price : 100);
+            if (most <= 0) {
+                return true;
+            }
+            ask("HOWMUCH4", state.ship, {goodName(state.good), unitTypeName(state.ship)}, -1, {most, price});
+            if (dialog_) {
+                makeInput(*art_, *dialog_, std::to_string(most), 3);
+                cargoMove_ = CargoMove{state.ship, state.good, most};
+            }
+            return true;
+        }
+        const auto& u = game_.unit(state.ship);
+        int aboard = -1;
+        for (int k = 0; k < u.holds && aboard < 0; ++k) {
+            aboard = holdGood(u, k) == state.good ? holdAmount(u, k) : -1;
+        }
+        if (aboard <= 0) {
+            return true;
+        }
+        ask("HOWMUCH5", state.ship,
+            {goodName(state.good), unitTypeName(state.ship), textLine(art_->names, "HOMEPORT", game_.human(), "")}, -1,
+            {aboard, bidPrice(nation, state.good)});
+        if (dialog_) {
+            makeInput(*art_, *dialog_, std::to_string(aboard), 3);
+            cargoMove_ = CargoMove{state.ship, state.good, aboard};
+        }
+        return true;
+    }
     case Command::Skip: // Space: everyone aboard the ship goes ashore
         if (state.ship >= 0) {
             for (const int p : game_.passengersInPort(state.ship)) {
@@ -3349,8 +3421,45 @@ bool PlayScreen::releaseColonyScreen(int x, int y, bool shift) {
         startLoad(ships[static_cast<std::size_t>(state.selectedShip)], drag.good, shift);
     } else if (drag.fromHold && warehouseGoodAt(x, y) >= 0) {
         startUnload(ships[static_cast<std::size_t>(state.selectedShip)], drag.good, shift);
+    } else if (const int k = harbourShipAt(x, y, count); drag.fromHold && k >= 0 && k != state.selectedShip) {
+        // The manual: cargo dragged from one carrier to another moves
+        // across; with Shift it asks how much (HOWMUCH3).
+        const int from = ships[static_cast<std::size_t>(state.selectedShip)];
+        const int to = ships[static_cast<std::size_t>(k)];
+        const int aboard = game_.colonyCargoHold(from, drag.good);
+        const int most = std::min({aboard, game_.colonyCargoRoom(to, drag.good), 100});
+        if (most <= 0) {
+            setColonyMessage(cargoLabel(kLabelNoRoom) + " " + goodName(drag.good) + "!");
+            return true;
+        }
+        if (shift && art_ != nullptr) {
+            ask("HOWMUCH3", from, {goodName(drag.good), unitTypeName(from), unitTypeName(to)}, -1, {most});
+            if (dialog_) {
+                makeInput(*art_, *dialog_, std::to_string(most), 3);
+                cargoMove_ = CargoMove{from, drag.good, most, to};
+            }
+            return true;
+        }
+        transferCargo(from, to, drag.good, most);
     }
     return true;
+}
+
+void PlayScreen::transferCargo(int from, int to, int good, int amount) {
+    if (!colonyScreen_ || amount <= 0) {
+        return;
+    }
+    // Through the warehouse in one go: what is unloaded is loaded again.
+    const int colonyIndex = colonyScreen_->colony;
+    const int moved = game_.unloadInColony(from, colonyIndex, good, amount);
+    const int loaded = game_.loadInColony(to, colonyIndex, good, moved);
+    if (loaded < moved) {
+        game_.loadInColony(from, colonyIndex, good, moved - loaded); // the rest goes back
+    }
+    if (loaded > 0) {
+        setColonyMessage(std::to_string(loaded) + " " + goodName(good) + " " + cargoLabel(kLabelMovedTo) + " " +
+                         unitTypeName(to));
+    }
 }
 
 void PlayScreen::setColonyMessage(std::string text) {
@@ -3848,6 +3957,11 @@ void PlayScreen::zoomTo(int zoom) {
 void PlayScreen::scrollView(int dx, int dy) { viceroy::scrollView(view_, game_, dx, dy); }
 
 bool PlayScreen::handle(Command command) {
+    if ((command == Command::BuySome || command == Command::SellSome) &&
+        !(europeScreen_ && !dialog_ && europeScreen_->focus == EuropeFocus::Market)) {
+        // Shift+Enter and Shift+S mean more only in Europe's market.
+        command = command == Command::BuySome ? Command::Confirm : Command::Sentry;
+    }
     if (!dialog_ && notices_.empty()) {
         view_.topLine.clear();
     }

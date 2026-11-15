@@ -137,7 +137,7 @@ int buyRoom(const SaveGame& save, int ship, int good, int freeHolds) {
     return freeHolds > 0 && s.holds < kMaxHolds ? kHoldSize : 0;
 }
 
-Trade buyGoods(SaveGame& save, const Ruleset& rules, int ship, int good, int freeHolds) {
+Trade buyGoods(SaveGame& save, const Ruleset& rules, int ship, int good, int freeHolds, int limit) {
     Trade trade;
     auto& s = save.units[static_cast<std::size_t>(ship)];
     if (good < 0 || good >= kGoodsKinds || europePlace(s) != EuropePlace::InPort || s.nation < 0 || s.nation > 3) {
@@ -160,7 +160,7 @@ Trade buyGoods(SaveGame& save, const Ruleset& rules, int ship, int good, int fre
         setHold(s, hold, good, 0);
         ++s.holds;
     }
-    int amount = kHoldSize - holdAmount(s, hold);
+    int amount = std::min(kHoldSize - holdAmount(s, hold), std::max(0, limit));
     if (price > 0) {
         amount = std::min(amount, nation.gold / price);
     }
@@ -208,20 +208,32 @@ int moveMarket(const Ruleset& rules, SaveNation& nation, int good, int volume) {
     return 0;
 }
 
-Trade sellGoods(SaveGame& save, const Ruleset& rules, int ship, int good) {
+Trade sellGoods(SaveGame& save, const Ruleset& rules, int ship, int good, int limit) {
     Trade trade;
     auto& s = save.units[static_cast<std::size_t>(ship)];
     if (europePlace(s) != EuropePlace::InPort || s.nation < 0 || s.nation > 3 || good < 0 || good >= kGoodsKinds) {
         return trade;
     }
     auto& nation = save.nations[static_cast<std::size_t>(s.nation)];
+    int first = -1;
+    for (int k = 0; k < s.holds && first < 0; ++k) {
+        first = holdGood(s, k) == good ? k : -1;
+    }
     // Hold by hold, as the original sells them: the price can move between.
     for (int k = s.holds - 1; k >= 0; --k) {
-        if (holdGood(s, k) != good) {
+        if (holdGood(s, k) != good || (limit >= 0 && k != first)) {
             continue;
         }
-        const int amount = holdAmount(s, k);
-        removeHold(s, k);
+        const int aboard = holdAmount(s, k);
+        const int amount = limit >= 0 ? std::min(limit, aboard) : aboard;
+        if (amount <= 0) {
+            continue;
+        }
+        if (amount < aboard) {
+            setHold(s, k, good, aboard - amount);
+        } else {
+            removeHold(s, k);
+        }
         const int price = bidPrice(nation, good);
         const int gross = amount * price;
         const int tax = gross * nation.taxRate / 100;

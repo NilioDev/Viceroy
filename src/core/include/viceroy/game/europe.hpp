@@ -78,9 +78,12 @@ int moveMarket(const Ruleset& rules, SaveNation& nation, int good, int volume);
 // good, or fills a free one. Limited by gold and room.
 // How much one purchase would load: up to a full hold of 100.
 int buyRoom(const SaveGame& save, int ship, int good, int freeHolds);
-Trade buyGoods(SaveGame& save, const Ruleset& rules, int ship, int good, int freeHolds);
-// Sells everything of a good aboard a ship in port.
-Trade sellGoods(SaveGame& save, const Ruleset& rules, int ship, int good);
+// `limit` buys less (HOWMUCH4).
+Trade buyGoods(SaveGame& save, const Ruleset& rules, int ship, int good, int freeHolds, int limit = 100);
+// Sells everything of a good aboard a ship in port; with a `limit` (0 or
+// more, HOWMUCH5) only that much of the first hold of the good, the rest
+// staying aboard.
+Trade sellGoods(SaveGame& save, const Ruleset& rules, int ship, int good, int limit = -1);
 
 // --- Recruit, Purchase and Train --------------------------------------------
 // What the passage of a recruit costs: 140 + 20 for every recruit so far,
