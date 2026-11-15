@@ -380,7 +380,7 @@ void Game::buildRouteTables() {
     int toY = 0;
     for (const bool ship : {false, true}) {
         const std::size_t base = ship ? kSeaBlocks : kLandBlocks;
-        std::fill_n(save_.tail.begin() + static_cast<long>(base), kBlocksAcross * kBlocksDown, 0);
+        std::fill_n(save_.tail.begin() + static_cast<long>(base), kBlocksAcross * kBlocksDown, std::uint8_t{0});
         for (int bx = 0; bx < kBlocksAcross; ++bx) {
             for (int by = 0; by < kBlocksDown; ++by) {
                 const int x0 = 1 + 4 * bx;
