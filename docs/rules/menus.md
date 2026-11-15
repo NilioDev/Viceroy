@@ -173,5 +173,15 @@ Seen in the original (PEDIA.TXT holds the pages, `@PEDIA` the parts):
   centred on the first building (22 + (height − 16) / 2 + 1); the good is
   2 lower and the names 6 below each top (7 + half the difference for the
   buildings). The text starts 4 rows below the last building, or at 53.
+- **A building's page:** the building (its BUILDING.SS sprite) at
+  (10, 33) with its name in gold 3 to its right, then 24 further on the
+  experts who work in it and, 24 after their name, what they make, as on
+  the skill's page (the good's name 14 right of its picture here), facing
+  the middle of the building. The text starts 12 rows below the picture.
+  A building that replaces another (Magazine, Arsenal, Fort, College,
+  Warehouse Expansion, ...) first says "Prerequisite: Armory" (`@MISC`
+  row 188) in green there, and the text starts 20 rows lower. The
+  stable shows the town's stables (sprite 46); the warehouse expansion
+  has no picture, its name at x 10, laid out as if 24 rows tall.
 - F1 on the map opens the page of the active unit's square (its mountains
   or hills, else its forest or ground); a key goes back to the map.

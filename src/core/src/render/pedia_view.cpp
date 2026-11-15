@@ -486,6 +486,63 @@ int drawSkillPage(Screen& screen, const Art& art, const ColonyArt* colonyArt, in
     return std::max(bottom, top + 16);
 }
 
+// The first row of @BUILDING of each kind of building; the others replace
+// the row before them.
+constexpr int kFirstOfKind[] = {0, 3, 6, 9, 12, 15, 17, 18, 19, 21, 24, 27, 30, 32, 35, 37, 39};
+constexpr int kPrerequisiteLabel = 188;
+constexpr int kStableRow = 17;
+constexpr int kStablesSprite = 46;
+constexpr int kWarehouseExpansionRow = 16;
+constexpr int kNoPictureHeight = 24;
+
+// A building's page (seen): the building at (10, 33) and its name, then
+// the experts who work in it and what they make, on one row facing the
+// middle of the building. Returns where the text starts.
+int drawBuildingPage(Screen& screen, const Art& art, const ColonyArt* colonyArt, int building) {
+    // Seen: the stable shows the stables of the town; the warehouse
+    // expansion shows no picture, its name where the picture would be and
+    // as tall as 24 rows.
+    const int sheetIndex = building == kStableRow ? kStablesSprite : building;
+    const auto* image = colonyArt != nullptr ? sheetImage(colonyArt->buildings, sheetIndex) : nullptr;
+    if (image == nullptr) {
+        return kPictureY;
+    }
+    const bool none = building == kWarehouseExpansionRow;
+    const int width = none ? 0 : image->width;
+    const int height = none ? kNoPictureHeight : image->height;
+    if (!none) {
+        screen.blit(*image, kTextX, kPictureY);
+    }
+    const int top = kPictureY + (height - 16) / 2 + 1;
+    const auto r = static_cast<std::size_t>(building);
+    const std::string name = r < art.rules.buildings.size() ? art.rules.buildings[r].name : std::string();
+    int x = none ? kTextX : kTextX + width + 3;
+    say(screen, art, x, top + 6, name, kGold);
+    x += Screen::textWidth(art.tiny, name) + 24;
+    for (const auto& p : kSkillPictures) {
+        if (std::find(p.buildings.begin(), p.buildings.end(), building) == p.buildings.end()) {
+            continue;
+        }
+        const auto j = static_cast<std::size_t>(p.job);
+        const std::string expert = j < art.rules.jobs.size() ? art.rules.jobs[j].expertName : std::string();
+        blitSprite(screen, art.icons, kExpertIcons + p.job, x, top);
+        say(screen, art, x + 14, top + 6, expert, kGold);
+        x += 14 + Screen::textWidth(art.tiny, expert) + 24;
+        blitSprite(screen, art.icons, p.icon, x, top + 2);
+        say(screen, art, x + 14, top + 6, firstField(textLine(art.names, "CARGO", p.good, "")), kGold);
+    }
+    // Seen: a building that replaces another names it ("Prerequisite:
+    // Magazine") below the picture, and the text starts lower.
+    int textY = kPictureY + height + 12;
+    if (std::find(std::begin(kFirstOfKind), std::end(kFirstOfKind), building) == std::end(kFirstOfKind) &&
+        building > 0 && r - 1 < art.rules.buildings.size()) {
+        say(screen, art, kTextX, textY,
+            label(art, kPrerequisiteLabel, "Prerequisite") + ": " + art.rules.buildings[r - 1].name, kGreen);
+        textY += 20;
+    }
+    return textY;
+}
+
 std::string partName(const Art& art, int part) { return textLine(art.pedia, "PEDIA", part, ""); }
 
 } // namespace
@@ -646,6 +703,9 @@ void drawPedia(Screen& screen, const Art& art, const PediaState& state, int nati
     }
     bool gold = false;
     int y = textTop(state.part);
+    if (state.part == pedia::kBuilding) {
+        y = drawBuildingPage(screen, art, colonyArt, state.page);
+    }
     if (state.part == pedia::kSkill) {
         y = drawSkillPage(screen, art, colonyArt, state.page) + 4;
     }
