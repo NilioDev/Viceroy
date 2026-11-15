@@ -665,17 +665,23 @@ void Game::slowByWarships(int ship) {
     }
 }
 
-void Game::loseShip(int loser, int winner) {
+void Game::loseShip(int loser, int winner, int fortNation) {
     // Read from the original and checked in six fights: the winner's guns
     // against the loser's hull decide between damaged and sunk, but a
     // nation's last ship of a kind is only damaged.
     // Without a winner (a raid on the harbour) the original takes a
     // privateer's guns.
     const auto& lt = rules_.units[static_cast<std::size_t>(unit(loser).type)];
-    const auto& wt = rules_.units[static_cast<std::size_t>(winner >= 0 ? unit(winner).type : kPrivateer)];
+    if (winner >= 0 && isShip(winner) && isShip(loser)) {
+        captureCargo(loser, winner);
+    }
+    // A fort firing from a colony shoots as artillery.
+    const bool fort = winner < 0 && fortNation >= 0;
+    const int winnerType = winner >= 0 ? unit(winner).type : fort ? kArtillery : kPrivateer;
+    const auto& wt = rules_.units[static_cast<std::size_t>(winnerType)];
     const int nation = unit(loser).nation;
-    const int winnerNation = winner >= 0 ? unit(winner).nation : -1;
-    const bool winnerShip = winner < 0 || isShip(winner);
+    const int winnerNation = winner >= 0 ? unit(winner).nation : fortNation;
+    const bool winnerShip = winner < 0 ? !fort : isShip(winner);
     bool damaged = true;
     if (wt.attack > 0 && wt.guns > 0) {
         damaged = 1 + nextRandom(wt.guns + lt.hull) <= lt.hull;
@@ -734,7 +740,7 @@ void Game::loseShip(int loser, int winner) {
         if (winnerNation == human()) {
             notice.music.push_back({MusicCue::Kind::MoodEvent, 4});
         }
-        if (winner >= 0 || nation == human()) {
+        if (winner >= 0 || fort || nation == human()) {
             notices_.push_back(std::move(notice));
         }
         std::vector<int> gone = aboard;
@@ -786,9 +792,77 @@ void Game::loseShip(int loser, int winner) {
         const bool crown = (save_.header[18] & 0x01) != 0 && nation == crownNation();
         notice.value = crown ? human() : nation;
     }
-    if (winner >= 0 || nation == human()) {
+    if (winner >= 0 || nation == human() || (fort && fortNation == human())) {
         notices_.push_back(std::move(notice));
     }
+}
+
+void Game::fortFire(int c) {
+    // Read from the original: at its turn a colony with a fort or a
+    // fortress fires on one ship on each square around it, from the north
+    // clockwise: the first ship there of another nation, if not at peace
+    // with it, and any privateer. The fort shoots with 4 for a fort, 8 for
+    // a fortress, times one more than the artillery in the colony.
+    const auto& colony = save_.colonies[static_cast<std::size_t>(c)];
+    const int level = buildingLevel(colony, BuildingKind::Fortification) - 1;
+    if (level <= 0 || colony.nation < 0 || colony.nation >= kEuropeanNations) {
+        return;
+    }
+    int artillery = 0;
+    for (const int u : unitsAt(colony.x, colony.y)) {
+        artillery += unit(u).type == kArtillery ? 1 : 0;
+    }
+    const int strength = (artillery + 1) * level * 4;
+    const std::string fortName = static_cast<std::size_t>(level) < rules_.buildings.size()
+                                     ? rules_.buildings[static_cast<std::size_t>(level)].name
+                                     : std::string();
+    constexpr int kDx[8] = {0, 1, 1, 1, 0, -1, -1, -1};
+    constexpr int kDy[8] = {-1, -1, 0, 1, 1, 1, 0, -1};
+    for (int d = 0; d < 8; ++d) {
+        const int x = colony.x + kDx[d];
+        const int y = colony.y + kDy[d];
+        if (!save_.map.inside(x, y)) {
+            continue;
+        }
+        int ship = -1;
+        for (const int u : unitsAt(x, y)) {
+            if (isShip(u)) {
+                ship = u;
+                break;
+            }
+        }
+        if (ship < 0) {
+            continue;
+        }
+        const auto& s = unit(ship);
+        const int them = s.nation;
+        if (them == colony.nation || them < 0) {
+            continue;
+        }
+        if (them < kEuropeanNations && atPeace(colony.nation, them) && s.type != kPrivateer) {
+            continue;
+        }
+        const bool shown = colony.nation == human() || them == human() ||
+                           (save_.map.at(colony.x, colony.y).seen & (1U << (4 + human()))) != 0;
+        const auto& st = rules_.units[static_cast<std::size_t>(s.type)];
+        if (shown) {
+            // "Fort at Jamestown opens fire on Spanish Privateer!"
+            GameNotice notice{"FORTFIRE", {fortName, colony.name, "", st.name}};
+            notice.adjectives = {{2, them}};
+            notices_.push_back(std::move(notice));
+        }
+        // The fight is rolled as any other, the ship defending with its
+        // combat value.
+        const int defense = st.combat;
+        const int roll = 1 + nextRandom(strength + defense);
+        if (attackerWins(strength, defense, roll)) {
+            if (shown) {
+                sound(sounds::kShipBeaten);
+            }
+            loseShip(ship, -1, colony.nation);
+        }
+    }
+    refreshUnitFlags();
 }
 
 void Game::loseFaith() {

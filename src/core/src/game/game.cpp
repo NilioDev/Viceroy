@@ -1006,6 +1006,8 @@ void Game::endTurn() {
     // Measured: the original goes through the colonies from the last
     // founded to the first, which sets the order of its messages.
     for (std::size_t c = save_.colonies.size(); c-- > 0;) {
+        // Read from the original: first the fort fires on ships nearby.
+        fortFire(static_cast<int>(c));
         auto& colony = save_.colonies[c];
         // Only the player's colonies lose work to tories.
         const bool tories = colony.nation >= 0 && colony.nation < kEuropeanNations &&
@@ -1276,6 +1278,89 @@ void addToHolds(SaveUnit& u, int good, int amount) {
 }
 
 } // namespace
+
+void Game::captureCargo(int loser, int winner) {
+    // Read from the original: a ship that beats another takes its cargo,
+    // hold by hold, while it has room: all of it when there is room for
+    // all; otherwise the player picks (PICKACARGO), and the computer takes
+    // the hold worth most at its prices. The rest is lost with the ship.
+    captureShip_ = -1;
+    captureHolds_.clear();
+    auto& l = save_.units[static_cast<std::size_t>(loser)];
+    std::vector<std::pair<int, int>> holds;
+    for (int k = 0; k < l.holds; ++k) {
+        holds.emplace_back(holdGood(l, k), holdAmount(l, k));
+    }
+    l.holds = 0;
+    if (holds.empty()) {
+        return;
+    }
+    const int winnerNation = unit(winner).nation;
+    const bool shown = winnerNation == human() || unit(loser).nation == human();
+    const auto take = [&](std::size_t k, bool tell) {
+        const auto [good, amount] = holds[k];
+        addToHolds(save_.units[static_cast<std::size_t>(winner)], good, amount);
+        if (tell && shown) {
+            // "Dutch cargo of 100 furs captured by English Privateer!"
+            GameNotice notice{"CARGOCAPTURE",
+                              {"",
+                               static_cast<std::size_t>(good) < rules_.cargo.size()
+                                   ? rules_.cargo[static_cast<std::size_t>(good)].name
+                                   : std::string(),
+                               "", rules_.units[static_cast<std::size_t>(unit(winner).type)].name},
+                              -1,
+                              {amount}};
+            notice.adjectives = {{0, unit(loser).nation}, {2, winnerNation}};
+            notices_.push_back(std::move(notice));
+        }
+        holds.erase(holds.begin() + static_cast<std::ptrdiff_t>(k));
+    };
+    if (freeHolds(winner) >= static_cast<int>(holds.size())) {
+        while (!holds.empty()) {
+            take(0, true);
+        }
+        return;
+    }
+    if (winnerNation == human()) {
+        captureShip_ = winner;
+        captureHolds_ = holds;
+        notices_.push_back(GameNotice{"PICKACARGO", {}});
+        return;
+    }
+    const auto& nation = save_.nations[static_cast<std::size_t>(winnerNation & 3)];
+    while (!holds.empty() && freeHolds(winner) > 0) {
+        std::size_t best = 0;
+        int most = -1;
+        for (std::size_t k = 0; k < holds.size(); ++k) {
+            const int worth = bidPrice(nation, holds[k].first) * holds[k].second;
+            if (worth >= most) {
+                most = worth;
+                best = k;
+            }
+        }
+        take(best, true);
+    }
+}
+
+std::vector<std::pair<int, int>> Game::cargoToCapture() const { return captureHolds_; }
+
+void Game::answerCargoCapture(int hold) {
+    const int ship = std::exchange(captureShip_, -1);
+    if (ship < 0 || ship >= unitCount() || hold < 0 || hold >= static_cast<int>(captureHolds_.size())) {
+        captureHolds_.clear();
+        return;
+    }
+    const auto [good, amount] = captureHolds_[static_cast<std::size_t>(hold)];
+    addToHolds(save_.units[static_cast<std::size_t>(ship)], good, amount);
+    captureHolds_.erase(captureHolds_.begin() + hold);
+    // Asked again while there is room and cargo left.
+    if (!captureHolds_.empty() && freeHolds(ship) > 0) {
+        captureShip_ = ship;
+        notices_.push_back(GameNotice{"PICKACARGO", {}});
+    } else {
+        captureHolds_.clear();
+    }
+}
 
 namespace {
 

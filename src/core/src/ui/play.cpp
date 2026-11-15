@@ -1491,6 +1491,24 @@ void PlayScreen::showNotices() {
         questionUnit_ = -1;
         return;
     }
+    if (notice.section == "PICKACARGO") {
+        // Read from the original: "Which cargo shall we capture?", a plain
+        // box: "Nothing", then the beaten ship's holds.
+        Dialog d = makeDialog(*art_, "PICKACARGO");
+        choices_.clear();
+        addOption(d, textLine(art_->labelText, "MISC", 32, "Nothing"));
+        choices_.push_back(-1);
+        const auto holds = game_.cargoToCapture();
+        for (std::size_t k = 0; k < holds.size(); ++k) {
+            addOption(d, std::to_string(holds[k].second) + " " + goodName(holds[k].first));
+            choices_.push_back(static_cast<int>(k));
+        }
+        d.selected = 0;
+        dialog_ = d;
+        question_ = "PICKACARGO";
+        questionUnit_ = -1;
+        return;
+    }
     if (notice.section == "LOSTCITY0" || notice.section == "RECRUITCHOOSE") {
         // A Fountain of Youth: "Which of the following individuals shall
         // we recruit?", one of the three on the docks, for free. With
@@ -2022,6 +2040,10 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
         goTo(picked);
     } else if (question == "LOSTCITY0") {
         game_.recruitFree(picked);
+    } else if (question == "PICKACARGO") {
+        game_.answerCargoCapture(picked);
+        auto news = game_.takeNotices();
+        notices_.insert(notices_.begin(), std::make_move_iterator(news.begin()), std::make_move_iterator(news.end()));
     } else if (question == "WHICHFREEDOM") {
         // A father who joins at once is announced before the rest of the
         // news, as in the original.

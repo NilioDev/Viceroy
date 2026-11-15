@@ -501,8 +501,9 @@ VCR_TEST("combat: a frigate beaten by a merchantman is repaired at the drydock (
     VCR_CHECK(g.unit(0).holds == 0);
     VCR_CHECK(g.unit(0).workTurns == 10); // 16 - 6
     auto notices = g.takeNotices();
-    VCR_CHECK(notices.size() == 1 && notices[0].section == "SHIPDAMAGE");
-    VCR_CHECK(notices[0].strings.at(2) == "Jamestown");
+    // The merchantman took the frigate's three holds first.
+    VCR_CHECK(notices.size() == 4 && notices[0].section == "CARGOCAPTURE" && notices[3].section == "SHIPDAMAGE");
+    VCR_CHECK(notices.back().strings.at(2) == "Jamestown");
     VCR_CHECK(g.move(0, {1, 0}) == MoveResult::Blocked);
     VCR_CHECK(!g.needsOrders(0));
     VCR_CHECK(!g.canAttack(0));
@@ -658,5 +659,50 @@ VCR_TEST("combat: the player hears who won when another European attacks") {
     g.attack(0, 1);
     for (const auto& n : g.takeNotices()) {
         VCR_CHECK(n.section != "EUROPEWIN" && n.section != "EUROPELOSE");
+    }
+}
+
+VCR_TEST("combat: a winning ship takes the beaten ship's cargo while it has room") {
+    const auto load = [](Game& game) {
+        auto& s = game.state();
+        auto& loser = s.units[1];
+        for (int k = 0; k < 4; ++k) {
+            setHold(loser, k, k + 1, 100 - 10 * k); // goods 1 to 4
+        }
+        loser.holds = 4;
+        auto& winner = s.units[0];
+        for (int k = 0; k < 3; ++k) {
+            setHold(winner, k, 9, 100);
+        }
+        winner.holds = 3; // one hold free
+        s.nations[kDutch].prices.fill(2);
+        s.nations[kDutch].prices[3] = 9; // good 3 is worth most to the Dutch
+    };
+    // The player picks.
+    {
+        Game g = seaBattleUntil(CombatOutcome::AttackerWon, load);
+        bool asked = false;
+        for (const auto& n : g.takeNotices()) {
+            asked = asked || n.section == "PICKACARGO";
+        }
+        VCR_CHECK(asked);
+        VCR_CHECK(g.cargoToCapture().size() == 4);
+        g.answerCargoCapture(1); // 90 of good 2
+        VCR_CHECK(g.unit(0).holds == 4 && holdGood(g.unit(0), 3) == 2 && holdAmount(g.unit(0), 3) == 90);
+        VCR_CHECK(g.takeNotices().empty()); // no room left: not asked again
+        VCR_CHECK(g.cargoToCapture().empty());
+    }
+    // The computer takes the hold worth most to it.
+    {
+        Game g = seaBattleUntil(CombatOutcome::AttackerWon, [&](Game& game) {
+            load(game);
+            game.state().humanNation = 0;
+        });
+        VCR_CHECK(g.unit(0).holds == 4 && holdGood(g.unit(0), 3) == 3 && holdAmount(g.unit(0), 3) == 80);
+        bool told = false;
+        for (const auto& n : g.takeNotices()) {
+            told = told || (n.section == "CARGOCAPTURE" && n.numbers == std::vector<int>{80});
+        }
+        VCR_CHECK(!told); // neither side is the player's
     }
 }
