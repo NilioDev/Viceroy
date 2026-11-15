@@ -835,8 +835,11 @@ void Game::aiSendOut(int c, int colonist, int role) {
                      : role == kRoleScout   ? unit_type::kScout
                                             : unit_type::kColonist;
     const int tools = std::min(100, colony.stock[cargo::kTools] / 20 * 20);
-    addColonist(colony.x, colony.y, colony.nation);
-    auto& u = save_.units.back();
+    const int made = addColonist(colony.x, colony.y, colony.nation);
+    if (made < 0) {
+        return;
+    }
+    auto& u = save_.units[static_cast<std::size_t>(made)];
     u.type = type;
     u.profession = skill;
     const auto take = [&](int good, int amount) {

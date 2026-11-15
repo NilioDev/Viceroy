@@ -86,3 +86,14 @@ SUREDISBAND with the unit's type ("Really disband Colonists?"); a ship with
 units aboard is not disbanded (DISBANDSHIP). Dump Cargo Overboard (O) asks
 OVERBOARD with "Nothing" first and then each hold ("100 Muskets"); the hold
 picked is emptied and the holds after it move up.
+
+## How many units there may be
+
+Read from the original's unit maker: the game holds 300 units. The
+player's units may take all 300 places, anyone else's (computer nations,
+natives, the Crown) only 292, and one European nation may have no more
+than 201. A unit that does not fit is not made; when it is the player's,
+they hear "A unit cannot be created because the maximum number of units
+for the game has been reached" (`TOOMANYUNITS`). In Europe nothing is paid
+for a recruit, purchase or training that does not fit (a guess), and a
+colonist cannot leave a colony then.

@@ -38,7 +38,8 @@ touch controls.
 > teach, a siege, abandoning the colony), while teachers in a school train
 > criminals, servants and free colonists, and planters and fur trappers
 > may learn their job by doing it; choose what the colony builds
-> on its Make panel or pay to finish it there; the musket button lists the
+> on its Make panel or pay to finish it there (a building it has already
+> is not built twice, and you are told); the musket button lists the
 > units in the colony; click one to move it to the front, clear its orders,
 > sentry or fortify it. At the end of the turn colonies
 > store what they make, breed horses from spare food, grow and finish
@@ -112,7 +113,8 @@ touch controls.
 > requests for withdrawal, gifts or an alliance against a third party.
 > The computer nations make peace and war among themselves, and you hear
 > of it. A scout at another nation's colony can meet its mayor or try to
-> spy on the colony; with Jan de Witt your wagon trains and ships can
+> spy on the colony, and you hear when foreign scouts are caught spying on
+> yours; with Jan de Witt your wagon trains and ships can
 > trade with other nations' colonies. The King may drag you into his wars in Europe, and
 > when your rebels reach half, the War of the Spanish Succession hands the
 > weakest nation's colonies to another. With a majority of rebels you can

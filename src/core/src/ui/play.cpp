@@ -367,6 +367,14 @@ void PlayScreen::buildColony(int unit) {
             placeFrontiersmanDialog(*dialog_);
         }
         return;
+    case FoundResult::BuildNear:
+        // "A colony building project is already under way in an adjacent
+        // square."
+        ask("TOONEARBUILD", unit);
+        if (dialog_) {
+            placeFrontiersmanDialog(*dialog_);
+        }
+        return;
     case FoundResult::TooMany:
         tell({"TOOMANYCOLONIES", {}});
         return;
@@ -1983,6 +1991,12 @@ void PlayScreen::answer(const std::string& question, int unit, int choice) {
         return;
     }
     const auto showOnDocks = [&](int made) {
+        if (made < 0) {
+            // TOOMANYUNITS, at once.
+            auto news = game_.takeNotices();
+            notices_.insert(notices_.begin(), std::make_move_iterator(news.begin()),
+                            std::make_move_iterator(news.end()));
+        }
         if (made >= 0 && europeScreen_) {
             europeScreen_->focus = EuropeFocus::Docks;
             europeScreen_->dock = 0;

@@ -69,7 +69,7 @@ void addCapped(std::uint8_t& byte, int value) {
 } // namespace
 
 int Game::addNativeUnit(int type, int tribe, int x, int y) {
-    if (unitCount() >= kMaxUnits) {
+    if (!roomForUnit(kEuropeanNations + tribe, type)) {
         return -1;
     }
     SaveUnit u;

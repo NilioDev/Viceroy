@@ -282,6 +282,9 @@ void Game::joinCongress(int nation, int father) {
     case kJohnPaulJones: {
         // A frigate on its way to the New World.
         const int i = addUnitInEurope(kFrigate, 0, nation);
+        if (i < 0) {
+            break;
+        }
         auto& u = save_.units[static_cast<std::size_t>(i)];
         setEuropeStage(u, 1);
         u.orders = 0;

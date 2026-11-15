@@ -51,7 +51,9 @@ is asked what to do (`SCOUTCOLONY`, told by the frontiersman):
   halved for a seasoned scout, plus the difficulty minus 2 (so less on the
   two easiest levels). Caught, the scout is gone and the colony gets 100
   horses (`LOSTOURSCOUTS`). Otherwise the player looks round the colony
-  screen, without a say in it.
+  screen, without a say in it. When another nation's scouts are caught in
+  one of the player's colonies, the player hears of it instead
+  (`LOSTTHEIRSCOUTS`, with that nation's name and the 100 horses).
 - **Attack Colony**: as any attack.
 - **Nothing**.
 

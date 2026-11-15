@@ -206,6 +206,28 @@ VCR_TEST("diplomacy: the odds of a scout caught infiltrating a colony") {
     }
 }
 
+VCR_TEST("diplomacy: the player hears of foreign scouts caught in their colony") {
+    // Read from the original: LOSTTHEIRSCOUTS names the scouts' nation.
+    // The risk is 12 in 36 for a plain scout, so some try catches it.
+    SaveGame s = scoutSave();
+    s.colonies[0].nation = kHuman;
+    s.units[1].nation = kFrench;
+    Game g(std::move(s), diplomacyRules());
+    bool seen = false;
+    for (int k = 0; k < 60 && !seen; ++k) {
+        if (g.infiltrateColony(1, 0)) {
+            const auto notices = g.takeNotices();
+            VCR_CHECK(sections(notices) == std::vector<std::string>{"LOSTTHEIRSCOUTS"});
+            VCR_CHECK(notices[0].adjectives.size() == 1 && notices[0].adjectives[0].second == kFrench);
+            VCR_CHECK(g.state().colonies[0].stock[8] == 100);
+            seen = true;
+        } else {
+            VCR_CHECK(g.takeNotices().empty());
+        }
+    }
+    VCR_CHECK(seen);
+}
+
 VCR_TEST("diplomacy: the King declares war on a nation the player has a treaty with") {
     SaveGame s = diplomacySave();
     s.difficulty = 4;

@@ -489,8 +489,10 @@ void Game::forceArrives(bool mercenaries) {
     if (!mercenaries) {
         setWord(save_.header, kHeaderPowerForce + 4, word(save_.header, kHeaderPowerForce + 4) - 1);
     }
-    addBuiltUnit(shipX, shipY, nation, kManOWar);
-    const int ship = unitCount() - 1;
+    const int ship = addBuiltUnit(shipX, shipY, nation, kManOWar);
+    if (ship < 0) {
+        return;
+    }
     GameNotice notice{mercenaries ? "MERCS" : "INTERVENE", {colony.name, ""}};
     notice.adjectives.emplace_back(1, word(save_.header, mercenaries ? kHeaderNextPower : kHeaderPower));
     notice.colony = picked;
@@ -518,8 +520,11 @@ void Game::forceArrives(bool mercenaries) {
         const int count = mercenaries ? mercenaries_.counts[static_cast<std::size_t>(kind)]
                                       : std::min(room[static_cast<std::size_t>(kind)], force(kind));
         for (int i = 0; i < count; ++i) {
-            addBuiltUnit(x, y, nation, type);
-            save_.units.back().profession = kVeteran;
+            const int made = addBuiltUnit(x, y, nation, type);
+            if (made < 0) {
+                break;
+            }
+            save_.units[static_cast<std::size_t>(made)].profession = kVeteran;
             if (!mercenaries) {
                 setWord(save_.header, kHeaderPowerForce + 2 * static_cast<std::size_t>(kind), force(kind) - 1);
             }
@@ -585,9 +590,12 @@ void Game::seizeAt(int x, int y) {
 
 void Game::placeCrownUnit(int x, int y, int type) {
     const int crown = crownNation();
-    addBuiltUnit(x, y, crown, type);
-    auto& u = save_.units.back();
-    u.movesUsed = movementAllowance(unitCount() - 1);
+    const int made = addBuiltUnit(x, y, crown, type);
+    if (made < 0) {
+        return;
+    }
+    auto& u = save_.units[static_cast<std::size_t>(made)];
+    u.movesUsed = movementAllowance(made);
     u.raw[3] = static_cast<std::uint8_t>(u.raw[3] | (0x10 << human())); // the rebels see it
     auto& square = save_.map.squares[static_cast<std::size_t>(y) * static_cast<std::size_t>(save_.map.width) +
                                      static_cast<std::size_t>(x)];

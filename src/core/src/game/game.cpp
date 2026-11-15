@@ -564,6 +564,20 @@ FoundResult Game::canFoundColony(int index) const {
     if (sq.mountains()) {
         return FoundResult::Mountains;
     }
+    // Read from the original: a unit of any nation on this square or next
+    // to it with orders to build a colony stops this one. (The unit itself
+    // is left out.)
+    for (int dy = -1; dy <= 1; ++dy) {
+        for (int dx = -1; dx <= 1; ++dx) {
+            for (std::size_t i = 0; i < save_.units.size(); ++i) {
+                const auto& o = save_.units[i];
+                if (static_cast<int>(i) != index && o.x == u.x + dx && o.y == u.y + dy &&
+                    o.orders == SaveUnit::kBuildColony && onMap(static_cast<int>(i))) {
+                    return FoundResult::BuildNear;
+                }
+            }
+        }
+    }
     return FoundResult::Founded;
 }
 
@@ -1104,6 +1118,15 @@ void Game::endTurn() {
         if (ours && turn.noMoreWagons) {
             const int colonies = nationEffects(save_, colony.nation).colonies;
             notices_.push_back(GameNotice{"NOMOREWAGONS", {colony.name}, -1, {colonies}, static_cast<int>(c)});
+        }
+        if (ours && turn.alreadyHave) {
+            // "Jamestown is set to produce a Docks, but it has already
+            // built one!"
+            notices_.push_back(GameNotice{"ALREADYHAVE",
+                                          {colony.name, constructionName(rules_, colony.construction)},
+                                          -1,
+                                          {},
+                                          static_cast<int>(c)});
         }
         if (ours && turn.noMoreWarehouse) {
             notices_.push_back(GameNotice{"NOMOREWAREHOUSE", {colony.name}, -1, {}, static_cast<int>(c)});
@@ -1696,7 +1719,37 @@ int Game::sightRadius(int index) const {
     return radius;
 }
 
-void Game::addColonist(int x, int y, int nation) {
+bool Game::roomForUnit(int nation, int type) {
+    const int count = unitCount();
+    const bool european = nation >= 0 && nation < kEuropeanNations;
+    const bool player = european && nation == human();
+    if (!player && count >= kMaxUnits - 8) {
+        return false;
+    }
+    bool full = count >= kMaxUnits;
+    if (!full && european) {
+        int own = 0;
+        for (const auto& u : save_.units) {
+            own += u.nation == nation ? 1 : 0;
+        }
+        full = own > 200;
+    }
+    if (full && player) {
+        // "A {unit} cannot be created because the maximum number of units
+        // for the game has been reached."
+        GameNotice notice{"TOOMANYUNITS", {}};
+        if (type >= 0 && type < static_cast<int>(rules_.units.size())) {
+            notice.strings = {rules_.units[static_cast<std::size_t>(type)].name};
+        }
+        notices_.push_back(std::move(notice));
+    }
+    return !full;
+}
+
+int Game::addColonist(int x, int y, int nation) {
+    if (!roomForUnit(nation, unit_type::kColonist)) {
+        return -1;
+    }
     SaveUnit u;
     // A free colonist with no orders, as the original stores one.
     static constexpr std::array<std::uint8_t, 28> kTemplate{0, 0, 0, 0x80, 0, 0, 0xFF, 0x58, 0, 0, 0, 0, 0, 0,
@@ -1709,9 +1762,13 @@ void Game::addColonist(int x, int y, int nation) {
     u.profession = 0x1C;
     save_.units.push_back(u);
     refreshUnitFlags();
+    return unitCount() - 1;
 }
 
-void Game::addBuiltUnit(int x, int y, int nation, int type) {
+int Game::addBuiltUnit(int x, int y, int nation, int type) {
+    if (!roomForUnit(nation, type)) {
+        return -1;
+    }
     SaveUnit u;
     // As the original stores a unit it has just built (measured: artillery
     // keeps the colonist's 0x1C in byte 23, wagons and ships 0).
@@ -1725,9 +1782,13 @@ void Game::addBuiltUnit(int x, int y, int nation, int type) {
     u.profession = type == kArtillery ? 0x1C : 0;
     save_.units.push_back(u);
     refreshUnitFlags();
+    return unitCount() - 1;
 }
 
 int Game::addUnitInEurope(int type, int profession, int nation) {
+    if (!roomForUnit(nation < 0 ? human() : nation, type)) {
+        return -1;
+    }
     SaveUnit u;
     static constexpr std::array<std::uint8_t, 28> kTemplate{0, 0, 0, 0, 0, 0, 0xFF, 0x58, 0, 0, 0, 0, 0, 0,
                                                             0, 0, 0, 0, 0xFF, 0, 0, 0, 0, 0, 0xFF, 0xFF, 0xFF, 0xFF};
@@ -1866,9 +1927,12 @@ int Game::recruit(int slot) {
     if (nation.gold < price) {
         return -1;
     }
-    nation.gold -= price;
     const int profession = nation.recruits[static_cast<std::size_t>(slot)];
     const int made = addUnitInEurope(professionUnitType(profession), profession);
+    if (made < 0) {
+        return -1; // TOOMANYUNITS: nothing is paid
+    }
+    nation.gold -= price;
     ++nation.recruitCount;
     nation.crosses = 0;
     nation.recruits[static_cast<std::size_t>(slot)] = randomRecruit(human());
@@ -1884,11 +1948,15 @@ int Game::purchase(int unitType) {
         if (nation.gold < item.price) {
             return -1;
         }
+        const int made = addUnitInEurope(unitType, 0);
+        if (made < 0) {
+            return -1; // TOOMANYUNITS: nothing is paid
+        }
         nation.gold -= item.price;
         if (unitType == kArtillery) {
             ++nation.artilleryBought;
         }
-        return addUnitInEurope(unitType, 0);
+        return made;
     }
     return -1;
 }
@@ -1918,8 +1986,11 @@ int Game::train(int jobRow) {
     if (price <= 0 || nation.gold < price) {
         return -1;
     }
-    nation.gold -= price;
-    return addUnitInEurope(professionUnitType(jobRow), jobRow);
+    const int made = addUnitInEurope(professionUnitType(jobRow), jobRow);
+    if (made >= 0) {
+        nation.gold -= price; // TOOMANYUNITS: nothing is paid
+    }
+    return made;
 }
 
 void Game::refreshUnitFlags() {

@@ -18,6 +18,10 @@ In this order:
    colony" (`@TOONEAR`, from the woman of the buy box). A native settlement
    next door does not stop it.
 6. On mountains: `@TOOMOUNTAIN` (the frontiersman).
+7. When a unit of any nation on the square or next to it has orders to
+   build a colony (orders 7): "A colony building project is already under
+   way in an adjacent square" (`@TOONEARBUILD`, the frontiersman). The
+   unit itself does not count.
 
 ## Warnings
 

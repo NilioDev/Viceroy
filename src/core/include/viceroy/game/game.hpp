@@ -136,6 +136,7 @@ enum class FoundResult {
     NotOnLand, // aboard, or not on the map
     AtSea,     // SEACOLONY
     Mountains, // TOOMOUNTAIN
+    BuildNear, // a unit next to it has orders to build a colony (TOONEARBUILD)
     TooClose,  // another colony is next to this square (TOONEAR)
     TooMany,   // TOOMANYCOLONIES
     InColony,  // the square holds a colony already
@@ -445,10 +446,12 @@ public:
     // The mood of a tribe's own tune: the Inca and the Aztecs have one each,
     // the other tribes share one.
     static int tribeMood(int tribe);
-    // A unit the colony on this square has built.
-    void addBuiltUnit(int x, int y, int nation, int type);
-    // A free colonist appears on the square (born in a colony).
-    void addColonist(int x, int y, int nation);
+    // A unit the colony on this square has built; its index, or -1 when
+    // there is no room for it (roomForUnit).
+    int addBuiltUnit(int x, int y, int nation, int type);
+    // A free colonist appears on the square (born in a colony); its index,
+    // or -1 when there is no room for it.
+    int addColonist(int x, int y, int nation);
 
     // --- Tutorial hints ------------------------------------------------------
     // The "Tutorial Hints" game option.
@@ -1056,6 +1059,11 @@ private:
     int addUnitInEurope(int type, int profession, int nation = -1);
     // The original holds at most 300 units and makes no more past that.
     static constexpr int kMaxUnits = 300;
+    // Read from the original's unit maker: the player's units may fill all
+    // 300 places, anyone else's only 292, and a European nation may have
+    // at most 201 units. The player hears TOOMANYUNITS when theirs is
+    // refused.
+    bool roomForUnit(int nation, int type);
     // A new unit of the tribe on (x, y); its index, or -1 if there is no
     // room for it.
     int addNativeUnit(int type, int tribe, int x, int y);
