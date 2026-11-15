@@ -2,9 +2,11 @@
 #include "viceroy/render/pedia_view.hpp"
 
 #include "viceroy/game/game.hpp"
+#include "viceroy/render/colony_view.hpp"
 #include "viceroy/render/dialog.hpp"
 
 #include <algorithm>
+#include <array>
 
 namespace viceroy {
 
@@ -96,11 +98,11 @@ int textTop(int part) {
 }
 
 // Lines of a paragraph as the original breaks them, worked out from the
-// line breaks of 44 pages: a word goes on the line while the line stays
+// line breaks of 68 pages: a word goes on the line while the line stays
 // within 286 pixels, measured with each space one pixel wide, a word ending
 // a sentence one pixel narrower and two after it, a line of PEDIA.TXT that
 // ends without a space three more before the next word, and the
-// paragraph's last word four pixels wider. Three of the 170 breaks seen do
+// paragraph's last word four pixels wider. Seven of the 310 breaks seen do
 // not follow this. kBareBreak marks where a line of the file ended without a
 // space.
 constexpr char kBareBreak = '\v';
@@ -170,8 +172,8 @@ std::vector<std::string> pageLines(const Art& art, int part, int id) {
     bool previousBare = false; // the last line of text ended without a space
     for (const auto& raw : section->lines) {
         std::string line = raw;
-        while (!line.empty() && line.back() == '\r') {
-            line.pop_back();
+        while (!line.empty() && (line.back() == '\r' || line.back() == '\t')) {
+            line.pop_back(); // seen: "^" and a tab is a paragraph break too
         }
         const bool bare = !line.empty() && line.back() != ' ';
         while (!line.empty() && line.back() == ' ') {
@@ -398,6 +400,92 @@ int drawGoodsPage(Screen& screen, const Art& art, int good) {
     return static_cast<int>(rows.size());
 }
 
+const IndexedImage* sheetImage(const SpriteSheet& sheet, int index) {
+    return index >= 0 && static_cast<std::size_t>(index) < sheet.sprites.size()
+               ? &sheet.sprites[static_cast<std::size_t>(index)].image
+               : nullptr;
+}
+
+// A skill's page (seen): the expert and the experts' name, then the
+// buildings they work in, one under another, and what they make.
+struct SkillPicture {
+    int job;
+    std::array<int, 3> buildings; // rows of @BUILDING, which are also BUILDING.SS sprites; -1 for none
+    int good;                     // row of @CARGO, -1 for none
+    int icon;                     // the good's picture
+};
+
+constexpr int kExpertIcons = 81;
+constexpr int kConvertIcon = 66;
+constexpr int kConvert = 27;
+
+constexpr SkillPicture kSkillPictures[] = {
+    {0, {-1, -1, -1}, 0, 22},   {1, {-1, -1, -1}, 1, 23},   {2, {-1, -1, -1}, 2, 24},   {3, {-1, -1, -1}, 3, 25},
+    {4, {-1, -1, -1}, 4, 26},   {5, {-1, -1, -1}, 5, 27},   {6, {-1, -1, -1}, 6, 28},   {7, {-1, -1, -1}, 7, 29},
+    {8, {-1, -1, -1}, 0, 57},   {9, {27, 28, 29}, 9, 31},   {10, {24, 25, 26}, 10, 32}, {11, {21, 22, 23}, 11, 33},
+    {12, {32, 33, 34}, 12, 34}, {13, {35, 36, -1}, 16, 54}, {14, {39, 40, 41}, 14, 36}, {15, {3, 4, 5}, 15, 37},
+    {16, {37, 38, -1}, 17, 56}, {17, {9, -1, -1}, 18, 62},
+};
+
+int drawSkillPage(Screen& screen, const Art& art, const ColonyArt* colonyArt, int job) {
+    const auto j = static_cast<std::size_t>(job);
+    const std::string expert = j < art.rules.jobs.size() ? art.rules.jobs[j].expertName : std::string();
+    const SkillPicture* picture = nullptr;
+    for (const auto& p : kSkillPictures) {
+        if (p.job == job) {
+            picture = &p;
+        }
+    }
+    // The buildings stand from y 22, four rows apart; the expert and the
+    // goods face the middle of the first.
+    int firstHeight = 0;
+    int buildingWidth = 0;
+    int bottom = 0;
+    if (picture != nullptr && colonyArt != nullptr) {
+        int y = 22;
+        for (const int b : picture->buildings) {
+            if (const auto* image = sheetImage(colonyArt->buildings, b)) {
+                if (firstHeight == 0) {
+                    firstHeight = image->height;
+                    buildingWidth = image->width;
+                }
+                y += image->height + 4;
+                bottom = y;
+            }
+        }
+    }
+    const int top = firstHeight > 0 ? 22 + (firstHeight - 16) / 2 + 1 : 33;
+    blitSprite(screen, art.icons, job == kConvert ? kConvertIcon : kExpertIcons + job, 10, top);
+    const int nameX = 24;
+    say(screen, art, nameX, top + 6, expert, kGold);
+    int x = nameX + Screen::textWidth(art.tiny, expert) + 24;
+    if (picture != nullptr && firstHeight > 0) {
+        int y = 22;
+        int firstName = 0;
+        for (const int b : picture->buildings) {
+            const auto* image = sheetImage(colonyArt->buildings, b);
+            if (image == nullptr) {
+                continue;
+            }
+            screen.blit(*image, x, y);
+            const auto r = static_cast<std::size_t>(b);
+            const std::string name = r < art.rules.buildings.size() ? art.rules.buildings[r].name : std::string();
+            say(screen, art, x + image->width + 3, y + (image->height - 16) / 2 + 7, name, kGold);
+            if (firstName == 0) {
+                firstName = Screen::textWidth(art.tiny, name);
+            }
+            y += image->height + 4;
+        }
+        x += buildingWidth + 3 + firstName + 24;
+    }
+    if (picture != nullptr) {
+        blitSprite(screen, art.icons, picture->icon, x, top + 2);
+        const std::string good = firstField(textLine(art.names, "CARGO", picture->good, ""));
+        say(screen, art, x + 16, top + 6, good, kGold);
+    }
+    return std::max(bottom, top + 16);
+}
+
 std::string partName(const Art& art, int part) { return textLine(art.pedia, "PEDIA", part, ""); }
 
 } // namespace
@@ -518,7 +606,7 @@ int pediaIndexHit(const Art& art, const PediaState& state, int x, int y) {
     return i;
 }
 
-void drawPedia(Screen& screen, const Art& art, const PediaState& state, int nation) {
+void drawPedia(Screen& screen, const Art& art, const PediaState& state, int nation, const ColonyArt* colonyArt) {
     if (art.woodPanel.palette) {
         screen.setColours(*art.woodPanel.palette, 16, 255);
     }
@@ -558,6 +646,9 @@ void drawPedia(Screen& screen, const Art& art, const PediaState& state, int nati
     }
     bool gold = false;
     int y = textTop(state.part);
+    if (state.part == pedia::kSkill) {
+        y = drawSkillPage(screen, art, colonyArt, state.page) + 4;
+    }
     if (state.part == pedia::kCargo) {
         // Seen: the text starts 23 rows below the last row of goods.
         y = kPictureY + kGoodsRowStep * drawGoodsPage(screen, art, state.page) + 10;

@@ -4108,7 +4108,7 @@ void PlayScreen::draw(Screen& screen, const Art& art) const {
         return;
     }
     if (pedia_) {
-        drawPedia(screen, art, *pedia_, game_.human());
+        drawPedia(screen, art, *pedia_, game_.human(), colonyArt_);
         return;
     }
     if (report_ != 0) {

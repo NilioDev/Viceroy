@@ -54,7 +54,12 @@ inline constexpr int kPediaRows = 24;
 inline constexpr int kPediaExit = -2;
 int pediaIndexHit(const Art& art, const PediaState& state, int x, int y);
 
-// nation: the player's, whose colour the units of the pages wear.
-void drawPedia(Screen& screen, const Art& art, const PediaState& state, int nation);
+struct ColonyArt;
+
+// nation: the player's, whose colour the units of the pages wear;
+// colonyArt: the buildings' pictures, which the pages of skills and
+// buildings show when given.
+void drawPedia(Screen& screen, const Art& art, const PediaState& state, int nation,
+               const ColonyArt* colonyArt = nullptr);
 
 } // namespace viceroy
