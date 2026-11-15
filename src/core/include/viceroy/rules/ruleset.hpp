@@ -115,6 +115,9 @@ struct Ruleset {
     // The names of the republics a nation becomes when its King lets its
     // colonies go (@INDEPENDENT, by nation); empty if the section is missing.
     std::vector<std::string> independent;
+    // What each special resource is worth to the computer players' choice
+    // of colony sites (@RESOURCE, in its order); empty if missing.
+    std::vector<int> resourceValues;
 };
 
 // Reads the rule tables. Missing sections, rows with the wrong number of

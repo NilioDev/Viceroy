@@ -75,10 +75,12 @@ the squares around it are explored.
 
 ## What Viceroy leaves empty
 
-The low nibble of the "seen" layer (set on most land in a new game), mask
-bit 0x20, the block of tribe data after the settlements, most of the
-header and the block after the map are not understood yet and start at
-zero, apart from the seed of the resource pattern.
+Mask bit 0x20, most of the 727 bytes after the tribe records, most of the
+header and the parts of the block after the map not named in
+[the savegame](../formats/savegame.md) are not understood yet and start at
+zero. The site values in the seen layer, the route tables, the tribe
+records and the header's America word are set as in a new world: see
+[new-world.md](new-world.md).
 
 ## The nations at the start
 

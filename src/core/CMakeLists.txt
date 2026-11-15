@@ -43,6 +43,7 @@ add_library(vcr_core STATIC
     src/game/europe.cpp
     src/game/resource.cpp
     src/game/new_game.cpp
+    src/game/new_world.cpp
     src/game/tutorial.cpp
     src/game/woodcut.cpp
     src/render/screen.cpp

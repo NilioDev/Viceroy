@@ -222,6 +222,16 @@ std::filesystem::path newGameSlot(const std::filesystem::path& folder) {
 
 void startNewGame(App& app) {
     try {
+        auto setup = app.newGame->setup();
+        setup.seed = static_cast<std::uint32_t>(SDL_GetTicksNS() ^ static_cast<Uint64>(std::time(nullptr)));
+        const auto folder = viceroy::pack::savesFolder(app.library);
+        if (app.newGame->isNewWorld()) {
+            auto save = viceroy::newWorldGame(app.newGame->settings(), app.art->rules, setup);
+            std::filesystem::create_directories(folder);
+            beginPlay(app, viceroy::Game(std::move(save), app.art->rules), newGameSlot(folder));
+            app.newGame.reset();
+            return;
+        }
         const auto base = viceroy::pack::baseFolder(app.library);
         const std::string mapName = app.newGame->mapFile().empty() ? "AMER2.MP" : app.newGame->mapFile();
         auto mapPath = viceroy::findFileNoCase(viceroy::pack::savesFolder(app.library), mapName);
@@ -231,10 +241,7 @@ void startNewGame(App& app) {
         if (!mapPath) {
             throw viceroy::FormatError("missing " + mapName);
         }
-        auto setup = app.newGame->setup();
-        setup.seed = static_cast<std::uint32_t>(SDL_GetTicksNS() ^ static_cast<Uint64>(std::time(nullptr)));
         auto save = viceroy::newAmericaGame(readAll(*mapPath), app.art->rules, setup);
-        const auto folder = viceroy::pack::savesFolder(app.library);
         std::filesystem::create_directories(folder);
         beginPlay(app, viceroy::Game(std::move(save), app.art->rules), newGameSlot(folder));
     } catch (const std::exception& e) {
@@ -272,13 +279,28 @@ std::vector<std::string> mapFiles(const App& app) {
 void pickTitle(App& app, viceroy::TitleChoice choice) {
     if (choice == viceroy::TitleChoice::Load) {
         showLoadMenu(app);
-    } else if (choice == viceroy::TitleChoice::America) {
+    } else if (choice == viceroy::TitleChoice::America || choice == viceroy::TitleChoice::NewWorld ||
+               choice == viceroy::TitleChoice::Customize) {
         try {
             if (!app.newGameArt) {
                 app.newGameArt = std::make_unique<viceroy::NewGameArt>(
                     viceroy::loadNewGameArt(viceroy::pack::baseFolder(app.library)));
             }
-            app.newGame = std::make_unique<viceroy::NewGameFlow>(*app.art, mapFiles(app));
+            if (choice == viceroy::TitleChoice::NewWorld) {
+                // Seen in the original: each of the five settings is dealt
+                // from 0 to 3.
+                viceroy::OriginalRandom dice(static_cast<std::uint32_t>(SDL_GetTicksNS()));
+                viceroy::NewWorldSettings settings;
+                for (int& v : settings.value) {
+                    v = dice.between(0, 3);
+                }
+                app.newGame =
+                    std::make_unique<viceroy::NewGameFlow>(viceroy::NewGameFlow::newWorld(*app.art, settings));
+            } else if (choice == viceroy::TitleChoice::Customize) {
+                app.newGame = std::make_unique<viceroy::NewGameFlow>(viceroy::NewGameFlow::customize(*app.art));
+            } else {
+                app.newGame = std::make_unique<viceroy::NewGameFlow>(*app.art, mapFiles(app));
+            }
             app.mode = Mode::NewGame;
         } catch (const std::exception& e) {
             app.mainMenu->say(std::string("Cannot start a game: ") + e.what());
@@ -848,7 +870,9 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
                 break; // the letters come as text
             }
         }
-        if (app->mode == Mode::NewGame && app->newGame->typing() && event->key.key == SDLK_BACKSPACE) {
+        if (app->mode == Mode::NewGame &&
+            (app->newGame->typing() || app->newGame->step() == viceroy::NewGameFlow::Step::Customize) &&
+            event->key.key == SDLK_BACKSPACE) {
             app->newGame->backspace();
             break;
         }

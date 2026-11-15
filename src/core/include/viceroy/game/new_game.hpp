@@ -5,6 +5,7 @@
 #pragma once
 
 #include "viceroy/data/savegame.hpp"
+#include "viceroy/game/new_world.hpp"
 #include "viceroy/rules/ruleset.hpp"
 
 #include <array>
@@ -69,5 +70,10 @@ struct NewGameSetup {
 // save the original keeps that Viceroy does not understand yet are left
 // empty. See docs/rules/new-game.md.
 SaveGame newAmericaGame(std::span<const std::uint8_t> mapFile, const Ruleset& rules, const NewGameSetup& setup);
+
+// A whole new game on a map made up at random (Start a Game in NEW WORLD,
+// see docs/rules/new-world.md), with the natives placed as the original
+// places them there.
+SaveGame newWorldGame(const NewWorldSettings& settings, const Ruleset& rules, const NewGameSetup& setup);
 
 } // namespace viceroy

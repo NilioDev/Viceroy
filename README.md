@@ -225,9 +225,11 @@ and download one at the bottom of the page.
 ## Controls
 
 When the game files are in place, Viceroy plays the original's opening and
-then shows its main menu. **Start a Game in AMERICA**, **LOAD Game** and
-**View Hall of Fame** work there; the New World maps and the customizing
-come later. After **Start a Game in AMERICA**, *Map Editor* lists the maps
+then shows its main menu. Everything there works: **Start a Game in NEW
+WORLD** makes up a new map at random as the original does, **Customize New
+World** lets you choose its land mass, land form, temperature and climate
+first, and **Start a Game in AMERICA**, **LOAD Game** and **View Hall of
+Fame** work too. After **Start a Game in AMERICA**, *Map Editor* lists the maps
 made with the original's map editor (`.MP` files) that were in the game's
 folder when you imported it, or that you put beside the saved games. A new
 game is saved in the first free slot, or over the savegame saved longest ago.

@@ -38,6 +38,7 @@ total matters for finding the map.
 | 14 | 2 | Map height (72) |
 | 16, 22, 23 | 1 each | Tutorial hints given, a bit each (see [tutorial](../rules/tutorial.md)) |
 | 18 | 1 | Game options and the course of the war of independence |
+| 24 | 2 | 1 on the map of America, 0 in a new world (read only by the natives' code) |
 | 26 | 2 | Year |
 | 28 | 2 | Season: 0 spring, 1 autumn |
 | 30 | 2 | Turn number |
@@ -170,7 +171,8 @@ nation (an attack adds one to its high byte). See
 [natives](../rules/natives.md).
 
 **Tribe** (78 bytes, eight of them at the start of the block after the
-settlements, in `@TRIBES` order): the tribe's level at 2 (0 semi-nomadic
+settlements, in `@TRIBES` order): its capital's x and y at 0 and 1 (1, 1
+before it has one), the tribe's level at 2 (0 semi-nomadic
 to 3 civilized), two numbers at 7 and 8 that its economy reads for
 muskets and horses, its horses at 10 and silver at 12 (16 bits), what it
 holds of each of the 16 goods from 14 (16 bits each), a word per European
@@ -197,5 +199,7 @@ In the block after the map, bytes 0 to 269 and 270 to 539 hold the links
 between the map's 4 × 4 blocks for the sea and for the land, one byte per
 block (15 across, 18 down, column by column), bit d set when the block is
 joined to its neighbour in direction d; the route finder uses them (see
-[routes](../rules/routes.md)). Bytes 608 to 611 hold the game's own random
+[routes](../rules/routes.md)). Bytes 540 to 571 count the farm squares of
+each land region and 572 to 603 the squares of each (16 bits each, region
+0 to 15). Bytes 608 to 611 hold the game's own random
 seed (the skill each settlement teaches is drawn from it).

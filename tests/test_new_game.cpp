@@ -8,6 +8,7 @@
 #include "viceroy/game_files.hpp"
 #include "viceroy/render/game_view.hpp"
 
+#include <array>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -242,4 +243,46 @@ VCR_TEST("original files: Map Editor picks a map file") {
     none.handle(Command::Down);
     none.handle(Command::Confirm);
     VCR_CHECK(none.step() == Step::Cancelled);
+}
+
+VCR_TEST("original files: Customize New World chooses the four settings") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    const NewGameArt pictures = loadNewGameArt(dir);
+    auto flow = NewGameFlow::customize(art);
+    using Step = NewGameFlow::Step;
+    VCR_CHECK(flow.step() == Step::Customize && flow.isNewWorld());
+    VCR_CHECK(flow.settings().value == (std::array<int, 5>{1, 1, 1, 1, 1}));
+    flow.handle(Command::Up); // land mass: small
+    flow.handle(Command::Right);
+    flow.handle(Command::Right);
+    flow.handle(Command::Down); // temperature: warm
+    flow.handle(Command::Left);
+    flow.handle(Command::Left);
+    flow.handle(Command::Left); // round to climate
+    flow.handle(Command::Skip); // wet
+    VCR_CHECK(flow.customizeColumn() == 3);
+    flow.click(10 + 76 + 5, 16 + 5); // land form: archipelago
+    VCR_CHECK(flow.customizeColumn() == 1);
+    VCR_CHECK(flow.settings().value == (std::array<int, 5>{0, 0, 2, 2, 1}));
+    Screen screen;
+    flow.draw(screen, art, pictures);
+    VCR_CHECK(screen.at(10 + 76, 16) == 14); // the setting being changed, in yellow
+    VCR_CHECK(screen.at(10, 16) == 10);      // the others in green
+    if (const char* out = std::getenv("VICEROY_CUSTOMIZE_SHOT")) {
+        std::ofstream ppm(out, std::ios::binary);
+        ppm << "P6\n" << Screen::kWidth << " " << Screen::kHeight << "\n255\n";
+        for (const auto index : screen.pixels()) {
+            const auto c = screen.colour(art.palette, index);
+            ppm << static_cast<char>(c.r) << static_cast<char>(c.g) << static_cast<char>(c.b);
+        }
+    }
+    flow.click(100, 190); // along the bottom: finished
+    VCR_CHECK(flow.step() == Step::Difficulty);
+    auto escape = NewGameFlow::customize(art);
+    escape.handle(Command::Cancel);
+    VCR_CHECK(escape.step() == Step::Cancelled);
 }

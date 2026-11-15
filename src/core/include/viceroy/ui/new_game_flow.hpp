@@ -22,6 +22,7 @@ namespace viceroy {
 struct NewGameArt {
     Picture difficulty; // DIFFICUL.PIK: the five men
     Picture nations;    // NATIONS.PIK: the four flags
+    Picture customize;  // CUSTOMIZ.PIK: the twelve pictures of a new world's settings
     Picture panel;      // WOODPANL.PIK: the wood behind the name and the nation pages
     Picture audience;   // KINGLSS1.PIK: the king's room
     SpriteSheet king;   // KING1.SS: the king and his dog
@@ -36,6 +37,7 @@ NewGameArt loadNewGameArt(const std::filesystem::path& folder);
 class NewGameFlow {
 public:
     enum class Step {
+        Customize,
         MapChoice,
         MapFile,
         Difficulty,
@@ -51,6 +53,17 @@ public:
 
     // maps: the map files (*.MP) offered after "Map Editor", as named.
     explicit NewGameFlow(const Art& art, std::vector<std::string> maps = {});
+    // A game in a new world made with these settings: no map to choose,
+    // so it starts at the difficulty.
+    static NewGameFlow newWorld(const Art& art, const NewWorldSettings& settings);
+    // Customize New World: the four settings are chosen first, then on as
+    // for a new world.
+    static NewGameFlow customize(const Art& art);
+    bool isNewWorld() const { return newWorld_; }
+    // The settings of the new world (on the Customize screen all 1 to
+    // start with).
+    const NewWorldSettings& settings() const { return settings_; }
+    int customizeColumn() const { return column_; }
 
     void handle(Command command);
     void click(int x, int y);
@@ -74,6 +87,7 @@ public:
 
 private:
     void next();
+    void choose(int column, int value);
     void drawDeparture(Screen& screen, const Art& art, const NewGameArt& pictures, int frame) const;
 
     const Art& art_;
@@ -84,6 +98,9 @@ private:
     int nation_ = 0;
     std::string name_;
     std::uint64_t elapsed_ = 0; // in the departure
+    bool newWorld_ = false;
+    NewWorldSettings settings_;
+    int column_ = 0; // the setting picked on the Customize screen
 };
 
 } // namespace viceroy

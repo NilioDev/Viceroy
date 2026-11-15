@@ -34,6 +34,9 @@ void copyPicture(Screen& screen, const IndexedImage& image) {
 }
 
 // Rows of the MISC section of LABELS.TXT.
+constexpr int kLandMass = 144; // Land Form, Temperature, Climate
+constexpr int kSmall = 148;    // three values for each of the four
+constexpr int kCustomizeTitle = 160;
 constexpr int kClickWhenFinished = 161;
 constexpr int kChoose = 162;
 constexpr int kDifficultyLevel = 163;
@@ -51,6 +54,21 @@ constexpr std::array<Rect, 5> kDifficultyFrames{{
     {128, 7, 68, 90}, {233, 7, 68, 90}, {23, 103, 68, 90}, {128, 103, 68, 90}, {233, 103, 68, 90}}};
 constexpr std::array<int, 5> kDifficultyColours{10, 9, 14, 13, 12};
 constexpr std::array<Rect, 4> kNationFrames{{{112, 13, 88, 82}, {211, 13, 88, 82}, {112, 104, 88, 82}, {211, 104, 88, 82}}};
+// Seen in the original: the Customize screen's twelve pictures in four
+// columns of three, 72 × 48 each; the one chosen in a column is framed in
+// green, in yellow in the column being changed.
+constexpr int kCustomizeColumns = 4;
+constexpr int kCustomizeRows = 3;
+constexpr int kCustomizeCellW = 72;
+constexpr int kCustomizeCellH = 48;
+constexpr int kCustomizeFinishY = 185; // a click this low finishes
+constexpr int kCustomizeColour = 10;
+constexpr int kCustomizeCurrent = 14;
+
+Rect customizeCell(int column, int row) {
+    return {10 + 76 * column, 16 + 60 * row - (row > 1 ? 1 : 0), kCustomizeCellW, kCustomizeCellH};
+}
+
 constexpr int kDepartureFrames = 10;
 // Measured on the original: a new picture every 9.6 seconds, coming in
 // over about 1.3 seconds.
@@ -184,6 +202,7 @@ NewGameArt loadNewGameArt(const std::filesystem::path& folder) {
     NewGameArt art;
     art.difficulty = readPicture(readFile(folder, "DIFFICUL.PIK"));
     art.nations = readPicture(readFile(folder, "NATIONS.PIK"));
+    art.customize = readPicture(readFile(folder, "CUSTOMIZ.PIK"));
     art.panel = readPicture(readFile(folder, "WOODPANL.PIK"));
     art.audience = readPicture(readFile(folder, "KINGLSS1.PIK"));
     art.king = readSpriteSheet(readFile(folder, "KING1.SS"));
@@ -210,6 +229,26 @@ NewGameFlow::NewGameFlow(const Art& art, std::vector<std::string> maps)
     mapFiles_.y = (Screen::kHeight - dialogHeight(mapFiles_)) / 2;
 }
 
+NewGameFlow NewGameFlow::newWorld(const Art& art, const NewWorldSettings& settings) {
+    NewGameFlow flow(art);
+    flow.newWorld_ = true;
+    flow.settings_ = settings;
+    flow.step_ = Step::Difficulty;
+    return flow;
+}
+
+NewGameFlow NewGameFlow::customize(const Art& art) {
+    NewGameFlow flow(art);
+    flow.newWorld_ = true;
+    flow.step_ = Step::Customize;
+    return flow;
+}
+
+void NewGameFlow::choose(int column, int value) {
+    column_ = column;
+    settings_.value[static_cast<std::size_t>(column)] = value;
+}
+
 std::string NewGameFlow::mapFile() const {
     if (mapChoice_.selected != 1 || mapFiles_.selected < 0 ||
         mapFiles_.selected >= static_cast<int>(mapFiles_.options.size())) {
@@ -232,6 +271,9 @@ NewGameSetup NewGameFlow::setup() const {
 
 void NewGameFlow::next() {
     switch (step_) {
+    case Step::Customize:
+        step_ = Step::Difficulty;
+        break;
     case Step::MapChoice:
         step_ = mapChoice_.selected == 0    ? Step::Difficulty
                 : mapFiles_.options.empty() ? Step::Cancelled
@@ -278,6 +320,23 @@ void NewGameFlow::handle(Command command) {
         step_ = Step::Cancelled;
         return;
     }
+    if (step_ == Step::Customize) {
+        // Seen in the original: left and right (and Tab) pick the setting,
+        // up and down (and the space bar) step through its three values.
+        auto& value = settings_.value[static_cast<std::size_t>(column_)];
+        if (command == Command::Confirm) {
+            next();
+        } else if (command == Command::MoveW || command == Command::Left) {
+            column_ = (column_ + kCustomizeColumns - 1) % kCustomizeColumns;
+        } else if (command == Command::MoveE || command == Command::Right || command == Command::NextUnit) {
+            column_ = (column_ + 1) % kCustomizeColumns;
+        } else if (command == Command::MoveN || command == Command::Up) {
+            value = (value + kCustomizeRows - 1) % kCustomizeRows;
+        } else if (command == Command::MoveS || command == Command::Down || command == Command::Skip) {
+            value = (value + 1) % kCustomizeRows;
+        }
+        return;
+    }
     if (command == Command::Confirm || (command == Command::Skip && step_ != Step::Name)) {
         next();
         return;
@@ -312,6 +371,20 @@ void NewGameFlow::handle(Command command) {
 void NewGameFlow::click(int x, int y) {
     const auto inside = [&](const Rect& r) { return x >= r.x && y >= r.y && x < r.x + r.w && y < r.y + r.h; };
     switch (step_) {
+    case Step::Customize:
+        // A click on a picture not yet chosen chooses it; a click along
+        // the bottom finishes.
+        for (int c = 0; c < kCustomizeColumns; ++c) {
+            for (int r = 0; r < kCustomizeRows; ++r) {
+                if (inside(customizeCell(c, r)) && settings_.value[static_cast<std::size_t>(c)] != r) {
+                    choose(c, r);
+                }
+            }
+        }
+        if (y >= kCustomizeFinishY) {
+            next();
+        }
+        break;
     case Step::MapChoice:
         if (const int option = dialogOptionAt(mapChoice_, x, y); option >= 0) {
             mapChoice_.selected = option;
@@ -362,6 +435,10 @@ void NewGameFlow::type(char c) {
 }
 
 void NewGameFlow::backspace() {
+    if (step_ == Step::Customize) {
+        column_ = (column_ + kCustomizeColumns - 1) % kCustomizeColumns;
+        return;
+    }
     if (step_ == Step::Name && !name_.empty()) {
         name_.pop_back();
     }
@@ -377,6 +454,24 @@ void NewGameFlow::tick(std::uint64_t milliseconds) {
 void NewGameFlow::draw(Screen& screen, const Art& art, const NewGameArt& pictures) const {
     screen.resetColours();
     switch (step_) {
+    case Step::Customize: {
+        copyPicture(screen, pictures.customize.image);
+        if (pictures.customize.palette) {
+            screen.setColours(*pictures.customize.palette, 0, 255);
+        }
+        shadowed(screen, art.labels, Screen::kWidth / 2, 4, label(art, kCustomizeTitle), kGreen, kEdge);
+        centred(screen, art.tiny, Screen::kWidth / 2, 190, "(" + label(art, kClickWhenFinished) + ")", kGreen);
+        for (int c = 0; c < kCustomizeColumns; ++c) {
+            const int r = settings_.value[static_cast<std::size_t>(c)];
+            const auto cell = customizeCell(c, r);
+            const int colour = c == column_ ? kCustomizeCurrent : kCustomizeColour;
+            screen.frame(cell, static_cast<std::uint8_t>(colour));
+            const int middle = cell.x + cell.w / 2;
+            shadowed(screen, art.tiny, middle, cell.y + 23 - art.tiny.height, label(art, kLandMass + c) + ":", colour);
+            shadowed(screen, art.tiny, middle, cell.y + 25, label(art, kSmall + 3 * c + r), colour);
+        }
+        break;
+    }
     case Step::MapChoice:
         screen.clear(0);
         drawDialog(screen, art, mapChoice_);
