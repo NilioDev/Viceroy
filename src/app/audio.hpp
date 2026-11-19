@@ -37,8 +37,8 @@ public:
     // Sends one driver command now, whatever the options: the opening and
     // the main menu call the driver directly.
     void command(int command);
-    // The opening's music, already as far in as the logo the original
-    // plays first would have taken it.
+    // The opening's music, `ticks` driver ticks in: 0 from the publisher's
+    // logo, more when the opening plays without it.
     void startIntro(int command, int ticks);
     // True while any voice plays.
     bool busy();

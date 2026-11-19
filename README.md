@@ -231,8 +231,8 @@ and download one at the bottom of the page (this needs a GitHub account).
 
 ## Controls
 
-When the game files are in place, Viceroy plays the original's opening and
-then shows its main menu. Everything there works: **Start a Game in NEW
+When the game files are in place, Viceroy plays the publisher's logo and
+the original's opening, and then shows its main menu. Everything there works: **Start a Game in NEW
 WORLD** makes up a new map at random as the original does, **Customize New
 World** lets you choose its land mass, land form, temperature and climate
 first, and **Start a Game in AMERICA**, **LOAD Game** and **View Hall of
@@ -243,7 +243,7 @@ game is saved in the first free slot, or over the savegame saved longest ago.
 
 | Action | Keyboard | Gamepad |
 | --- | --- | --- |
-| Skip the opening | Any key, or click | Any button |
+| Skip the logo, then the opening | Any key, or click | Any button |
 | Pick in the main menu or the list of savegames | Up / Down and Enter, or click | D-pad and A |
 | Back from the list of savegames to the main menu | Esc | B |
 | New game: pick the difficulty and the nation | Arrow keys and Enter, or click and then *Click Here When Finished* | D-pad and A |

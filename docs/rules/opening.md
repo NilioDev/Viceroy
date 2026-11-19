@@ -1,8 +1,41 @@
 # The opening and the main menu
 
 Measured on the original running in DOSBox, recorded at 20 frames a second.
-Viceroy plays the opening from the player's own files; the publisher's logo
-that comes before it is left out.
+Viceroy plays the publisher's logo and the opening from the player's own
+files.
+
+## The publisher's logo
+
+Read from `OPENING.EXE` (its `_open_logo`, `_logo_loop`, `_do_logo` and
+`_fade_loop`) and checked pixel by pixel against a recording in DOSBox,
+during the fades too.
+
+- `MPSLOGO.SS` is the turning logo; its palette is the logo's palette.
+  `MPSNAME.SS` is the publisher's name, written out letter by letter below
+  it. When either file is missing, Viceroy goes straight to the opening.
+- The screen and the palette start black. The timer runs at
+  1193182 / 1960 Hz and the game clock counts every tenth interrupt (about
+  60.9 a second). Every 6 ticks of that clock comes a frame, counted from 1;
+  the first shows at once.
+- Each frame shows the next sprite of `MPSLOGO.SS`, round and round. From
+  frame 92 it also shows the next sprite of `MPSNAME.SS`, and keeps its last
+  one once all have shown. A sprite's x is its middle; its top is
+  `y − height + 23`. Each frame first fills with black the logo's sprite
+  grown by 8 pixels on each side (from row 22), and while the name is being
+  written the name's sprite grown the same way, then draws the name and the
+  logo over it.
+- At frame 32 the palette fades in (at frame 1 when there is no sound
+  driver), at frame 196 it fades out, and after frame 229 the logo ends and
+  the opening starts.
+- A fade has 17 steps. Each step adds to every colour (or takes from it) a
+  sixteenth of the logo's colour, rounded, at least 1; a fade in stops at
+  the logo's colour, a fade out at 0. The original writes the palette a
+  part in each vertical retrace; in DOSBox a step took 8 retraces at 70 Hz
+  (114 ms), the first colours changing first, and the loop waits for it,
+  so the frames come every 114 ms instead of 99 ms while the palette fades.
+- The whole logo takes about 23 seconds.
+- Enter, Esc, Space or a click ends the logo and the opening starts; the
+  music goes on. Viceroy takes any key or button, as for the opening.
 
 ## Pictures
 
@@ -61,8 +94,10 @@ over.
 
 ## Music
 
-Tune 34h, already 1430 ticks in (where the original's tune is after its
-logo), then 8026h at frame 25 and 25h at frame 720. See
+Tune 34h starts as the publisher's logo comes up and goes on into the
+opening, then 8026h at frame 25 and 25h at frame 720. Without the logo's
+files, Viceroy starts the tune 1430 ticks in, where the original's tune is
+when the map comes up. See
 `docs/rules/sound.md`.
 
 ## The main menu
