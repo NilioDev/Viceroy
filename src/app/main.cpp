@@ -65,6 +65,8 @@ struct App {
     std::vector<viceroy::HallEntry> hall; // the places shown from the main menu
     std::unique_ptr<viceroy::TitleArt> title;
     std::unique_ptr<viceroy::MainMenu> mainMenu;
+    // The publisher's logo while it plays, before the opening.
+    std::unique_ptr<viceroy::Logo> logo;
     // The opening while it plays, and its last picture behind the menu
     // when it played to the end.
     std::unique_ptr<viceroy::Intro> intro;
@@ -187,6 +189,7 @@ void showTitle(App& app) {
     }
     app.audio.setPlaying(false);
     app.play.reset();
+    app.logo.reset();
     if (app.intro && !app.intro->finished()) {
         app.intro.reset(); // skipped: the still title picture instead
     }
@@ -379,9 +382,15 @@ void openLibrary(App& app) {
         }
         app.status.clear();
         app.audio.open(viceroy::pack::baseFolder(app.library));
-        if (app.mode == Mode::Intro) {
+        if (app.mode == Mode::Intro && app.title->logo) {
+            // The original starts the opening's tune as its publisher's
+            // logo comes up.
+            app.logo = std::make_unique<viceroy::Logo>(*app.title, app.audio.ready());
+            app.audio.startIntro(viceroy::Logo::kMusic, 0);
+        } else if (app.mode == Mode::Intro) {
             app.audio.startIntro(viceroy::Intro::kMusic, viceroy::Intro::kMusicLeadTicks);
         }
+        app.lastTicks = SDL_GetTicks(); // the pictures keep time with the music from here
     } catch (const std::exception& e) {
         app.art.reset();
         app.status = std::string("Cannot read the imported game: ") + e.what() + " Drop it here again.";
@@ -634,6 +643,17 @@ std::optional<Command> stickDirection(float x, float y) {
     return kByAngle[static_cast<std::size_t>((sector + 8) % 8)];
 }
 
+// A key, click or button during the opening: the first ends the publisher's
+// logo and the opening starts, as in the original; the next ends the
+// opening.
+void skipIntro(App& app) {
+    if (app.logo) {
+        app.logo.reset();
+        return;
+    }
+    showTitle(app);
+}
+
 void send(App& app, Command command) {
     switch (app.mode) {
     case Mode::Welcome:
@@ -642,6 +662,8 @@ void send(App& app, Command command) {
         }
         break;
     case Mode::Intro:
+        skipIntro(app);
+        break;
     case Mode::HallOfFame:
         showTitle(app);
         break;
@@ -688,7 +710,7 @@ void click(App& app, float wx, float wy) {
     float y = 0;
     SDL_RenderCoordinatesFromWindow(app.renderer, wx, wy, &x, &y);
     if (app.mode == Mode::Intro) {
-        showTitle(app);
+        skipIntro(app);
         return;
     }
     if (app.mode == Mode::Title) {
@@ -789,7 +811,9 @@ void present(App& app) {
         return;
     }
     app.screen.resetColours();
-    if (app.mode == Mode::Intro) {
+    if (app.mode == Mode::Intro && app.logo) {
+        app.logo->draw(app.screen);
+    } else if (app.mode == Mode::Intro) {
         app.intro->draw(app.screen, *app.title);
     } else if (app.mode == Mode::Title) {
         app.mainMenu->draw(app.screen, *app.art, *app.title, app.intro.get());
@@ -885,7 +909,7 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
             break;
         }
         if (app->mode == Mode::Intro) {
-            showTitle(*app);
+            skipIntro(*app);
             break;
         }
         if (app->mode == Mode::Play && app->play->typing()) {
@@ -1002,7 +1026,7 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
     case SDL_EVENT_GAMEPAD_BUTTON_DOWN: {
         app->pointerShown = false;
         if (app->mode == Mode::Intro) {
-            showTitle(*app);
+            skipIntro(*app);
             break;
         }
         if (app->mode == Mode::Welcome) {
@@ -1125,7 +1149,12 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
         // menu stays up.
         app->audio.command(kMenuTune);
     }
-    if (app->mode == Mode::Intro) {
+    if (app->mode == Mode::Intro && app->logo) {
+        app->logo->tick(elapsed);
+        if (app->logo->finished()) {
+            app->logo.reset(); // the opening comes next
+        }
+    } else if (app->mode == Mode::Intro) {
         app->intro->tick(elapsed);
         for (const int command : app->intro->takeSounds()) {
             app->audio.command(command);

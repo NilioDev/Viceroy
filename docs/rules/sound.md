@@ -24,8 +24,9 @@ Read from the original's code and checked against its sound recorded in
 DOSBox:
 
 - **The opening** (OPENING.EXE) starts tune 34h as its publisher's logo
-  comes up. Viceroy leaves the logo out, so it starts the tune 1430 ticks
-  in, where it was when the map came up. At frame 25 the opening sends
+  comes up, and Viceroy does the same. (Without the logo's files it starts
+  the tune 1430 ticks in, where it is when the map comes up.) At frame 25
+  the opening sends
   8026h, which jumps the tune to its second part (see
   `docs/formats/sound-driver.md`), and as the man starts wading ashore
   (frame 720) 25h, which takes over on the next beat.

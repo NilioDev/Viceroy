@@ -105,3 +105,49 @@ VCR_TEST("original files: the opening plays and can be skipped") {
     menu.draw(screen, art, title, &intro);
     dump(screen, art, "menu_after_intro");
 }
+
+VCR_TEST("original files: the publisher's logo plays before the opening") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    const TitleArt title = loadTitleArt(dir);
+    VCR_CHECK(title.logo && title.logoName);
+    Logo logo(title, true);
+    VCR_CHECK(!logo.finished());
+    Screen screen;
+    // VICEROY_LOGO_MS=500,9000,... dumps the logo that long after it came up.
+    if (const char* times = std::getenv("VICEROY_LOGO_MS")) {
+        std::string list = times;
+        std::size_t at = 0;
+        while (at < list.size()) {
+            const int ms = std::atoi(list.c_str() + at);
+            Logo shown(title, true);
+            shown.tick(static_cast<std::uint64_t>(ms));
+            shown.draw(screen);
+            dump(screen, art, "logo" + std::to_string(ms) + "_f" + std::to_string(shown.frame()));
+            const auto comma = list.find(',', at);
+            at = comma == std::string::npos ? list.size() : comma + 1;
+        }
+    }
+    // The first frame shows at once, on a palette still black.
+    logo.tick(0);
+    VCR_CHECK(logo.frame() == 1);
+    logo.draw(screen);
+    VCR_CHECK(screen.colour(art.palette, screen.at(160, 60)) == Rgb{});
+    // Six ticks of a clock at 1193182 / 19600 Hz a frame, slower while the
+    // palette fades; the logo ends after frame 229, about 23 seconds in.
+    logo.tick(3000);
+    VCR_CHECK(logo.frame() == 31);
+    logo.tick(19'000);
+    VCR_CHECK(!logo.finished());
+    logo.tick(1'500);
+    VCR_CHECK(logo.finished());
+    VCR_CHECK(logo.frame() == Logo::kLastFrame);
+    // A key ends it at once.
+    Logo skipped(title, true);
+    skipped.tick(1000);
+    skipped.skip();
+    VCR_CHECK(skipped.finished());
+}

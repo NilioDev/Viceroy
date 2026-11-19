@@ -148,7 +148,181 @@ int number(const std::vector<std::string>& fields, std::size_t i) {
     return i < fields.size() ? static_cast<int>(parseNumber(fields[i]).value_or(0)) : 0;
 }
 
+// The logo's clock, read from OPENING.EXE: the timer runs at 1193182 / 1960
+// Hz and the game clock counts every tenth interrupt, about 60.9 a second.
+// A new frame of the logo comes every six ticks of that clock.
+constexpr std::int64_t kClockNumerator = 19'600'000'000; // microseconds a tick, times 1193182
+constexpr std::int64_t kClockDenominator = 1'193'182;
+constexpr std::int64_t kLogoFrameTicks = 6;
+// One step of a fade sets the whole palette, a part in each vertical
+// retrace; in DOSBox that took eight retraces at 70 Hz. The loop waits for
+// it, so the logo's frames come slower while it fades (measured).
+constexpr std::int64_t kFadeStepUs = 114'145;
+constexpr std::int64_t kRetraceUs = kFadeStepUs / 8;
+constexpr std::size_t kBytesPerRetrace = 768 / 8;
+constexpr int kFadeSteps = 17;
+
+std::int64_t ticksAt(std::int64_t us) {
+    return us * kClockDenominator / kClockNumerator;
+}
+
+std::int64_t usAt(std::int64_t ticks) {
+    return (ticks * kClockNumerator + kClockDenominator - 1) / kClockDenominator;
+}
+
+void fillCanvas(IndexedImage& canvas, int x, int y, int w, int h, std::uint8_t colour) {
+    for (int yy = std::max(0, y); yy < std::min(canvas.height, y + h); ++yy) {
+        for (int xx = std::max(0, x); xx < std::min(canvas.width, x + w); ++xx) {
+            canvas.pixels[static_cast<std::size_t>(yy * canvas.width + xx)] = colour;
+        }
+    }
+}
+
+void drawOnCanvas(IndexedImage& canvas, const IndexedImage& image, int x, int y) {
+    for (int yy = 0; yy < image.height; ++yy) {
+        for (int xx = 0; xx < image.width; ++xx) {
+            const auto c = image.pixels[static_cast<std::size_t>(yy * image.width + xx)];
+            const int cx = x + xx;
+            const int cy = y + yy;
+            if (c != kTransparent && cx >= 0 && cy >= 0 && cx < canvas.width && cy < canvas.height) {
+                canvas.pixels[static_cast<std::size_t>(cy * canvas.width + cx)] = c;
+            }
+        }
+    }
+}
+
+// Where OPENING.EXE puts a sprite of the logo: x is its middle, and y the
+// row below it, 22 rows down.
+struct LogoPlace {
+    int x = 0;
+    int y = 0;
+    int w = 0;
+    int h = 0;
+};
+
+LogoPlace logoPlace(const Sprite& sprite) {
+    const int w = sprite.image.width;
+    const int h = sprite.image.height;
+    return {sprite.x - w / 2, sprite.y - h + 23, w, h};
+}
+
+const SpriteSheet kNoSprites{};
+
 } // namespace
+
+Logo::Logo(const TitleArt& art, bool sound)
+    : logo_(art.logo ? *art.logo : kNoSprites),
+      name_(art.logoName ? *art.logoName : kNoSprites),
+      canvas_{Screen::kWidth, Screen::kHeight,
+              std::vector<std::uint8_t>(static_cast<std::size_t>(Screen::kWidth * Screen::kHeight), 0)} {
+    // Without a sound driver the original fades in at once.
+    fadeUpStart_ = sound ? 32 : 1;
+    if (logo_.sprites.empty() || name_.sprites.empty()) {
+        going_ = false;
+        return;
+    }
+    if (logo_.palette) {
+        for (std::size_t i = 0; i < 256; ++i) {
+            const Rgb c = (*logo_.palette)[i];
+            target_[i * 3] = static_cast<std::uint8_t>(c.r >> 2);
+            target_[i * 3 + 1] = static_cast<std::uint8_t>(c.g >> 2);
+            target_[i * 3 + 2] = static_cast<std::uint8_t>(c.b >> 2);
+        }
+    }
+    // A sixteenth of each colour, rounded, and at least 1.
+    for (std::size_t i = 0; i < increments_.size(); ++i) {
+        const int c = target_[i];
+        increments_[i] = static_cast<std::uint8_t>(std::max(1, (c >> 4) + ((c >> 3) & 1)));
+    }
+}
+
+void Logo::tick(std::uint64_t milliseconds) {
+    now_ += static_cast<std::int64_t>(milliseconds) * 1000;
+    // OPENING.EXE's _open_logo loop: a new frame when six ticks have passed
+    // since the last, then a step of the fade if one is running.
+    while (going_ && loop_ <= now_) {
+        const std::int64_t clock = ticksAt(loop_);
+        if (clock - logoClock_ >= kLogoFrameTicks) {
+            ++frame_;
+            step();
+            if (frame_ == fadeUpStart_) {
+                fadeCount_ = 0;
+            }
+            if (frame_ == kFadeOutFrame) {
+                fadeCount_ = 0;
+                current_ = target_;
+            }
+            if (frame_ >= kLastFrame) {
+                going_ = false;
+            }
+            logoClock_ = clock;
+        }
+        if (fadeCount_ < kFadeSteps) {
+            shown_ = current_;
+            stepStart_ = loop_;
+            fadeStep();
+            ++fadeCount_;
+            loop_ += kFadeStepUs;
+            continue;
+        }
+        loop_ = std::max(loop_, usAt(logoClock_ + kLogoFrameTicks));
+    }
+}
+
+void Logo::fadeStep() {
+    const bool out = frame_ >= kFadeOutFrame;
+    for (std::size_t i = 0; i < current_.size(); ++i) {
+        const int c = current_[i];
+        const int d = increments_[i];
+        current_[i] = static_cast<std::uint8_t>(out ? std::max(0, c - d) : std::min<int>(target_[i], c + d));
+    }
+}
+
+void Logo::step() {
+    const int logoCount = static_cast<int>(logo_.sprites.size());
+    const int nameCount = static_cast<int>(name_.sprites.size());
+    const bool naming = frame_ >= kNameFrame;
+    bool named = false;
+    if (nameSprite_ > nameCount) {
+        nameSprite_ = nameCount;
+        named = true;
+    }
+    const Sprite& logo = logo_.sprites[static_cast<std::size_t>(logoSprite_ - 1)];
+    const Sprite& name = name_.sprites[static_cast<std::size_t>(nameSprite_ - 1)];
+    const LogoPlace l = logoPlace(logo);
+    const LogoPlace n = logoPlace(name);
+    // Black round the logo and, while it is being written, the name; then
+    // the name and the logo over it.
+    fillCanvas(canvas_, l.x - 8, 22, l.w + 16, l.h + 16, 0);
+    if (naming && !named) {
+        fillCanvas(canvas_, n.x - 8, n.y - 8, n.w + 16, n.h + 16, 0);
+    }
+    if (naming) {
+        drawOnCanvas(canvas_, name.image, n.x, n.y);
+    }
+    drawOnCanvas(canvas_, logo.image, l.x, l.y);
+    if (++logoSprite_ > logoCount) {
+        logoSprite_ = 1;
+    }
+    if (naming) {
+        ++nameSprite_;
+    }
+}
+
+void Logo::draw(Screen& screen) const {
+    // A step of the fade reaches the screen a part at a time, from the
+    // first colour on, one part each retrace.
+    const std::int64_t retraces = now_ >= stepStart_ ? (now_ - stepStart_) / kRetraceUs + 1 : 0;
+    const std::size_t written = static_cast<std::size_t>(std::min<std::int64_t>(retraces, 8)) * kBytesPerRetrace;
+    const auto value = [&](std::size_t i) { return i < written ? current_[i] : shown_[i]; };
+    Palette palette{};
+    for (std::size_t i = 0; i < palette.size(); ++i) {
+        const auto scale = [](std::uint8_t v) { return static_cast<std::uint8_t>((v << 2) | (v >> 4)); };
+        palette[i] = {scale(value(i * 3)), scale(value(i * 3 + 1)), scale(value(i * 3 + 2))};
+    }
+    screen.setColours(palette, 0, 255);
+    copyPicture(screen, canvas_, 0, 0);
+}
 
 Intro::Intro(const TitleArt& art) {
     if (const auto* section = art.script.find("CREDITS")) {
@@ -296,6 +470,11 @@ TitleArt loadTitleArt(const std::filesystem::path& folder) {
     for (const char* name : {"OPENWND1.SS", "OPENSUN.SS", "OPENMON1.SS", "OPENWND2.SS", "OPENMON2.SS",
                              "OPENMON3.SS", "OPENFISH.SS", "OPENGUY.SS", "OPENLOGO.SS", "OPENBONK.SS"}) {
         art.animations.push_back(readSpriteSheet(readFile(folder, name)));
+    }
+    // The logo is left out when its pictures are missing.
+    if (findFileNoCase(folder, "MPSLOGO.SS") && findFileNoCase(folder, "MPSNAME.SS")) {
+        art.logo = readSpriteSheet(readFile(folder, "MPSLOGO.SS"));
+        art.logoName = readSpriteSheet(readFile(folder, "MPSNAME.SS"));
     }
     return art;
 }
