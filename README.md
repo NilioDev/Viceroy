@@ -214,15 +214,20 @@ game. It contains none of the original game's files: you need your own copy.
 
 ## Try it
 
-There are no releases yet. Every build on `main` makes test packages: open
-the [latest CI run on main](https://github.com/NilioDev/Viceroy/actions/workflows/ci.yml?query=branch%3Amain)
-and download one at the bottom of the page.
+Download Viceroy from the
+[Releases page](https://github.com/NilioDev/Viceroy/releases/latest); no
+GitHub account is needed.
 
-- 🐧 **Linux:** `Viceroy-Linux-AppImage`. Unpack the zip, make the
-  `.AppImage` executable (right-click, *Properties*, *Allow executing file as
-  program*, or `chmod +x`) and double-click it.
-- 🪟 **Windows:** `Viceroy-Windows`, then start `Viceroy.exe`.
-- 🍎 **macOS:** `Viceroy-macOS`.
+- 🐧 **Linux:** the `.AppImage`. Make it executable (right-click,
+  *Properties*, *Allow executing file as program*, or `chmod +x`) and
+  double-click it.
+- 🪟 **Windows:** the `windows-x64` zip. Unpack it and start `Viceroy.exe`.
+- 🍎 **macOS:** the `macos` zip. Unpack it and open `Viceroy.app`. It is not
+  signed, so the first time right-click it and choose *Open*.
+
+Want the very newest build? Every build on `main` also makes test packages:
+open the [latest CI run on main](https://github.com/NilioDev/Viceroy/actions/workflows/ci.yml?query=branch%3Amain)
+and download one at the bottom of the page (this needs a GitHub account).
 
 ## Controls
 

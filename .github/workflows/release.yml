@@ -1,0 +1,148 @@
+name: Release
+
+# Builds Viceroy for Linux, Windows and macOS and puts the packages on a
+# GitHub release, where anyone can download them without signing in.
+#
+# Start it by pushing a tag such as v0.1.0, or by hand from the Actions tab
+# ("Run workflow"); the tag must match VERSION in CMakeLists.txt. The packages
+# hold only Viceroy itself, never files from the original game.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag for the release, e.g. v0.1.0 (made on the chosen branch if it does not exist)"
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - name: Linux
+            os: ubuntu-24.04
+          - name: Windows
+            os: windows-latest
+          - name: macOS
+            os: macos-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check the tag matches the version
+        shell: bash
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          version=$(sed -n 's/^ *VERSION \([0-9.]*\)$/\1/p' CMakeLists.txt | head -1)
+          if [ "$TAG" != "v$version" ]; then
+            echo "::error::Tag $TAG does not match VERSION $version in CMakeLists.txt"
+            exit 1
+          fi
+          echo "VCR_VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Install SDL build dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ninja-build pkg-config \
+            libasound2-dev libpulse-dev libpipewire-0.3-dev \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \
+            libxi-dev libxss-dev libxtst-dev libxkbcommon-dev \
+            libwayland-dev libdecor-0-dev wayland-protocols \
+            libdrm-dev libgbm-dev libgl1-mesa-dev libgles2-mesa-dev libegl1-mesa-dev \
+            libdbus-1-dev libibus-1.0-dev libudev-dev \
+            desktop-file-utils
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVCR_USE_SYSTEM_SDL3=OFF
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Test
+        run: ctest --test-dir build --build-config Release --output-on-failure
+
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: packaging/linux/make-appimage.sh build dist
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $dir = "dist/Viceroy-$env:VCR_VERSION-windows-x64"
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          Copy-Item build/src/app/Release/Viceroy.exe $dir
+          Copy-Item LICENSE "$dir/LICENSE.txt"
+          Compress-Archive -Path $dir -DestinationPath "$dir.zip"
+          Remove-Item -Recurse $dir
+
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p dist
+          ditto -c -k --keepParent build/src/app/Viceroy.app \
+            "dist/Viceroy-$VCR_VERSION-macos-$(uname -m).zip"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-${{ matrix.name }}
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum * > SHA256SUMS.txt
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+          TARGET: ${{ github.sha }}
+        run: |
+          cat > notes.md <<'NOTES'
+          Download the file for your system below. Viceroy needs your own copy
+          of the original DOS game's files; none are included. See the
+          README for how to start and import them.
+
+          - **Linux:** the `.AppImage`. Make it executable
+            (`chmod +x`, or right-click, Properties, Allow executing file as
+            program) and double-click it.
+          - **Windows:** the `windows-x64.zip`. Unpack it and start `Viceroy.exe`.
+          - **macOS:** the `macos` zip. Unpack it and open `Viceroy.app`
+            (the first time: right-click, Open, since it is not signed).
+          NOTES
+          gh release create "$TAG" dist/* \
+            --target "$TARGET" --title "Viceroy ${TAG#v}" \
+            --notes-file notes.md --prerelease
