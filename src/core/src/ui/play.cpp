@@ -2641,7 +2641,7 @@ void PlayScreen::openRecruit() {
         return;
     }
     const auto& nation = game_.state().nations[static_cast<std::size_t>(game_.human())];
-    const int price = recruitPrice(nation);
+    const int price = recruitPrice(nation, game_.state().difficulty);
     Dialog d = makeDialog(*art_, "RECRUIT", {}, {price});
     choices_ = {-1};
     addOption(d, "(None)");

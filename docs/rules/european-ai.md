@@ -274,7 +274,11 @@ with someone next to it. Otherwise it decides:
   muskets, horses, tools and trade goods to the colony that lacks them
   most (or sell them where they are), fetch goods from the list of
   colonies, and sail to Europe when there are more people on the docks
-  than ships on the way, when chosen to fetch recruits, or now and then.
+  than ships on the way, when chosen to fetch recruits, or now and then
+  (one turn in 32) — with nobody else aboard and no goods for the colonies;
+  goods to sell may be aboard. A ship with goods to sell (anything but
+  horses, trade goods, tools and muskets) in more than one hold, or full,
+  sails for Europe to sell them there.
 - **Treasure** goes to the nearest colony; there the gold goes to the
   nation, and the player hears of it.
 - **Missionaries** go to the village where the tribe is most tense,

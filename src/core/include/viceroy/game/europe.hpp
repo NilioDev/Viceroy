@@ -86,10 +86,10 @@ Trade buyGoods(SaveGame& save, const Ruleset& rules, int ship, int good, int fre
 Trade sellGoods(SaveGame& save, const Ruleset& rules, int ship, int good, int limit = -1);
 
 // --- Recruit, Purchase and Train --------------------------------------------
-// What the passage of a recruit costs: 140 + 20 for every recruit so far,
-// less a share for the crosses gathered towards the next migrant. Measured
-// on the original; see docs/rules/europe.md.
-int recruitPrice(const SaveNation& nation);
+// What the passage of a recruit costs: 20 × (recruits so far + difficulty
+// level + 7), less a share for the crosses gathered towards the next
+// migrant. Read from the original; see docs/rules/europe.md.
+int recruitPrice(const SaveNation& nation, int difficulty = 0);
 int artilleryPrice(const SaveNation& nation);
 
 struct PurchaseItem {

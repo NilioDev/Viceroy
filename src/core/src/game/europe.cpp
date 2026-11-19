@@ -250,15 +250,16 @@ Trade sellGoods(SaveGame& save, const Ruleset& rules, int ship, int good, int li
     return trade;
 }
 
-int recruitPrice(const SaveNation& nation) {
-    // At no crosses the price is 140 + 20 per recruit so far. It falls in
-    // a straight line as crosses gather, to a floor reached when they are
-    // all there: about a fifth of the full price, but not much under 100.
-    const int full = 140 + 20 * std::max(0, nation.recruitCount);
-    const int needed = std::max(1, nation.crossesNeeded);
-    const int crosses = std::clamp(nation.crosses, 0, needed);
-    const long long fall = std::min(99LL * (full - 100), 79253LL * full / 1000) ; // in hundredths
-    return full - static_cast<int>(fall * crosses / needed / 100);
+int recruitPrice(const SaveNation& nation, int difficulty) {
+    // Read from the original: the full price is 20 × (recruits so far +
+    // level + 7). As crosses gather it falls in a straight line towards a
+    // floor of a fifth of it (at least 100), by the share crosses /
+    // (needed + 1), rounded towards the full price; never below 10.
+    const int full = 20 * (std::max(0, nation.recruitCount) + difficulty + 7);
+    const int floor = std::max(100, full / 5);
+    const long long fall =
+        static_cast<long long>(full - floor) * std::max(0, nation.crosses) / (std::max(0, nation.crossesNeeded) + 1);
+    return std::max(10, full - static_cast<int>(fall));
 }
 
 int artilleryPrice(const SaveNation& nation) {

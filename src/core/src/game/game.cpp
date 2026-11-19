@@ -299,8 +299,10 @@ std::vector<int> Game::passengers(int ship) const {
     if (!isShip(ship) || !onMap(ship) || !save_.map.at(unit(ship).x, unit(ship).y).isWater()) {
         return out;
     }
+    // Only the ship's own nation's people: a ship of another nation may
+    // share the square (where ships come back from Europe).
     for (const int other : unitsAt(unit(ship).x, unit(ship).y)) {
-        if (!isShip(other)) {
+        if (!isShip(other) && unit(other).nation == unit(ship).nation) {
             out.push_back(other);
         }
     }
@@ -1017,6 +1019,9 @@ void Game::endTurn() {
     // from this count).
     nationCensus(human());
     kingFrigate(human(), save_.turn + 1);
+    // Read from the original: the turn of a nation begins with its
+    // immigration, then its colonies add the crosses they make.
+    immigration(human());
     // Measured: the original goes through the colonies from the last
     // founded to the first, which sets the order of its messages.
     for (std::size_t c = save_.colonies.size(); c-- > 0;) {
@@ -1029,6 +1034,15 @@ void Game::endTurn() {
         const int sonsBefore = sonsOfLibertyPercent(colony, nationEffects(save_, colony.nation).libertyExtra(true));
         NationEffects effects = nationEffects(save_, colony.nation);
         effects.customs = static_cast<NationEffects::Customs>(customsOf(static_cast<int>(c)));
+        if (colony.nation >= 0 && colony.nation < kEuropeanNations) {
+            const int crosses =
+                colonyProduction(colony, save_.map, rules_, save_.difficulty, tories, effects).produced[cargo::kCrosses];
+            if (colony.nation == human()) {
+                save_.nations[static_cast<std::size_t>(colony.nation)].crosses += crosses;
+            } else {
+                colonyCrosses_[static_cast<std::size_t>(colony.nation)] += crosses;
+            }
+        }
         const ColonyTurn turn = runColonyTurn(colony, save_.map, rules_, save_.difficulty, tories, effects);
         sellExports(turn, static_cast<int>(c));
         // Read from the original: the colony's bells go to the congress
@@ -1146,7 +1160,6 @@ void Game::endTurn() {
         rebelSentiment(n);
     }
     offerMercenaries();
-    gatherCrosses();
     repairShips();
     loseFaith();
     sailOn();
@@ -1907,23 +1920,80 @@ int Game::randomRecruit(int nation) {
     }
 }
 
-void Game::gatherCrosses() {
-    // Measured: 2 crosses a turn with no colony at all, plus what the
-    // colonies make. When they reach the number needed, one of the three
-    // on the docks comes over for free and the crosses start again at 0.
-    auto& nation = save_.nations[static_cast<std::size_t>(human())];
-    int crosses = 2;
+int Game::crossesNeeded(int nation) const {
+    // Read from the original: twice the nation's people (the colonists in
+    // its colonies and every unit it has, ships and those in Europe too)
+    // plus 8, at most 4000. A computer nation needs (8 − level) eighths of
+    // that, and the English two thirds.
+    int people = 0;
     for (const auto& colony : save_.colonies) {
-        if (colony.nation == human()) {
-            crosses += colonyProduction(colony, save_.map, rules_, save_.difficulty, true,
-                                        nationEffects(save_, colony.nation)).produced[cargo::kCrosses];
+        if (colony.nation == nation) {
+            people += colony.population;
         }
     }
-    nation.crosses += crosses;
-    if (nation.crosses < nation.crossesNeeded || nation.crossesNeeded <= 0) {
+    for (const auto& u : save_.units) {
+        people += u.nation == nation ? 1 : 0;
+    }
+    if (people < 4000) {
+        people *= 2;
+    }
+    int needed = std::min(people + 8, 4000);
+    if (nation < 0 || nation >= kEuropeanNations || save_.players[static_cast<std::size_t>(nation)].control != 0) {
+        needed = (8 - save_.difficulty) * needed >> 3;
+    }
+    if (nation == 0) {
+        needed = needed * 2 / 3;
+    }
+    return needed;
+}
+
+int Game::dockCrosses(int nation) const {
+    // Read from the original: 2 crosses a turn; but once a newcomer has
+    // come (bit 0x40 of the nation record's first byte, never cleared),
+    // everyone waiting in port makes the crosses go down instead, by 2
+    // each.
+    int crosses = 2;
+    if (nation < 0 || nation >= kEuropeanNations ||
+        (save_.nations[static_cast<std::size_t>(nation)].raw[0] & kNewcomerCame) == 0) {
+        return crosses;
+    }
+    const int port = kEuropeBase + nation + 4 * kPortStage;
+    for (const auto& u : save_.units) {
+        // The units that are people: colonists, soldiers, pioneers,
+        // missionaries, dragoons, scouts and the Continental units.
+        const bool person = u.type <= unit_type::kScout || u.type == 7 || u.type == 9;
+        if (u.nation == nation && u.x == port && person) {
+            crosses = crosses > 0 ? -2 : crosses - 2;
+        }
+    }
+    return crosses;
+}
+
+void Game::immigration(int nation) {
+    if (nation < 0 || nation >= kEuropeanNations) {
         return;
     }
-    nation.crosses = 0;
+    auto& n = save_.nations[static_cast<std::size_t>(nation)];
+    const int fromColonies = std::exchange(colonyCrosses_[static_cast<std::size_t>(nation)], 0);
+    // Read from the original: nobody comes once independence is declared.
+    if (independenceDeclared()) {
+        n.crosses += fromColonies;
+        return;
+    }
+    n.raw[0] = static_cast<std::uint8_t>(n.raw[0] & ~0x20);
+    const int needed = crossesNeeded(nation);
+    n.crossesNeeded = needed;
+    n.crosses = std::max(0, n.crosses + dockCrosses(nation));
+    const bool player = save_.players[static_cast<std::size_t>(nation)].control == 0;
+    // Read from the original: more crosses than needed bring someone.
+    if (n.crosses > needed) {
+        immigrate(nation, player);
+    }
+    n.crosses += fromColonies;
+}
+
+void Game::immigrate(int nation, bool player) {
+    auto& n = save_.nations[static_cast<std::size_t>(nation)];
     // Read from the original: a newcomer makes the next tune a cheerful
     // one (at once without Background Music).
     std::vector<MusicCue> music{{MusicCue::Kind::SetMood, 2}};
@@ -1932,24 +2002,35 @@ void Game::gatherCrosses() {
     }
     // Read from the original: with William Brewster the player chooses
     // which of the three comes (RECRUITCHOOSE), without the news of unrest.
+    // (What a computer nation does with him is not known: it takes one by
+    // chance, like the others.)
     constexpr int kBrewster = 20;
-    if (hasFather(human(), kBrewster)) {
+    if (player && hasFather(nation, kBrewster)) {
+        // The crosses go back to 0 when the player has chosen; the box
+        // comes at once in the original.
+        n.crosses = 0;
         GameNotice choose{"RECRUITCHOOSE", {}};
         choose.music = std::move(music);
         notices_.push_back(std::move(choose));
         return;
     }
+    n.crosses = 0;
     // Guess: which of the three comes is chance (the original took the
     // second in the one case measured).
     random_ = random_ == 0 ? static_cast<std::uint32_t>(save_.turn * 7919 + 17) | 1U : random_;
     random_ = random_ * 1103515245U + 12345U;
     const auto slot = static_cast<std::size_t>((random_ >> 16) % 3U);
-    const int profession = nation.recruits[slot];
-    addUnitInEurope(professionUnitType(profession), profession);
-    nation.recruits[slot] = randomRecruit(human());
-    GameNotice unrest{"UNREST", {}, profession};
-    unrest.music = std::move(music);
-    notices_.push_back(std::move(unrest));
+    const int profession = n.recruits[slot];
+    n.recruits[slot] = randomRecruit(nation);
+    if (addUnitInEurope(professionUnitType(profession), profession, nation) < 0) {
+        return;
+    }
+    if (player) {
+        GameNotice unrest{"UNREST", {}, profession};
+        unrest.music = std::move(music);
+        notices_.push_back(std::move(unrest));
+    }
+    n.raw[0] = static_cast<std::uint8_t>(n.raw[0] | kNewcomerCame);
 }
 
 int Game::recruit(int slot) {
@@ -1957,7 +2038,7 @@ int Game::recruit(int slot) {
     if (slot < 0 || slot >= static_cast<int>(nation.recruits.size())) {
         return -1;
     }
-    const int price = recruitPrice(nation);
+    const int price = recruitPrice(nation, save_.difficulty);
     if (nation.gold < price) {
         return -1;
     }

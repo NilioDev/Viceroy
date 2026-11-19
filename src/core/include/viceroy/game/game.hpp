@@ -438,6 +438,12 @@ public:
     // Ends the human's turn: everyone gets their moves back, and the
     // calendar moves on (one turn a year until 1600, then spring and autumn).
     void endTurn();
+    // Immigration at the start of a nation's turn (the player's at the end
+    // of the turn, before its colonies): the crosses needed are worked out
+    // again, the nation's own crosses added, and a newcomer comes when
+    // there are more than needed. See docs/rules/europe.md.
+    void immigration(int nation);
+    int crossesNeeded(int nation) const;
     // What happened in the human's colonies at the last end of turn.
     const std::vector<std::string>& lastTurnNews() const { return lastTurnNews_; }
     // Message boxes for the player that came up since the last call: a
@@ -1111,7 +1117,12 @@ private:
     int routeTerrainCost(int x, int y) const;
     bool routeOneMove() const;
     int randomRecruit(int nation);
-    void gatherCrosses(); // immigration at the end of the turn
+    int dockCrosses(int nation) const;
+    void immigrate(int nation, bool player);
+    static constexpr std::uint8_t kNewcomerCame = 0x40; // byte 0 of the nation record
+    // Crosses the computer's colonies made this turn, added after their
+    // nation's immigration (as the original adds them with the colonies).
+    std::array<int, kEuropeanNations> colonyCrosses_{};
     // What the computer's nations plan with, kept in memory only, as the
     // original keeps it.
     struct EuroAiState {

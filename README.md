@@ -63,7 +63,9 @@ touch controls.
 > muskets, tools or horses (or sell their gear), and bless them as
 > missionaries. Crosses made in your colonies and churches
 > bring colonists over from the docks for free (with William Brewster you
-> choose who comes). Liberty bells win colonists
+> choose who comes); the more people you have, the more crosses the next
+> one takes, and people left waiting on the docks hold the next one back.
+> The computer nations get their newcomers the same way. Liberty bells win colonists
 > for the Sons of Liberty: at 50% and 100% membership a colony works
 > better, and too many tories slow it down. Soldiers, dragoons and
 > artillery can attack the other nations' units and colonies on the map,

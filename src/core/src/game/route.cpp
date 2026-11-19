@@ -496,7 +496,12 @@ bool Game::routeCoarse(int x0, int y0, int x1, int y1) {
     const int sby = r.targetY;
     r.startBlockX = sbx;
     r.startBlockY = sby;
-    routeBlock(x1, y1, ship); // when it fails the start's block stays
+    // When the goal's block is not found the start's block stays (the
+    // search itself uses the target for squares, so it is put back).
+    if (!routeBlock(x1, y1, ship)) {
+        r.targetX = sbx;
+        r.targetY = sby;
+    }
     const int tbx = r.targetX;
     const int tby = r.targetY;
     std::array<std::uint8_t, kBlocksAcross * kBlocksDown> steps{};

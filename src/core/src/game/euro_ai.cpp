@@ -1064,6 +1064,7 @@ void Game::europeanTurn(int n) {
     kingTax(n, save_.turn, save_.year);
     nationCensus(n);
     kingFrigate(n, save_.turn);
+    immigration(n);
     aiTallies(n);
     aiRelations(n);
     aiEurope(n);

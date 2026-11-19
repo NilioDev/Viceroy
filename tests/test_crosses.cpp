@@ -49,22 +49,75 @@ VCR_TEST("crosses: two a turn without a colony") {
     VCR_CHECK(g.takeNotices().empty());
 }
 
-VCR_TEST("crosses: enough crosses bring a colonist from the docks") {
+VCR_TEST("crosses: more crosses than needed bring a colonist from the docks") {
+    // Nobody at all: 2 × 0 + 8 = 8 crosses are needed, and 9 is more.
     Game g = crossGame(7, 9);
     g.endTurn();
     const auto& dutch = g.state().nations[3];
     VCR_CHECK(dutch.crosses == 0);
-    VCR_CHECK(dutch.crossesNeeded == 9);
+    VCR_CHECK(dutch.crossesNeeded == 8);
     VCR_CHECK(g.unitCount() == 1);
+    VCR_CHECK((dutch.raw[0] & 0x40) != 0); // someone has come
     const auto notices = g.takeNotices();
     VCR_CHECK(notices.size() == 1 && notices[0].section == "UNREST" && notices[0].value == 0x1C);
+    // Exactly the number needed is not enough.
+    Game h = crossGame(6, 0);
+    h.endTurn();
+    VCR_CHECK(h.unitCount() == 0 && h.state().nations[3].crosses == 8);
 }
 
-VCR_TEST("crosses: nothing comes while the number needed is unknown") {
-    Game g = crossGame(50, 0);
+VCR_TEST("crosses: the number needed follows the nation's people, as in the original") {
+    // Read from the original: 2 × (colonists in colonies + units) + 8; a
+    // computer nation (8 - level) eighths of it, the English two thirds.
+    Game g = crossGame(0, 0);
+    auto& s = g.state();
+    s.colonies.resize(1);
+    s.colonies[0].nation = 3;
+    s.colonies[0].population = 5;
+    s.units.resize(4);
+    for (auto& u : s.units) {
+        u.nation = 3;
+        u.x = 1;
+        u.y = 1;
+    }
+    VCR_CHECK(g.crossesNeeded(3) == 2 * (5 + 4) + 8);
+    s.players[3].control = 1;
+    s.difficulty = 2;
+    VCR_CHECK(g.crossesNeeded(3) == 26 * 6 / 8);
+    s.players[0].control = 1;
+    for (auto& u : s.units) {
+        u.nation = 0;
+    }
+    s.colonies[0].nation = 0;
+    VCR_CHECK(g.crossesNeeded(0) == 26 * 6 / 8 * 2 / 3);
+    // The saves of the original agree: 98 colonists and 40 units need 284.
+}
+
+VCR_TEST("crosses: people waiting on the docks hold immigration back") {
+    // Once someone has come, each person in port takes 2 crosses a turn
+    // instead of the 2 the nation gathers.
+    Game g = crossGame(10, 0);
+    g.endTurn(); // 12 > 8: a colonist comes and waits on the docks
+    VCR_CHECK(g.unitCount() == 1 && g.state().nations[3].crosses == 0);
+    g.state().nations[3].crosses = 5;
     g.endTurn();
-    VCR_CHECK(g.unitCount() == 0);
-    VCR_CHECK(g.state().nations[3].crosses == 52);
+    VCR_CHECK(g.state().nations[3].crosses == 3);
+    g.endTurn();
+    g.endTurn();
+    VCR_CHECK(g.state().nations[3].crosses == 0); // not below nothing
+    VCR_CHECK(g.unitCount() == 1);
+}
+
+VCR_TEST("crosses: computer nations get newcomers too") {
+    Game g = crossGame(0, 0);
+    auto& s = g.state();
+    s.players[1].control = 1;
+    s.nations[1].crosses = 20;
+    s.nations[1].recruits = {0x1C, 0x1C, 0x1C};
+    g.immigration(1);
+    VCR_CHECK(g.unitCount() == 1 && g.unit(0).nation == 1);
+    VCR_CHECK(s.nations[1].crosses == 0 && s.nations[1].crossesNeeded == 8);
+    VCR_CHECK(g.takeNotices().empty()); // the player hears nothing of it
 }
 
 VCR_TEST("docks: who comes next follows the original's draw") {
