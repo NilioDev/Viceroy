@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.22)
 
 project(Viceroy
-    VERSION 0.0.1
+    VERSION 0.1.0
     DESCRIPTION "Clean-room engine that plays the 1994 colonial strategy game from your own files"
     LANGUAGES C CXX)
 

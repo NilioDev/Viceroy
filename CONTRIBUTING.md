@@ -54,3 +54,12 @@ linked in (`-DVCR_USE_SYSTEM_SDL3=OFF`) into
 `out/Viceroy-<version>-linux-<arch>.AppImage`. CI makes one on every run
 (artifact `Viceroy-Linux-AppImage`). The icon in `packaging/linux` is our own
 art.
+
+## Making a release
+
+`.github/workflows/release.yml` builds Linux (AppImage), Windows and macOS
+packages and puts them on a GitHub release. Set `VERSION` in
+`CMakeLists.txt`, merge that to `main`, then either push a tag `v<version>`
+or run the *Release* workflow by hand from the Actions tab with that tag. The
+workflow stops if the tag and `VERSION` differ. Releases are marked as
+pre-releases for now.
