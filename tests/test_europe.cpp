@@ -288,6 +288,11 @@ VCR_TEST("europe: recruit prices as measured on the original") {
         n.crossesNeeded = c.needed;
         VCR_CHECK(recruitPrice(n) == c.price);
     }
+    // Read from the original: the level counts like recruits so far.
+    n.recruitCount = 0;
+    n.crosses = 0;
+    VCR_CHECK(recruitPrice(n, 2) == 180);
+    VCR_CHECK(recruitPrice(n, 4) == 220);
     n.artilleryBought = 8;
     VCR_CHECK(artilleryPrice(n) == 1300);
 }

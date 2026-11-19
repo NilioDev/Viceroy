@@ -358,3 +358,20 @@ VCR_TEST("ships: a fort fires on enemy ships beside the colony") {
     // 8 against 8: about half the time.
     VCR_CHECK(damaged > 8 && damaged < 32);
 }
+
+VCR_TEST("ships: a ship takes only its own nation's people along") {
+    // Where ships come back from Europe two nations' ships may share a
+    // square; found by a long play session.
+    SaveGame s = shipSave();
+    SaveUnit french;
+    french.x = 2;
+    french.y = 2;
+    french.type = unit_type::kCaravel;
+    french.nation = 1;
+    s.units.push_back(french); // 2
+    Game g(std::move(s), boardingRules());
+    VCR_CHECK(g.passengers(2).empty());
+    VCR_CHECK(g.passengers(0) == std::vector<int>{1});
+    VCR_CHECK(g.move(2, {0, 1}) == MoveResult::Moved);
+    VCR_CHECK(g.unit(2).y == 3 && g.unit(1).x == 2 && g.unit(1).y == 2);
+}

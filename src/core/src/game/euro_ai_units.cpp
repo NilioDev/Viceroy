@@ -2163,8 +2163,10 @@ int Game::aiDecide(int n, int i) {
         }
         // Cargo: deliver, fetch, or go home.
         const auto& u = U();
-        const bool empty = u.holds == 0 && others == 0;
-        if (empty && maxKind < 0 && boardOK && !goalTIShip && ai_.inPort[un] > ai_.homeward[un]) {
+        // Read from the original: a ship with nobody else aboard and no goods
+        // for the colonies (it may carry goods to sell) sails for Europe
+        // when more people wait on the docks than ships are on the way.
+        if (others == 0 && maxKind < 0 && boardOK && !goalTIShip && ai_.inPort[un] > ai_.homeward[un]) {
             aiToEurope(i);
             return finish();
         }
@@ -2265,8 +2267,13 @@ int Game::aiDecide(int n, int i) {
                 setHold(v, h, 0, 0);
             }
             v.holds = 0;
+        } else if (u.holds > 0 && !goalTIShip && (u.holds == capacity || u.holds > 1)) {
+            // Read from the original: goods to sell, full or in more than
+            // one hold, go to Europe.
+            aiToEurope(i);
+            return finish();
         }
-        if (U().holds == 0 && others == 0 && !goalTIShip && (shipOK || boardOK)) {
+        if (others == 0 && !goalTIShip && (shipOK || boardOK)) {
             int best = -1;
             int pick = -1;
             for (std::size_t e = 0; e < ai_.pickups.size(); ++e) {
@@ -2302,7 +2309,7 @@ int Game::aiDecide(int n, int i) {
         if (goalTIShip) {
             return finish();
         }
-        if (U().holds == 0 && others == 0 && boardOK) {
+        if (others == 0 && maxKind < 0 && boardOK) {
             if ((U().raw[kFlags] & 0x20) != 0 || ((i + save_.turn) & 31) == 0) {
                 aiToEurope(i);
                 return finish();

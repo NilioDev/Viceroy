@@ -102,22 +102,30 @@ Both were compared pixel for pixel with the original.
 
 ## Crosses and immigration
 
-Measured by ending turns in the original with changed saves.
+Read from the original. Every European nation, the computer's too, has its
+immigration at the start of its turn, before its colonies:
 
-- The nation gathers 2 crosses a turn (byte 46) even without a colony, plus
-  what its colonies make: every colony makes 1 cross, and 1 more for each
-  level of its church.
-- When the crosses reach the number needed (byte 48) one of the three people
-  on the docks (bytes 2 to 4) comes over for free, the crosses go back to 0
-  and someone new takes the empty place. Which of the three comes is a guess
-  (chance); the original took the second in the one case measured.
+- The crosses needed (byte 48) are worked out again each time: twice the
+  nation's people, that is the colonists in its colonies and every unit it
+  has (ships and those in Europe too), plus 8, at most 4000. A computer
+  nation needs (8 − level) eighths of that, and the English two thirds of
+  what the others do. The saves agree: 98 colonists and 40 units need 284.
+- The nation gathers 2 crosses (byte 46). But once someone has come (bit
+  0x40 of the nation record's first byte, which stays set), each person
+  waiting in port (colonists, soldiers, pioneers, missionaries, dragoons,
+  scouts and the Continental units on the docks or aboard a ship there)
+  takes 2 crosses away instead; the crosses never go below 0.
+- With more crosses than needed one of the three people on the docks
+  (bytes 2 to 4) comes over for free, the crosses go back to 0 and someone
+  new takes the empty place. Which of the three comes is a guess (chance);
+  the original took the second in the one case measured.
+- Then the colonies add what they make: every colony makes 1 cross, and 1
+  more for each level of its church.
+- Nobody comes once independence is declared.
 - With William Brewster the player chooses which of the three comes
   (`@RECRUITCHOOSE`, the religious adviser's box with the home port), and
-  there is no `@UNREST` news. Read from the original.
-- The number needed does not change when someone comes. It is a running
-  value the original moves in other ways (it was 2 lower after an artillery
-  was lost, and the English need 2/3 of what the others do); the rule for
-  it is not known, so Viceroy keeps the save's number.
+  there is no `@UNREST` news. Read from the original. What a computer
+  nation does with him is not known; Viceroy lets chance choose for it.
 - The religious adviser tells you in `@UNREST`: %COUNTRY is the nation's
   name ("the Netherlands"), STRING0 the home port and STRING1 the expert
   name of whoever came. The box is centred across the screen and its top
@@ -137,15 +145,14 @@ original then asks (43 readings).
 
 - **Recruit** offers the three people waiting at bytes 2 to 4 of the nation
   record, named by the plural column of `@JOB` (profession 0x1C, a free
-  colonist, uses the Colonist row), after "(None)". The passage costs
-  140 + 20 × the recruits so far (byte 6) with no crosses. As crosses
-  (byte 46) gather towards those needed (byte 48) the price falls in a
-  straight line: price = full − ⌊K × crosses / needed⌋ with
-  K = min(0.99 × (full − 100), 0.79253 × full). This fits 36 of the 39
-  readings exactly and the rest within two gold; the exact rule is not
-  known. After a recruit the count goes up by one and the crosses go back
-  to 0 (the next price was the full one). The recruit's place is taken by
-  someone new (see below).
+  colonist, uses the Colonist row), after "(None)". Read from the original:
+  the passage costs 20 × (recruits so far (byte 6) + difficulty level + 7)
+  with no crosses. As crosses (byte 46) gather it falls towards a floor of
+  a fifth of that, but at least 100: price = full − ⌊(full − floor) ×
+  crosses / (needed + 1)⌋, never below 10. This gives all the 39 prices
+  measured earlier. After a recruit the count goes up by one and the
+  crosses go back to 0 (the next price was the full one). The recruit's
+  place is taken by someone new (see below).
 - **Who comes next** (read from the original with a debugger). Let
   c = ⌊(L + 3) / 2⌋, with L the difficulty level (0 to 4) for the player and 1
   for a computer nation. A roll of 1 to 15 at most c brings a petty criminal,
