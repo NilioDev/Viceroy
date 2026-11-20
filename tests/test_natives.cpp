@@ -1414,3 +1414,25 @@ VCR_TEST("original files: a unit that is gone leaves no unit mark on its square"
     game.establishMission(missionary, kVillage);
     VCR_CHECK((game.state().map.at(village.x - 1, village.y).flags & MapSquare::kHasUnit) == 0);
 }
+
+VCR_TEST("original files: a village in the arctic wants no tools (a 16-bit shift)") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
+    SaveGame save = readSaveGame(Bytes(std::istreambuf_iterator<char>(in), {}));
+    save.colonies.clear();
+    constexpr int kVillage = 15, kArcticTerrain = 24, kTools = 14;
+    const auto& village = save.settlements[kVillage];
+    for (int y = village.y - 2; y <= village.y + 2; ++y) {
+        for (int x = village.x - 2; x <= village.x + 2; ++x) {
+            auto& sq = save.map.at(x, y);
+            sq.terrain = kArcticTerrain;
+            sq.relief = 0;
+        }
+    }
+    // 25 arctic squares count 100, so the tools are shifted by 51: the
+    // original's CPU takes that as 19, and all bits fall out of 16.
+    VCR_CHECK(villageEconomy(save, kVillage).wants[kTools] == 0);
+}

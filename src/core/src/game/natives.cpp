@@ -366,7 +366,10 @@ VillageEconomy villageEconomy(const SaveGame& save, int settlement) {
     A[kCoats] = 8 * arctic + B[kFurs];
     A[kRum] = 2 * (2 * (2 * level + n) + food);
     A[kTradeGoods] = (level + 2) * (n + 3) + 8;
-    A[kTools] = static_cast<std::int16_t>((level * n) << ((arctic >> 1) + 1));
+    // A 16-bit shift as the original's CPU does it: the count is taken
+    // modulo 32, and anything shifted past bit 15 is lost.
+    const unsigned toolShift = static_cast<unsigned>((arctic >> 1) + 1) & 31U;
+    A[kTools] = static_cast<std::int16_t>(static_cast<std::uint16_t>(static_cast<std::uint32_t>(level * n) << toolShift));
     A[kMuskets] = 4 * ((7 - (t ? signedByte(t[7]) : 0)) - level);
     B[kHorses] = divide(t ? word(t + 0x0A) : 0, (settlementsOfTribe >> 1) + 1);
     A[kHorses] = 4 * ((9 - (t ? signedByte(t[8]) : 0)) - level);
