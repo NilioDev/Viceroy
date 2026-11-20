@@ -1379,3 +1379,38 @@ VCR_TEST("original files: braves visit colonies and wagon trains (read from the 
     VCR_CHECK(begged && gifts && food && converts);
     VCR_CHECK(demanded && refused && spoke && wagons && spain);
 }
+
+VCR_TEST("original files: a unit that is gone leaves no unit mark on its square") {
+    const std::filesystem::path dir = VICEROY_GAMEDATA_DIR;
+    if (!isGameFolder(dir)) {
+        VCR_SKIP("no game files in gamedata/");
+    }
+    const Art art = loadArt(dir);
+    std::ifstream in(*findFileNoCase(dir, "COLONY00.SAV"), std::ios::binary);
+    SaveGame save = readSaveGame(Bytes(std::istreambuf_iterator<char>(in), {}));
+    constexpr int kDutch = 3, kVillage = 15;
+    const auto& village = save.settlements[kVillage];
+    int missionary = -1;
+    for (std::size_t i = 0; i < save.units.size(); ++i) {
+        if (save.units[i].nation == kDutch && save.units[i].type == 0) {
+            missionary = static_cast<int>(i);
+            break;
+        }
+    }
+    auto& u = save.units[static_cast<std::size_t>(missionary)];
+    u.type = 3;
+    u.profession = 0x1C;
+    u.x = village.x - 1;
+    u.y = village.y;
+    for (auto& o : save.units) {
+        if (&o != &u && o.x == u.x && o.y == u.y) {
+            o.x = 0; // somewhere else, at the map's edge
+            o.y = 0;
+        }
+    }
+    auto& square = save.map.at(u.x, u.y);
+    square.flags = static_cast<std::uint8_t>(square.flags | MapSquare::kHasUnit);
+    Game game(save, art.rules);
+    game.establishMission(missionary, kVillage);
+    VCR_CHECK((game.state().map.at(village.x - 1, village.y).flags & MapSquare::kHasUnit) == 0);
+}
