@@ -2180,6 +2180,8 @@ void Game::removeUnit(int index) {
         fix(u.prevInTransport);
     }
     fix(save_.activeUnit);
+    // The square it stood on keeps its unit mark only if others are left.
+    refreshUnitFlags();
 }
 
 } // namespace viceroy
